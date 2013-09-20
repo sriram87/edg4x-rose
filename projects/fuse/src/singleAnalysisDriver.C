@@ -1,0 +1,39 @@
+/*****************************************
+ * author: Sriram Aananthakrishnan, 2013 *
+ *****************************************/
+
+// quick way to set up the composer andtest individual analysis
+
+#include "sage3basic.h"
+#include "compose.h"
+#include "backwardSlicingAnalysis.h"
+#include <iostream>
+
+using namespace std;
+using namespace fuse;
+
+int main(int argc, char** argv)
+{
+  printf("========== S T A R T ==========\n");
+    // Run the front end
+  SgProject* project = frontend(argc, argv);
+  //generatePDF(*project);
+  cout << "Frontend done\n";
+
+  SliceCriterions sliceCriterions;
+  std::vector<SgReturnStmt*> stmtsOfInterest = SageInterface::querySubTree<SgReturnStmt>(project);
+  std::vector<SgReturnStmt*>::iterator it;
+  for(it = stmtsOfInterest.begin(); it != stmtsOfInterest.end(); ++it) {
+    sliceCriterions.addSlicingCriterionFromStmt(*it);
+  }
+
+  std::list<ComposedAnalysis*> analyses;
+  analyses.push_back(new BackwardSlicingAnalysis(sliceCriterions));
+  checkDataflowInfoPass* cdip = new checkDataflowInfoPass();
+  ChainComposer cc(analyses, cdip, true);
+  cc.runAnalysis();
+  printf("==========  E  N  D  ==========\n");
+
+  return 0;
+}
+

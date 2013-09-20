@@ -1,10 +1,14 @@
 include $(top_srcdir)/config/Makefile.for.ROSE.includes.and.libs
 
-bin_PROGRAMS = fuse
+bin_PROGRAMS = fuse singleAnalysisDriver
 
 fuse_CXXFLAGS =
 fuse_LDADD = -lrose
 fuse_LDFLAGS = $(ROSE_LIBS) $(LIBS_WITH_RPATH)
+
+singleAnalysisDriver_CXXFLAGS =
+singleAnalysisDriver_LDADD = -lrose
+singleAnalysisDriver_LDFLAGS = $(ROSE_LIBS) $(LIBS_WITH_RPATH)
 
 INCLUDES = \
 	$(ROSE_INCLUDES) \
@@ -36,6 +40,7 @@ fuse_SOURCES = \
 	dbglog/widgets.C \
 	dbglog/widgets/ats_graph.C \
 	lattice/lattice.C \
+	simpleAnalyses/backwardSlicingAnalysis.C \
 	simpleAnalyses/call_context_sensitivity_analysis.C \
 	simpleAnalyses/const_prop_analysis.C \
 	simpleAnalyses/dead_path_elim_analysis.C \
@@ -47,6 +52,32 @@ fuse_SOURCES = \
 	simpleAnalyses/taintAnalysis.C \
 	state/nodeState.C \
 	compositionalTestAnalysis.C
+
+singleAnalysisDriver_SOURCES = \
+	analysis/abstract_object.C \
+	analysis/abstract_object_map.C \
+	analysis/abstract_object_set.C \
+	analysis/analysis.C \
+	analysis/analysis_tester.C \
+	analysis/compose.C \
+	analysis/composed_analysis.C \
+	analysis/factor_trans_system.C \
+	analysis/graphIterator.C \
+	analysis/partitions.C \
+	analysis/stx_analysis.C \
+	cfgUtils/CallGraphTraverse.C \
+	cfgUtils/cfgUtils.C \
+	cfgUtils/DataflowCFG.C \
+	cfgUtils/VirtualCFGIterator.C \
+	dbglog/dbglog.C \
+	dbglog/widgets.C \
+	dbglog/widgets/ats_graph.C \
+	lattice/lattice.C \
+	simpleAnalyses/backwardSlicingAnalysis.C \
+	simpleAnalyses/saveDotAnalysis.C \
+	state/nodeState.C \
+	singleAnalysisDriver.C
+
 
 include_HEADERS =\
 	analysis/abstract_object.h \
@@ -71,6 +102,7 @@ include_HEADERS =\
 	dbglog/widgets/ats_graph.h \
 	lattice/lattice.h \
 	lattice/latticeFull.h \
+	simpleAnalyses/backwardSlicingAnalysis.h \
 	simpleAnalyses/call_context_sensitivity_analysis.h \
 	simpleAnalyses/const_prop_analysis.h \
 	simpleAnalyses/dead_path_elim_analysis.h \

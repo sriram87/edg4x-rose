@@ -7,20 +7,24 @@
 using namespace dbglog;
 
 namespace fuse {
+
+  int backwardSlicingDebugLevel = 2;
+
   /*******************
    * SliceCriterions *
    *******************/
-  SliceCriterions::SlicingCriterion SliceCriterions::buildSlicingCriterionFromStmt(SgStatement* stmt) {
+  SliceCriterionsList::SliceCriterion
+  SliceCriterionsList::buildSliceCriterionFromStmt(SgStatement* stmt) {
     std::vector<SgVarRefExp*> varRefExps = SageInterface::querySubTree<SgVarRefExp>(stmt);
-    SliceCriterions::SlicingCriterion sc;
+    SliceCriterionsList::SliceCriterion sc;
     sc.first = stmt;
     sc.second.insert(varRefExps.begin(), varRefExps.end());
     return sc;
   }
 
-  std::string SliceCriterions::str() {
+  std::string SliceCriterionsList::str() {
     std::ostringstream oss;
-    std::vector<SlicingCriterion>::iterator it = sliceCriterions.begin();
+    std::vector<SliceCriterion>::iterator it = sliceCriterions.begin();
     std::set<SgVarRefExp*>::iterator sit;
     for( ; it != sliceCriterions.end(); ++it) {
       oss << "[<SgStatement=" << (*it).first->unparseToString() << ", ";
@@ -68,6 +72,7 @@ namespace fuse {
   // union the two sets
   bool BackwardSlicingLattice::meetUpdate(Lattice* that) {
     bool modified = false;
+    scope reg("BackwardSlicingLattice::meetUpdate", scope::medium, 2, backwardSlicingDebugLevel);
     try {
       BackwardSlicingLattice* bsl = dynamic_cast<BackwardSlicingLattice*>(that);      
       // if this lattice is full, nothing is updated
@@ -81,15 +86,20 @@ namespace fuse {
       }
       // union the relevantML set
       modified = relevantMLSet->meetUpdate(bsl->relevantMLSet);
+
       // union the relevantCFGNSet
       unsigned int size_b = relevantCFGNSet.size();
-      relevantCFGNSet.insert(bsl->relevantCFGNSet.begin(), relevantCFGNSet.end());
+      relevantCFGNSet.insert(bsl->relevantCFGNSet.begin(), bsl->relevantCFGNSet.end());
       unsigned int size_a = relevantCFGNSet.size();
       modified = modified || (size_b != size_a);
     }
     catch(std::bad_cast& bc) {
       dbg << "BackwardSlicingLattice::meetUpdate(Lattice*): " << bc.what() << "\n";
       ROSE_ASSERT(false);
+    }
+    if(backwardSlicingDebugLevel >=2 ) {
+      dbg << "After meetUpdate: bsl= " << str("") << std::endl;
+      dbg << "modified=" << modified << std::endl;
     }
     return modified;
   }
@@ -155,7 +165,7 @@ namespace fuse {
     std::ostringstream oss;
     oss << "BackwardSlicingLattice@";
     oss << "pedge=" << pedge->str() << std::endl;
-    oss << "relevantMLSet=" << relevantMLSet->str(indent);
+    oss << "relevantMLSet=" << relevantMLSet->str(indent) << std::endl;
     oss << "relevantCFGNset=[";
     for(std::set<SgNode*>::iterator it = relevantCFGNSet.begin();
         it != relevantCFGNSet.end(); ) {
@@ -178,21 +188,38 @@ namespace fuse {
   void BackwardSlicingAnalysis::genInitLattice(PartPtr part, 
                                                PartEdgePtr pedge,
                                                std::vector<Lattice*>& initLattices) {
-    // use the slicing criterion to initialize the BackwardSlicingLattice
-    std::vector<SliceCriterions::SlicingCriterion> allSliceCriterions = sc.getSlicingCriterions();
-    std::vector<SliceCriterions::SlicingCriterion>::iterator sc_it;
+    // set the scope for debugging
+    scope reg("BackwardSlicingAnalysis::genInitLattice", scope::medium, 2, backwardSlicingDebugLevel);
+
     std::set<SgNode*> relevantCFGNSet;
     AbstractObjectSet aos(pedge,
                           composer,
                           this,                          
                           AbstractObjectSet::may);
-    for(sc_it = allSliceCriterions.begin(); sc_it != allSliceCriterions.end(); ++sc_it) {
-      SgStatement* stmt = (*sc_it).first;
-      std::set<SgVarRefExp*> varRefExpsSet = (*sc_it).second;
-      relevantCFGNSet.insert(stmt);
-      // TODO: insert ML corresponding to SgVarRefExp
+    // get the set of CFGNodes at this part
+    const std::set<CFGNode>& CFGNodesAtThisPart = part->CFGNodes();
+
+    // iterate of the slice criterion list and check if CFGNode of the stmt
+    // is in this part
+    const std::vector<SliceCriterionsList::SliceCriterion>& scList = sc.getSliceCriterions();
+    std::vector<SliceCriterionsList::SliceCriterion>::const_iterator scIt = scList.begin();
+    for( ; scIt != scList.end(); ++scIt) {
+      SgStatement* stmt = (*scIt).first;
+      CFGNode stmtCFGNode = stmt->cfgForEnd();
+      if(CFGNodesAtThisPart.find(stmtCFGNode) != CFGNodesAtThisPart.end()) {
+        // create slicing constraints for this part
+        relevantCFGNSet.insert(stmtCFGNode.getNode());
+        std::set<SgVarRefExp*> varRefExpSet = (*scIt).second;
+        std::set<SgVarRefExp*>::iterator vresIt = varRefExpSet.begin();
+        for( ; vresIt != varRefExpSet.end(); ++ vresIt) {
+          MemLocObjectPtr mlop = composer->Expr2MemLoc(*vresIt, part->inEdgeFromAny(), this);
+          aos.insert(mlop);
+        }
+      }
     }
+    
     BackwardSlicingLattice* bsl = new BackwardSlicingLattice(pedge, aos, relevantCFGNSet);
+    dbg << "pedge= " << pedge->str("") << ", bsl=" << bsl->str("") << std::endl;
     initLattices.push_back(bsl);
   }
 
@@ -207,7 +234,6 @@ namespace fuse {
   void BackwardSlicingTransfer::visit(SgAssignOp* sgn) {
   }
 
-  void BackwardSlicingTransfer::visit(SgNode* sgn) {
-    std::cout << "spinning\n";
+  void BackwardSlicingTransfer::visit(SgNode* sgn) {   
   }
 }; // end namespace

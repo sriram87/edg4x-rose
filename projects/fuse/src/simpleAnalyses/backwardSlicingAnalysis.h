@@ -9,35 +9,38 @@
 #include "abstract_object_set.h"
 
 namespace fuse {
+
+  extern int backwardSlicingDebugLevel;
+
   /*******************
    * SliceCriterions *
    *******************/
   //! class to specify the criterion for slicing
   //! criterions are specified using pair<SgStatement*, list<SgVarRefExp> > 
-  class SliceCriterions
+  class SliceCriterionsList
   {
   public:
-    typedef std::pair<SgStatement*, std::set<SgVarRefExp*> > SlicingCriterion;
+    typedef std::pair<SgStatement*, std::set<SgVarRefExp*> > SliceCriterion;;
   private:
-    std::vector<SlicingCriterion> sliceCriterions;
+    std::vector<SliceCriterion> sliceCriterions;
   public:
-    SliceCriterions() { }
-    void addSlicingCriterion(SlicingCriterion sc) {
+    SliceCriterionsList() { }
+    void addSliceCriterion(SliceCriterion sc) {
       sliceCriterions.push_back(sc);
     }
-    std::vector<SlicingCriterion> getSlicingCriterions() {
+    std::vector<SliceCriterion> getSliceCriterions() {
       return sliceCriterions;
     }
 
   private:
     // internal helper method to build slicing criterion
-    SlicingCriterion buildSlicingCriterionFromStmt(SgStatement* stmt);
+    SliceCriterion buildSliceCriterionFromStmt(SgStatement* stmt);
 
   public:
     //! interface method to build and add slicing criterion from a SgStatement
-    void addSlicingCriterionFromStmt(SgStatement* stmt) {
-      SlicingCriterion sc = buildSlicingCriterionFromStmt(stmt);
-      addSlicingCriterion(sc);
+    void addSliceCriterionFromStmt(SgStatement* stmt) {
+      SliceCriterion sc = buildSliceCriterionFromStmt(stmt);
+      addSliceCriterion(sc);
     }
 
     //! stringfy the constraints
@@ -89,9 +92,9 @@ namespace fuse {
    ***************************/
   class BackwardSlicingAnalysis : public BWDataflow
   {
-    SliceCriterions& sc;
+    SliceCriterionsList& sc;
   public:
-    BackwardSlicingAnalysis(SliceCriterions& _sc) : sc(_sc) { }
+    BackwardSlicingAnalysis(SliceCriterionsList& _sc) : sc(_sc) { }
     // intra-procedural analysis initializes the edges of
     // starting parts by calling this function
     // bw: pedge : part->outEdgeToAny

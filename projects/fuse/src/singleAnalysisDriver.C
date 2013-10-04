@@ -20,11 +20,11 @@ int main(int argc, char** argv)
   //generatePDF(*project);
   cout << "Frontend done\n";
 
-  SliceCriterions sliceCriterions;
+  SliceCriterionsList sliceCriterions;
   std::vector<SgReturnStmt*> stmtsOfInterest = SageInterface::querySubTree<SgReturnStmt>(project);
   std::vector<SgReturnStmt*>::iterator it;
   for(it = stmtsOfInterest.begin(); it != stmtsOfInterest.end(); ++it) {
-    sliceCriterions.addSlicingCriterionFromStmt(*it);
+    sliceCriterions.addSliceCriterionFromStmt(*it);
   }
 
   std::list<ComposedAnalysis*> analyses;

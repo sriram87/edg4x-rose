@@ -73,6 +73,30 @@ namespace fuse {
       relevantCFGNSetIsFull(false) { 
       relevantMLSet = new AbstractObjectSet(_relevantMLSet);
     }
+
+    // insert ML into relevantMLSet
+    // helper method for transfer functions
+    bool insertRelevantML(MemLocObjectPtr mlp) {
+      return relevantMLSet->insert(boost::dynamic_pointer_cast<AbstractObject>(mlp));
+    }
+
+    // insert CFGN into relevantCFGNSet
+    // helper method for transfer functions
+    bool insertRelevantCFGN(CFGNode cfgn) {
+      typedef std::set<SgNode*>::iterator CFGNIterator;
+      std::pair<CFGNIterator, bool> rv = relevantCFGNSet.insert(cfgn.getNode());
+      return rv.second;
+    }
+   
+    AbstractObjectSet& getRelevantMLSet() {
+      return *relevantMLSet;
+    }
+
+    std::set<SgNode*>& getRelevantCFGNSet() {
+      return relevantCFGNSet;
+    }
+
+    // lattice operators
     void initialize();
     Lattice* copy() const;
     void copy(Lattice* that);
@@ -83,6 +107,7 @@ namespace fuse {
     bool setMLValueToFull(MemLocObjectPtr ml);
     bool isFull();
     bool isEmpty();
+    std::string relevantCFGNSetToStr(std::set<SgNode*>& relevantCFGNSet);
     std::string strp(PartEdgePtr pedge, std::string indent);
     std::string str(std::string indent);
   };
@@ -95,12 +120,19 @@ namespace fuse {
     SliceCriterionsList& sc;
   public:
     BackwardSlicingAnalysis(SliceCriterionsList& _sc) : sc(_sc) { }
+
     // intra-procedural analysis initializes the edges of
     // starting parts by calling this function
     // bw: pedge : part->outEdgeToAny
     void genInitLattice(PartPtr part, 
                         PartEdgePtr pedge,
                         std::vector<Lattice*>& initLattices);
+
+    // helper function for genInitLattice
+    void createSliceCriterionForPart(SliceCriterionsList::SliceCriterion sc,
+                                     PartPtr part,
+                                     AbstractObjectSet& relevantMLSet,
+                                     std::set<SgNode*>& relevantCFGNSet);
 
     // visitor pattern invoked by
     // ComposedAnalysis::runAnalysis on each part
@@ -130,27 +162,133 @@ namespace fuse {
     }
   };
 
+  // dataflow transfer visitor class for statements
+  // transfer functions are applied on statements first in
+  // the backward direction that subsequently calls transfer
+  // functions for expressions of BackwardSlicingExprTransfer
   class BackwardSlicingTransfer : public DFTransferVisitor
   {
     PartPtr part;
     CFGNode cfgn;
     NodeState& state;
     std::map<PartEdgePtr, std::vector<Lattice*> >& dfInfo;
+    Composer* composer;
+    BackwardSlicingAnalysis* bsa;      
+    bool modified;
+    BackwardSlicingLattice* bsl;
   public:
     BackwardSlicingTransfer(PartPtr _part,
                             CFGNode _cfgn,
                             NodeState& _state,
-                            std::map<PartEdgePtr, std::vector<Lattice*> >& _dfInfo) 
+                            std::map<PartEdgePtr, std::vector<Lattice*> >& _dfInfo,
+                            Composer* _composer,
+                            BackwardSlicingAnalysis* _bsa) 
       : DFTransferVisitor(_part, _cfgn, _state, _dfInfo),
       part(_part),
       cfgn(_cfgn),
       state(_state),
-      dfInfo(_dfInfo) { }
-    void visit(SgAssignOp* sgn);
-    void visit(SgNode* sgn);
+      dfInfo(_dfInfo),
+      composer(_composer),
+      bsa(_bsa),
+      modified(false) {
+      // set up the lattice from dfinfo
+      setBSLFromDfInfo();
+    }
 
+    /********************************************************
+     * Access methods for BackwardSlicingExpressionTransfer *
+     ********************************************************/
+    void setBSLFromDfInfo();
+
+    BackwardSlicingLattice* getBSL() {
+      ROSE_ASSERT(bsl);
+      return bsl;
+    }
+
+    PartPtr getPartPtr() {
+      return part;
+    }
+
+    Composer* getComposer() {
+      return composer;
+    }
+
+    BackwardSlicingAnalysis* getBSA() {
+      return bsa;
+    }
+
+    CFGNode getCFGN() {
+      return cfgn;
+    }
+
+    /**********************
+     * Transfer Functions *
+     **********************/
+
+    void visit(SgExpression* sgn); 
+    
+    // should not reach here
+    void visit(SgNode* sgn) {
+      // NOTE: assert(false) here
+    }
+
+    /*****************************
+     * DFTransferVisitor Methods *
+     *****************************/
     bool finish() {
-      return false;
+      return modified;
+    }
+  };
+
+  // transfer functions for expressions
+  class BackwardSlicingExprTransfer : public ROSE_VisitorPatternDefaultBase
+  {
+    // handle to the transfer functions class
+    BackwardSlicingTransfer& bst;
+    // flag to indicate if the transfer functions modified state
+    bool modified;
+
+    // keep track ml defined by this expression
+    AbstractObjectSet defML;
+    AbstractObjectSet refML;
+  public:
+  BackwardSlicingExprTransfer(BackwardSlicingTransfer& _bst)
+    : bst(_bst), 
+      modified(false),
+      defML(bst.getPartPtr()->inEdgeFromAny(), 
+            bst.getComposer(), 
+            bst.getBSA(), AbstractObjectSet::may),
+      refML(bst.getPartPtr()->inEdgeFromAny(), 
+            bst.getComposer(), 
+            bst.getBSA(), AbstractObjectSet::may) { }
+    
+    void visit(SgNode* sgn) {
+      // this class explicity should handle only expressions
+      std::cerr << "Unhandled Expression " << sgn->class_name() << std::endl;
+      ROSE_ASSERT(false);
+    }
+
+    template <typename T> void binaryExprTransfer(SgBinaryOp* sgn, T transferFunctor);
+        
+    void visit(SgAssignOp* sgn);
+    void visit(SgAddOp* sgn);
+    
+    void visit(SgVarRefExp* sgn) {
+    }
+
+    void visit(SgValueExp* sgn) {
+    }
+
+    // implementation of transfer functions
+    void transferAssignment(MemLocObjectPtr mlExp, MemLocObjectPtr mlLHS, MemLocObjectPtr mlRHS, 
+                            AbstractObjectSet& relevantMLSetIN);
+    void transferBinaryOpNoMod(MemLocObjectPtr mlExp, MemLocObjectPtr mlLHS, MemLocObjectPtr mlRHS, 
+                               AbstractObjectSet& relevantMLSetIN);
+
+    void updateRelevantMLSet();
+    void updateRelevantCFGNSet();
+    bool isStateModified() {
+      return modified;
     }
   };
 

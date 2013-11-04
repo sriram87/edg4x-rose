@@ -7,6 +7,7 @@
 
 #include "compose.h"
 #include "abstract_object_set.h"
+#include <utility>
 
 namespace fuse {
 
@@ -51,50 +52,43 @@ namespace fuse {
   /**************************
    * BackwardSlicingLattice *
    **************************/
-  //! BackwardSlicingLattice consists of two sets
-  //! relevantMLSet - tracks direct/indirect MemLocs 
-  //! relevant to the slice
-  //! relevantCFGNSet - tracks direct/indirect statements
-  //! and other CFGNodes that are relevant to slice   
+  //! Slicing algorithm determines relevant variables and relevant statements
+  //! relevant variabes are tracked using two sets relevantMLRef, relevantMLVal of the BSL
+  //! relevantMLRef denotes the memory reference of the ML
+  //! relevantMLVal denotes the symoblic value associated with the ML
+  //! same ML is used to denote reference and symbolic value
+  //! assignment semantics kills symbolic value and reference is maintained
+  //! relevantAS : set of abstract states (paritions) that are in the slice
+  //! relevantAS membership is determined by 
+  //! 1. semantics of the expression (relevant to slice)
+  //! 2. contents of relevantMLRef and relevantMLVal
   class BackwardSlicingLattice : public FiniteLattice
   {
-    AbstractObjectSet* relevantMLSet;
-    // should be using PartPtr/PartEdgePtr instead ?
-    std::set<SgNode*> relevantCFGNSet;
-    bool relevantCFGNSetIsFull;
+    AbstractObjectSet* relevantMLRef;
+    AbstractObjectSet* relevantMLVal;
+    //! flag is used to denote if the set is full or not
+    std::pair<bool, std::set<PartPtr> > relevantAS;    
 
   public:
   BackwardSlicingLattice(PartEdgePtr pedge,
-                         AbstractObjectSet _relevantMLSet,
-                         std::set<SgNode*> _relevantCFGNSet)
+                         AbstractObjectSet& _relevantMLRef,
+                         AbstractObjectSet& _relevantMLVal,
+                         std::pair<bool, std::set<PartPtr> >& _relevantAS)
     : Lattice(pedge), 
-      FiniteLattice(pedge), 
-      relevantCFGNSet(_relevantCFGNSet),
-      relevantCFGNSetIsFull(false) { 
-      relevantMLSet = new AbstractObjectSet(_relevantMLSet);
+      FiniteLattice(pedge) {
+        relevantMLRef = new AbstractObjectSet(_relevantMLRef);
+        relevantMLVal = new AbstractObjectSet(_relevantMLVal);
+        relevantAS = _relevantAS;
     }
 
-    // insert ML into relevantMLSet
-    // helper method for transfer functions
-    bool insertRelevantML(MemLocObjectPtr mlp) {
-      return relevantMLSet->insert(boost::dynamic_pointer_cast<AbstractObject>(mlp));
-    }
+    bool insertRelevantMLRef(MemLocObjectPtr ml);
+    bool insertRelevantMLVal(MemLocObjectPtr ml);
+    bool insertRelevantAS(PartPtr part);
 
-    // insert CFGN into relevantCFGNSet
-    // helper method for transfer functions
-    bool insertRelevantCFGN(CFGNode cfgn) {
-      typedef std::set<SgNode*>::iterator CFGNIterator;
-      std::pair<CFGNIterator, bool> rv = relevantCFGNSet.insert(cfgn.getNode());
-      return rv.second;
-    }
-   
-    AbstractObjectSet& getRelevantMLSet() {
-      return *relevantMLSet;
-    }
+    bool removeRelevantMLVal(MemLocObjectPtr ml);
 
-    std::set<SgNode*>& getRelevantCFGNSet() {
-      return relevantCFGNSet;
-    }
+    bool containsML(AbstractObjectSet* relevantML, MemLocObjectPtr ml);
+    bool relevantMLValContainsML(MemLocObjectPtr ml);
 
     // lattice operators
     void initialize();
@@ -107,9 +101,9 @@ namespace fuse {
     bool setMLValueToFull(MemLocObjectPtr ml);
     bool isFull();
     bool isEmpty();
-    std::string relevantCFGNSetToStr(std::set<SgNode*>& relevantCFGNSet);
-    std::string strp(PartEdgePtr pedge, std::string indent);
-    std::string str(std::string indent);
+    std::string relevantASToStr(std::pair<bool, std::set<PartPtr> >& _relevantAS);
+    std::string strp(PartEdgePtr pedge, std::string indent="");
+    std::string str(std::string indent="");
   };
 
   /***************************
@@ -129,10 +123,9 @@ namespace fuse {
                         std::vector<Lattice*>& initLattices);
 
     // helper function for genInitLattice
-    void createSliceCriterionForPart(SliceCriterionsList::SliceCriterion sc,
-                                     PartPtr part,
-                                     AbstractObjectSet& relevantMLSet,
-                                     std::set<SgNode*>& relevantCFGNSet);
+    void initBSLForPart(SliceCriterionsList::SliceCriterion sc,
+                        PartPtr part,
+                        BackwardSlicingLattice* bsl);
 
     // visitor pattern invoked by
     // ComposedAnalysis::runAnalysis on each part
@@ -235,9 +228,7 @@ namespace fuse {
     /*****************************
      * DFTransferVisitor Methods *
      *****************************/
-    bool finish() {
-      return modified;
-    }
+    bool finish();
   };
 
   // transfer functions for expressions
@@ -251,6 +242,12 @@ namespace fuse {
     // keep track ml defined by this expression
     AbstractObjectSet defML;
     AbstractObjectSet refML;
+
+    // data needed for transfer functions
+    Composer* composer;
+    PartPtr part;
+    BackwardSlicingAnalysis* bsa;
+    BackwardSlicingLattice* bsl;
   public:
   BackwardSlicingExprTransfer(BackwardSlicingTransfer& _bst)
     : bst(_bst), 
@@ -260,33 +257,61 @@ namespace fuse {
             bst.getBSA(), AbstractObjectSet::may),
       refML(bst.getPartPtr()->inEdgeFromAny(), 
             bst.getComposer(), 
-            bst.getBSA(), AbstractObjectSet::may) { }
+            bst.getBSA(), AbstractObjectSet::may),
+      composer(bst.getComposer()),
+      part(bst.getPartPtr()),
+      bsa(bst.getBSA()),
+      bsl(bst.getBSL()) { }
     
     void visit(SgNode* sgn) {
       // this class explicity should handle only expressions
-      std::cerr << "Unhandled Expression " << sgn->class_name() << std::endl;
+      dbg << "Unhandled Expression " << sgn->class_name() << std::endl;
       ROSE_ASSERT(false);
     }
 
     template <typename T> void binaryExprTransfer(SgBinaryOp* sgn, T transferFunctor);
         
-    void visit(SgAssignOp* sgn);
-    void visit(SgAddOp* sgn);
-    
-    void visit(SgVarRefExp* sgn) {
-    }
+    // expression with modifying semantics
+    void visit(SgAssignOp* sgn);    
+    void visit(SgCompoundAssignOp* sgn);
 
-    void visit(SgValueExp* sgn) {
-    }
+    // binary op with no-modification semantics
+    // NOTE: these expressions may have side-effects
+    // side-effects are handled when handling sub-expressions
+    void visit(SgAddOp* sgn);
+    void visit(SgAndOp* sgn);
+    void visit(SgArrowExp* sgn);
+    void visit(SgArrowStarOp* sgn);
+    void visit(SgBitAndOp* sgn);
+    void visit(SgBitOrOp* sgn);
+    void visit(SgBitXorOp* sgn);
+    void visit(SgCommaOpExp* sgn);
+    void visit(SgDivideOp* sgn);
+    void visit(SgDotExp* sgn);
+    void visit(SgDotStarOp* sgn);
+    void visit(SgEqualityOp* sgn);
+    void visit(SgGreaterOrEqualOp* sgn);
+    void visit(SgGreaterThanOp* sgn);
+    void visit(SgLessOrEqualOp* sgn);
+    void visit(SgLessThanOp* sgn);
+    void visit(SgLshiftOp* sgn);
+    void visit(SgModOp* sgn);
+    void visit(SgMultiplyOp* sgn);
+    void visit(SgNotEqualOp* sgn);
+    void visit(SgOrOp* sgn);
+    void visit(SgPntrArrRefExp* sgn);
+    void visit(SgRshiftOp* sgn);
+    void visit(SgSubtractOp* sgn);
+    
+    void visit(SgVarRefExp* sgn);
+    void visit(SgValueExp* sgn);
 
     // implementation of transfer functions
-    void transferAssignment(MemLocObjectPtr mlExp, MemLocObjectPtr mlLHS, MemLocObjectPtr mlRHS, 
-                            AbstractObjectSet& relevantMLSetIN);
-    void transferBinaryOpNoMod(MemLocObjectPtr mlExp, MemLocObjectPtr mlLHS, MemLocObjectPtr mlRHS, 
-                               AbstractObjectSet& relevantMLSetIN);
+    void transferAssignment(MemLocObjectPtr mlExp, MemLocObjectPtr mlLHS, MemLocObjectPtr mlRHS);
+    void transferBinaryOpNoMod(MemLocObjectPtr mlExp, MemLocObjectPtr mlLHS, MemLocObjectPtr mlRHS);
 
-    void updateRelevantMLSet();
-    void updateRelevantCFGNSet();
+    void updateRelevantML();
+    void updateRelevantAS();
     bool isStateModified() {
       return modified;
     }

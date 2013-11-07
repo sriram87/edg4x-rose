@@ -11,8 +11,6 @@
 
 namespace fuse {
 
-  extern int backwardSlicingDebugLevel;
-
   /*******************
    * SliceCriterions *
    *******************/
@@ -81,14 +79,17 @@ namespace fuse {
         relevantAS = _relevantAS;
     }
 
-    bool insertRelevantMLRef(MemLocObjectPtr ml);
-    bool insertRelevantMLVal(MemLocObjectPtr ml);
-    bool insertRelevantAS(PartPtr part);
+    bool insertRelMLRef(MemLocObjectPtr ml);
+    bool insertRelMLVal(MemLocObjectPtr ml);
+    bool insertRelAS(std::set<PartPtr>& partPtrSet);
+    bool insertRelAS(PartPtr part);
 
-    bool removeRelevantMLVal(MemLocObjectPtr ml);
+    bool removeRelMLVal(MemLocObjectPtr ml);
 
     bool containsML(AbstractObjectSet* relevantML, MemLocObjectPtr ml);
-    bool relevantMLValContainsML(MemLocObjectPtr ml);
+    bool containsRelMLVal(MemLocObjectPtr ml);
+    bool containsRelMLRef(MemLocObjectPtr ml);
+    bool containsAS(PartPtr part);
 
     // lattice operators
     void initialize();
@@ -99,9 +100,15 @@ namespace fuse {
     bool setToFull();
     bool setToEmpty();
     bool setMLValueToFull(MemLocObjectPtr ml);
+    bool isFullLat() {
+      return isFull();
+    }
+    bool isEmptyLat() {
+      return isEmpty();
+    }
     bool isFull();
     bool isEmpty();
-    std::string relevantASToStr(std::pair<bool, std::set<PartPtr> >& _relevantAS);
+    std::string str(std::set<PartPtr>& partPtrSet);
     std::string strp(PartEdgePtr pedge, std::string indent="");
     std::string str(std::string indent="");
   };
@@ -218,7 +225,9 @@ namespace fuse {
      * Transfer Functions *
      **********************/
 
-    void visit(SgExpression* sgn); 
+    void visit(SgExpression* sgn);
+    void visit(SgVariableDeclaration* sgn);
+    void visit(SgInitializedName* sgn);
     
     // should not reach here
     void visit(SgNode* sgn) {
@@ -242,6 +251,7 @@ namespace fuse {
     // keep track ml defined by this expression
     AbstractObjectSet defML;
     AbstractObjectSet refML;
+    std::set<PartPtr> relAS;
 
     // data needed for transfer functions
     Composer* composer;
@@ -306,12 +316,16 @@ namespace fuse {
     void visit(SgVarRefExp* sgn);
     void visit(SgValueExp* sgn);
 
-    // implementation of transfer functions
-    void transferAssignment(MemLocObjectPtr mlExp, MemLocObjectPtr mlLHS, MemLocObjectPtr mlRHS);
-    void transferBinaryOpNoMod(MemLocObjectPtr mlExp, MemLocObjectPtr mlLHS, MemLocObjectPtr mlRHS);
+    void visit(SgInitializedName* sgn);
+    void visit(SgAssignInitializer* sgn);
 
-    void updateRelevantML();
-    void updateRelevantAS();
+    // implementation of transfer functions
+    void transferAssignment(SgNode* bexp, SgNode* lexp, SgNode* rexp);
+    void transferBinaryOpNoMod(SgNode* bexp, SgNode* lexp, SgNode* rexp);
+
+    // helper methods
+    std::list<PartPtr> getOperandPartPtr(SgNode* anchor, SgNode* operand);
+    void updateBSLState();
     bool isStateModified() {
       return modified;
     }

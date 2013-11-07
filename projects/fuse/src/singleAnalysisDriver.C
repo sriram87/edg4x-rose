@@ -6,6 +6,7 @@
 
 #include "sage3basic.h"
 #include "compose.h"
+#include "const_prop_analysis.h"
 #include "backwardSlicingAnalysis.h"
 #include <iostream>
 
@@ -14,6 +15,7 @@ using namespace fuse;
 
 int main(int argc, char** argv)
 {
+  FuseInit(argc, argv);
   printf("========== S T A R T ==========\n");
     // Run the front end
   SgProject* project = frontend(argc, argv);
@@ -28,6 +30,7 @@ int main(int argc, char** argv)
   }
 
   std::list<ComposedAnalysis*> analyses;
+  //analyses.push_back(new ConstantPropagationAnalysis());
   analyses.push_back(new BackwardSlicingAnalysis(sliceCriterions));
   checkDataflowInfoPass* cdip = new checkDataflowInfoPass();
   ChainComposer cc(analyses, cdip, true);

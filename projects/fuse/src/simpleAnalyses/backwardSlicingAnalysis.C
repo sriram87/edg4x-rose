@@ -6,12 +6,12 @@
 
 #include <boost/bind.hpp>
 
-using namespace dbglog;
+using namespace sight;
 using namespace std;
 
 namespace fuse {
 
-  int backwardSlicingDebugLevel = 2;
+  DEBUG_LEVEL(backwardSlicingDebugLevel, 2);
 
   /*******************
    * SliceCriterions *
@@ -75,7 +75,7 @@ namespace fuse {
   // union the two sets
   bool BackwardSlicingLattice::meetUpdate(Lattice* that) {
     bool modified = false;
-    scope reg("BackwardSlicingLattice::meetUpdate", scope::medium, 2, backwardSlicingDebugLevel);
+    scope reg("BackwardSlicingLattice::meetUpdate", scope::medium, attrGE("backwardSlicingDebugLevel", 1));
     try {
       BackwardSlicingLattice* thatBSL = dynamic_cast<BackwardSlicingLattice*>(that);      
       // if this lattice is full, nothing is updated
@@ -102,7 +102,7 @@ namespace fuse {
       dbg << "BackwardSlicingLattice::meetUpdate(Lattice*): " << bc.what() << "\n";
       ROSE_ASSERT(false);
     }
-    if(backwardSlicingDebugLevel >=2 ) {
+    if(backwardSlicingDebugLevel() >=2 ) {
       dbg << "After meetUpdate: bsl= " << this->str() << endl;
       dbg << "modified=" << modified << endl;
     }
@@ -165,45 +165,52 @@ namespace fuse {
 
   bool BackwardSlicingLattice::isFull() {
     // shouldn't be a case when only one of them is full
-    if(relevantMLRef->isFull() || relevantMLVal->isFull() || relevantAS.first) {
+    if(relevantMLRef->isFullLat() || relevantMLVal->isFullLat() || relevantAS.first) {
       ROSE_ASSERT(false);
     }
       
-    return relevantMLRef->isFull() && relevantMLVal->isFull() && relevantAS.first;
+    return relevantMLRef->isFullLat() && relevantMLVal->isFullLat() && relevantAS.first;
   }
 
   bool BackwardSlicingLattice::isEmpty() {
-    bool empty = relevantMLRef->isEmpty() && relevantMLVal->isEmpty();
+    bool empty = relevantMLRef->isEmptyLat() && relevantMLVal->isEmptyLat();
     empty = empty && relevantAS.first == false && relevantAS.second.size() == 0;
     return empty;
   }
 
-  bool BackwardSlicingLattice::insertRelevantMLRef(MemLocObjectPtr ml) {
+  bool BackwardSlicingLattice::insertRelMLRef(MemLocObjectPtr ml) {
     return relevantMLRef->insert(ml);
   }
 
-  bool BackwardSlicingLattice::insertRelevantMLVal(MemLocObjectPtr ml) {
+  bool BackwardSlicingLattice::insertRelMLVal(MemLocObjectPtr ml) {
     return relevantMLVal->insert(ml);
   }
 
-  bool BackwardSlicingLattice::insertRelevantAS(PartPtr part) {
+  bool BackwardSlicingLattice::insertRelAS(PartPtr part) {
     pair<set<PartPtr>::iterator, bool> rv = relevantAS.second.insert(part);
     return rv.second;
   }
 
-  bool BackwardSlicingLattice::removeRelevantMLVal(MemLocObjectPtr ml) {
+  bool BackwardSlicingLattice::insertRelAS(set<PartPtr>& that) {
+    unsigned int size_b = relevantAS.second.size();
+    relevantAS.second.insert(that.begin(), that.end());
+    unsigned int size_a = relevantAS.second.size();
+    return size_b != size_a;    
+  }
+
+  bool BackwardSlicingLattice::removeRelMLVal(MemLocObjectPtr ml) {
     return relevantMLVal->remove(ml);
   }
 
-  string BackwardSlicingLattice::relevantASToStr(pair<bool, set<PartPtr> >& _relevantAS) {
+  string BackwardSlicingLattice::str(set<PartPtr>& partPtrSet) {
     ostringstream oss;
-    set<PartPtr>::iterator it = _relevantAS.second.begin();
+    set<PartPtr>::iterator it = partPtrSet.begin();
     oss << "[";
-    for( ;it != _relevantAS.second.end(); ) {
+    for( ;it != partPtrSet.end(); ) {
       PartPtr part = *it;
       oss << part->str();
       ++it;
-      if(it != _relevantAS.second.end())
+      if(it != partPtrSet.end())
         oss << ", ";
     }
     oss << "]";
@@ -214,17 +221,25 @@ namespace fuse {
     return relevantML->containsMay(ml);
   }
 
-  bool BackwardSlicingLattice::relevantMLValContainsML(MemLocObjectPtr ml) {
+  bool BackwardSlicingLattice::containsRelMLVal(MemLocObjectPtr ml) {
     return containsML(relevantMLVal, ml);
+  }
+
+  bool BackwardSlicingLattice::containsRelMLRef(MemLocObjectPtr ml) {
+    return containsML(relevantMLRef, ml);
+  }
+
+  bool BackwardSlicingLattice::containsAS(PartPtr part) {
+    return (relevantAS.second.find(part) != relevantAS.second.end());
   }
 
   string BackwardSlicingLattice::strp(PartEdgePtr pedge, string indent) {
     ostringstream oss;
     oss << "BackwardSlicingLattice@";
     oss << "pedge=" << pedge->str() << endl;
-    oss << "relevantMLRef=" << relevantMLRef->strp(pedge, indent) << endl;
-    oss << "relevantMLVal=" << relevantMLVal->strp(pedge, indent) << endl;
-    oss << "relevantAS=" << relevantASToStr(relevantAS) << endl;
+    oss << "< relevantMLRef=" << relevantMLRef->strp(pedge, indent) << ">\n";
+    oss << "< relevantMLVal=" << relevantMLVal->strp(pedge, indent) << ">\n";
+    oss << "< relevantAS=" << str(relevantAS.second) << ">\n";
     return oss.str();
   }
 
@@ -248,13 +263,13 @@ namespace fuse {
     // if the stmtCFGNode is in this abstract state (part) then populate
     // relevantCFGNSet and relevantMLSet
     if(CFGNodesAtThisPart.find(stmtCFGNode) != CFGNodesAtThisPart.end()) {
-      bsl->insertRelevantAS(part); 
+      bsl->insertRelAS(part); 
       set<SgVarRefExp*> varRefExpSet = sc.second;
       set<SgVarRefExp*>::iterator vresIt = varRefExpSet.begin();
       for( ; vresIt != varRefExpSet.end(); ++ vresIt) {
         MemLocObjectPtr ml = composer->Expr2MemLoc(*vresIt, part->inEdgeFromAny(), this);
-        bsl->insertRelevantMLRef(ml);
-        bsl->insertRelevantMLVal(ml);
+        bsl->insertRelMLRef(ml);
+        bsl->insertRelMLVal(ml);
       }
     }
   }
@@ -263,7 +278,8 @@ namespace fuse {
                                                PartEdgePtr pedge,
                                                vector<Lattice*>& initLattices) {
     // set the scope for debugging
-    scope reg("BackwardSlicingAnalysis::genInitLattice", scope::medium, 2, backwardSlicingDebugLevel);
+    string regString = "BackwardSlicingAnalysis::genInitLattice@" + part->str();
+    scope reg(regString, scope::medium, attrGE("backwardSlicingDebugLevel", 1));
     AbstractObjectSet relevantML(pedge,
                                  composer,
                                  this,                          
@@ -278,7 +294,7 @@ namespace fuse {
     for( ; scIt != scList.end(); ++scIt) {
       initBSLForPart(*scIt, part, bsl);
     }    
-    if(backwardSlicingDebugLevel >= 2) {
+    if(backwardSlicingDebugLevel() >= 2) {
       dbg << "pedge= " << pedge->str("") << ", bsl=" << bsl->str("") << endl;
     }
     initLattices.push_back(bsl);
@@ -311,11 +327,32 @@ namespace fuse {
     modified = bset.isStateModified();
   }
 
+  void BackwardSlicingTransfer::visit(SgVariableDeclaration* sgn) {
+    const SgInitializedNamePtrList& variables = sgn->get_variables();
+    SgInitializedNamePtrList::const_iterator it = variables.begin();
+    for( ; it != variables.end(); ++it) {
+      MemLocObjectPtr ml = composer->Expr2MemLoc(*it, part->inEdgeFromAny(), bsa);
+      // if the ml is in ref set then this part is relevant
+      // if certain variables in this list are relevant then
+      // we need to think about what this part should be!!
+      if(bsl->containsRelMLRef(ml)) {
+        modified = bsl->insertRelAS(part) || modified;
+      }
+    }
+  }
+
+  void BackwardSlicingTransfer::visit(SgInitializedName* sgn) {
+    // process this as an expression
+    BackwardSlicingExprTransfer bset(*this);
+    sgn->accept(bset);
+    modified = bset.isStateModified();
+  }
+
   bool BackwardSlicingTransfer::finish() {
     scope reg("BackwardSlicingTransfer::finish", 
-              scope::medium, 2, backwardSlicingDebugLevel);
+              scope::medium, attrGE("backwardSlicingDebugLevel", 1));
 
-    if(backwardSlicingDebugLevel >= 2 && modified) {
+    if(backwardSlicingDebugLevel() >= 3 && modified) {
       dbg << "Transferred BSL=" << bsl->str() << "\n";
     }
     return modified;
@@ -325,34 +362,25 @@ namespace fuse {
    * BackwardSlicingExprTransfer *
    *******************************/
 
-  template <typename T>
-  void BackwardSlicingExprTransfer::binaryExprTransfer(SgBinaryOp* sgn, T transferFunctor) {
-    scope reg("BackwardSlicingExprTransfer::binaryExprTransfer", 
-              scope::medium, 2, backwardSlicingDebugLevel);
-
-    MemLocObjectPtr mlExp = composer->Expr2MemLoc(sgn, part->inEdgeFromAny(), bsa);
-    MemLocObjectPtr mlLHS = composer->OperandExpr2MemLoc(sgn, sgn->get_lhs_operand(), 
-                                                         part->inEdgeFromAny(), bsa);
-    MemLocObjectPtr mlRHS = composer->OperandExpr2MemLoc(sgn, sgn->get_rhs_operand(), 
-                                                         part->inEdgeFromAny(), bsa);
-    if(backwardSlicingDebugLevel >= 2) {
-      dbg << "mlExp=" << mlExp->strp(part->inEdgeFromAny()) << ",";
-      dbg << "mlLHS=" << mlLHS->strp(part->inEdgeFromAny()) << ",";
-      dbg << "mlRHS=" << mlRHS->strp(part->inEdgeFromAny()) << "\n";
+  list<PartPtr> BackwardSlicingExprTransfer::getOperandPartPtr(SgNode* anchor, SgNode* operand) {
+    list<PartEdgePtr> operandPEdges = (part->inEdgeFromAny())->getOperandPartEdge(anchor, operand);
+    list<PartPtr> operandParts;
+    list<PartEdgePtr>::iterator it = operandPEdges.begin();
+    for( ; it != operandPEdges.end(); ++it) {
+      PartPtr operandPart = (*it)->source();
+      operandParts.push_back(operandPart);
     }
-
-    transferFunctor(mlExp, mlLHS, mlRHS);
-    updateRelevantML();
-    updateRelevantAS();
+    return operandParts;
   }
 
-  void BackwardSlicingExprTransfer::updateRelevantML() {    
-    scope reg("BackwardSlicingExprTransfer::updateRelevantMLSet", 
-              scope::medium, 2, backwardSlicingDebugLevel);
+  void BackwardSlicingExprTransfer::updateBSLState() {    
+    scope reg("BackwardSlicingExprTransfer::updateRelMLSet", 
+              scope::medium, attrGE("backwardSlicingDebugLevel", 1));
 
-    if(backwardSlicingDebugLevel >=2 ) {
+    if(backwardSlicingDebugLevel() >=2 ) {
       dbg << "defML=" << defML.str() << "\n";
       dbg << "refML=" << refML.str() << "\n";
+      dbg << "relAS=" << bsl->str(relAS) << "\n";
     }
 
     bool removed = false;
@@ -361,7 +389,7 @@ namespace fuse {
     if(defMLSize > 0) {
       for(AbstractObjectSet::const_iterator it = defML.begin(); it != defML.end(); ++it) {
         MemLocObjectPtr ml = boost::dynamic_pointer_cast<MemLocObject> (*it);
-        removed = bsl->removeRelevantMLVal(ml) || removed;
+        removed = bsl->removeRelMLVal(ml) || removed;
       }
     }
 
@@ -371,48 +399,70 @@ namespace fuse {
     if(refMLSize > 0) {
       for(AbstractObjectSet::const_iterator it = refML.begin(); it != refML.end(); ++it) {
         MemLocObjectPtr ml = boost::dynamic_pointer_cast<MemLocObject> (*it);
-        added = bsl->insertRelevantMLRef(ml) || added;
-        added = bsl->insertRelevantMLVal(ml) || added;
+        added = bsl->insertRelMLRef(ml) || added;
+        added = bsl->insertRelMLVal(ml) || added;
       }
     }
-    modified = removed || added;
-    if(backwardSlicingDebugLevel >= 2) {
+
+    bool partSetModified = false;
+    if(relAS.size() > 0) {
+      partSetModified = bsl->insertRelAS(relAS);
+    }
+
+    modified = removed || added || partSetModified;
+
+    if(backwardSlicingDebugLevel() >= 2) {
       dbg << "bsl=" << bsl->str() << "\n";
       dbg << "modified=" << (modified? "true" : "false") << "\n";
     }
   }
 
-  void BackwardSlicingExprTransfer::updateRelevantAS() {    
-    scope reg("BackwardSlicingExprTransfer::updateRelevantCFGNSet", 
-              scope::medium, 2, backwardSlicingDebugLevel);
+  template <typename T>
+  void BackwardSlicingExprTransfer::binaryExprTransfer(SgBinaryOp* sgn, T transferFunctor) {
+    scope reg("BackwardSlicingExprTransfer::binaryExprTransfer", 
+              scope::medium, attrGE("backwardSlicingDebugLevel", 1));
 
-    if(backwardSlicingDebugLevel >= 2) {
-      dbg << "StateModified? = " << (modified? "true":"false") << "\n";
-    }
-    
-    // if the relevantMLSet was updated then the statement is relevant
-    // modified flag is set by updateRelevantMLSet
-    if(modified) {
-      bsl->insertRelevantAS(bst.getPartPtr());
-    }
+    transferFunctor(sgn, sgn->get_lhs_operand(), sgn->get_rhs_operand());
+    updateBSLState();
   }
 
-  void BackwardSlicingExprTransfer::transferAssignment(MemLocObjectPtr mlExp, 
-                                                       MemLocObjectPtr mlLHS, 
-                                                       MemLocObjectPtr mlRHS) {
-    if(bsl->relevantMLValContainsML(mlExp) ||
-       bsl->relevantMLValContainsML(mlLHS)) {
+  void BackwardSlicingExprTransfer::transferAssignment(SgNode* bexp,
+                                                       SgNode* lexp, 
+                                                       SgNode* rexp) {
+    MemLocObjectPtr mlExp = composer->Expr2MemLoc(bexp, part->inEdgeFromAny(), bsa);
+    MemLocObjectPtr mlLHS = composer->OperandExpr2MemLoc(bexp, lexp, part->inEdgeFromAny(), bsa);
+    MemLocObjectPtr mlRHS = composer->OperandExpr2MemLoc(bexp, rexp, part->inEdgeFromAny(), bsa);
+
+    if(bsl->containsRelMLVal(mlExp) ||
+       bsl->containsRelMLVal(mlLHS)) {
       defML.insert(boost::dynamic_pointer_cast<AbstractObject>(mlLHS));
       refML.insert(boost::dynamic_pointer_cast<AbstractObject>(mlRHS));
+      relAS.insert(part);
+      // insert the current, left and rhs parts
+      list<PartPtr> lhsPartPtrs = getOperandPartPtr(bexp, lexp);
+      list<PartPtr> rhsPartPtrs = getOperandPartPtr(bexp, rexp);
+      relAS.insert(lhsPartPtrs.begin(), lhsPartPtrs.end());
+      relAS.insert(rhsPartPtrs.begin(), rhsPartPtrs.end());
     }
   }
 
-  void BackwardSlicingExprTransfer::transferBinaryOpNoMod(MemLocObjectPtr mlExp,
-                                                          MemLocObjectPtr mlLHS,
-                                                          MemLocObjectPtr mlRHS) {
-    if(bsl->relevantMLValContainsML(mlExp)) {
+  void BackwardSlicingExprTransfer::transferBinaryOpNoMod(SgNode* bexp,
+                                                          SgNode* lexp, 
+                                                          SgNode* rexp) {
+    MemLocObjectPtr mlExp = composer->Expr2MemLoc(bexp, part->inEdgeFromAny(), bsa);
+    MemLocObjectPtr mlLHS = composer->OperandExpr2MemLoc(bexp, lexp, part->inEdgeFromAny(), bsa);
+    MemLocObjectPtr mlRHS = composer->OperandExpr2MemLoc(bexp, rexp, part->inEdgeFromAny(), bsa);
+    if(bsl->containsRelMLVal(mlExp)) {
       refML.insert(boost::dynamic_pointer_cast<AbstractObject>(mlLHS));
       refML.insert(boost::dynamic_pointer_cast<AbstractObject>(mlRHS));
+      // insert the left and right parts
+      // no need to insert this part
+      // if we are here the part was already in the relevantAS set
+      ROSE_ASSERT(bsl->containsAS(part));
+      list<PartPtr> lhsPartPtrs = getOperandPartPtr(bexp, lexp);
+      list<PartPtr> rhsPartPtrs = getOperandPartPtr(bexp, rexp);
+      relAS.insert(lhsPartPtrs.begin(), lhsPartPtrs.end());
+      relAS.insert(rhsPartPtrs.begin(), rhsPartPtrs.end());
     }
   }
 
@@ -546,6 +596,41 @@ namespace fuse {
     binaryExprTransfer(sgn, boost::bind(&BackwardSlicingExprTransfer::transferBinaryOpNoMod,
                                         this,
                                         _1, _2, _3));
+  }
+
+  void BackwardSlicingExprTransfer::visit(SgInitializedName* sgn) {
+    MemLocObjectPtr ml = composer->Expr2MemLoc(sgn, part->inEdgeFromAny(), bsa);
+    if(bsl->containsRelMLVal(ml)) {
+      // initialized name is relevant
+      // add it to defML
+      defML.insert(boost::dynamic_pointer_cast<AbstractObject>(ml));
+      relAS.insert(part);
+      SgInitializer* initializer = sgn->get_initializer();
+      // if initializer is not NULL
+      // process it as an expression
+      if(initializer) {
+        MemLocObjectPtr iml = composer->Expr2MemLoc(initializer, part->inEdgeFromAny(), bsa);
+        ROSE_ASSERT(iml.get());
+        refML.insert(boost::dynamic_pointer_cast<AbstractObject>(iml));
+      }
+      // update the state based on computed information
+      updateBSLState();
+    }
+  }
+
+  void BackwardSlicingExprTransfer::visit(SgAssignInitializer* sgn) {
+    MemLocObjectPtr ml = composer->Expr2MemLoc(sgn, part->inEdgeFromAny(), bsa);
+    if(bsl->containsRelMLVal(ml)) {
+      // get the operand and process it
+      SgExpression* operand = sgn->get_operand();
+      MemLocObjectPtr oml = composer->Expr2MemLoc(operand, part->inEdgeFromAny(), bsa);
+      refML.insert(oml);
+      relAS.insert(part);
+      list<PartPtr> opParts = getOperandPartPtr(sgn, operand);
+      // add the operand parts here
+      relAS.insert(opParts.begin(), opParts.end());
+      updateBSLState();
+    }
   }
 
   void BackwardSlicingExprTransfer::visit(SgVarRefExp* sgn) {    

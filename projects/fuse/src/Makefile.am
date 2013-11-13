@@ -1,10 +1,14 @@
 include $(top_srcdir)/config/Makefile.for.ROSE.includes.and.libs
 
-bin_PROGRAMS = fuse fuseLayout
+bin_PROGRAMS = fuse fuseLayout nodeStateTestDriver
 
 fuse_CXXFLAGS = $(ROSE_WITH_SIGHT_CPPFLAGS) -DROSE_PREFIX="\"${prefix}\""
 fuse_LDADD = -lrose
 fuse_LDFLAGS = $(ROSE_LIBS) $(LIBS_WITH_RPATH) $(ROSE_WITH_SIGHT_LDFLAGS)
+
+nodeStateTestDriver_CXXFLAGS = $(ROSE_WITH_SIGHT_CPPFLAGS) -DROSE_PREFIX="\"${prefix}\""
+nodeStateTestDriver_LDADD = -lrose
+nodeStateTestDriver_LDFLAGS = $(ROSE_LIBS) $(LIBS_WITH_RPATH) $(ROSE_WITH_SIGHT_LDFLAGS)
 
 INCLUDES = \
 	$(ROSE_INCLUDES) \
@@ -43,6 +47,30 @@ fuse_SOURCES = \
 	simpleAnalyses/taintAnalysis.C \
 	state/nodeState.C \
 	compositionalTestAnalysis.C
+
+nodeStateTestDriver_SOURCES = \
+	analysis/abstract_object.C \
+	analysis/abstract_object_map.C \
+	analysis/abstract_object_set.C \
+	analysis/analysis.C \
+	analysis/analysis_tester.C \
+	analysis/compose.C \
+	analysis/composed_analysis.C \
+	analysis/factor_trans_system.C \
+	analysis/graphIterator.C \
+	analysis/partitions.C \
+	analysis/stx_analysis.C \
+	cfgUtils/CallGraphTraverse.C \
+	cfgUtils/cfgUtils.C \
+	cfgUtils/DataflowCFG.C \
+	cfgUtils/VirtualCFGIterator.C \
+	sight/widgets/ats_graph_structure.C \
+	lattice/lattice.C \
+	simpleAnalyses/const_prop_analysis.C \
+	simpleAnalyses/printAnalysisStates.C \
+	simpleAnalyses/saveDotAnalysis.C \
+	state/nodeState.C \
+	nodeStateTestDriver.C
 
 fuseLayout_CXXFLAGS = $(ROSE_WITH_SIGHT_CPPFLAGS)
 fuseLayout_LDFLAGS = $(ROSE_LIBS) $(LIBS_WITH_RPATH) $(ROSE_WITH_SIGHT_LAYOUT_LDFLAGS)

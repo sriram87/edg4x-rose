@@ -98,28 +98,170 @@ const std::map<PartEdgePtr, std::vector<Lattice*> >& NodeState::getLatticeBelowA
   return dfInfoBelow.find(analysis)->second;
 }
 
+Lattice* NodeState::meetLatticeMapInfo(const LatticeMap& dfMap,
+                                       Analysis* analysis,
+                                       int latticeName,
+                                       bool isAbove) const {
+  scope reg("NodeState::meetLatticeMapInfo", scope::medium, attrGE("nodeStateDebugLevel", 2));
+  LatticeMap::const_iterator a;
+  a = dfMap.find(analysis);
+  if(a == dfMap.end()) {
+    dbg << "dfMap.find("<<analysis<<")!=dfMap.end() = "
+        <<(dfMap.find((Analysis*)analysis) != dfMap.end())
+        <<" dfMap.size()="<<dfMap.size()<<endl;
+    for(LatticeMap::const_iterator i=dfMap.begin(); i!=dfMap.end(); i++)
+    { dbg << "i="<<i->first<<endl; }
+    assert(0);
+  }
+
+  // map is found for the analysis
+  assert(a != dfMap.end());
+  const map<PartEdgePtr, vector<Lattice*> >& edgeToLatticeMap = a->second;
+  map<PartEdgePtr, vector<Lattice*> >::const_iterator eLM;
+  // map is empty return NULL
+  if(edgeToLatticeMap.size() == 0) return NULL;
+
+  Lattice *retLattice;
+  eLM = edgeToLatticeMap.begin();
+
+  // get the first edge from the map
+  PartEdgePtr pedge = eLM->first;
+  // pedge should never be NULL in this function
+  assert(pedge); 
+  // check if the meet info is already cached for us 
+  // at part->inEdgeFromAny (above) or part->outEdgeToAny() (below)
+  if(isAbove) {
+    // source is wildcard for above information
+    PartPtr part = pedge->target();
+    retLattice = getLattice_ex(dfMap, analysis, part->inEdgeFromAny(), latticeName);
+    // return the information if its already available
+    if(retLattice) return retLattice;
+  }
+  else {
+    // target is wildcard for below information
+    PartPtr part = pedge->source();
+    retLattice = getLattice_ex(dfMap, analysis, part->outEdgeToAny(), latticeName);
+    if(retLattice) return retLattice;
+  }
+  // all the info are stored for specific edges
+  assert(pedge->source() && pedge->target());
+  retLattice = (eLM->second)[latticeName]->copy();
+  if(nodeStateDebugLevel() >= 2) {
+    dbg << "pedge=" << pedge->str()
+        << ", lat@pedge=" << (eLM->second)[latticeName]->str()
+        << ", retLattice=" << retLattice->str() << endl;
+  }
+  ++eLM;
+  // meet with all other lattices
+  for( ; eLM != edgeToLatticeMap.end(); ++eLM) {
+    pedge = eLM->first;
+    assert(pedge->source() && pedge->target());
+    retLattice->meetUpdate((eLM->second)[latticeName]);
+    if(nodeStateDebugLevel() >= 2) {
+      dbg << "pedge=" << pedge->str()
+        << ", lat@pedge=" << (eLM->second)[latticeName]->str()
+        << ", retLattice=" << retLattice->str() << endl;
+    }
+  }
+  return retLattice;
+}
+
+Lattice* NodeState::getLatticeAbove_rec(Analysis* analysis, 
+                                        PartEdgePtr departEdge, 
+                                        int latticeName) const {
+  Lattice* retLattice;
+  if(departEdge && departEdge->source() && departEdge->target()) {    
+    retLattice = getLattice_ex(dfInfoAbove, analysis, departEdge, latticeName);
+    if(!retLattice) {
+      PartPtr part = departEdge->target();
+      retLattice = getLatticeAbove_rec(analysis, part->inEdgeFromAny(), latticeName);
+    }
+  }
+  else if(departEdge && departEdge->target()) {
+    retLattice = getLattice_ex(dfInfoAbove, analysis, departEdge, latticeName);
+    if(!retLattice) {
+      retLattice = getLatticeAbove_rec(analysis, NULLPartEdge, latticeName);
+    }
+  }
+  else if(!departEdge) {
+    retLattice = getLattice_ex(dfInfoAbove, analysis, departEdge, latticeName);  
+    if(!retLattice) {
+      retLattice = meetLatticeMapInfo(dfInfoAbove, analysis, latticeName, true);
+    }
+  }
+  else { 
+    assert(0); 
+  }
+  return retLattice;
+}
+
+Lattice* NodeState::getLatticeBelow_rec(Analysis* analysis,
+                                        PartEdgePtr departEdge, 
+                                        int latticeName) const {
+  Lattice* retLattice;
+  if(departEdge && departEdge->source() && departEdge->target()) {
+    retLattice = getLattice_ex(dfInfoBelow, analysis, departEdge, latticeName);
+    if(!retLattice) {
+      PartPtr part = departEdge->source();
+      retLattice = getLatticeBelow_rec(analysis, part->outEdgeToAny(), latticeName);
+    }
+  }
+  else if(departEdge && departEdge->source()) {
+    retLattice = getLattice_ex(dfInfoBelow, analysis, departEdge, latticeName);
+    if(!retLattice) {
+      retLattice = getLatticeBelow_rec(analysis, NULLPartEdge, latticeName);
+    }
+  }
+  else if(!departEdge) {
+    retLattice = getLattice_ex(dfInfoBelow, analysis, departEdge, latticeName);    
+    if(!retLattice) {
+      retLattice = meetLatticeMapInfo(dfInfoBelow, analysis, latticeName, false);    
+    }
+  }
+  else { 
+    assert(0); 
+  }
+  return retLattice;
+}
+
 // returns the given lattice from above the node, which owned by the given analysis
 Lattice* NodeState::getLatticeAbove(Analysis* analysis, int latticeName) const
 {
-  return getLattice_ex(dfInfoAbove, analysis, NULLPartEdge, latticeName);
+  return getLatticeAbove(analysis, NULLPartEdge, latticeName);
+  // return getLattice_ex(dfInfoAbove, analysis, NULLPartEdge, latticeName);
 }
 
 // returns the given lattice from below the node, which owned by the given analysis
 Lattice* NodeState::getLatticeBelow(Analysis* analysis, int latticeName) const
 {
-  return getLattice_ex(dfInfoBelow, analysis, NULLPartEdge, latticeName);
+  return getLatticeBelow(analysis, NULLPartEdge, latticeName);
+  // return getLattice_ex(dfInfoBelow, analysis, NULLPartEdge, latticeName);
 }
   
 // Returns the given lattice above the node from the given analysis along the given departing edge
 Lattice* NodeState::getLatticeAbove(Analysis* analysis, PartEdgePtr departEdge, int latticeName) const
 {
-  return getLattice_ex(dfInfoAbove, analysis, departEdge, latticeName);
+  // scope reg("NodeState::getLatticeAbove", scope::medium, attrGE("nodeStateDebugLevel", 2));
+  // if(nodeStateDebugLevel() >= 2) {
+  //   dbg << "analysis=" << dynamic_cast<ComposedAnalysis*>(analysis)->str() 
+  //       << ", PartEdge=" << (departEdge? departEdge->str() : "NULL")
+  //       << ", latticeName=" << latticeName << endl;
+  // }
+  return getLatticeAbove_rec(analysis, departEdge, latticeName);
+  // return getLattice_ex(dfInfoAbove, analysis, departEdge, latticeName);
 }
 
 // Returns the given lattice below the node from the given analysis along the given departing edge
 Lattice* NodeState::getLatticeBelow(Analysis* analysis, PartEdgePtr departEdge, int latticeName) const
 {
-  return getLattice_ex(dfInfoBelow, analysis, departEdge, latticeName);
+  // scope reg("NodeState::getLatticeBelow", scope::medium, attrGE("nodeStateDebugLevel", 2));
+  // if(nodeStateDebugLevel() >= 2) {
+  //   dbg << "analysis=" << dynamic_cast<ComposedAnalysis*>(analysis)->str() 
+  //       << ", PartEdge=" << (departEdge? departEdge->str() : "NULL")
+  //       << ", latticeName=" << latticeName << endl;
+  // }
+  return getLatticeBelow_rec(analysis, departEdge, latticeName);
+  // return getLattice_ex(dfInfoBelow, analysis, departEdge, latticeName);
 }
 
 

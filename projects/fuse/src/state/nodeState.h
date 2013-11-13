@@ -124,6 +124,10 @@ class NodeState
   Lattice* getLatticeAbove(Analysis* analysis, int latticeName) const;
   // Returns the given lattice below the node from the given analysis along the NULL edge
   Lattice* getLatticeBelow(Analysis* analysis, int latticeName) const;
+
+  Lattice* meetLatticeMapInfo(const LatticeMap& dfMap, Analysis* analysis, int latticeName, bool isAbove) const;
+  Lattice* getLatticeAbove_rec(Analysis* analysis, PartEdgePtr departEdge, int latticeName) const;
+  Lattice* getLatticeBelow_rec(Analysis* analysis, PartEdgePtr departEdge, int latticeName) const;
   
   // Returns the given lattice above the node from the given analysis along the given departing edge
   Lattice* getLatticeAbove(Analysis* analysis, PartEdgePtr departEdge, int latticeName) const;

@@ -54,6 +54,7 @@ class BoolNodeStateAnalysisFW : public FWDataflow
     boost::shared_ptr<BoolNodeStateML> bml = boost::make_shared<BoolNodeStateML>(parent);
     if(pedge->source() && pedge->target()) {
       NodeState* state = NodeState::getNodeState(this, pedge->source());
+      dbg << "state@pedge=" << pedge->str() << "state:" << state->str() << endl;
       BoolAndLattice* bal = dynamic_cast<BoolAndLattice*>(state->getLatticeBelow(this, pedge, 0));
       assert(bal);
       dbg << "bal=" << bal->str() << endl;
@@ -61,6 +62,7 @@ class BoolNodeStateAnalysisFW : public FWDataflow
     else if(pedge->source()) {
       // outEdgeToAny
       NodeState* state = NodeState::getNodeState(this, pedge->source());
+      dbg << "state@pedge=" << pedge->str() << "state:" << state->str() << endl;
       BoolAndLattice* balA = dynamic_cast<BoolAndLattice*>(state->getLatticeBelow(this, pedge, 0));
       assert(balA);
       dbg << "balA=" << balA->str() << endl;
@@ -68,6 +70,7 @@ class BoolNodeStateAnalysisFW : public FWDataflow
     else if(pedge->target()) {
       // inEdgeFromAny
       NodeState* state = NodeState::getNodeState(this, pedge->target());
+      dbg << "state@pedge=" << pedge->str() << "state:" << state->str() << endl;
       BoolAndLattice* balB = dynamic_cast<BoolAndLattice*>(state->getLatticeAbove(this, pedge, 0));
       assert(balB);
       dbg << "balB=" << balB->str() << endl;
@@ -118,6 +121,7 @@ class BoolNodeStateAnalysisBW : public BWDataflow
     boost::shared_ptr<BoolNodeStateML> bml;
     if(pedge->source() && pedge->target()) {
       NodeState* state = NodeState::getNodeState(this, pedge->source());
+      dbg << "state@pedge=" << pedge->str() << "state: " << state->str() << endl;
       BoolAndLattice* bal = dynamic_cast<BoolAndLattice*>(state->getLatticeBelow(this, pedge, 0));
       assert(bal);
       if(bal) bml = boost::make_shared<BoolNodeStateML>(parent);
@@ -126,6 +130,7 @@ class BoolNodeStateAnalysisBW : public BWDataflow
     else if(pedge->source()) {
       // outEdgeToAny
       NodeState* state = NodeState::getNodeState(this, pedge->source());
+      dbg << "state@pedge=" << pedge->str() << "state:" << state->str() << endl;
       BoolAndLattice* balA = dynamic_cast<BoolAndLattice*>(state->getLatticeBelow(this, pedge, 0));
       assert(balA);
       dbg << "balA=" << balA->str() << endl;
@@ -134,6 +139,7 @@ class BoolNodeStateAnalysisBW : public BWDataflow
     else if(pedge->target()) {
       // inEdgeFromAny
       NodeState* state = NodeState::getNodeState(this, pedge->target());
+      dbg << "state@pedge=" << pedge->str() << "state:" << state->str() << endl;
       BoolAndLattice* balB = dynamic_cast<BoolAndLattice*>(state->getLatticeAbove(this, pedge, 0));
       assert(balB);
       dbg << "balB=" << balB->str() << endl;
@@ -200,7 +206,7 @@ int main(int argc, char** argv)
   mySubAnalyses.push_back(bmlq);
   mySubAnalyses.push_back(bnsabw);
   mySubAnalyses.push_back(bmlq);
-  ChainComposer* cc = new ChainComposer(mySubAnalyses, cdip, true);
+  ChainComposer* cc = new ChainComposer(mySubAnalyses, NULL, false);
   cc->runAnalysis();
   printf("==========  E  N  D  ==========\n");
   return 0;

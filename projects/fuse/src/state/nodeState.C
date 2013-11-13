@@ -166,64 +166,6 @@ Lattice* NodeState::meetLatticeMapInfo(const LatticeMap& dfMap,
   return retLattice;
 }
 
-Lattice* NodeState::getLatticeAbove_rec(Analysis* analysis, 
-                                        PartEdgePtr departEdge, 
-                                        int latticeName) const {
-  Lattice* retLattice;
-  if(departEdge && departEdge->source() && departEdge->target()) {    
-    retLattice = getLattice_ex(dfInfoAbove, analysis, departEdge, latticeName);
-    if(!retLattice) {
-      PartPtr part = departEdge->target();
-      retLattice = getLatticeAbove_rec(analysis, part->inEdgeFromAny(), latticeName);
-    }
-  }
-  else if(departEdge && departEdge->target()) {
-    retLattice = getLattice_ex(dfInfoAbove, analysis, departEdge, latticeName);
-    if(!retLattice) {
-      retLattice = getLatticeAbove_rec(analysis, NULLPartEdge, latticeName);
-    }
-  }
-  else if(!departEdge) {
-    retLattice = getLattice_ex(dfInfoAbove, analysis, departEdge, latticeName);  
-    if(!retLattice) {
-      retLattice = meetLatticeMapInfo(dfInfoAbove, analysis, latticeName, true);
-    }
-  }
-  else { 
-    assert(0); 
-  }
-  return retLattice;
-}
-
-Lattice* NodeState::getLatticeBelow_rec(Analysis* analysis,
-                                        PartEdgePtr departEdge, 
-                                        int latticeName) const {
-  Lattice* retLattice;
-  if(departEdge && departEdge->source() && departEdge->target()) {
-    retLattice = getLattice_ex(dfInfoBelow, analysis, departEdge, latticeName);
-    if(!retLattice) {
-      PartPtr part = departEdge->source();
-      retLattice = getLatticeBelow_rec(analysis, part->outEdgeToAny(), latticeName);
-    }
-  }
-  else if(departEdge && departEdge->source()) {
-    retLattice = getLattice_ex(dfInfoBelow, analysis, departEdge, latticeName);
-    if(!retLattice) {
-      retLattice = getLatticeBelow_rec(analysis, NULLPartEdge, latticeName);
-    }
-  }
-  else if(!departEdge) {
-    retLattice = getLattice_ex(dfInfoBelow, analysis, departEdge, latticeName);    
-    if(!retLattice) {
-      retLattice = meetLatticeMapInfo(dfInfoBelow, analysis, latticeName, false);    
-    }
-  }
-  else { 
-    assert(0); 
-  }
-  return retLattice;
-}
-
 // returns the given lattice from above the node, which owned by the given analysis
 Lattice* NodeState::getLatticeAbove(Analysis* analysis, int latticeName) const
 {
@@ -241,27 +183,72 @@ Lattice* NodeState::getLatticeBelow(Analysis* analysis, int latticeName) const
 // Returns the given lattice above the node from the given analysis along the given departing edge
 Lattice* NodeState::getLatticeAbove(Analysis* analysis, PartEdgePtr departEdge, int latticeName) const
 {
-  // scope reg("NodeState::getLatticeAbove", scope::medium, attrGE("nodeStateDebugLevel", 2));
-  // if(nodeStateDebugLevel() >= 2) {
-  //   dbg << "analysis=" << dynamic_cast<ComposedAnalysis*>(analysis)->str() 
-  //       << ", PartEdge=" << (departEdge? departEdge->str() : "NULL")
-  //       << ", latticeName=" << latticeName << endl;
-  // }
-  return getLatticeAbove_rec(analysis, departEdge, latticeName);
-  // return getLattice_ex(dfInfoAbove, analysis, departEdge, latticeName);
+  Lattice* retLattice;
+  scope reg("NodeState::getLatticeAbove", scope::medium, attrGE("nodeStateDebugLevel", 2));
+  if(nodeStateDebugLevel() >= 2) {
+    dbg << "analysis=" << dynamic_cast<ComposedAnalysis*>(analysis)->str() 
+        << ", PartEdge=" << (departEdge? departEdge->str() : "NULL")
+        << ", latticeName=" << latticeName << endl;
+  }
+  
+  // if the departEdge is not NULLPartEdge
+  // assert that we always get specific edge or inEdgeFromAny
+  // if the info is not available query for info on NULLPartEdge
+  if(departEdge) {
+    assert(departEdge->target());
+    retLattice = getLattice_ex(dfInfoAbove, analysis, departEdge, latticeName);  
+    if(!retLattice) {
+      retLattice = getLatticeAbove(analysis, NULLPartEdge, latticeName);
+    }
+  }
+  // departEdge is NULLPartEdge
+  // check if its already available
+  // if not available merge the info along all edges
+  else {
+    retLattice = getLattice_ex(dfInfoAbove, analysis, departEdge, latticeName);
+    if(!retLattice) {
+      retLattice = meetLatticeMapInfo(dfInfoAbove, analysis, latticeName, true);
+    }
+  }
+  if(nodeStateDebugLevel() >= 2) {
+    dbg << "retLattice=" << (retLattice? retLattice->str() : "NULL") << endl;
+  }
+  return retLattice;
 }
 
 // Returns the given lattice below the node from the given analysis along the given departing edge
 Lattice* NodeState::getLatticeBelow(Analysis* analysis, PartEdgePtr departEdge, int latticeName) const
 {
-  // scope reg("NodeState::getLatticeBelow", scope::medium, attrGE("nodeStateDebugLevel", 2));
-  // if(nodeStateDebugLevel() >= 2) {
-  //   dbg << "analysis=" << dynamic_cast<ComposedAnalysis*>(analysis)->str() 
-  //       << ", PartEdge=" << (departEdge? departEdge->str() : "NULL")
-  //       << ", latticeName=" << latticeName << endl;
-  // }
-  return getLatticeBelow_rec(analysis, departEdge, latticeName);
-  // return getLattice_ex(dfInfoBelow, analysis, departEdge, latticeName);
+  Lattice* retLattice;
+  scope reg("NodeState::getLatticeBelow", scope::medium, attrGE("nodeStateDebugLevel", 2));
+  if(nodeStateDebugLevel() >= 2) {
+    dbg << "analysis=" << dynamic_cast<ComposedAnalysis*>(analysis)->str() 
+        << ", PartEdge=" << (departEdge? departEdge->str() : "NULL")
+        << ", latticeName=" << latticeName << endl;
+  }
+  // if the departEdge is not NULLPartEdge
+  // assert that we always get specific edge or outEdgeToAny
+  // if the info is not available query for info on NULLPartEdge
+  if(departEdge) {
+    assert(departEdge->source());
+    retLattice = getLattice_ex(dfInfoBelow, analysis, departEdge, latticeName);
+    if(!retLattice) {
+      retLattice = getLatticeBelow(analysis, NULLPartEdge, latticeName);
+    }
+  }
+  // departEdge is NULLPartEdge
+  // check if its already available
+  // if not available merge the info along all edges
+  else {
+    retLattice = getLattice_ex(dfInfoBelow, analysis, departEdge, latticeName);
+    if(!retLattice) {
+      retLattice = meetLatticeMapInfo(dfInfoBelow, analysis, departEdge, latticeName);
+    }
+  }
+  if(nodeStateDebugLevel() >= 2) {
+    dbg << "retLattice=" << (retLattice? retLattice->str() : "NULL") << endl;
+  }
+  return retLattice;
 }
 
 

@@ -122,29 +122,24 @@ Lattice* NodeState::meetLatticeMapInfo(const LatticeMap& dfMap,
   if(edgeToLatticeMap.size() == 0) return NULL;
 
   Lattice *retLattice;
+  // If the info is already cached in NULLPartEdge return the info
+  eLM = edgeToLatticeMap.find(NULLPartEdge);
+  if(eLM != edgeToLatticeMap.end()) {
+    // check for the lattice located at latticeName
+    // if not available return NULL otherwise
+    if(eLM->second.size() >= (unsigned int)latticeName)
+      return eLM->second[latticeName];
+    else return NULL;
+  }
+
+  // Info is associated with concrete edges
   eLM = edgeToLatticeMap.begin();
 
   // get the first edge from the map
   PartEdgePtr pedge = eLM->first;
-  // pedge should never be NULL in this function
-  assert(pedge); 
-  // check if the meet info is already cached for us 
-  // at part->inEdgeFromAny (above) or part->outEdgeToAny() (below)
-  if(isAbove) {
-    // source is wildcard for above information
-    PartPtr part = pedge->target();
-    retLattice = getLattice_ex(dfMap, analysis, part->inEdgeFromAny(), latticeName);
-    // return the information if its already available
-    if(retLattice) return retLattice;
-  }
-  else {
-    // target is wildcard for below information
-    PartPtr part = pedge->source();
-    retLattice = getLattice_ex(dfMap, analysis, part->outEdgeToAny(), latticeName);
-    if(retLattice) return retLattice;
-  }
-  // all the info are stored for specific edges
-  assert(pedge->source() && pedge->target());
+  // pedge should never be NULL here
+  // pedges should be concrete at this point
+  assert(pedge && pedge->source() && pedge->target()); 
   retLattice = (eLM->second)[latticeName]->copy();
   if(nodeStateDebugLevel() >= 2) {
     dbg << "pedge=" << pedge->str()
@@ -188,28 +183,29 @@ Lattice* NodeState::getLatticeAbove(Analysis* analysis, PartEdgePtr departEdge, 
   if(nodeStateDebugLevel() >= 2) {
     dbg << "analysis=" << dynamic_cast<ComposedAnalysis*>(analysis)->str() 
         << ", PartEdge=" << (departEdge? departEdge->str() : "NULL")
-        << ", latticeName=" << latticeName << endl;
+        << ", latticeName=" << latticeName << endl;    
   }
-  
-  // if the departEdge is not NULLPartEdge
-  // assert that we always get specific edge or inEdgeFromAny
-  // if the info is not available query for info on NULLPartEdge
-  if(departEdge) {
-    assert(departEdge->target());
-    retLattice = getLattice_ex(dfInfoAbove, analysis, departEdge, latticeName);  
-    if(!retLattice) {
-      retLattice = getLatticeAbove(analysis, NULLPartEdge, latticeName);
-    }
-  }
-  // departEdge is NULLPartEdge
-  // check if its already available
-  // if not available merge the info along all edges
-  else {
-    retLattice = getLattice_ex(dfInfoAbove, analysis, departEdge, latticeName);
-    if(!retLattice) {
-      retLattice = meetLatticeMapInfo(dfInfoAbove, analysis, latticeName, true);
-    }
-  }
+
+  // We must get either a NULLPartEdge, a concrete edge or inEdgeFromAny
+  assert(!departEdge || departEdge->target());
+
+  // given concrete edge or inEdgeFromAny verify that the state queried upon (this) 
+  // and the state associated with the edge are same
+  // otherwise the given departEdge is invalid for this state
+  if(departEdge) assert(this==getNodeState(dynamic_cast<ComposedAnalysis*>(analysis), departEdge->target()));
+
+  // If the edge is inEdgeFromAny, query NULLPartEdge instead
+  if(departEdge && !departEdge->source()) departEdge = NULLPartEdge;
+
+  // departEdge is either NULLPartEdge or concrete here
+  retLattice = getLattice_ex(dfInfoAbove, analysis, departEdge, latticeName);
+
+  // If departEdge is concrete and the info above is at NULLPartEdge, we’ll return that info
+  // If departEdge is  NULLPartEdge or inEdgeFromAny, and the info above is stored separately among concrete edges, we merge their lattices
+  // If departEdge is concrete and the above info is stored on concrete edges that do not include departEdge, 
+  // we’ll also merge, although this should not happen in a valid analysis
+  if(!retLattice) retLattice = meetLatticeMapInfo(dfInfoAbove, analysis, latticeName, true);
+
   if(nodeStateDebugLevel() >= 2) {
     dbg << "retLattice=" << (retLattice? retLattice->str() : "NULL") << endl;
   }
@@ -226,28 +222,31 @@ Lattice* NodeState::getLatticeBelow(Analysis* analysis, PartEdgePtr departEdge, 
         << ", PartEdge=" << (departEdge? departEdge->str() : "NULL")
         << ", latticeName=" << latticeName << endl;
   }
-  // if the departEdge is not NULLPartEdge
-  // assert that we always get specific edge or outEdgeToAny
-  // if the info is not available query for info on NULLPartEdge
-  if(departEdge) {
-    assert(departEdge->source());
-    retLattice = getLattice_ex(dfInfoBelow, analysis, departEdge, latticeName);
-    if(!retLattice) {
-      retLattice = getLatticeBelow(analysis, NULLPartEdge, latticeName);
-    }
-  }
-  // departEdge is NULLPartEdge
-  // check if its already available
-  // if not available merge the info along all edges
-  else {
-    retLattice = getLattice_ex(dfInfoBelow, analysis, departEdge, latticeName);
-    if(!retLattice) {
-      retLattice = meetLatticeMapInfo(dfInfoBelow, analysis, departEdge, latticeName);
-    }
-  }
+
+  // We must get either a NULLPartEdge, a concrete edge or outEdgeToAny
+  assert(!departEdge || departEdge->source());
+
+  // given concrete edge or outEdgeToAny verify that the state queried upon (this) 
+  // and the state associated with the edge are same
+  // otherwise the given departEdge is invalid for this state
+  if(departEdge) assert(this==getNodeState(dynamic_cast<ComposedAnalysis*>(analysis), departEdge->source()));
+
+  // If the edge is outEdgeToAny, query NULLPartEdge instead
+  if(departEdge && !departEdge->target()) departEdge = NULLPartEdge;
+  
+  // departEdge is either NULLPartEdge or concrete here
+  retLattice = getLattice_ex(dfInfoBelow, analysis, departEdge, latticeName);
+
+  // If departEdge is concrete and the info above is at NULLPartEdge, we’ll return that info
+  // If departEdge is  NULLPartEdge or outEdgeToAny, and the info above is stored separately among concrete edges, we merge their lattices
+  // If departEdge is concrete and the above info is stored on concrete edges that do not include departEdge, 
+  // we’ll also merge, although this should not happen in a valid analysis
+  if(!retLattice) retLattice = meetLatticeMapInfo(dfInfoBelow, analysis, latticeName, true);
+
   if(nodeStateDebugLevel() >= 2) {
     dbg << "retLattice=" << (retLattice? retLattice->str() : "NULL") << endl;
   }
+
   return retLattice;
 }
 

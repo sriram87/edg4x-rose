@@ -590,6 +590,16 @@ std::string Context::str(std::string indent) const
 PartPtr NULLPart;
 PartEdgePtr NULLPartEdge;
 
+Part::Part(ComposedAnalysis* analysis, PartPtr parent, PartContextPtr pContext) : 
+    analysis(analysis), parent(parent), pContext(pContext)
+{
+}
+
+Part::Part(const Part& that) : 
+    analysis(that.analysis), parent(that.parent), pContext(that.pContext)
+{
+}
+
 Part::~Part()
 {
   /*scope reg(txt()<<"Deleting Part "<<this, scope::medium);*/
@@ -836,7 +846,23 @@ bool Part::operator> (const PartPtr& that) const { return !(*this<=that); }
 /* ####################
    ##### PartEdge #####
    #################### */
+PartEdge::PartEdge(ComposedAnalysis* analysis, PartEdgePtr parent) : 
+    analysis(analysis), parent(parent) {
+}
 
+PartEdge::PartEdge(const PartEdge& that) :
+    analysis(that.analysis), parent(that.parent), remap(that.remap) {
+}
+
+// Function that will always be called after a PartEdge is created and before it is returned
+// to the caller. It is called outside of the PartEdge constructor, which makes it possible to
+// place code inside that registers a shared pointer to this PartEdge with a directory of some kind.
+void PartEdge::init() {
+  analysis->registerBase2RefinedMapping(parent, shared_from_this());
+  /*dbg << "PartEdge::init() mapping base "<<(parent?parent->str():"NULL")<<" to "<<endl;
+  dbg << "     refined "<<str()<<endl;*/
+}
+  
 // Let A={ set of execution prefixes that terminate at the given anchor SgNode }
 // Let O={ set of execution prefixes that terminate at anchor's operand SgNode }
 // Since to reach a given SgNode an execution must first execute all of its operands it must

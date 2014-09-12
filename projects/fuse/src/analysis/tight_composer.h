@@ -109,7 +109,7 @@ namespace fuse {
     TightCompositionQueryManager tcqm;
     
   public:
-    TightComposer(const std::list<ComposedAnalysis*>& analyses);
+    TightComposer(const std::list<ComposedAnalysis*>& analyses, bool trackBase2RefinedPartEdgeMapping=false);
     TightComposer(const TightComposer&);
   
     // Returns a shared pointer to a freshly-allocated copy of this ComposedAnalysis object
@@ -270,6 +270,12 @@ namespace fuse {
     // Return the anchor Parts of an application
     std::set<PartPtr> GetStartAStates(ComposedAnalysis* client);
     std::set<PartPtr> GetEndAStates(ComposedAnalysis* client);
+
+    // Returns all the edges implemented by the entire composer that refine the given
+    // base PartEdge
+    // NOTE: Once we change ChainComposer to derive from ComposedAnalysis, we can modify
+    //       this to implement that interface.
+    const std::set<PartEdgePtr>& getRefinedPartEdges(PartEdgePtr base) const;
 
     // -----------------------------------------
     // ----- Methods from ComposedAnalysis -----

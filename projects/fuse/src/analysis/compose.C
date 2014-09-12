@@ -14,7 +14,7 @@ using namespace sight;
 using namespace boost;
 namespace fuse
 {
-DEBUG_LEVEL(composerDebugLevel, 0);
+DEBUG_LEVEL(composerDebugLevel, 1);
 
 //--------------------
 //----- Composer -----
@@ -282,6 +282,8 @@ ChainComposer::ChainComposer(const ChainComposer& that) :
   currentAnalysis(currentAnalysis), testAnalysis(testAnalysis), verboseTest(verboseTest)
 {} 
 
+ChainComposer::~ChainComposer() {
+}
 
 // Calls the operation with the ComposedAnalysis* argument
 template<class RetType>
@@ -449,73 +451,6 @@ RetType ChainComposer::callServerAnalysisFunc(
   RetType v = callOp(pedge, server, type);
   if(verbose) dbg << "Returning "<<ret2Str(v, "")<<endl;
   return v;
-  
-/*  // Otherwise, iterate backwards through the composition chain looking for a completed analysis 
-  // that implements the operation
-  list<ComposedAnalysis*>::reverse_iterator a=doneAnalyses.rbegin();
-  while(doneAnalyses.size() >= 0) {
-    scope reg(txt()<<opName << "  : " << (*a)->str(""), scope::medium, 
-              attrGE("composerDebugLevel", (verbose? 1: composerDebugLevel()+1)));
-    if(composerDebugLevel() >= (verbose? 1: composerDebugLevel()+1)) {
-      dbg << "pedge="<<(pedge? pedge->str(): "NULLPartEdgePtr")<<endl;
-    }
-    
-    ComposedAnalysis* curDoneAnalysis = *a;
-    // Move the current analysis from doneAnalyses onto a backup list to ensure that in recursive calls
-    // to callServerAnalysisFunc() doneAnalyses excludes the current analysis. doneAnalyses will be restored
-    // at the end of this function.
-    doneAnalyses_back.push_front(curDoneAnalysis);
-    doneAnalyses.pop_back();
-    a=doneAnalyses.rbegin();
-    
-    // If the current completed analysis implements the given operation, invoke it
-    //if(isSupported(curDoneAnalysis)) {
-    bool isSupported = false;
-    switch(type) {
-      case Composer::codeloc:   isSupported = curDoneAnalysis->implementsExpr2CodeLoc();   break;
-      case Composer::val:       isSupported = curDoneAnalysis->implementsExpr2Val();       break;
-      case Composer::memloc:    isSupported = curDoneAnalysis->implementsExpr2MemLoc();    break;
-      case Composer::memregion: isSupported = curDoneAnalysis->implementsExpr2MemRegion(); break;
-      case Composer::atsGraph:  isSupported = curDoneAnalysis->implementsATSGraph();       break;
-      default: assert(0);
-    }
-      // Now invoke the given caller routine on the appropriate PartEdge
-    if(isSupported) {
-      opMeasure->pause();
-      RetType v = callOp(pedge, curDoneAnalysis);
-      opMeasure->resume();
-      
-      // Now that we've reached the desired analysis, reconstruct doneAnalyses and return its reply
-      // Restore doneAnalyses by pushing back all the analyses that were removed for the sake of recursive
-      // calls to callServerAnalysisFunc().
-      doneAnalyses.splice(doneAnalyses.end(), doneAnalyses_back);
-      
-      / *dbg << "Final State of doneAnalysis="<<endl;
-      for(list<ComposedAnalysis*>::iterator a=doneAnalyses.begin(); a!=doneAnalyses.end(); a++)
-        dbg << "    "<<(*a)->str("        ")<<endl;* /
-      if(composerDebugLevel()>=1 && verbose) dbg << "Returning "<<ret2Str(v, "")<<endl;
-      endMeasure(opMeasure);
-      return v;
-      // If the current analysis does not implement this method we keep looking further back in the chain
-    } else {
-      if(composerDebugLevel()>=1 && verbose) dbg << "&nbsp;&nbsp;&nbsp;&nbsp;"<<opName<<" Not Implemented by "<<curDoneAnalysis->str()<<". Advancing to "<<(*a)->str("")<<endl;
-    }
-    
-    // If the current caller object is concerned with PartEdges and the current analysis implements partition graphs, 
-    // convert the current PartEdge that it implemented to the corresponding PartEdge of its precessor on which the 
-    // current PartEdge is based.
-    if(composerDebugLevel()>=1 && verbose) dbg << "pedge="<<(pedge? pedge->str(): "NULLPartEdge")<<" curDoneAnalysis->implementsATSGraph()="<<curDoneAnalysis->implementsATSGraph()<<endl;
-    if(pedge && curDoneAnalysis->implementsATSGraph())
-    { pedge = curDoneAnalysis->convertPEdge(pedge); 
-      //pedge = pedge->getParent();
-      if(composerDebugLevel()>=1 && verbose) dbg << "Updated: pedge="<<(pedge? pedge->str(): "NULLPartEdge")<<endl;
-    }
-  }
-  
-  // The first analysis in the chain must implement every optional method so 
-  // control should never reach this point
-  cerr << "ERROR: no analysis implements method "<<opName<<"(SgExpression)";
-  assert(0);*/
 }
  
 // -------------------------------------
@@ -648,7 +583,7 @@ ValueObjectPtr ChainComposer::Expr2Val_ex(SgNode* n, PartEdgePtr pedge, Composed
            function<ComposedAnalysis::implTightness (ComposedAnalysis*)>(bind( &ComposedAnalysis::Expr2ValTightness, _1)),
            function<string (ValueObjectPtr, string)>(
                  CallGet2Arg<ValueObject, ValueObjectPtr>(function<string (ValueObject*, string)>(bind( &ValueObject::str, _1, _2)))),
-           pedge, client, false);
+           pedge, client, true);
 }
 ValueObjectPtr ChainComposer::Expr2Val(SgNode* n, PartEdgePtr pedge, ComposedAnalysis* client) { 
   // Call Expr2Val_ex() and wrap the results with a UnionValueObject
@@ -1114,6 +1049,43 @@ set<PartPtr> ChainComposer::GetEndAStates(ComposedAnalysis* client) {
            NULLPartEdge, client, false);
 }
 
+// Returns all the edges implemented by the entire composer that refine the given
+// base PartEdge
+const set<PartEdgePtr>& ChainComposer::getRefinedPartEdges(PartEdgePtr base) const {
+  scope s(txt()<<"ChainComposer::getRefinedPartEdges("<<base->str()<<")");
+  // If we don't yet have the edges that refine base in the cache, compute them and add one
+  if(base2RefinedPartEdge.find(base) == base2RefinedPartEdge.end()) {
+    dbg << "    not cached. #doneAnalyses="<<doneAnalyses.size()<<endl;
+    boost::shared_ptr<std::set<PartEdgePtr> > baseEdges = boost::make_shared<std::set<PartEdgePtr> >(); 
+    baseEdges->insert(base);
+
+    // Iterate through all the completed analyses that implement an ATS
+    for(std::list<ComposedAnalysis*>::const_iterator a=doneAnalyses.begin(); a!=doneAnalyses.end(); a++) {
+      if((*a)->implementsATSGraph() && *a!=SyntacticAnalysis::instance()) {
+        // Given all the base edges in *baseEdges (part of the ATS on which the current
+        // analysis ran), get the set edges that refine them gathering them into refinedEdges.
+        boost::shared_ptr<std::set<PartEdgePtr> > refinedEdges = boost::make_shared<std::set<PartEdgePtr> >();
+        dbg << "        Analysis "<<(*a)->str()<<" implements the ATS, #baseEdges="<<baseEdges->size()<<endl;
+        for(std::set<PartEdgePtr>::iterator e=baseEdges->begin(); e!=baseEdges->end(); e++) {
+          const std::set<PartEdgePtr>& curRefinedEdges = (*a)->getRefinedPartEdges(*e);
+          dbg << "          refined edge="<<(*e)->str()<<", #curRefinedEdges="<<curRefinedEdges.size()<<endl;
+          refinedEdges->insert(curRefinedEdges.begin(), curRefinedEdges.end());
+        }
+        // Drop the prior set of edges and replace them with their corresponding refined edges
+        dbg << "#baseEdges="<<baseEdges->size()<<", #refinedEdges="<<refinedEdges->size()<<endl;
+        baseEdges = refinedEdges;
+      }
+    }
+    // Store the ultimate refined edges in the cache
+    dbg << "    Setting base="<<base->str()<<" to "<<baseEdges->size()<<" edges = "<<baseEdges.get()<<endl;
+    //((std::map<PartEdgePtr, boost::shared_ptr<std::set<PartEdgePtr> > >)base2RefinedPartEdge)[base] = baseEdges;
+    ((ChainComposer*)this)->base2RefinedPartEdge[base] = baseEdges;
+  }
+  
+  // Return the set of edges that refine base from the cache
+  return *(((ChainComposer*)this)->base2RefinedPartEdge[base].get());
+}
+
 // -----------------------------------------
 // ----- Methods from ComposedAnalysis -----
 // -----------------------------------------
@@ -1150,7 +1122,7 @@ void ChainComposer::runAnalysis()
       set<PartPtr> endStates   = GetEndAStates(currentAnalysis);
       ostringstream fName; fName << "ats." << i << "." << doneAnalyses.back()->str();
       ats2dot(fName.str(), "ATS", startStates, endStates);
-      ats2dot_bw(fName.str()+".BW", "ATS", startStates, endStates);
+//      ats2dot_bw(fName.str()+".BW", "ATS", startStates, endStates);
     }
     
     struct timeval start, end;
@@ -1189,7 +1161,7 @@ void ChainComposer::runAnalysis()
       set<PartPtr> endStates   = GetEndAStates(*(allAnalyses.begin()));
       ostringstream fName; fName << "ats." << i << "." << doneAnalyses.back()->str();
       ats2dot(fName.str(), "ATS", startStates, endStates);
-      ats2dot_bw(fName.str()+".BW", "ATS", startStates, endStates);
+//      ats2dot_bw(fName.str()+".BW", "ATS", startStates, endStates);
     }
     
     /*list<string> contextAttrs;

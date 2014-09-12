@@ -6,10 +6,11 @@
 #include <boost/make_shared.hpp>
 #include <boost/lambda/lambda.hpp>
 #include <boost/lambda/casts.hpp>
+#include "sageInterface.h"
 
 using namespace std;
 using namespace sight;
-
+using namespace SageInterface;
 
 #include <cwchar>
 
@@ -2036,9 +2037,23 @@ CPValueKindPtr CPConcreteKind::op(SgBinaryOp* op, CPValueKindPtr that) {
     dbg << "(that->getKind() == CPValueKind::unknown)="<<(that->getKind() == CPValueKind::unknown)<<endl;
   }*/
   
-  // * op uninitialized => *
-  if(that->getKind() == CPValueKind::uninitialized)
-    return copyV();
+  if(that->getKind() == CPValueKind::uninitialized) {
+    if(isSgAndOp(op)) {
+      // True && uninitialized => uninitialized
+      if(isConstantTrue(getVal().get())) return that;
+      // False && uninitialized => False
+      else       return boost::make_shared<CPUninitializedKind>();
+    
+    } else if(isSgOrOp(op)) {
+      // True || uninitialized => True
+      if(isConstantTrue(getVal().get())) return copyV();
+      // False | uninitialized => uninitialized
+      else       return boost::make_shared<CPUninitializedKind>();
+    
+    // * op uninitialized => *
+    } else
+      return copyV();
+  }
   
   // * op unknown => unknown
   if(that->getKind() == CPValueKind::unknown)
@@ -2530,7 +2545,17 @@ CPValueKindPtr CPOffsetListKind::op(SgBinaryOp* op, CPValueKindPtr that) {
       {
         scope s("V_SgDotExp", scope::medium, attrGE("constantPropagationAnalysisDebugLevel", 1));
         // Find the index of the DotExp's RHS within the class of its LHS
-        SgClassType *type = isSgClassType(isSgDotExp(op)->get_lhs_operand()->get_type());
+        SgClassType *type;
+        if((type = isSgClassType(isSgDotExp(op)->get_lhs_operand()->get_type()))==NULL) {
+          if(isSgReferenceType(isSgDotExp(op)->get_lhs_operand()->get_type()))
+            type = isSgClassType(isSgReferenceType(isSgDotExp(op)->get_lhs_operand()->get_type())->get_base_type());
+        }
+/*        cout << "op="<<SgNode2Str(op)<<endl;
+        cout << "isSgDotExp(op)->get_lhs_operand()="<<SgNode2Str(isSgDotExp(op)->get_lhs_operand())<<endl;
+        cout << "type="<<SgNode2Str(isSgDotExp(op)->get_lhs_operand()->get_type())<<endl;
+        if(isSgReferenceType(isSgDotExp(op)->get_lhs_operand()->get_type())) {
+          cout << "isSgReferenceType(type)->get_base_type()="<<SgNode2Str(isSgReferenceType(isSgDotExp(op)->get_lhs_operand()->get_type())->get_base_type())<<endl;
+        }*/
         assert(type);
         SgClassDeclaration* decl = isSgClassDeclaration(type->get_declaration()->get_definingDeclaration());
         assert(decl);
@@ -2543,10 +2568,14 @@ CPValueKindPtr CPOffsetListKind::op(SgBinaryOp* op, CPValueKindPtr that) {
 
         const SgDeclarationStatementPtrList& members = def->get_members();
         long long memberIdx=0;
-        //dbg << "    RHS="<<SgNode2Str(isSgVarRefExp(isSgDotExp(op)->get_rhs_operand()))<<", symbol="<<SgNode2Str(isSgVarRefExp(isSgDotExp(op)->get_rhs_operand())->get_symbol())<<", decl="<<SgNode2Str(isSgVarRefExp(isSgDotExp(op)->get_rhs_operand())->get_symbol()->get_declaration())<<endl;
-        SgInitializedName* rhsDecl = isSgVarRefExp(isSgDotExp(op)->get_rhs_operand())->get_symbol()->get_declaration();
+        SgInitializedName* rhsVarDecl=NULL;
+        SgMemberFunctionDeclaration* rhsFuncDecl=NULL;
+        if(isSgVarRefExp(isSgDotExp(op)->get_rhs_operand()))
+          rhsVarDecl = isSgVarRefExp(isSgDotExp(op)->get_rhs_operand())->get_symbol()->get_declaration();
+        else if(isSgMemberFunctionRefExp(isSgDotExp(op)->get_rhs_operand()))
+          rhsFuncDecl = isSgMemberFunctionDeclaration(isSgMemberFunctionRefExp(isSgDotExp(op)->get_rhs_operand())->get_symbol()->get_declaration()->get_definingDeclaration());
         //dbg << "rhsDecl="<<SgNode2Str(rhsDecl)<<endl;
-        assert(rhsDecl);
+        assert(rhsVarDecl || rhsFuncDecl);
 
         for(SgDeclarationStatementPtrList::const_iterator m=members.begin(); m!=members.end(); m++) {
           //scope s2(txt()<<memberIdx<<":    member ="<<SgNode2Str(*m));
@@ -2554,7 +2583,7 @@ CPValueKindPtr CPOffsetListKind::op(SgBinaryOp* op, CPValueKindPtr that) {
             const SgInitializedNamePtrList& decls = isSgVariableDeclaration(*m)->get_variables();
             for(SgInitializedNamePtrList::const_iterator d=decls.begin(); d!=decls.end(); d++) {
               //dbg << "        decl "<<memberIdx<<"="<<SgNode2Str(*d)<<" type="<<SgNode2Str((*d)->get_type())<<endl;
-              if(*d == rhsDecl) { 
+              if(*d == rhsVarDecl) { 
                 //dbg << "    memberIdx="<<memberIdx<<endl;
                 
                 // Return a new offset kind that extends the current one by appending a memberIdx rank
@@ -2565,14 +2594,24 @@ CPValueKindPtr CPOffsetListKind::op(SgBinaryOp* op, CPValueKindPtr that) {
                 newOffsetL.push_back(rank(memberIdx));
                 return boost::make_shared<CPOffsetListKind>(newOffsetL);
               }
-              /*if(SgClassType* varClassType = isSgClassType((*d)->get_type())) {
-                SgClassDeclaration* varClassDecl = isSgClassDeclaration(varClassType->get_declaration()->get_definingDeclaration());
-                memberIdx += getNumClassMembers(varClassDecl->get_definition());
-              } else {*/
-               memberIdx++;
-              //} 
+              memberIdx++;
             }
-          } /*else if(isSgClassDeclaration(*m)) {
+          } else if(isSgMemberFunctionDeclaration(*m)) {
+            if(rhsFuncDecl == isSgMemberFunctionDeclaration(*m)->get_definingDeclaration()) {
+              //dbg << "    memberIdx="<<memberIdx<<endl;
+
+              // Return a new offset kind that extends the current one by appending a memberIdx rank
+              list<intWrap> newOffsetL = offsetL;
+              // Remove the trailing element in newOffsetL if it is a concrete constant 0 since such
+              // a concrete offset has no meaning
+              if(newOffsetL.back().getType()==intWrap::offsetT && newOffsetL.back().get()==0) newOffsetL.pop_back();
+              newOffsetL.push_back(rank(memberIdx));
+              return boost::make_shared<CPOffsetListKind>(newOffsetL);
+            }
+            memberIdx++;
+          }
+          
+          /*else if(isSgClassDeclaration(*m)) {
             memberIdx += getNumClassMembers(isSgClassDeclaration(isSgClassDeclaration(*m)->get_definingDeclaration())->get_definition());
           }*/
         }
@@ -3523,12 +3562,6 @@ void ConstantPropagationAnalysisTransfer::visit(SgValueExp *val) {
 }
 
 
-bool
-ConstantPropagationAnalysisTransfer::finish()
-{
-  return modified;
-}
-
 ConstantPropagationAnalysisTransfer::ConstantPropagationAnalysisTransfer(
           PartPtr part, CFGNode cn, NodeState& state, 
           map<PartEdgePtr, vector<Lattice*> >& dfInfo, 
@@ -3548,7 +3581,7 @@ ConstantPropagationAnalysisTransfer::ConstantPropagationAnalysisTransfer(
 // **********************************************************************
 
 // GB: Is this needed for boost shared-pointers?
-ConstantPropagationAnalysis::ConstantPropagationAnalysis()
+ConstantPropagationAnalysis::ConstantPropagationAnalysis() : FWDataflow(/*trackBase2RefinedPartEdgeMapping*/ false)
 {
 }
 

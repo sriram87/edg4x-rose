@@ -1,5 +1,6 @@
 #include "sage3basic.h"
 #include "compose.h"
+#include "tight_composer.h"
 #include "const_prop_analysis.h"
 #include "live_dead_analysis.h"
 #include "ortho_array_analysis.h"
@@ -7,22 +8,27 @@
 #include "dead_path_elim_analysis.h"
 #include "printAnalysisStates.h"
 #include "pointsToAnalysis.h"
+#include "virtualMethodAnalysis.h"
 #include "analysis_tester.h"
 #include <vector>
 #include <ctype.h>
 #include <boost/xpressive/xpressive.hpp>
 #include <boost/xpressive/regex_actions.hpp>
+#include "sageBuilder.h"
+#include "sageInterface.h"
 #include "sight.h"
+using namespace sight;
 #include <sys/time.h>
 
 using namespace std;
 using namespace fuse;
 using namespace boost::xpressive;
-
+using namespace SageBuilder;
+using namespace SageInterface;
 
 // Regex expressions for the composition command, defined globally so that they can be used inside main 
 // (where they're initialized) as well as inside output_nested_results()
-sregex composer, lcComposer, lpComposer, analysis, cpAnalysis, ldAnalysis, oaAnalysis, ccsAnalysis, dpAnalysis, ptAnalysis, analysisList, compSpec;
+sregex composer, lcComposer, lpComposer, tComposer, analysis, cpAnalysis, ldAnalysis, ccsAnalysis, dpAnalysis, ptAnalysis, vmAnalysis, analysisList, compSpec;
 
 // Displays nested results to std::cout with indenting
 struct output_nested_results
@@ -40,9 +46,13 @@ struct output_nested_results
   {
   }
 
+  string composerType2Str(composerType type)
+  { return (type==looseSeq? "looseSeq": (type==loosePar? "loosePar": (type==tight? "tight": (type==unknown? "unknown": "???")))); }
+
   template< typename BidiIterT >
   void operator ()( match_results< BidiIterT > const &what ) 
   {
+    //scope s("operator ()");
     // first, do some indenting
     typedef typename std::iterator_traits< BidiIterT >::value_type char_type;
     //char_type space_ch = char_type(' ');
@@ -51,15 +61,16 @@ struct output_nested_results
     
     // If this term is an analysis rather than a composer
     smatch subWhat;
+    //dbg << "match="<<match<<", parentComposerType="<<composerType2Str(parentComposerType)<<", parentComposer="<<parentComposer<<endl;
     if(regex_match(match, subWhat, analysis)) {
 //      cout << "analysis match="<<match<<", smatch="<<subWhat<<endl;
       // Create the selected analysis and add it to the parent's sub-analysis list
-           if(regex_match(match, subWhat, cpAnalysis))  { parentSubAnalyses.push_back(new ConstantPropagationAnalysis()); }
+           if(regex_match(match, subWhat, cpAnalysis))  {  /*dbg << "CP"<<endl;*/ parentSubAnalyses.push_back(new ConstantPropagationAnalysis()); }
       else if(regex_match(match, subWhat, ldAnalysis))  { parentSubAnalyses.push_back(new LiveDeadMemAnalysis()); }
 //      else if(regex_match(match, subWhat, oaAnalysis))  { parentSubAnalyses.push_back(new OrthogonalArrayAnalysis()); }//ComposedAnalysis* ca = new OrthogonalArrayAnalysis(); cout << "OrthogonalArrayAnalysis="<<ca->str()<<endl; parentSubAnalyses.push_back(ca); }
-      else if(regex_match(match, subWhat, dpAnalysis))  { parentSubAnalyses.push_back(new DeadPathElimAnalysis()); }
+      else if(regex_match(match, subWhat, dpAnalysis))  { parentSubAnalyses.push_back(new DeadPathElimAnalysis(true)); }
       else if(regex_match(match, subWhat, ccsAnalysis)) { 
-        parentSubAnalyses.push_back(new CallContextSensitivityAnalysis(1, CallContextSensitivityAnalysis::callSite));
+        parentSubAnalyses.push_back(new CallContextSensitivityAnalysis(1, CallContextSensitivityAnalysis::callSite, /*trackBase2RefinedPartEdgeMapping*/ true));
         
 /*        list<ComposedAnalysis*> mySubAnalyses;
         composerType myComposerType = unknown;
@@ -70,6 +81,7 @@ struct output_nested_results
             ons);*/
       }
       else if(regex_match(match, subWhat, ptAnalysis))  { parentSubAnalyses.push_back(new PointsToAnalysis()); }
+      else if(regex_match(match, subWhat, vmAnalysis))  { parentSubAnalyses.push_back(new VirtualMethodAnalysis(true)); }
     // Otherwise, if this is a composer, create the analyses in its sub-analysis list and then create the composer
     } else if(regex_match(match, subWhat, lcComposer)) {
       //std::fill_n( std::ostream_iterator<char_type>( std::cout ), tabs_ * 4, space_ch ); cout << "LOOSE SEQUENTIAL\n"<<endl;
@@ -77,11 +89,13 @@ struct output_nested_results
     } else if(regex_match(match, subWhat, lpComposer)) {
       //std::fill_n( std::ostream_iterator<char_type>( std::cout ), tabs_ * 4, space_ch ); cout << "LOOSE PARALLEL\n"<<endl;
       parentComposerType = loosePar;
+    } else if(regex_match(match, subWhat, tComposer)) {
+      parentComposerType = tight;
     // Finally, if this is a list of analyses for a given parent composer
-    } else {
+    } else if(parentComposerType != unknown) {
       //cout << "other match="<<match<<endl;
       
-      assert(parentComposerType != unknown);
+      //assert(parentComposerType != unknown);
       list<ComposedAnalysis*> mySubAnalyses;
       composerType myComposerType = unknown;
       
@@ -92,25 +106,235 @@ struct output_nested_results
           what.nested_results().end(),
           ons);
       // std::fill_n( std::ostream_iterator<char_type>( std::cout ), tabs_ * 4, space_ch );
-      /*cout << "#mySubAnalyses="<<mySubAnalyses.size()<<endl;
+      /*dbg << "#mySubAnalyses="<<mySubAnalyses.size()<<endl;
       for(list<ComposedAnalysis*>::iterator i=mySubAnalyses.begin(); i!=mySubAnalyses.end(); i++)
-      { // std::fill_n( std::ostream_iterator<char_type>( std::cout ), tabs_ * 4, space_ch );
-        cout << "    "<<(*i)->str()<<endl; }*/
+      { dbg << "    "<<(*i)->str()<<endl; }*/
       
       if(parentComposerType == looseSeq) {
+//dbg << "ChainComposer"<<endl;
         ChainComposer* cc = new ChainComposer(mySubAnalyses, cdip, true);
         // Until ChainComposer is made to be a ComposedAnalysis, we cannot add it to the parentSubAnalyses list. This means that 
-        // LooseComposer can only be user at the outer-most level of composition
+        // LooseComposer can only be used at the outer-most level of composition
         // !!!parentSubAnalyses.push_back(cc);
-        *parentComposer = cc;
+        if(parentComposer) *parentComposer = cc;
       } else if(parentComposerType == loosePar) {
+//dbg << "LooseParallelComposer"<<endl;
         LooseParallelComposer* lp = new LooseParallelComposer(mySubAnalyses);
         parentSubAnalyses.push_back(lp);
-        *parentComposer = lp;
+        if(parentComposer) *parentComposer = lp;
+      } else if(parentComposerType == tight) {
+//dbg << "TightComposer parentComposer="<<parentComposer<<endl;
+        TightComposer* t = new TightComposer(mySubAnalyses);
+        parentSubAnalyses.push_back(t);
+        if(parentComposer) *parentComposer = t;
       }
+    } else {
+      //dbg << "Other"<<endl;
+      // Output any nested matches
+      list<ComposedAnalysis*> mySubAnalyses;
+      composerType myComposerType = unknown;
+      output_nested_results ons(tabs_ + 1, myComposerType, parentSubAnalyses, NULL, NULL);
+      //output_nested_results ons(tabs_ + 1, myComposerType, mySubAnalyses, NULL, NULL);
+      //output_nested_results ons(tabs_ + 1, parentComposerType, parentSubAnalyses, parentComposer, NULL);
+      std::for_each(
+          what.nested_results().begin(),
+          what.nested_results().end(),
+          ons);
     }
   }
 };
+
+#include "midend/abstractLayer/VariableIdMapping.h"
+#include "midend/abstractLayer/CPAstAttributeInterface.h"
+#include "midend/abstractLayer/AstAnnotator.h"
+#include "midend/abstractLayer/Labeler.h"
+#include "stx_analysis.h"
+VariableIdMapping vIDMap;
+
+class ValueASTAttribute: public CPAstAttributeInterface {
+  protected:
+  std::set<PartEdgePtr> refinedEdges;
+  Composer* composer;
+  checkDataflowInfoPass* cdip;
+  public:
+  typedef enum {above, below} dirT;
+  dirT dir;
+
+  // Given a vector for base VirtualCFG edges, get the corresponding refined edges from
+  // this attributes composer and add them to the given set of refined edges
+  void collectRefinedEdges(std::set<PartEdgePtr>& refined, const std::vector<CFGEdge>& base) {
+    dbg << "collectRefinedEdges() #b="<<base.size()<<endl;
+    for(std::vector<CFGEdge>::const_iterator b=base.begin(); b!=base.end(); b++) {
+      dbg << "    b="<<CFGEdge2Str(*b)<<endl;
+      StxPartEdgePtr stxEdge = StxPartEdge::create(*b, SyntacticAnalysis::instance());
+      const std::set<PartEdgePtr>& refinedEdges = composer->getRefinedPartEdges(stxEdge);
+      dbg << "    #refinedEdges="<<refinedEdges.size()<<endl;
+      refined.insert(refinedEdges.begin(), refinedEdges.end());
+    }
+    //assert(refined.size()>0);
+  }
+
+  ValueASTAttribute(SgNode* n, Composer* composer, checkDataflowInfoPass* cdip, dirT dir): 
+        composer(composer), cdip(cdip), dir(dir) {
+    scope s(txt()<<"ValueASTAttribute("<<SgNode2Str(n)<<")");
+ 
+    // NOTE: this is a temporary hack where we assume the appropriate index for the CFGNode
+    //       that represents SgNode n. In the future we should change Expr2* to accept CFGNodes
+    CFGNode cn;
+    if(isSgBinaryOp(n))
+      cn = CFGNode(n, 2);
+    else if(isSgUnaryOp(n)) {
+      if(isSgCastExp(n)) cn = CFGNode(n, 0);
+      else if(isSgAddressOfOp(n) || isSgPointerDerefExp(n) || isSgPlusPlusOp(n) || isSgMinusMinusOp(n)) cn = CFGNode(n, 1);
+      else                   cn = CFGNode(n, 2);
+    }
+    else if(isSgValueExp(n))    cn = CFGNode(n, 1);
+    else                        cn = CFGNode(n, 0);
+ 
+    // Collect the PartEdges (computed by the given composer) that refine the incoming or
+    // outgoing edges of the given SgNode
+    collectRefinedEdges(refinedEdges, cn.outEdges());// (dir==above? cn.inEdges(): cn.outEdges()));
+  }
+ 
+  // Apply Expr2Value for the given expression to all the edges in refinedEdges and return
+  // the union of the resulting ValueObjects
+  ValueObjectPtr Expr2Val(SgExpression* expr) { 
+    ValueObjectPtr val;
+
+    dbg << "Expr2Val("<<SgNode2Str(expr)<<") #refinedEdges="<<refinedEdges.size()<<endl;
+    for(std::set<PartEdgePtr>::iterator r=refinedEdges.begin(); r!=refinedEdges.end(); r++) {
+      ValueObjectPtr edgeVal = composer->Expr2Val(expr, *r, cdip);
+      if(val==NULLValueObject) val = edgeVal;
+      else                     val->meetUpdate(edgeVal, *r, composer, NULL);
+    }
+    dbg << "Expr2Val returning val="<<val.get()<<endl;
+
+    return val;
+  }
+
+  bool isConstantInteger(SgVarRefExp* ref) {
+    scope s(txt()<<"isConstantInteger(ref="<<SgNode2Str(ref)<<")");
+    ValueObjectPtr val = Expr2Val(ref);
+    dbg << "isConstantInteger() val="<<val.get()<<endl;
+    if(!val) return false;
+    dbg << "isConstantInteger() val="<<val->str()<<endl;
+    if(val->isConcrete() && isStrictIntegerType(val->getConcreteType())) {
+      std::set<boost::shared_ptr<SgValueExp> > cVals = val->getConcreteValue();
+      if(cVals.size()==1) return true;
+    }
+    return false;
+  }
+  
+  bool isConstantInteger(VariableId varId) {
+    scope s(txt()<<"isConstantInteger(varID="<<SgNode2Str(vIDMap.getSymbol(varId))<<")");
+    ValueObjectPtr val = Expr2Val(buildVarRefExp(isSgVariableSymbol(vIDMap.getSymbol(varId))));
+    dbg << "isConstantInteger() val="<<val.get()<<endl;
+    if(!val) return false;
+    dbg << "isConstantInteger() val="<<val->str()<<endl;
+    if(val->isConcrete() && isStrictIntegerType(val->getConcreteType())) {
+      std::set<boost::shared_ptr<SgValueExp> > cVals = val->getConcreteValue();
+      if(cVals.size()==1) return true;
+    }
+    return false;
+  }
+  
+  ConstantInteger getConstantInteger(SgVarRefExp* ref) {
+    dbg << "getConstantInteger("<<SgNode2Str(ref)<<")"<<endl;
+    ValueObjectPtr val = Expr2Val(ref);
+    assert(val);
+    if(val->isConcrete() && isStrictIntegerType(val->getConcreteType())) {
+      dbg << "val="<<val->str()<<endl;
+      std::set<boost::shared_ptr<SgValueExp> > cVals = val->getConcreteValue();
+      if(cVals.size()==1) return getIntegerConstantValue((*cVals.begin()).get());
+    }
+    ROSE_ASSERT(0);
+  }
+
+  ConstantInteger getConstantInteger(VariableId varId) {
+    ValueObjectPtr val = Expr2Val(buildVarRefExp(isSgVariableSymbol(vIDMap.getSymbol(varId))));
+    if(val->isConcrete() && isStrictIntegerType(val->getConcreteType())) {
+      std::set<boost::shared_ptr<SgValueExp> > cVals = val->getConcreteValue();
+      if(cVals.size()==1) return getIntegerConstantValue((*cVals.begin()).get());
+    }
+    ROSE_ASSERT(0);
+  }
+
+  ~ValueASTAttribute() {}
+
+  string toString() {
+    return "hi";
+  }
+
+  static void place(Composer* composer, checkDataflowInfoPass* cdip) {
+    RoseAst ast(getProject());
+    for(RoseAst::iterator i=ast.begin(); i!=ast.end();++i) {
+      if(isSgExpression(*i)) {
+        (*i)->setAttribute("fuse_cp_above", new ValueASTAttribute(*i, composer, cdip, above));
+        (*i)->setAttribute("fuse_cp_below", new ValueASTAttribute(*i, composer, cdip, below));
+      }
+    }
+  }
+
+  static void placeLabeler(Composer* composer, checkDataflowInfoPass* cdip, Labeler& labeler) {
+    for(Labeler::iterator i=labeler.begin();i!=labeler.end();++i) {
+      SgNode* node=labeler.getNode(*i);
+      ROSE_ASSERT(node);
+      node->setAttribute("fuse_cp_above", new ValueASTAttribute(node, composer, cdip, above));
+      node->setAttribute("fuse_cp_below", new ValueASTAttribute(node, composer, cdip, below));
+    }
+  }
+
+  static void show(Composer* composer, VariableIdMapping& vIDMap) {
+    RoseAst ast(getProject());
+    for(RoseAst::iterator i=ast.begin(); i!=ast.end();++i) {
+      /*if(SgExprStatement* stmt = isSgExprStatement(*i)) {
+        cout << "i="<<SgNode2Str(*i)<<endl;
+        ValueASTAttribute* above = (ValueASTAttribute*)stmt->get_expression()->getAttribute("fuse_cp_above");
+        cout << "    above="<<above<<endl;
+       // ValueASTAttribute* below = stmt->get_expression()->getAttribute("fuse_cp_aft");
+
+        // Determine whether any of the variables in the current scope are constants above
+        // this statement
+        SgScopeStatement* scope = getEnclosingProcedure(stmt);
+        cout << "    scope="<<SgNode2Str(scope)<<endl;
+        SgVariableSymbol *cur = scope->first_variable_symbol();
+        while(cur) {
+          cout << "    cur="<<SgNode2Str(cur)<<", isConstantInteger="<<above->isConstantInteger(vIDMap.variableId(cur))<<endl;
+          if(above->isConstantInteger(vIDMap.variableId(cur)))
+            cout << "Variable "<<cur->unparseToString()<<"="<<above->getConstantInteger(vIDMap.variableId(cur))<<" at "<<SgNode2Str(stmt)<<endl;
+          cur = scope->next_variable_symbol();
+        }
+      }*/
+      if(SgVarRefExp* ref = isSgVarRefExp(*i)) {
+        if(isStrictIntegerType(ref->get_type())) {
+          //cout << "ref="<<SgNode2Str(ref)<<endl;
+          ValueASTAttribute* above = (ValueASTAttribute*)(ref->getAttribute("fuse_cp_above"));
+          //cout << "    above="<<above<<endl;
+          //cout << "    isConstantInteger="<<above->isConstantInteger(ref)<<endl; cout.flush();
+          if(above->isConstantInteger(ref))
+            cout << SgNode2Str(ref)<<": Value="<<above->getConstantInteger(ref)<<endl;
+        }
+      }
+    }
+  }
+}; // class ValueASTAttribute
+
+template<typename T>
+void printAttributes(Labeler* labeler, VariableIdMapping* vim, string attributeName) {
+   long labelNum=labeler->numberOfLabels();
+   for(long i=0;i<labelNum;++i) {
+     Label lab=i;
+     SgNode* node=labeler->getNode(i);
+     cout<<"@Label "<<lab<<":";
+     T* attr=dynamic_cast<T*>(node->getAttribute(attributeName));
+     if(node)
+       cout<<attr->toString()<<endl; // the attribute is casted to also allow to call other functions here
+     else
+       cout<<" none.";
+     cout<<endl;
+   }
+}
+
 
 int main(int argc, char** argv)
 {
@@ -163,16 +387,18 @@ int main(int argc, char** argv)
 
   lcComposer = as_xpr(icase("loosechain")) | icase("lc");
   lpComposer = as_xpr(icase("loosepar"))   | icase("lp");
-  composer = by_ref(lcComposer) | by_ref(lpComposer);
+  tComposer  = as_xpr(icase("tight"))      | icase("t");
+  composer = by_ref(lcComposer) | by_ref(lpComposer) | by_ref(tComposer);
   //composer = as_xpr(icase("loosechain")) | icase("lc") | icase("loosepar") | icase("lp");
   
   cpAnalysis  = as_xpr(icase("constantpropagationanalysis")) | icase("constantpropagation") | icase("cp");
   ldAnalysis  = as_xpr(icase("livedeadmemanalysis"))         | icase("livedead")            | icase("ld");
-  oaAnalysis  = as_xpr(icase("livedeadmemanalysis"))         | icase("orthoarray")          | icase("oa");
   ccsAnalysis = as_xpr(icase("callctxsensanalysis"))         | icase("callctxsens")         | icase("ccs");
   dpAnalysis  = as_xpr(icase("deadpathelimanalysis"))        | icase("deadpath")            | icase("dp");
   ptAnalysis  = as_xpr(icase("pointstoanalysis"))            | icase("pointsto")            | icase("pt");
-  analysis = by_ref(cpAnalysis) | by_ref(ldAnalysis) | by_ref(oaAnalysis) | by_ref(ccsAnalysis) | by_ref(dpAnalysis) | by_ref(ptAnalysis);
+  vmAnalysis  = as_xpr(icase("virtualmethodanalysis"))       | icase("virtualmem")          | icase("vm");
+  analysis = by_ref(cpAnalysis) | by_ref(ldAnalysis) | by_ref(ccsAnalysis) | 
+             by_ref(dpAnalysis) | by_ref(ptAnalysis) | by_ref(vmAnalysis);
   analysisList = '(' >> *_s >> (by_ref(analysis) | by_ref(compSpec)) >> *_s >> (!('(' >> *_s >>  +_w   >> *_s >> ')') ) >>
         *(*_s >> "," >> *_s >> (by_ref(analysis) | by_ref(compSpec)) >> *_s >> (!('(' >> *_s >>  +_w   >> *_s >> ')') ) ) >> *_s >> ')';
   compSpec = *_s >> by_ref(composer) >> *_s >> analysisList >> *_s;
@@ -215,7 +441,18 @@ int main(int argc, char** argv)
       gettimeofday(&end, NULL);
       cout << "Elapsed="<<((end.tv_sec*1000000+end.tv_usec) - 
                            (start.tv_sec*1000000+start.tv_usec))/1000000.0<<"s"<<endl;
-      
+  
+/*      VariableIdMapping vIDMap;
+      vIDMap.computeVariableSymbolMapping(getProject());
+      ValueASTAttribute::place(rootComposer, cdip);
+      ValueASTAttribute::show(rootComposer, vIDMap);
+      Labeler labeler(getProject());
+//      labeler.createLabels(getProject());
+      ValueASTAttribute::placeLabeler(rootComposer, cdip, labeler);
+/ *      AstAnnotator ara(&labeler);
+      ara.annotateAstAttributesAsCommentsBeforeStatements(getProject(), "fuse_cp_above");* /
+      printAttributes<ValueASTAttribute>(&labeler, &vIDMap, "fuse_cp_above");*/
+
       //cout << "rootComposer="<<rootComposer<<" cdip->getNumErrors()="<<cdip->getNumErrors()<<endl;
       if(cdip->getNumErrors() > 0) cout << cdip->getNumErrors() << " Errors Reported!"<<endl;
       else                         cout << "PASS"<<endl;
@@ -226,6 +463,7 @@ int main(int argc, char** argv)
   
   printf("==========  E  N  D  ==========\n");
   
-  return 0;
+  return backend (project);
+  //return 0;
 }
 

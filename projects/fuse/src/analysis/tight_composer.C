@@ -176,7 +176,8 @@ namespace fuse {
    * TightComposer Methods *
    ******************************/
 
-  TightComposer::TightComposer(const std::list<ComposedAnalysis*>& analyses) : allAnalyses(analyses) {    
+  TightComposer::TightComposer(const std::list<ComposedAnalysis*>& analyses, bool trackBase2RefinedPartEdgeMapping) : 
+    ComposedAnalysis(trackBase2RefinedPartEdgeMapping), allAnalyses(analyses) {    
     list<ComposedAnalysis*>::iterator a=allAnalyses.begin();
     // get the first analysis' direction
     // all other analyses should be in the same direction
@@ -188,7 +189,8 @@ namespace fuse {
     }    
   }
       
-  TightComposer::TightComposer(const TightComposer& that) : allAnalyses(that.allAnalyses), dir(that.dir) {
+  TightComposer::TightComposer(const TightComposer& that) : 
+     ComposedAnalysis(that), allAnalyses(that.allAnalyses), dir(that.dir) {
   }
 
   void TightComposer::initializeQueryList(list<Expr2AnyKey>& queryList) {
@@ -589,20 +591,20 @@ namespace fuse {
   // Computes the meet of from and to and saves the result in to.
   // Returns true if this causes this to change and false otherwise.
   bool TightComposer::meetUpdateV (ValueObjectPtr to, ValueObjectPtr from, PartEdgePtr pedge, ComposedAnalysis* analysis) {
-    to->meetUpdateV(from, pedge);
+    return to->meetUpdateV(from, pedge);
   }
 
   bool TightComposer::meetUpdateMR(MemRegionObjectPtr to, MemRegionObjectPtr from, PartEdgePtr pedge, ComposedAnalysis* analysis) {
-    to->meetUpdateMR(from, pedge);
+    return to->meetUpdateMR(from, pedge);
   }
   
   // Returns whether the given AbstractObject corresponds to the set of all sub-executions or the empty set
   bool TightComposer::isFullV (ValueObjectPtr ao, PartEdgePtr pedge, ComposedAnalysis* analysis) {
-    ao->isFullV(pedge);
+    return ao->isFullV(pedge);
   }
 
   bool TightComposer::isFullMR(MemRegionObjectPtr ao, PartEdgePtr pedge, ComposedAnalysis* analysis) {
-    ao->isFullMR(pedge);
+    return ao->isFullMR(pedge);
   }
   
   // Returns whether the given AbstractObject corresponds to the empty set
@@ -630,6 +632,13 @@ namespace fuse {
   std::set<PartPtr> TightComposer::GetEndAStates(ComposedAnalysis* client) {
     return GetEndAStates_Spec();
   }
+
+  // Returns all the edges implemented by the entire composer that refine the given
+  // base PartEdge
+  // NOTE: Once we change ChainComposer to derive from ComposedAnalysis, we can modify
+  //       this to implement that interface.
+  const std::set<PartEdgePtr>& TightComposer::getRefinedPartEdges(PartEdgePtr base) const
+  { assert(0); }
 
   // -----------------------------------------
   // ----- Methods from ComposedAnalysis -----

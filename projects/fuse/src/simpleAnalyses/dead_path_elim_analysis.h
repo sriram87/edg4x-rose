@@ -48,9 +48,24 @@ class DeadPathElimPart : public Part//, public boost::enable_shared_from_this<De
   std::map<DeadPathElimPart*, bool> cache_equal;
   std::map<DeadPathElimPart*, bool> cache_less;
   
-  public:
+  protected:
   DeadPathElimPart(PartPtr base, ComposedAnalysis* analysis);
   DeadPathElimPart(const DeadPathElimPart& that);
+
+  public:
+  // Parts must be created via static construction methods to make it possible to separately
+  // initialize them. This is needed to allow Parts to register themselves with global directories,
+  // a process that requires the creation of a shared pointer to themselves.
+  static DeadPathElimPartPtr create(PartPtr base, ComposedAnalysis* analysis) {
+    DeadPathElimPartPtr newPart(boost::shared_ptr<DeadPathElimPart>(new DeadPathElimPart(base, analysis)));
+    newPart->init();
+    return newPart;
+  }
+  static DeadPathElimPartPtr create(const DeadPathElimPart& that) {
+    DeadPathElimPartPtr newPart(boost::shared_ptr<DeadPathElimPart>(new DeadPathElimPart(that)));
+    newPart->init();
+    return newPart;
+  }
   
   private:
   // Returns a shared pointer to this of type DeadPathElimPartPtr
@@ -110,7 +125,7 @@ class DeadPathElimPartEdge : public FiniteLattice, public PartEdge {
   friend class DeadPathElimPart; 
   friend class DeadPathElimTransfer;
   
-  public:
+  protected:
   /* GB 2012-10-15 - Commented out because this constructor makes it difficult to set the lattice of the created edge
   DeadPathElimPartEdge(DeadPathElimPartPtr src, DeadPathElimPartPtr tgt, 
                        PartEdgePtr baseEdge, DeadPathElimAnalysis* analysis);*/
@@ -123,7 +138,47 @@ class DeadPathElimPartEdge : public FiniteLattice, public PartEdge {
   DeadPathElimPartEdge(PartEdgePtr baseEdge, ComposedAnalysis* analysis);
   
   DeadPathElimPartEdge(const DeadPathElimPartEdge& that);
-  
+
+  public:
+  // Parts must be created via static construction methods to make it possible to separately
+  // initialize them. This is needed to allow Parts to register themselves with global directories,
+  // a process that requires the creation of a shared pointer to themselves.
+  static DeadPathElimPartEdgePtr create(PartEdgePtr base, ComposedAnalysis* analysis, DPELevel level) {
+    DeadPathElimPartEdgePtr newPartEdge(boost::shared_ptr<DeadPathElimPartEdge>(new DeadPathElimPartEdge(base, analysis, level)));
+    newPartEdge->init();
+    return newPartEdge;
+  }
+  static DeadPathElimPartEdgePtr create(PartEdgePtr base, ComposedAnalysis* analysis) {
+    DeadPathElimPartEdgePtr newPartEdge(boost::shared_ptr<DeadPathElimPartEdge>(new DeadPathElimPartEdge(base, analysis)));
+    newPartEdge->init();
+    return newPartEdge;
+  }
+  static DeadPathElimPartEdgePtr create(const DeadPathElimPartEdge& that) {
+    DeadPathElimPartEdgePtr newPartEdge(boost::shared_ptr<DeadPathElimPartEdge>(new DeadPathElimPartEdge(that)));
+    newPartEdge->init();
+    return newPartEdge;
+  }
+  static DeadPathElimPartEdge* createRaw(PartEdgePtr base, ComposedAnalysis* analysis, DPELevel level) {
+    DeadPathElimPartEdge* newPartEdge = new DeadPathElimPartEdge(base, analysis, level);
+    //newPartEdge->init();
+    return newPartEdge;
+  }
+  static DeadPathElimPartEdge* createRaw(PartEdgePtr base, ComposedAnalysis* analysis) {
+    DeadPathElimPartEdge* newPartEdge = new DeadPathElimPartEdge(base, analysis);
+    //newPartEdge->init();
+    return newPartEdge;
+  }
+  static DeadPathElimPartEdge* createRaw(const DeadPathElimPartEdge& that) {
+    DeadPathElimPartEdge* newPartEdge = new DeadPathElimPartEdge(that);
+    //newPartEdge->init();
+    return newPartEdge;
+  }
+  // Create a shared pointer to a DeadPathElimPartEdge from a raw pointer to it
+  static DeadPathElimPartEdgePtr raw2shared(DeadPathElimPartEdge* raw) {
+    DeadPathElimPartEdgePtr shared = initPtr(raw);
+    shared->init();
+    return shared;   
+  }
   private:
   // Returns a shared pointer to this of type DeadPathElimPartEdgePtr
   DeadPathElimPartEdgePtr get_shared_this();
@@ -273,9 +328,9 @@ class DeadPathElimAnalysis : public FWDataflow
   bool cacheInitialized_GetStartAStates_Spec;
   std::set<PartPtr> cache_GetEndAStates_Spec;
   bool cacheInitialized_GetEndAStates_Spec;
-   
+  
   public:
-  DeadPathElimAnalysis();
+  DeadPathElimAnalysis(bool trackBase2RefinedPartEdgeMapping=false);
   
   // Returns a shared pointer to a freshly-allocated copy of this ComposedAnalysis object
   ComposedAnalysisPtr copy() { return boost::make_shared<DeadPathElimAnalysis>(); }

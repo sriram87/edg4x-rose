@@ -21,13 +21,14 @@ using namespace std;
 
 namespace fuse
 {
-DEBUG_LEVEL(composedAnalysisDebugLevel, 0);
+DEBUG_LEVEL(composedAnalysisDebugLevel, 1);
   
 /****************************
  ***** ComposedAnalysis *****
  ****************************/
 
-ComposedAnalysis::ComposedAnalysis() {
+ComposedAnalysis::ComposedAnalysis(bool trackBase2RefinedPartEdgeMapping): 
+      trackBase2RefinedPartEdgeMapping(trackBase2RefinedPartEdgeMapping) {
   startStatesInitialized = false;
   endStatesInitialized = false;
 }
@@ -132,13 +133,36 @@ PartEdgePtr ComposedAnalysis::convertPEdge(PartEdgePtr pedge)
 {
   // If the result of this function has been computed, return it
   map<PartEdgePtr, PartEdgePtr>::iterator oldPEdge;
-  if((oldPEdge=new2oldPEdge.find(pedge)) != new2oldPEdge.end()) return oldPEdge->second;
+  if((oldPEdge=refined2BasePedge.find(pedge)) != refined2BasePedge.end()) return oldPEdge->second;
   
   // Cache the result
   //PartEdgePtr result = convertPEdge_Spec(pedge);
   PartEdgePtr result = pedge->getParent();
-  new2oldPEdge[pedge] = result;
+  refined2BasePedge[pedge] = result;
   return result;
+}
+
+// Given a PartEdge base from the ATS on which this ComposedAnalysis runs and a PartEdge implemented
+// by this composed analysis that refines base, records the mapping from the base PartEdge
+// to the refined PartEdge.
+void ComposedAnalysis::registerBase2RefinedMapping(PartEdgePtr base, PartEdgePtr refined) {
+  // It should only be possible to call this function if this analysis implements an ATS
+  // since it should be the constructor of the PartEdges implemented by this analysis that call
+  // this function.
+  assert(implementsATSGraph());
+
+  // Register the mapping from base to refined if this is explicitly requested
+  if(trackBase2RefinedPartEdgeMapping)
+    base2RefinedPartEdge[base].insert(refined);
+}
+
+// Given a PartEdge implemented by this analysis, returns the set of refined PartEdges implemented
+// by this analysis or the NULLPartEdge if this relationship was not tracked.
+static set<PartEdgePtr> emptyEdgeSet;
+const set<PartEdgePtr>& ComposedAnalysis::getRefinedPartEdges(PartEdgePtr base) const {
+  std::map<PartEdgePtr, std::set<PartEdgePtr> >::const_iterator i = base2RefinedPartEdge.find(base);
+  if(i==base2RefinedPartEdge.end()) return emptyEdgeSet;
+  return i->second;
 }
 
 // Generates the initial lattice state for the given dataflow node, in the given function. Implementations 
@@ -293,7 +317,7 @@ void ComposedAnalysis::runAnalysis()
                             reg.getAnchor(), worklistGraph, toAnchors, fromAnchors);
     (*curNodeIt)++;
 
-    dbg << "curNodeIt++=" << curNodeIt->str() << endl;
+    //dbg << "curNodeIt=" << curNodeIt->str() << endl;
 
   } // end worklist iteration    
 }
@@ -649,7 +673,7 @@ void ComposedAnalysis::propagateDF2Desc(ComposedAnalysis* analysis,
     if(modified || visited.find(nextPart)==visited.end()) {   
       curNodeIt->add(nextPartEdge);
     }
-    dbg << "curNodeIt=" << curNodeIt->str() << endl;
+    //dbg << "curNodeIt=" << curNodeIt->str() << endl;
   }
 }
 
@@ -853,7 +877,7 @@ bool checkDataflowInfoPass::transfer(PartPtr part, CFGNode cn, NodeState& state,
     SgFunctionCallExp* call;
     if((call = isSgFunctionCallExp(n->getNode())) && n->getIndex()==2) {
       Function func(call);
-      if(func.get_name().getString() == "CompDebugAssert") {
+      if(func.get_name().getString().find("CompDebugAssert")==0) {
         SgExpressionPtrList args = call->get_args()->get_expressions();
         for(SgExpressionPtrList::iterator a=args.begin(); a!=args.end(); a++) {
           ValueObjectPtr v = getComposer()->OperandExpr2Val(call, *a, part->inEdgeFromAny(), this);
@@ -881,6 +905,14 @@ bool checkDataflowInfoPass::transfer(PartPtr part, CFGNode cn, NodeState& state,
             dbg << "<span style=\"color:red;font-size:14pt\">"<<errorMesg.str()<<"</span>"<<endl;
             numErrors++;
           }
+        }
+      } else if(func.get_name().getString().find("CompShow")==0) {
+        SgExpressionPtrList args = call->get_args()->get_expressions();
+        for(SgExpressionPtrList::iterator a=args.begin(); a!=args.end(); a++) {
+          ValueObjectPtr v = getComposer()->OperandExpr2Val(call, *a, part->inEdgeFromAny(), this);
+          assert(v);
+          Sg_File_Info *info = call->get_startOfConstruct();
+          cout << info->get_filenameString()<<":"<<info->get_line()<<" "<<func.get_name().getString()<<"("<<(*a)->unparseToString()<<"="<<v->str()<<")"<<endl;
         }
       }
     }

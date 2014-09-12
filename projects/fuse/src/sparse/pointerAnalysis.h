@@ -163,8 +163,8 @@ namespace scc_private
   /// Sparse PointTo Analysis
   class SparsePointToAnalysis : virtual public PGSSAAnalysis {
   public:
-    SparsePointToAnalysis() : hasVisitor(false) {};
-    SparsePointToAnalysis(SparsePointToAnalysis* oldAnalysis) : hasVisitor(false) {};
+    SparsePointToAnalysis() : ComposedAnalysis(/*trackBase2RefinedPartEdgeMapping*/ false), hasVisitor(false) {};
+    SparsePointToAnalysis(SparsePointToAnalysis* oldAnalysis) : ComposedAnalysis(/*trackBase2RefinedPartEdgeMapping*/ false), hasVisitor(false) {};
 
     void genInitLattice(const Function& func, PartPtr part, PartEdgePtr pedge,
                         std::vector<Lattice*>& initLattices);

@@ -225,19 +225,24 @@ bool func2AllCalls_initialized=false;
 
 // Given a function call, returns the set of all functions that it may invoke
 set<Function> getAllCalleeFuncs(SgFunctionCallExp* call) {
+  scope s(txt()<<"getAllCalleeFuncs("<<SgNode2Str(call)<<")", scope::medium, attrGE("stxAnalysisDebugLevel", 2));
   initFuncEntryExit();
   
   set<Function> callees;
   
   Function callee(call);
+  if(stxAnalysisDebugLevel()>=2) dbg << "callee.isKnown()="<<callee.isKnown()<<endl;
+  
   // If the function being called is statically known
   if(callee.isKnown())
-     callees.insert(call);
+    //callees.insert(call);
+    callees = Function::getCallees(call);
   // Otherwise, find all the functions with the same type as this function call.
   // They are all possible referents of the call
   // !!! NOTE: This should be updated to compute type compatibility rather than strict equality !!!
   else {
     for(map<Function, CFGNode>::iterator f=Func2Entry.begin(); f!=Func2Entry.end(); f++) {
+      if(stxAnalysisDebugLevel()>=2) dbg << "f->first.get_type()="<<SgNode2Str(f->first.get_type())<<", call->get_function()->get_type()="<<SgNode2Str(call->get_function()->get_type())<<endl;
       if(f->first.get_type() == call->get_function()->get_type())
         callees.insert(f->first);
     }
@@ -384,7 +389,7 @@ std::set<PartPtr> SyntacticAnalysis::GetStartAStates_Spec()
   // Return the entry points into all the global VariableDeclarations
   set<PartPtr> startStates;
   for(set<SgVariableDeclaration*>::iterator d=SyntacticAnalysis::globalDeclarations.begin(); d!=SyntacticAnalysis::globalDeclarations.end(); d++)
-    startStates.insert(makePtr<StxPart>((*d)->cfgForBeginning(), this, filter));
+    startStates.insert(StxPart::create((*d)->cfgForBeginning(), this, filter));
   
   // If there are no global VariableDeclarations, the analysis entry points are the entries
   // into the non-static functions
@@ -396,7 +401,8 @@ std::set<PartPtr> SyntacticAnalysis::GetStartAStates_Spec()
 
 // Returns whether the given function can be called from outside the current compilation unit
 bool isExternallyCallable(const Function& func) {
-  return !SageInterface::isStatic(func.get_declaration()) &&
+  return !isSgMemberFunctionDeclaration(func.get_declaration()) &&
+         !SageInterface::isStatic(func.get_declaration()) &&
          !func.get_declaration()->get_file_info()->isCompilerGenerated() && 
          func.get_definition()->getAttribute("fuse:UnknownSideEffects")==NULL;
 }
@@ -410,7 +416,7 @@ void SyntacticAnalysis::addFunctionEntries(set<ArgPartPtr>& states, SyntacticAna
 /*      dbg << f->first.get_name().getString()<<"() declaration="<<f->first.get_declaration()<<"="<<CFGNode2Str(f->first.get_declaration())<<", static="<<SageInterface::isStatic(f->first.get_declaration())<<", compgen="<<f->first.get_declaration()->get_file_info()->isCompilerGenerated()<<endl;
       dbg << f->first.get_name().getString()<<"() definition="<<f->first.get_definition()<<"="<<CFGNode2Str(f->first.get_definition())<<", compgen="<<f->first.get_definition()->get_file_info()->isCompilerGenerated()<<", unknown="<<f->first.get_definition()->getAttribute("fuse:UnknownSideEffects")<<endl;*/
     if(isExternallyCallable(f->first))
-      states.insert(makePtr<StxPart>(f->second, analysis, analysis->filter));
+      states.insert(StxPart::create(f->second, analysis, analysis->filter));
   }
 }
 
@@ -434,16 +440,16 @@ set<PartPtr> SyntacticAnalysis::GetEndAStates_Spec()
   // Find all the return statements in main() and add them to endStates
   for(VirtualCFG::dataflowIterator df(mainStart, mainEnd); df!=VirtualCFG::iterator::end(); df++) {
     if(SgReturnStmt* ret = isSgReturnStmt((*df).getNode()))
-      endStates.insert(makePtr<StxPart>(ret, this, filter));
+      endStates.insert(StxPart::create(ret, this, filter));
   }
   
   // Add main's ending point
-  endStates.insert(makePtr<StxPart>(mainEnd, this, filter));*/
+  endStates.insert(StxPart::create(mainEnd, this, filter));*/
   
   // Return the entry points of all the non-static functions
   set<PartPtr> endStates;
   /*Function main(SageInterface::findMain(SageInterface::getFirstGlobalScope(SageInterface::getProject()))->get_definition());
-  endStates.insert(makePtr<StxPart>(getFunc2Exit(main), this, filter));*/
+  endStates.insert(StxPart::create(getFunc2Exit(main), this, filter));*/
   
   initFuncEntryExit();
   scope s("EndAStates", attrGE("stxAnalysisDebugLevel", 3));
@@ -452,7 +458,7 @@ set<PartPtr> SyntacticAnalysis::GetEndAStates_Spec()
        !f->first.get_declaration()->get_file_info()->isCompilerGenerated()) {*/
     if(isExternallyCallable(f->first)) {
       if(stxAnalysisDebugLevel()>3) dbg << CFGNode2Str(f->second)<<"()"<<endl;
-      endStates.insert(makePtr<StxPart>(f->second, this, filter));
+      endStates.insert(StxPart::create(f->second, this, filter));
     }
   }
   
@@ -586,8 +592,8 @@ map<StxPartEdgePtr, bool> makeClosureDF(const vector<CFGEdge>& orig, // raw in o
     //if (((*i).*otherSide)().isInteresting())
     if (filter(((*i).*otherSide)())) {
       //edges.push_back(/*boost::static_pointer_cast<PartEdge>(*/boost::make_shared<StxPartEdge>(*i, filter)/*)*/);
-      //edges.push_back(makePtr<StxPartEdge>(*i, analysis, filter));
-      StxPartEdgePtr newEdge = makePtr<StxPartEdge>(*i, analysis, filter);
+      //edges.push_back(StxPartEdge::create(*i, analysis, filter));
+      StxPartEdgePtr newEdge = StxPartEdge::create(*i, analysis, filter);
       if(stxAnalysisDebugLevel()>=3) dbg << "newEdge="<<newEdge->str()<<endl;
       if(edges.find(newEdge) == edges.end()) edges[newEdge] = true;
     }
@@ -620,7 +626,7 @@ map<StxPartEdgePtr, bool> StxPart::getOutEdges()
     set<StxPartPtr> entries;
     SyntacticAnalysis::addFunctionEntries(entries, dynamic_cast<SyntacticAnalysis*>(analysis));
     for(set<StxPartPtr>::iterator e=entries.begin(); e!=entries.end(); e++)
-      vStx[makePtr<StxPartEdge>(n, (*e)->n, analysis)] = true;
+      vStx[StxPartEdge::create(n, (*e)->n, analysis)] = true;
   // If current node is a function call, connect the call to the SgFunctionParameterList of the called function.
   } else if((call = isSgFunctionCallExp(n.getNode())) && n.getIndex()==2) {
     set<Function> callees = getAllCalleeFuncs(call);
@@ -634,13 +640,13 @@ map<StxPartEdgePtr, bool> StxPart::getOutEdges()
     }
     
     for(set<Function>::iterator c=callees.begin(); c!=callees.end(); c++)
-      vStx[makePtr<StxPartEdge>(n, getFunc2Entry(*c), analysis)] = true;
+      vStx[StxPartEdge::create(n, getFunc2Entry(*c), analysis)] = true;
     
     // If the callee function has a definition, connect this function call directly to the function's entry point
     /*if(callee.get_definition()) {
       assert(callee.get_params());
-      //vStx[makePtr<StxPartEdge>(n, CFGNode(callee.get_params(), 1), analysis)] = true;
-      vStx[makePtr<StxPartEdge>(n, getFunc2Entry(callee), analysis)] = true;
+      //vStx[StxPartEdge::create(n, CFGNode(callee.get_params(), 1), analysis)] = true;
+      vStx[StxPartEdge::create(n, getFunc2Entry(callee), analysis)] = true;
       
       {
         dbg << "The successors of call "<<CFGNode2Str(n)<<endl;
@@ -664,8 +670,8 @@ map<StxPartEdgePtr, bool> StxPart::getOutEdges()
      * /
     // Otherwise, create synthetic entry and exit points for the routine and connect the call to this entry
     } else {
-      //vStx[makePtr<StxPartEdge>(n, CFGNode(call, 3), analysis)] = true;
-      vStx[makePtr<StxPartEdge>(n, getFunc2Entry(callee), analysis)] = true;
+      //vStx[StxPartEdge::create(n, CFGNode(call, 3), analysis)] = true;
+      vStx[StxPartEdge::create(n, getFunc2Entry(callee), analysis)] = true;
     }*/
   // If current node is the end of a function definition, connect it to all the calls of this function
   // !!! NOTE: we should be connecting it to all the function calls that match the calling signature
@@ -683,7 +689,7 @@ map<StxPartEdgePtr, bool> StxPart::getOutEdges()
     indent ind(attrGE("stxAnalysisDebugLevel", 2));
     for(set<SgFunctionCallExp*>::const_iterator c=calls.begin(); c!=calls.end(); c++) {
       CFGNode callNode(*c, 3);
-      vStx[makePtr<StxPartEdge>(n, callNode, analysis, filter)]=1;
+      vStx[StxPartEdge::create(n, callNode, analysis, filter)]=1;
       
       /*dbg << "To the successors of call "<<CFGNode2Str(callNode)<<endl;
       indent ind;
@@ -692,7 +698,7 @@ map<StxPartEdgePtr, bool> StxPart::getOutEdges()
       map<StxPartEdgePtr, bool> outvStx = makeClosureDF(callNode.outEdges(), &CFGNode::outEdges, &CFGPath::target, &mergePaths, filter, analysis);
       for(map<StxPartEdgePtr, bool>::iterator i=outvStx.begin(); i!=outvStx.end(); i++) {
         //dbg << i->first->source()->str() << " =&gt; "<< i->first->target()->str()<<endl;
-        vStx[makePtr<StxPartEdge>(n, i->first->stxTarget()->n, analysis, filter)]=1;
+        vStx[StxPartEdge::create(n, i->first->stxTarget()->n, analysis, filter)]=1;
       }*/
     }
   // If the current node is a return statement, connect it to the function's exit SgFunctionDefinition node
@@ -702,12 +708,12 @@ map<StxPartEdgePtr, bool> StxPart::getOutEdges()
       dbg << "returning from func="<<func.str()<<endl;
       dbg << "Exit node="<<CFGNode2Str(getFunc2Exit(func))<<endl;
     }
-    vStx[makePtr<StxPartEdge>(n, getFunc2Exit(func), analysis)] = true;
+    vStx[StxPartEdge::create(n, getFunc2Exit(func), analysis)] = true;
   //} else if(isSgFunctionParameterList(n.getNode())) {
   } else if(isFuncEntry(n)) {
     // If this is the synthesized entry node to a function without a body, return the edge to its corresponding exit node
     /*if(isFuncEntry(n)) {
-      vStx[makePtr<StxPartEdge>(n, getEntry2Exit(n),  analysis)] = true;
+      vStx[StxPartEdge::create(n, getEntry2Exit(n),  analysis)] = true;
       return vStx;
     } else*/
       return makeClosureDF(n.outEdges(), &CFGNode::outEdges, &CFGPath::target, &mergePaths, filter, analysis);
@@ -754,14 +760,14 @@ map<StxPartEdgePtr, bool> StxPart::getInEdges()
     // If the function is known
     if(callee.isKnown()) {
       if(stxAnalysisDebugLevel()>=2) dbg << "exit="<<CFGNode2Str(getFunc2Exit(callee))<<endl;
-      vStx[makePtr<StxPartEdge>(getFunc2Exit(callee), n, analysis)] = true;
+      vStx[StxPartEdge::create(getFunc2Exit(callee), n, analysis)] = true;
     // Otherwise, find all the functions with the same type as this function call.
     // They are all possible referents of the call
     // !!! NOTE: This should be updated to compute type compatibility rather than strict equality !!!
     } else {
       for(map<Function, CFGNode>::iterator f=Func2Exit.begin(); f!=Func2Exit.end(); f++) {
         if(f->first.get_type() == isSgFunctionCallExp(n.getNode())->get_function()->get_type())
-          vStx[makePtr<StxPartEdge>(f->second, n, analysis)] = true;
+          vStx[StxPartEdge::create(f->second, n, analysis)] = true;
       }
     }
     
@@ -778,7 +784,7 @@ map<StxPartEdgePtr, bool> StxPart::getInEdges()
     // Also connect it to all the SgReturnStmts in the function
     for(CFGIterator it(getFunc2Entry(func)); it!=CFGIterator::end(); it++) {
       if(isSgReturnStmt(it->getNode()) && it->getIndex()==1)
-        vStx[makePtr<StxPartEdge>(*it, n, analysis)] = true;
+        vStx[StxPartEdge::create(*it, n, analysis)] = true;
     }
     if(stxAnalysisDebugLevel()>=2) dbg << "-------------#vStx="<<vStx.size()<<"---------------------"<<endl;
   // If the current node is the entry point of a function
@@ -792,7 +798,7 @@ map<StxPartEdgePtr, bool> StxPart::getInEdges()
     indent ind(attrGE("stxAnalysisDebugLevel", 2));
     for(set<SgFunctionCallExp*>::const_iterator c=calls.begin(); c!=calls.end(); c++) {
       CFGNode callNode(*c, 2);
-      vStx[makePtr<StxPartEdge>(callNode, n, analysis, filter)]=1;
+      vStx[StxPartEdge::create(callNode, n, analysis, filter)]=1;
     }
     
     // If this function can be called from the outside, add incoming edges from all the global
@@ -801,7 +807,7 @@ map<StxPartEdgePtr, bool> StxPart::getInEdges()
       // Return the entry points into all the global VariableDeclarations
       set<PartPtr> startStates;
       for(set<SgVariableDeclaration*>::iterator d=SyntacticAnalysis::globalDeclarations.begin(); d!=SyntacticAnalysis::globalDeclarations.end(); d++)
-        vStx[makePtr<StxPartEdge>((*d)->cfgForEnd(), n, analysis, filter)]=1;
+        vStx[StxPartEdge::create((*d)->cfgForEnd(), n, analysis, filter)]=1;
     }
   } else {
     // If this is the starting point of a declaration of a global variable, do not add any incoming edges
@@ -852,9 +858,9 @@ set<PartPtr> StxPart::matchingCallParts() const
   set<PartPtr> ret;
 
   if(isSgFunctionCallExp(n.getNode()) && n.getIndex()==2)
-    ret.insert(makePtr<StxPart>(CFGNode(n.getNode(), 3), analysis));
+    ret.insert(StxPart::create(CFGNode(n.getNode(), 3), analysis));
   else if(isSgFunctionCallExp(n.getNode()) && n.getIndex()==3)
-    ret.insert(makePtr<StxPart>(CFGNode(n.getNode(), 2), analysis));
+    ret.insert(StxPart::create(CFGNode(n.getNode(), 2), analysis));
 
   return ret;
 }
@@ -869,7 +875,7 @@ set<PartPtr> StxPart::matchingCallParts() const
 std::list<PartPtr> StxPart::getOperandPart(SgNode* anchor, SgNode* operand)
 {
   list<PartPtr> l;
-  l.push_back(makePtr<StxPart>(operand->cfgForEnd(), analysis));
+  l.push_back(StxPart::create(operand->cfgForEnd(), analysis));
   return l;
 }*/
 
@@ -890,11 +896,11 @@ bool isNULLCFGNode(CFGNode n) { return isSgNullStatement(n.getNode()); }
 
 // Returns a PartEdgePtr, where the source is a wild-card part (NULLPart) and the target is this Part
 PartEdgePtr StxPart::inEdgeFromAny()
-{ return makePtr<StxPartEdge>(getCFGNode(), n, analysis); } ///*NULLCFGNode*/SageInterface::getGlobalScope(n.getNode())->cfgForBeginning(), n); }
+{ return StxPartEdge::create(getCFGNode(), n, analysis); } ///*NULLCFGNode*/SageInterface::getGlobalScope(n.getNode())->cfgForBeginning(), n); }
 
 // Returns a PartEdgePtr, where the target is a wild-card part (NULLPart) and the source is this Part
 PartEdgePtr StxPart::outEdgeToAny()
-{ return makePtr<StxPartEdge>(n, getCFGNode(), analysis); } ///*NULLCFGNode*/SageInterface::getGlobalScope(n.getNode())->cfgForEnd()); }
+{ return StxPartEdge::create(n, getCFGNode(), analysis); } ///*NULLCFGNode*/SageInterface::getGlobalScope(n.getNode())->cfgForEnd()); }
 
 bool StxPart::equal(const PartPtr& o) const
 {
@@ -916,7 +922,7 @@ std::string StxPart::str(std::string indent) const
 {
   ostringstream oss;
   if(isNULLCFGNode(n.getNode())) oss << "[*]";
-  else oss << CFGNode2Str(n);//", analysis="<<analysis<<"]";
+  else oss << "[StxPart:"<< CFGNode2Str(n)<<"]";//", analysis="<<analysis<<"]";
   return oss.str();
 }
 
@@ -930,7 +936,7 @@ PartPtr StxPartEdge::source() const {
 
 StxPartPtr StxPartEdge::stxSource() const {
   if(isNULLCFGNode(p.source().getNode())) return NULLPart;
-  else return makePtr<StxPart>(p.source(), analysis, filter);
+  else return StxPart::create(p.source(), analysis, filter);
 }
 
 PartPtr StxPartEdge::target() const { 
@@ -939,7 +945,7 @@ PartPtr StxPartEdge::target() const {
 
 StxPartPtr StxPartEdge::stxTarget() const { 
   if(isNULLCFGNode(p.target().getNode())) return NULLPart;
-  else return makePtr<StxPart>(p.target(), analysis, filter);
+  else return StxPart::create(p.target(), analysis, filter);
 }
 
 // Let A={ set of execution prefixes that terminate at the given anchor SgNode }
@@ -963,7 +969,7 @@ std::list<PartEdgePtr> StxPartEdge::getOperandPartEdge(SgNode* anchor, SgNode* o
   StxPartPtr partTarget = (*(opPart.outStxEdges().begin()))->target();
   assert(partTarget);
   assert(partTarget->n.getNode());
-  l.push_back(makePtr<StxPartEdge>(opCFG, partTarget->n, analysis));
+  l.push_back(StxPartEdge::create(opCFG, partTarget->n, analysis));
   return l;
 }
 
@@ -1747,11 +1753,20 @@ StxNamedMemRegionTypePtr NULLStxNamedMemRegionType;
 StxNamedMemRegionTypePtr StxNamedMemRegionType::getInstance(SgNode* n) {
   if(SgVarRefExp* ref = isSgVarRefExp(n)) {
     return boost::make_shared<StxNamedMemRegionType>(ref->get_symbol()->get_declaration(), ref->get_symbol());
+  } else if(SgCastExp* cast = isSgCastExp(n)) {
+    // Unwrap the casts until we hit a non-cast expression
+    SgExpression* operand = NULL;
+    do {
+      operand = cast->get_operand();
+    } while((cast=isSgCastExp(cast->get_operand())));
+    
+    if(SgVarRefExp* ref = isSgVarRefExp(operand))
+      return boost::make_shared<StxNamedMemRegionType>(ref->get_symbol()->get_declaration(), ref->get_symbol());
   } else if(SgInitializedName* iname = isSgInitializedName(n)) {
     return boost::make_shared<StxNamedMemRegionType>(iname, iname->search_for_symbol_from_symbol_table());
-  } else {
-    return NULLStxNamedMemRegionType;
   }
+  
+  return NULLStxNamedMemRegionType;
 }
 
 // Return whether there exists a CFGNode within this part that is inside the function in which the anchor symbol

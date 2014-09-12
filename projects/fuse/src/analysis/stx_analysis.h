@@ -132,14 +132,47 @@ class StxPart : public Part
   bool (*filter) (CFGNode cfgn); // a filter function to decide which raw CFG node to show (if return true) or hide (otherwise)
   
   friend class StxPartEdge;
+  /*friend class CompSharedPtr<StxPart>;
+  template<class T>
+  friend boost::shared_ptr<T> boost::make_shared<T>(CFGNode n, ComposedAnalysis* analysis, bool (*f) (CFGNode));*/
   
-  public:
+  protected:
   StxPart(CFGNode n, ComposedAnalysis* analysis, bool (*f) (CFGNode) = defaultFilter): 
     Part(analysis, NULLPart, makePtr<StxFuncContext>(n)), n(n), filter(f) {}
   StxPart(const StxPart& part):    Part((const Part&)part), n(part.n), filter(part.filter) {} 
   StxPart(const StxPartPtr& part): Part((const Part&)part), n(part->n), filter(part->filter) {} 
   StxPart(const StxPart& part,    bool (*f) (CFGNode) = defaultFilter): Part((const Part&)part), n(part.n), filter (f) {}
   StxPart(const StxPartPtr& part, bool (*f) (CFGNode) = defaultFilter): Part((const Part&)part), n(part->n), filter (f) {}
+
+  public:
+  // PartEdges must be created via static construction methods to make it possible to separately
+  // initialize them. This is needed to allow PartEdges to register themselves with global directories,
+  // a process that requires the creation of a shared pointer to themselves.
+  static StxPartPtr create(CFGNode n, ComposedAnalysis* analysis, bool (*f) (CFGNode) = defaultFilter) {
+    StxPartPtr newPart(boost::shared_ptr<StxPart>(new StxPart(n, analysis, f)));
+    newPart->init();
+    return newPart;
+  }
+  static StxPartPtr create(const StxPart& part) {
+    StxPartPtr newPart(boost::shared_ptr<StxPart>(new StxPart(part, defaultFilter)));
+    newPart->init();
+    return newPart;
+  }
+  static StxPartPtr create(const StxPartPtr& part) {
+    StxPartPtr newPart(boost::shared_ptr<StxPart>(new StxPart(part, defaultFilter)));
+    newPart->init();
+    return newPart;
+  }
+  static StxPartPtr create(const StxPart& part,    bool (*f) (CFGNode) = defaultFilter) {
+    StxPartPtr newPart(boost::shared_ptr<StxPart>(new StxPart(part, f)));
+    newPart->init();
+    return newPart;
+  }
+  static StxPartPtr create(const StxPartPtr& part, bool (*f) (CFGNode) = defaultFilter) {
+    StxPartPtr newPart(boost::shared_ptr<StxPart>(new StxPart(part, f)));
+    newPart->init();
+    return newPart;
+  }
   
   private:
   // Returns a shared pointer to this of type StxPartPtr
@@ -189,13 +222,34 @@ class StxPartEdge : public PartEdge
 {
   CFGPath p;
   bool (*filter) (CFGNode cfgn);
+  friend class CompSharedPtr<StxPartEdge>;
 
-  public:
+  protected:
   StxPartEdge(CFGNode src, CFGNode tgt, ComposedAnalysis* analysis, bool (*f) (CFGNode) = defaultFilter):
       PartEdge(analysis, NULLPartEdge), p(CFGEdge(src, tgt)), filter(f) {}
   StxPartEdge(CFGPath p, ComposedAnalysis* analysis, bool (*f) (CFGNode) = defaultFilter):
       PartEdge(analysis, NULLPartEdge), p(p), filter(f) {}
   StxPartEdge(const StxPartEdge& dfe): PartEdge((const PartEdge&)dfe), p(dfe.p), filter(dfe.filter) {}
+  public:
+
+  // PartEdges must be created via static construction methods to make it possible to separately
+  // initialize them. This is needed to allow PartEdges to register themselves with global directories,
+  // a process that requires the creation of a shared pointer to themselves.
+  static StxPartEdgePtr create(CFGNode src, CFGNode tgt, ComposedAnalysis* analysis, bool (*f) (CFGNode) = defaultFilter) {
+    StxPartEdgePtr newEdge(boost::shared_ptr<StxPartEdge>(new StxPartEdge(src, tgt, analysis, f)));
+    newEdge->init();
+    return newEdge;
+  }
+  static StxPartEdgePtr create(CFGPath p, ComposedAnalysis* analysis, bool (*f) (CFGNode) = defaultFilter) {
+    StxPartEdgePtr newEdge(boost::shared_ptr<StxPartEdge>(new StxPartEdge(p, analysis, f)));
+    newEdge->init();
+    return newEdge;
+  }
+  static StxPartEdgePtr create(const StxPartEdge& dfe) {
+    StxPartEdgePtr newEdge(boost::shared_ptr<StxPartEdge>(new StxPartEdge(dfe)));
+    newEdge->init();
+    return newEdge;
+  }
   
   PartPtr source() const;
   StxPartPtr stxSource() const;

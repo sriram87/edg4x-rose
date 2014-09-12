@@ -63,6 +63,9 @@ class Function
   // returns one of this function's declarations. it is guaranteed to be the same each time get_declaration 
   // is called and to be the canonical declaration
   SgFunctionDeclaration* get_declaration() const;
+  
+  // Returns one of function's defining declaration
+  SgFunctionDeclaration* get_definingDeclaration() const;
 
   // returns the file_info of the definition or one of the declarations if there is no definition
   Sg_File_Info* get_file_info() const;
@@ -78,6 +81,15 @@ class Function
   
   // Returns the Function object that refers to the function that contains the given SgNode
   static Function getEnclosingFunction(SgNode* n, bool includingSelf=true);
+  
+  // Add to funcs all the Functions that virtually override decl
+  static void addVirtualOverrides(SgFunctionDeclaration* decl, std::set<Function> funcs);
+
+  // Return whether the given SgFunctionType is virtual
+  static bool isVirtual(SgFunctionType* type);
+
+  // Returns the set of functions that the given SgFunctionCallExp may refer to
+  static std::set<Function> getCallees(SgFunctionCallExp* call);
 
   std::string str(std::string indent="") const;
 };

@@ -854,8 +854,8 @@ namespace hssa_private {
     SgFunctionDefinition* currFuncDef;
 
   public:
-    PGSSAAnalysis() : currFuncDef(NULL), currentObjMap_(NULL) {};
-    PGSSAAnalysis(SgProject* project_) : project(project_), currFuncDef(NULL), currentObjMap_(NULL) {};
+    PGSSAAnalysis() : ComposedAnalysis(/*trackBase2RefinedPartEdgeMapping*/ false), currFuncDef(NULL), currentObjMap_(NULL) {};
+    PGSSAAnalysis(SgProject* project_) : ComposedAnalysis(/*trackBase2RefinedPartEdgeMapping*/ false), project(project_), currFuncDef(NULL), currentObjMap_(NULL) {};
 
       // NodeState* initializeFunctionNodeState(const Function &func, NodeState *fState);
 

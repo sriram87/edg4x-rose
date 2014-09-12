@@ -4,11 +4,28 @@
 #include "sage3basic.h"
 #include "CallGraphTraverse.h"
 #include "cfgUtils.h"
+#include "sageInterface.h"
+#include "midend/programAnalysis/CallGraphAnalysis/CallGraph.h"
+using namespace SageInterface;
 
 #include <set>
 using namespace std;
 
+using namespace sight;
+
 namespace fuse {
+// Points to the object that stores the entire class hierarchy of all types
+ClassHierarchyWrapper* classHierarchy=NULL;
+
+// Initializes and returns the ClassHierarchyGraph
+static ClassHierarchyWrapper* CHG() {
+  if(classHierarchy==NULL) {
+    classHierarchy = new ClassHierarchyWrapper(getProject());
+    ROSE_ASSERT(classHierarchy);
+  }
+  return classHierarchy;
+}
+
   
 /****************************
  ********* Function *********
@@ -69,6 +86,7 @@ Function::Function(SgFunctionDefinition* sample)
 
 Function::Function(SgFunctionCallExp* funcCall)
 {
+  //dbg << "Function::Function("<<SgNode2Str(funcCall)<<")"<<endl;
   //assert(isSgFunctionRefExp(funcCall->get_function()));
   // If the call's referent is known, initialize based on its declaration
   if(isSgFunctionRefExp(funcCall->get_function())) {
@@ -298,6 +316,13 @@ SgFunctionDeclaration* Function::get_declaration() const
   return decl;
 }
 
+// Returns one of function's defining declaration
+SgFunctionDeclaration* Function::get_definingDeclaration() const
+{
+  //return *(decls.begin());
+  return isSgFunctionDeclaration(decl->get_definingDeclaration());
+}
+
 // returns the file_info of the definition or one of the declarations if there is no definition
 Sg_File_Info* Function::get_file_info() const
 {
@@ -365,6 +390,16 @@ string Function::str(string indent) const
   }
   oss << ")";
   return oss.str();
+}
+
+// Returns the set of functions that the given SgFunctionCallExp may refer to
+set<Function> Function::getCallees(SgFunctionCallExp* call) {
+  Rose_STL_Container<SgFunctionDeclaration*> calleeList;
+  CallTargetSet::getDeclarationsForExpression(call, CHG(), calleeList);
+  set<Function> callees;
+  for(Rose_STL_Container<SgFunctionDeclaration*>::iterator c=calleeList.begin(); c!=calleeList.end(); c++)
+    callees.insert(Function(*c));
+  return callees;
 }
 
 /******************************

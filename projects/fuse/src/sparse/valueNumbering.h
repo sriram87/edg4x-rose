@@ -163,8 +163,8 @@ namespace scc_private
   class SparseValueNumbering : virtual public PGSSAAnalysis {
 
   public:
-    SparseValueNumbering() : hasVisitor(false) {};
-      SparseValueNumbering(SparseValueNumbering* oldAnalysis) : hasVisitor(false) {};
+    SparseValueNumbering() : ComposedAnalysis(/*trackBase2RefinedPartEdgeMapping*/ false), hasVisitor(false) {};
+    SparseValueNumbering(SparseValueNumbering* oldAnalysis) : ComposedAnalysis(/*trackBase2RefinedPartEdgeMapping*/ false), hasVisitor(false) {};
 
     void genInitLattice(const Function& func, PartPtr part, PartEdgePtr pedge,
                         std::vector<Lattice*>& initLattices);

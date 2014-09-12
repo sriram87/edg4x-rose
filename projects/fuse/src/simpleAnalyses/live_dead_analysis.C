@@ -15,7 +15,7 @@ DEBUG_LEVEL(liveDeadAnalysisDebugLevel, 0);
 // ###############################
 
 LiveDeadMemAnalysis::LiveDeadMemAnalysis(funcSideEffectUses* fseu): 
-fseu(fseu)
+    BWDataflow(/*trackBase2RefinedPartEdgeMapping*/ false), fseu(fseu)
 {
 }
 

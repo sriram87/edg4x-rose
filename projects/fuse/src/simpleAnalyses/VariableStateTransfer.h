@@ -393,6 +393,11 @@ public:
     // Documentation says this is no longer used, so explicitly fail if we see it
     assert(0);
   }
+  
+  bool finish()
+  {
+    return modified;
+  }
 };
 
 }; //namespace fuse

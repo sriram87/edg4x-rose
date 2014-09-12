@@ -1,7 +1,7 @@
 include $(top_srcdir)/config/Makefile.for.ROSE.includes.and.libs
 include $(ROSE_WITH_SIGHT_INSTALL_PATH)/Makefile.extern
 
-bin_PROGRAMS = fuse fuseTight fuseLayout
+bin_PROGRAMS = fuse fuseLayout
 
 INCLUDES = \
 	$(ROSE_INCLUDES) \
@@ -43,6 +43,7 @@ include_HEADERS =\
 	simpleAnalyses/printAnalysisStates.h \
 	simpleAnalyses/saveDotAnalysis.h \
 	simpleAnalyses/taintAnalysis.h \
+	simpleAnalyses/virtualMethodAnalysis.h \
 	simpleAnalyses/VariableStateTransfer.h \
 	sparse/constantAnalysis.h \
 	sparse/heapDefsAndUsesTraversal.h \
@@ -104,6 +105,7 @@ fuse_SOURCES = \
 	simpleAnalyses/printAnalysisStates.C \
 	simpleAnalyses/saveDotAnalysis.C \
 	simpleAnalyses/taintAnalysis.C \
+	simpleAnalyses/virtualMethodAnalysis.C \
         sparse/constantAnalysis.C \
 	sparse/heapDefsAndUsesTraversal.C \
 	sparse/heapSSA.C \
@@ -139,74 +141,51 @@ FUSE_CPP_TESTS = \
 	simplePtrTest.cpp \
 	sas13Fig1Example.cpp
 
-FUSE_C_CHECKS = $(addprefix fuse_C_, $(addsuffix .passed, $(FUSE_C_TESTS)))
-FUSE_C_EXPENSIVE_CHECKS = $(addprefix fuse_C_EXP_, $(addsuffix .passed, $(FUSE_C_EXPENSIVE_TESTS)))
-FUSE_CPP_CHECKS = $(addprefix fuse_cpp_, $(addsuffix .passed, $(FUSE_CPP_TESTS)))
-FUSE_FLAGS = 
-FUSE = ./fuse
-
-$(FUSE_C_CHECKS): fuse_C_%.passed: $(TESTS_DIR)/% $(TEST_EXIT_STATUS) $(FUSE)
-	@$(RTH_RUN) CMD="./fuse  -I$(TESTS_DIR) -c $<" $(TEST_EXIT_STATUS) $@
-
-$(FUSE_C_EXPENSIVE_CHECKS): fuse_C_EXP_%.passed: $(TESTS_DIR)/% $(TEST_EXIT_STATUS) $(FUSE)
-	@$(RTH_RUN) CMD="./fuse  -I$(TESTS_DIR) -c $<" $(TEST_EXIT_STATUS) $@
-
-$(FUSE_CPP_CHECKS): fuse_cpp_%.passed: $(TESTS_DIR)/% $(TEST_EXIT_STATUS) $(FUSE)
-	@$(RTH_RUN) CMD="./fuse  -I$(TESTS_DIR) -c $<" $(TEST_EXIT_STATUS) $@
-
-.PHONY: check-fuse check-fuse-expensive
-
-check-fuse: $(FUSE_C_CHECKS) $(FUSE_CPP_CHECKS)
-check-fuse-expensive: $(FUSE_C_EXPENSIVE_CHECKS)
-
-.PHONY: clean-fuse
-clean-fuse:
-	rm -rf fuse fuse-*.o
-
 #############
 # FUSETIGHT #
 #############
-fuseTight_CXXFLAGS = $(SIGHT_CFLAGS) -DROSE_PREFIX="\"${top_builddir}\""
-fuseTight_LDADD = -lrose
-fuseTight_LDFLAGS = $(ROSE_LIBS) $(LIBS_WITH_RPATH) $(SIGHT_LINKFLAGS)
-
-fuseTight_DEPENDENCIES=fuseLayout
-
-fuseTight_SOURCES = \
-	analysis/abstract_object.C \
-	analysis/abstract_object_map.C \
-	analysis/abstract_object_set.C \
-	analysis/analysis.C \
-	analysis/analysis_tester.C \
-	analysis/compose.C \
-	analysis/composed_analysis.C \
-	analysis/factor_trans_system.C \
-	analysis/graphIterator.C \
-	analysis/partitions.C \
-	analysis/stx_analysis.C \
-	analysis/tight_composer.C \
-	cfgUtils/CallGraphTraverse.C \
-	cfgUtils/cfgUtils.C \
-	cfgUtils/DataflowCFG.C \
-	cfgUtils/VirtualCFGIterator.C \
-	sight/widgets/ats_graph_structure.C \
-	lattice/lattice.C \
-	simpleAnalyses/call_context_sensitivity_analysis.C \
-	simpleAnalyses/const_prop_analysis.C \
-	simpleAnalyses/dead_path_elim_analysis.C \
-	simpleAnalyses/live_dead_analysis.C \
-	simpleAnalyses/pointsToAnalysis.C \
-	simpleAnalyses/printAnalysisStates.C \
-	simpleAnalyses/saveDotAnalysis.C \
-	simpleAnalyses/taintAnalysis.C \
-	sparse/constantAnalysis.C \
-	sparse/heapDefsAndUsesTraversal.C \
-	sparse/heapSSA.C \
-	sparse/hssaMemObject.C \
-	sparse/pointerAnalysis.C \
-	sparse/valueNumbering.C \
-	state/nodeState.C \
-	tightCompositionTest.C
+#fuseTight_CXXFLAGS = $(SIGHT_CFLAGS) -DROSE_PREFIX="\"${top_builddir}\""
+#fuseTight_LDADD = -lrose
+#fuseTight_LDFLAGS = $(ROSE_LIBS) $(LIBS_WITH_RPATH) $(SIGHT_LINKFLAGS)
+#
+#fuseTight_DEPENDENCIES=fuseLayout
+#
+#fuseTight_SOURCES = \
+#	analysis/abstract_object.C \
+#	analysis/abstract_object_map.C \
+#	analysis/abstract_object_set.C \
+#	analysis/analysis.C \
+#	analysis/analysis_tester.C \
+#	analysis/compose.C \
+#	analysis/composed_analysis.C \
+#	analysis/factor_trans_system.C \
+#	analysis/graphIterator.C \
+#	analysis/partitions.C \
+#	analysis/stx_analysis.C \
+#	analysis/tight_composer.C \
+#	cfgUtils/CallGraphTraverse.C \
+#	cfgUtils/cfgUtils.C \
+#	cfgUtils/DataflowCFG.C \
+#	cfgUtils/VirtualCFGIterator.C \
+#	sight/widgets/ats_graph_structure.C \
+#	lattice/lattice.C \
+#	simpleAnalyses/call_context_sensitivity_analysis.C \
+#	simpleAnalyses/const_prop_analysis.C \
+#	simpleAnalyses/dead_path_elim_analysis.C \
+#	simpleAnalyses/live_dead_analysis.C \
+#	simpleAnalyses/pointsToAnalysis.C \
+#	simpleAnalyses/printAnalysisStates.C \
+#	simpleAnalyses/saveDotAnalysis.C \
+#	simpleAnalyses/taintAnalysis.C \
+#	simpleAnalyses/virtualMethodAnalysis.C \
+#	sparse/constantAnalysis.C \
+#	sparse/heapDefsAndUsesTraversal.C \
+#	sparse/heapSSA.C \
+#	sparse/hssaMemObject.C \
+#	sparse/pointerAnalysis.C \
+#	sparse/valueNumbering.C \
+#	state/nodeState.C \
+#	tightCompositionTest.C
 
 #SA 8/15/2014
 # Adding checks for testing tight composition
@@ -220,24 +199,52 @@ FUSETIGHT_CP_PT_TESTS=\
 	simplePtrTestTight4.cpp \
 	simplePtrTestTight5.cpp
 
-FUSETIGHT_CP_ARR_TESTS = arrayPtrTestTight.cpp
+#FUSETIGHT_CP_ARR_TESTS = arrayPtrTestTight.cpp
+#
+#FUSETIGHT_TESTS = ${FUSETIGHT_CP_PT_TESTS}
+#
+#FUSETIGHT_CHECKS = $(addprefix fusetight_, $(addsuffix .passed, $(FUSETIGHT_TESTS)))
+#
+#FUSETIGHT = ./fuseTight
+#
+#$(FUSETIGHT_CHECKS): fusetight_%.passed: $(TESTS_DIR)/% $(TEST_EXIT_STATUS) $(FUSETIGHT)
+#	@$(RTH_RUN) CMD="./fuseTight  -I$(TESTS_DIR) -c $<" $(TEST_EXIT_STATUS) $@
+#
+#
+#.PHONY: check-fusetight
+#check-fusetight: $(FUSETIGHT_CHECKS)
+#
+#.PHONY: clean-fusetight
+#clean-fusetight:
+#	rm -rf fuseTight fuseTight-*.o
 
-FUSETIGHT_TESTS = ${FUSETIGHT_CP_PT_TESTS}
-
+FUSE_C_CHECKS = $(addprefix fuse_C_, $(addsuffix .passed, $(FUSE_C_TESTS)))
+FUSE_C_EXPENSIVE_CHECKS = $(addprefix fuse_C_EXP_, $(addsuffix .passed, $(FUSE_C_EXPENSIVE_TESTS)))
+FUSE_CPP_CHECKS = $(addprefix fuse_cpp_, $(addsuffix .passed, $(FUSE_CPP_TESTS)))
 FUSETIGHT_CHECKS = $(addprefix fusetight_, $(addsuffix .passed, $(FUSETIGHT_TESTS)))
+FUSE_FLAGS = 
+FUSE = ./fuse
 
-FUSETIGHT = ./fuseTight
+$(FUSE_C_CHECKS): fuse_C_%.passed: $(TESTS_DIR)/% $(TEST_EXIT_STATUS) $(FUSE)
+	@$(RTH_RUN) CMD="./fuse  -I$(TESTS_DIR) -c $<" $(TEST_EXIT_STATUS) $@
 
-$(FUSETIGHT_CHECKS): fusetight_%.passed: $(TESTS_DIR)/% $(TEST_EXIT_STATUS) $(FUSETIGHT)
-	@$(RTH_RUN) CMD="./fuseTight  -I$(TESTS_DIR) -c $<" $(TEST_EXIT_STATUS) $@
+$(FUSE_C_EXPENSIVE_CHECKS): fuse_C_EXP_%.passed: $(TESTS_DIR)/% $(TEST_EXIT_STATUS) $(FUSE)
+	@$(RTH_RUN) CMD="./fuse  -I$(TESTS_DIR) -c $<" $(TEST_EXIT_STATUS) $@
 
+$(FUSE_CPP_CHECKS): fuse_cpp_%.passed: $(TESTS_DIR)/% $(TEST_EXIT_STATUS) $(FUSE)
+	@$(RTH_RUN) CMD="./fuse  -I$(TESTS_DIR) -c $<" $(TEST_EXIT_STATUS) $@
 
-.PHONY: check-fusetight
-check-fusetight: $(FUSETIGHT_CHECKS)
+$(FUSETIGHT_CHECKS): fusetight_%.passed: $(TESTS_DIR)/% $(TEST_EXIT_STATUS) $(FUSE)
+	@$(RTH_RUN) CMD="./fuse  -I$(TESTS_DIR) -c $<" $(TEST_EXIT_STATUS) $@
 
-.PHONY: clean-fusetight
-clean-fusetight:
-	rm -rf fuseTight fuseTight-*.o
+.PHONY: check-fuse check-fuse-expensive
+
+check-fuse: $(FUSE_C_CHECKS) $(FUSE_CPP_CHECKS) $(FUSETIGHT_CHECKS)
+check-fuse-expensive: $(FUSE_C_EXPENSIVE_CHECKS)
+
+.PHONY: clean-fuse
+clean-fuse:
+	rm -rf fuse fuse-*.o
 
 #############
 # EXTRADIST #

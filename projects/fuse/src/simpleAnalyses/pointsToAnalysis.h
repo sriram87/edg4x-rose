@@ -63,7 +63,7 @@ namespace fuse
   class PointsToAnalysis : public virtual FWDataflow
   {
   public:
-    PointsToAnalysis() { }
+    PointsToAnalysis() : FWDataflow(/*trackBase2RefinedPartEdgeMapping*/ false) { }
     
     // Returns a shared pointer to a freshly-allocated copy of this ComposedAnalysis object
     ComposedAnalysisPtr copy() { return boost::make_shared<PointsToAnalysis>(); }

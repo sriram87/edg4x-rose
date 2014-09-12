@@ -296,14 +296,17 @@ class Part : public sight::printable, public boost::enable_shared_from_this<Part
   PartContextPtr pContext;
   
   public:
-  Part(ComposedAnalysis* analysis, PartPtr parent, PartContextPtr pContext=NULLPartContextPtr) : 
-    analysis(analysis), parent(parent), pContext(pContext) {}
-  Part(const Part& that) : 
-    analysis(that.analysis), parent(that.parent), pContext(that.pContext) {}
+  Part(ComposedAnalysis* analysis, PartPtr parent, PartContextPtr pContext=NULLPartContextPtr);
+  Part(const Part& that);
+  
+  // Function that will always be called after a Part is created and before it is returned
+  // to the caller. It is called outside of the Part constructor, which makes it possible to
+  // place code inside that registers a shared pointer to this Part with a directory of some kind.
+  void init() {}
   
   ~Part();
   
-  // Returns true if this PartEdge comes from the same analysis as that PartEdge and false otherwise
+  // Returns true if this Part comes from the same analysis as that Part and false otherwise
   bool compatible(const Part& that) { return analysis == that.analysis; }
   bool compatible(PartPtr that)     { return analysis == that->analysis; }
   
@@ -468,14 +471,13 @@ class PartEdge : public sight::printable, public boost::enable_shared_from_this<
   MLRemapper remap;
   
   public:
-  /*PartEdge(ComposedAnalysis* analysis, PartEdgePtr parent) :
-    analysis(analysis), parent(parent), remap(boost::make_shared<NullMLRemapper>()) {}
-  PartEdge(ComposedAnalysis* analysis, PartEdgePtr parent, boost::shared_ptr<MLRemapper> remap) :
-    analysis(analysis), parent(parent), remap(remap) {}*/
-  PartEdge(ComposedAnalysis* analysis, PartEdgePtr parent) : 
-    analysis(analysis), parent(parent) {}
-  PartEdge(const PartEdge& that) :
-    analysis(that.analysis), parent(that.parent), remap(that.remap) {}
+  PartEdge(ComposedAnalysis* analysis, PartEdgePtr parent);
+  PartEdge(const PartEdge& that);
+
+  // Function that will always be called after a PartEdge is created and before it is returned
+  // to the caller. It is called outside of the PartEdge constructor, which makes it possible to
+  // place code inside that registers a shared pointer to this PartEdge with a directory of some kind.
+  void init();
   
   // Returns true if this PartEdge comes from the same analysis as that PartEdge and false otherwise
   bool compatible(const PartEdge& that) { return analysis == that.analysis; }

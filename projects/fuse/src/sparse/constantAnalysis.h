@@ -172,8 +172,8 @@ namespace scc_private
   class SparseConstantAnalysis : virtual public PGSSAAnalysis {
    
   public:
-    SparseConstantAnalysis() : hasVisitor(false) {};
-      SparseConstantAnalysis(SparseConstantAnalysis* oldAnalysis) : hasVisitor(false) {};
+    SparseConstantAnalysis() : ComposedAnalysis(/*trackBase2RefinedPartEdgeMapping*/ false), hasVisitor(false) {};
+      SparseConstantAnalysis(SparseConstantAnalysis* oldAnalysis) : ComposedAnalysis(/*trackBase2RefinedPartEdgeMapping*/ false), hasVisitor(false) {};
 
     void genInitLattice(const Function& func, PartPtr part, PartEdgePtr pedge, 
 			std::vector<Lattice*>& initLattices);

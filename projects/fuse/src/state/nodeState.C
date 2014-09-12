@@ -349,6 +349,9 @@ Lattice* NodeState::getLattice_ex(const LatticeMap& dfMap, Analysis* analysis,
 
   if(dfMap.find((Analysis*)analysis) == dfMap.end()) {
     scope reg("NodeState::getLattice_ex: Analysis not found!", scope::medium);
+    ComposedAnalysis* compAnalysis = dynamic_cast<ComposedAnalysis*>(analysis);
+    if(compAnalysis) dbg<<"analysis="<<compAnalysis->str()<<endl;
+    dbg << "#dfMap="<<dfMap.size()<<endl;
     dbg << "dfMap.find("<<analysis<<")!=dfMap.end() = "<<(dfMap.find((Analysis*)analysis) != dfMap.end())<<" dfMap.size()="<<dfMap.size()<<endl;
     for(LatticeMap::const_iterator i=dfMap.begin(); i!=dfMap.end(); i++)
     { dbg << "i="<<i->first<<endl; }

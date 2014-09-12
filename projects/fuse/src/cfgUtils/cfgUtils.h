@@ -14,7 +14,7 @@ namespace fuse
 
   // pulls off all the SgCastExps that may be wrapping the given expression, returning the expression that is being wrapped
   SgExpression* unwrapCasts(SgExpression* e);
-
+  
   // Creates the SgValueExp that denotes the contents of the given expression, returning NULL if this is not possible.
   // The caller must deallocate the returned object
   SgValueExp* getSGValueExp(SgExpression* e);

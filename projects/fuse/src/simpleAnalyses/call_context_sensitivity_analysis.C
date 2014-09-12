@@ -273,7 +273,7 @@ std::list<PartEdgePtr> CallCtxSensPart::outEdges()
   
     // Create CallCtxSensPartEdges for all the outgoing src->tgt CallCtxSensPart pairs in lat
     for(set<CallCtxSensPartPtr>::iterator i=lat->outgoing[get_shared_this()].begin(); i!=lat->outgoing[get_shared_this()].end(); i++)
-      ccsEdges.push_back(makePtr<CallCtxSensPartEdge>(*be, get_shared_this(), *i, ccsa));
+      ccsEdges.push_back(CallCtxSensPartEdge::create(*be, get_shared_this(), *i, ccsa));
   }
   
   if(callContextSensitivityDebugLevel()>2) dbg << "#ccsEdges="<<ccsEdges.size()<<endl;
@@ -306,7 +306,7 @@ std::list<PartEdgePtr> CallCtxSensPart::inEdges() {
   
     // Create CallCtxSensPartEdges for all the incoming  src->tgt CallCtxSensPart pairs in lat
     for(set<CallCtxSensPartPtr>::iterator i=lat->incoming[get_shared_this()].begin(); i!=lat->incoming[get_shared_this()].end(); i++)
-      ccsEdges.push_back(makePtr<CallCtxSensPartEdge>(*be, *i, get_shared_this(), ccsa));
+      ccsEdges.push_back(CallCtxSensPartEdge::create(*be, *i, get_shared_this(), ccsa));
   }
   
   return ccsEdges;
@@ -323,7 +323,7 @@ set<PartPtr> CallCtxSensPart::matchingCallParts() const {
   // Wrap the parts returned by the call to the parent Part with CallCtxSensParts
   set<PartPtr> parentMatchParts = getParent()->matchingCallParts();
   for(set<PartPtr>::iterator mp=parentMatchParts.begin(); mp!=parentMatchParts.end(); mp++) {
-    matchParts.insert(makePtr<CallCtxSensPart>(*mp, *this, analysis));
+    matchParts.insert(CallCtxSensPart::create(*mp, *this, analysis));
   }
   return matchParts;
 }
@@ -341,13 +341,13 @@ std::list<PartPtr> getOperandPart(SgNode* anchor, SgNode* operand);*/
 // Returns a PartEdgePtr, where the source is a wild-card part (NULLPart) and the target is this Part
 PartEdgePtr CallCtxSensPart::inEdgeFromAny()
 {
-  return makePtr<CallCtxSensPartEdge>(getParent()->inEdgeFromAny(), NULLPart, get_shared_this(), analysis);
+  return CallCtxSensPartEdge::create(getParent()->inEdgeFromAny(), NULLPart, get_shared_this(), analysis);
 }
 
 // Returns a PartEdgePtr, where the target is a wild-card part (NULLPart) and the source is this Part
 PartEdgePtr CallCtxSensPart::outEdgeToAny()
 {
-  return makePtr<CallCtxSensPartEdge>(getParent()->outEdgeToAny(), get_shared_this(), NULLPart, analysis);
+  return CallCtxSensPartEdge::create(getParent()->outEdgeToAny(), get_shared_this(), NULLPart, analysis);
 }
 
 // Returns the specific context of this Part. Can return the NULLPartContextPtr if this
@@ -447,15 +447,15 @@ std::list<PartEdgePtr> CallCtxSensPartEdge::getOperandPartEdge(SgNode* anchor, S
   // Convert the list of edges into a set for easier/faster lookups
   list<PartEdgePtr> ccsEdges;
   for(list<PartEdgePtr>::iterator be=baseEdges.begin(); be!=baseEdges.end(); be++) {
-    CallCtxSensPartPtr edgeSrc = makePtr<CallCtxSensPart>((*be)->source(), (src? src: tgt), analysis);
+    CallCtxSensPartPtr edgeSrc = CallCtxSensPart::create((*be)->source(), (src? src: tgt), analysis);
     { scope reg("edgeSrc", scope::low, attrGE("callContextSensitivityDebugLevel", 2));
     if(callContextSensitivityDebugLevel()>=2) dbg<<edgeSrc->str()<<endl; }
     
-    CallCtxSensPartPtr edgeTgt = makePtr<CallCtxSensPart>((*be)->target(), (src? src: tgt), analysis);
+    CallCtxSensPartPtr edgeTgt = CallCtxSensPart::create((*be)->target(), (src? src: tgt), analysis);
     { scope reg("edgeTgt", scope::low, attrGE("callContextSensitivityDebugLevel", 2));
     if(callContextSensitivityDebugLevel()>=2) dbg<<edgeTgt->str()<<endl; }
     
-    CallCtxSensPartEdgePtr ccsEdge = makePtr<CallCtxSensPartEdge>(*be, edgeSrc, edgeTgt, analysis);
+    CallCtxSensPartEdgePtr ccsEdge = CallCtxSensPartEdge::create(*be, edgeSrc, edgeTgt, analysis);
     { scope reg("ccsEdge", scope::low, attrGE("callContextSensitivityDebugLevel", 2));
     if(callContextSensitivityDebugLevel()>=2) dbg<<ccsEdge->str()<<endl; }
     
@@ -1096,7 +1096,7 @@ void CallContextSensitivityAnalysis::genInitLattice(PartPtr part, PartEdgePtr pe
       Function emptyLastCtxtFunc;
       bool noRecursion=false;
       ccsLat->outgoing[NULLPart].
-              insert(makePtr<CallCtxSensPart>((*e)->source(), emptyContext, emptyLastCtxtFunc, noRecursion, this));
+              insert(CallCtxSensPart::create((*e)->source(), emptyContext, emptyLastCtxtFunc, noRecursion, this));
     }
   }
   
@@ -1164,7 +1164,7 @@ bool CallContextSensitivityAnalysis::transfer(PartPtr part, CFGNode cn, NodeStat
           newTargets = createFuncExitEdge(*e, *src);
         } else {
           if(callContextSensitivityDebugLevel()>=1) dbg << "<b>Internal Node</b>" << endl;
-          newTargets.insert(makePtr<CallCtxSensPart>((*e)->target(), (*src)->context, (*src)->lastCtxtFunc, (*src)->recursive, this));
+          newTargets.insert(CallCtxSensPart::create((*e)->target(), (*src)->context, (*src)->lastCtxtFunc, (*src)->recursive, this));
         }
         
         for(set<CallCtxSensPartPtr>::iterator t=newTargets.begin(); t!=newTargets.end(); t++) {
@@ -1448,11 +1448,11 @@ set<CallCtxSensPartPtr> CallContextSensitivityAnalysis::createCallOutEdge(PartEd
     if(callContextSensitivityDebugLevel()>=1) dbg << "src->lastCtxtFunc="<<src->lastCtxtFunc.get_name().getString()<<"(), calleeFunc="<<calleeFunc.get_name().getString()<<endl;
     if(src->recursive || src->lastCtxtFunc==calleeFunc) {
       if(callContextSensitivityDebugLevel()>=1) dbg << "Recursive call."<<endl;
-      ret.insert(makePtr<CallCtxSensPart>(baseEdge->target(), src->context, src->lastCtxtFunc, true, this));
+      ret.insert(CallCtxSensPart::create(baseEdge->target(), src->context, src->lastCtxtFunc, true, this));
     // Else, if there is no recursion at this point in the analysis
     } else {
       if(callContextSensitivityDebugLevel()>=1) dbg << "Non-recursive call."<<endl;
-      ret.insert(makePtr<CallCtxSensPart>(baseEdge->target(), src->context, src->lastCtxtFunc, false, this));
+      ret.insert(CallCtxSensPart::create(baseEdge->target(), src->context, src->lastCtxtFunc, false, this));
     }
   // If we haven't yet reached the limits of our context 
   } else {
@@ -1462,7 +1462,7 @@ set<CallCtxSensPartPtr> CallContextSensitivityAnalysis::createCallOutEdge(PartEd
     new_context.push(baseEdge->source());
     //dbg << "#new_context="<<new_context.getCtxtStackDepth()<<endl;
 
-    ret.insert(makePtr<CallCtxSensPart>(baseEdge->target(), new_context, 
+    ret.insert(CallCtxSensPart::create(baseEdge->target(), new_context, 
                            // If the context has reached its limit, pass the Fucntion object that denoted the 
                            // object in which the call resides. Otherwise, pass a blank Function object
                            (new_context.getCtxtStackDepth()==getSensDepth()? callerFunc: Function()),
@@ -1504,7 +1504,7 @@ set<CallCtxSensPartPtr> CallContextSensitivityAnalysis::createFuncExitEdge(PartE
         CallPartContext new_context = src->context;
         new_context.pop();
         if(callContextSensitivityDebugLevel()>=1) dbg << "Match. #new_context="<<new_context.getCtxtStackDepth()<<endl;
-        ret.insert(makePtr<CallCtxSensPart>(baseEdge->target(), new_context, Function(), false, this));
+        ret.insert(CallCtxSensPart::create(baseEdge->target(), new_context, Function(), false, this));
       } else {
         if(callContextSensitivityDebugLevel()>=1) dbg << "No Match."<<endl;
       
@@ -1514,14 +1514,14 @@ set<CallCtxSensPartPtr> CallContextSensitivityAnalysis::createFuncExitEdge(PartE
         if(src->recursive) {
           if(callContextSensitivityDebugLevel()>=1) dbg << "Recursive."<<endl;
 
-          ret.insert(makePtr<CallCtxSensPart>(baseEdge->target(), src->context, src->lastCtxtFunc, true, this));
+          ret.insert(CallCtxSensPart::create(baseEdge->target(), src->context, src->lastCtxtFunc, true, this));
         }
       }
     // If we're returning to a function that is not the last one in our context
     } else {
       if(callContextSensitivityDebugLevel()>=1) dbg << "Returning to non-last in context"<<endl;
       // Create an edge with the same context information as src
-      ret.insert(makePtr<CallCtxSensPart>(baseEdge->target(), src->context, src->lastCtxtFunc, src->recursive, this));
+      ret.insert(CallCtxSensPart::create(baseEdge->target(), src->context, src->lastCtxtFunc, src->recursive, this));
     }
   
   // If we're not currently at full context depth and we have a non-empty context (empty contexts correspond to 
@@ -1539,7 +1539,7 @@ set<CallCtxSensPartPtr> CallContextSensitivityAnalysis::createFuncExitEdge(PartE
       CallPartContext new_context = src->context;
       new_context.pop();
       if(callContextSensitivityDebugLevel()>=1) dbg << "Match. #new_context="<<new_context.getCtxtStackDepth()<<endl;
-      ret.insert(makePtr<CallCtxSensPart>(baseEdge->target(), new_context, Function(), false, this));
+      ret.insert(CallCtxSensPart::create(baseEdge->target(), new_context, Function(), false, this));
     } else 
       if(callContextSensitivityDebugLevel()>=1) dbg << "No Match."<<endl;
   } else 
@@ -1584,7 +1584,7 @@ set<PartPtr> CallContextSensitivityAnalysis::GetStartAStates_Spec()
     // Only include exits of functions with no calling contexts since those that do have calling contexts
     // correspond to instances of the functions that must have been called from inside the current compilation
     // unit and could not have been called from outside
-    CallCtxSensPartPtr ccs = makePtr<CallCtxSensPart>(*s, this);
+    CallCtxSensPartPtr ccs = CallCtxSensPart::create(*s, this);
     if(ccs->context.getCtxtStackDepth()==0)
       startCCSStates.insert(ccs);
   }
@@ -1623,7 +1623,7 @@ set<PartPtr> CallContextSensitivityAnalysis::GetEndAStates_Spec()
       }
     }
   }
-  //endCCSStates.insert(makePtr<CallCtxSensPart>(*i, this));
+  //endCCSStates.insert(CallCtxSensPart::create(*i, this));
   return endCCSStates;
 }
 

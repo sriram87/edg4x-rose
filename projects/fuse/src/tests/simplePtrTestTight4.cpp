@@ -1,3 +1,4 @@
+#pragma fuse lc(cp, dp, t(pt, cp))
 
 void CompDebugAssert(bool expr);
 
@@ -12,6 +13,7 @@ int main()
   else {
     p = &val2;
   }
+  CompDebugAssert(*p==4);
 
   return *p + 1;
 }

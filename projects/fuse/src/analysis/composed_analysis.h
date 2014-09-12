@@ -24,7 +24,9 @@ class ComposedAnalysis : public virtual Dataflow, public sight::printable
   public:
   Composer* composer;
   
-  ComposedAnalysis();
+  // trackBase2RefinedPartEdgeMapping - records whether the mapping from base PartEdges to their
+  //     corresponding refined parts should be tracked
+  ComposedAnalysis(bool trackBase2RefinedPartEdgeMapping);
   
   // Informs this analysis about the identity of the Composer object that composes
   // this analysis with others
@@ -117,8 +119,23 @@ class ComposedAnalysis : public virtual Dataflow, public sight::printable
   // Cached copies of the results of GetStartAState and GetEndAState
   std::set<PartPtr> StartAStates;
   std::set<PartPtr> EndAStates;
-  
-  std::map<PartEdgePtr, PartEdgePtr> new2oldPEdge;  
+ 
+  // Maps refined edges to the base edges they refine. Set inside convertPEdge()
+  // by caching the output of PartEdge->getParent
+  std::map<PartEdgePtr, PartEdgePtr> refined2BasePedge;
+
+  // Maps base parts from the ATS on which this analysis runs to the parts implemented
+  // by this analysis that refine themto the edges that refine them. Set inside 
+  // registerBase2RefinedMapping(), which is called inside the PartEdge constructor
+  // when the connection between a given refined part and its base part is first established.
+  std::map<PartEdgePtr, std::set<PartEdgePtr> > base2RefinedPartEdge;
+
+  protected:
+  // Records whether the base2RefinedPartEdge mapping should be tracked. It is not needed
+  // in most cases, so it should be used only when explicitly needed (e.g. when users need
+  // to ask for analysis results at AST nodes and we need to track down all analysis ATS
+  // PartEdges that correspond to each ATS SgNode*.
+  bool trackBase2RefinedPartEdgeMapping;
   
   public:
    
@@ -139,6 +156,15 @@ class ComposedAnalysis : public virtual Dataflow, public sight::printable
   // from which pedge was derived. This function caches the results if possible.
   PartEdgePtr convertPEdge(PartEdgePtr pedge);
   
+  // Given a PartEdge base from the ATS on which this ComposedAnalysis runs and a PartEdge implemented
+  // by this composed analysis that refines base, records the mapping from the base PartEdge
+  // to the refined PartEdge.
+  void registerBase2RefinedMapping(PartEdgePtr base, PartEdgePtr refined);
+  
+  // Given a PartEdge implemented by this analysis, returns the set of refined PartEdges implemented
+  // by this analysis or the NULLPart if this relationship was not tracked.
+  const std::set<PartEdgePtr>& getRefinedPartEdges(PartEdgePtr base) const;
+
   // Specific Composers implement this function
   //virtual PartEdgePtr convertPEdge_Spec(PartEdgePtr pedge) { throw NotImplementedException(); }
   
@@ -268,7 +294,7 @@ class FWDataflow  : public ComposedAnalysis
 {
   public:
   
-  FWDataflow()
+  FWDataflow(bool trackBase2RefinedPartEdgeMapping): ComposedAnalysis(trackBase2RefinedPartEdgeMapping)
   {}
 
   void initNodeState(PartPtr part);
@@ -301,7 +327,7 @@ class BWDataflow  : public ComposedAnalysis
 {
   public:
   
-  BWDataflow()
+  BWDataflow(bool trackBase2RefinedPartEdgeMapping): ComposedAnalysis(trackBase2RefinedPartEdgeMapping)
   {}
 
   void initNodeState(PartPtr part);
@@ -336,7 +362,7 @@ class UndirDataflow  : public ComposedAnalysis
 {
   public:
   
-  UndirDataflow()
+  UndirDataflow() : ComposedAnalysis(/*trackBase2RefinedPartEdgeMapping*/ false)
   {}
 
   // relevant only for directional dataflow analysis
@@ -387,7 +413,7 @@ class printDataflowInfoPass : public FWDataflow
   Analysis* analysis;
 
   public:
-  printDataflowInfoPass(Analysis *analysis)
+  printDataflowInfoPass(Analysis *analysis) : FWDataflow(/*trackBase2RefinedPartEdgeMapping*/ false)
   {
           this->analysis = analysis;
   }
@@ -414,8 +440,8 @@ class checkDataflowInfoPass : public FWDataflow
   int numErrors;
 
   public:
-  checkDataflowInfoPass() : numErrors(0) { }
-  checkDataflowInfoPass(int numErrors): numErrors(numErrors) { }
+  checkDataflowInfoPass() : FWDataflow(/*trackBase2RefinedPartEdgeMapping*/ false), numErrors(0) { }
+  checkDataflowInfoPass(int numErrors): FWDataflow(/*trackBase2RefinedPartEdgeMapping*/ false), numErrors(numErrors) { }
   
   // Returns a shared pointer to a freshly-allocated copy of this ComposedAnalysis object
   ComposedAnalysisPtr copy() { return boost::make_shared<checkDataflowInfoPass>(numErrors); }

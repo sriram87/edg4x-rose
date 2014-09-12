@@ -141,7 +141,7 @@ public:
     //            originally to make things simpler, but it seems that the FiniteVarsExprProductLattice depends on it even
     //            though I saw commented out code and comments somewhere(?) that indicated otherwise.
     TaintAnalysis(LiveDeadVarsAnalysis *ldv_analysis)
-        : ldv_analysis(ldv_analysis), debug(NULL) {}
+        :  : FWDataflow(/*trackBase2RefinedPartEdgeMapping*/ false), ldv_analysis(ldv_analysis), debug(NULL) {}
 
     /** Accessor for debug settings.  If a non-null output stream is supplied, then debugging information will be sent to that
      *  stream; otherwise debugging information is suppressed.  Debugging is disabled by default.

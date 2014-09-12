@@ -43,12 +43,12 @@ class CompSharedPtr : public sight::printable
   // If both ptr and o.ptr are != NULL, use their equality operator
   // If both ptr and o.ptr are == NULL, they are equal
   // If only one is == NULL but the other is not, order the NULL object as < the non-NULL object
-  bool operator==(const CompSharedPtr<Type> & o) const { if(ptr.get()!=NULL) { if(o.get()!=NULL) return (*ptr.get()) == o; else return false; } else { if(o.get()!=NULL) return false; else return true;  } }
-  bool operator< (const CompSharedPtr<Type> & o) const { if(ptr.get()!=NULL) { if(o.get()!=NULL) return (*ptr.get()) <  o; else return false; } else { if(o.get()!=NULL) return true;  else return false; } }
-  bool operator!=(const CompSharedPtr<Type> & o) const { if(ptr.get()!=NULL) { if(o.get()!=NULL) return (*ptr.get()) != o; else return true;  } else { if(o.get()!=NULL) return true;  else return false; } }
-  bool operator>=(const CompSharedPtr<Type> & o) const { if(ptr.get()!=NULL) { if(o.get()!=NULL) return (*ptr.get()) >= o; else return true;  } else { if(o.get()!=NULL) return false; else return true;  } }
-  bool operator<=(const CompSharedPtr<Type> & o) const { if(ptr.get()!=NULL) { if(o.get()!=NULL) return (*ptr.get()) <= o; else return false; } else { if(o.get()!=NULL) return true;  else return true;  } }
-  bool operator> (const CompSharedPtr<Type> & o) const { if(ptr.get()!=NULL) { if(o.get()!=NULL) return (*ptr.get()) >  o; else return true;  } else { if(o.get()!=NULL) return false; else return false; } }
+  bool operator==(const CompSharedPtr<Type> & o) const { if(ptr.get()!=NULL) { if(o.get()!=NULL) { /*dbg << "CompSharedPtr == returning "<<((*ptr.get()) == o)<<std::endl;*/ return (*ptr.get()) == o; } else return false; } else { if(o.get()!=NULL) return false; else return true;  } }
+  bool operator< (const CompSharedPtr<Type> & o) const { if(ptr.get()!=NULL) { if(o.get()!=NULL) { /*dbg << "CompSharedPtr <  returning "<<((*ptr.get()) <  o)<<std::endl;*/ return (*ptr.get()) <  o; } else return false; } else { if(o.get()!=NULL) return true;  else return false; } }
+  bool operator!=(const CompSharedPtr<Type> & o) const { if(ptr.get()!=NULL) { if(o.get()!=NULL) { /*dbg << "CompSharedPtr != returning "<<((*ptr.get()) != o)<<std::endl;*/ return (*ptr.get()) != o; } else return true;  } else { if(o.get()!=NULL) return true;  else return false; } }
+  bool operator>=(const CompSharedPtr<Type> & o) const { if(ptr.get()!=NULL) { if(o.get()!=NULL) { /*dbg << "CompSharedPtr >= returning "<<((*ptr.get()) >= o)<<std::endl;*/ return (*ptr.get()) >= o; } else return true;  } else { if(o.get()!=NULL) return false; else return true;  } }
+  bool operator<=(const CompSharedPtr<Type> & o) const { if(ptr.get()!=NULL) { if(o.get()!=NULL) { /*dbg << "CompSharedPtr <= returning "<<((*ptr.get()) <= o)<<std::endl;*/ return (*ptr.get()) <= o; } else return false; } else { if(o.get()!=NULL) return true;  else return true;  } }
+  bool operator> (const CompSharedPtr<Type> & o) const { if(ptr.get()!=NULL) { if(o.get()!=NULL) { /*dbg << "CompSharedPtr >  returning "<<((*ptr.get()) >  o)<<std::endl;*/ return (*ptr.get()) >  o; } else return true;  } else { if(o.get()!=NULL) return false; else return false; } }
   
   Type* get() const { return ptr.get(); }
   const Type* operator->() const { return ptr.get(); }

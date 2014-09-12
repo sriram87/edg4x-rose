@@ -92,17 +92,18 @@ std::string AbstractObjectMap::str(std::string indent) const {
 std::string AbstractObjectMap::strp(PartEdgePtr pedge, std::string indent) const
 {
   ostringstream oss;
-  oss << "[AbstractObjectMap: "; //("<<pedge->str()<<"): ";
-  
-  //printf("[AbstractObjectMap: "); fflush(stdout);
+  oss << "<u>AbstractObjectMap:</u>"; 
+  oss << "<table border=1><tr><td>Key</td><td>Value</td>";
   for(list<MapElement>::const_iterator it = items.begin();
        it != items.end(); it++) {
     //printf("\n%s%p =&gt; %p\n", indent.c_str(), it->first.get(), it->second.get()); fflush(stdout);
-    oss << endl;
-    oss << indent<<"&nbsp;&nbsp;&nbsp;&nbsp;"<<it->first->strp(pedge, indent+"&nbsp;&nbsp;&nbsp;&nbsp;")<<" =&gt; "<<endl;
-    oss << indent<<"&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;"<<it->second->str(indent+"&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;");
+    oss << "<tr><td>";
+    oss << it->first->strp(pedge, indent+"&nbsp;&nbsp;&nbsp;&nbsp;")<<" =&gt; ";
+    oss << "</td><td>";
+    oss << it->second->str(indent+"&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;");
+    oss << "</td></tr>";
   }
-  oss << "]";
+  oss << "</table>"<<endl;
   return oss.str();
 }
 

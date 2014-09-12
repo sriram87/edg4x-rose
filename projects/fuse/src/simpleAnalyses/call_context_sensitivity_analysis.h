@@ -114,7 +114,7 @@ class CallCtxSensPart : public Part
   // The CallContextSensitivityAnalysis this Part is associated with
   CallContextSensitivityAnalysis* ccsa;
   
-  public:
+  protected:
   // Creates a CallCtxSensPart from the given base, using no calling context
   CallCtxSensPart(PartPtr base, ComposedAnalysis* analysis);
   
@@ -126,6 +126,36 @@ class CallCtxSensPart : public Part
   CallCtxSensPart(PartPtr base, const CallCtxSensPart& contextPart, ComposedAnalysis* analysis);
   
   CallCtxSensPart(const CallCtxSensPart& that);
+
+  public:
+  // Parts must be created via static construction methods to make it possible to separately
+  // initialize them. This is needed to allow Parts to register themselves with global directories,
+  // a process that requires the creation of a shared pointer to themselves.
+  static CallCtxSensPartPtr create(PartPtr base, ComposedAnalysis* analysis) {
+    CallCtxSensPartPtr newPart(boost::shared_ptr<CallCtxSensPart>(new CallCtxSensPart(base, analysis)));
+    newPart->init();
+    return newPart;
+  }
+  static CallCtxSensPartPtr create(PartPtr base, const CallPartContext& context, const Function& lastCtxtFunc, bool recursive, ComposedAnalysis* analysis) {
+    CallCtxSensPartPtr newPart(boost::shared_ptr<CallCtxSensPart>(new CallCtxSensPart(base, context, lastCtxtFunc, recursive, analysis)));
+    newPart->init();
+    return newPart;
+  }
+  static CallCtxSensPartPtr create(PartPtr base, CallCtxSensPartPtr contextPart, ComposedAnalysis* analysis) {
+    CallCtxSensPartPtr newPart(boost::shared_ptr<CallCtxSensPart>(new CallCtxSensPart(base, contextPart, analysis)));
+    newPart->init();
+    return newPart;
+  }
+  static CallCtxSensPartPtr create(PartPtr base, const CallCtxSensPart& contextPart, ComposedAnalysis* analysis) {
+    CallCtxSensPartPtr newPart(boost::shared_ptr<CallCtxSensPart>(new CallCtxSensPart(base, contextPart, analysis)));
+    newPart->init();
+    return newPart;
+  }
+  static CallCtxSensPartPtr create(const CallCtxSensPart& that) {
+    CallCtxSensPartPtr newPart(boost::shared_ptr<CallCtxSensPart>(new CallCtxSensPart(that)));
+    newPart->init();
+    return newPart;
+  }
   
   private:
   // Returns a shared pointer to this of type CallCtxSensPartPtr;
@@ -188,12 +218,27 @@ class CallCtxSensPartEdge : public PartEdge {
   friend class CallContextSensitivityAnalysis;
   friend class CallCtxSensMR;
   friend class CallCtxSensML;
-  public:
+  protected:
   // Constructor to be used when constructing the edges (e.g. from genInitLattice()).  
   CallCtxSensPartEdge(PartEdgePtr baseEdge, CallCtxSensPartPtr src, CallCtxSensPartPtr tgt, ComposedAnalysis* analysis);
   
   CallCtxSensPartEdge(const CallCtxSensPartEdge& that);
 
+  public:
+  // PartEdges must be created via static construction methods to make it possible to separately
+  // initialize them. This is needed to allow PartEdges to register themselves with global directories,
+  // a process that requires the creation of a shared pointer to themselves.
+  static CallCtxSensPartEdgePtr create(PartEdgePtr baseEdge, CallCtxSensPartPtr src, CallCtxSensPartPtr tgt, ComposedAnalysis* analysis) {
+    CallCtxSensPartEdgePtr newPartEdge(boost::shared_ptr<CallCtxSensPartEdge>(new CallCtxSensPartEdge(baseEdge, src, tgt, analysis)));
+    newPartEdge->init();
+    return newPartEdge;
+  }
+  static CallCtxSensPartEdgePtr create(const CallCtxSensPartEdge& that) {
+    CallCtxSensPartEdgePtr newPartEdge(boost::shared_ptr<CallCtxSensPartEdge>(new CallCtxSensPartEdge(that)));
+    newPartEdge->init();
+    return newPartEdge;
+  }
+  
   private:
   // Returns a shared pointer to this of type CallCtxSensPartEdgePtr
   CallCtxSensPartEdgePtr get_shared_this();
@@ -496,10 +541,11 @@ class CallContextSensitivityAnalysis : public FWDataflow
   sensType type;
   
   public:
-  CallContextSensitivityAnalysis(int sensDepth, sensType type) : sensDepth(sensDepth), type(type) {}
+  CallContextSensitivityAnalysis(int sensDepth, sensType type, bool trackBase2RefinedPartEdgeMapping) : 
+    FWDataflow(trackBase2RefinedPartEdgeMapping), sensDepth(sensDepth), type(type) {}
   
   // Returns a shared pointer to a freshly-allocated copy of this ComposedAnalysis object
-  ComposedAnalysisPtr copy() { return boost::make_shared<CallContextSensitivityAnalysis>(sensDepth, type); }
+  ComposedAnalysisPtr copy() { return boost::make_shared<CallContextSensitivityAnalysis>(sensDepth, type, trackBase2RefinedPartEdgeMapping); }
   
   unsigned int getSensDepth() const { return sensDepth; }
   sensType getSensType() const { return type; }

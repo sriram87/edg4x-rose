@@ -733,9 +733,7 @@ class ConstantPropagationAnalysisTransfer : public VariableStateTransfer<CPValue
   void visit(SgNotOp* sgn);
   
   void visit(SgValueExp *val);
-   
-  bool finish();
-   
+  
   ConstantPropagationAnalysisTransfer(PartPtr part, CFGNode cn, NodeState& state, 
                                       std::map<PartEdgePtr, std::vector<Lattice*> >& dfInfo, 
                                       Composer* composer, ConstantPropagationAnalysis* analysis);

@@ -6,7 +6,6 @@ using namespace std;
 
 namespace fuse {
 
-//int deadPathElimAnalysisDebugLevel=0;
 DEBUG_LEVEL(deadPathElimAnalysisDebugLevel, 0);
 
 std::string DPELevel2Str(enum DPELevel level) {
@@ -75,15 +74,11 @@ list<PartEdgePtr> DeadPathElimPart::outEdges()
       if(deadPathElimAnalysisDebugLevel()>=2) dbg << "outPartEdge("<<(outPartEdge->level==live)<<")="<<outPartEdge->str()<<endl;
 
       if(outPartEdge->level==live)
-        // Create a new DeadPathElimPartEdgePtr from a copy of outPartEdge to ensure that the original is not deallocated
-        // when the shared pointer goes out of scope.
-        cache_outEdges.push_back(initPtr(dynamic_cast<DeadPathElimPartEdge*>(outPartEdge)));
-        /*cache_outEdges.push_back(makePtr<DeadPathElimPartEdge>(
-                               / *makePtrFromThis(shared_from_this()),
-                               // Create a shared pointer from a copy of the raw pointer to make sure that the original 
-                               // object is not deleted when the reference count drops to 0.
-                               initPtr(dynamic_cast<DeadPathElimPart*>(outPart->copy())),* /
-                               *be, analysis));*/
+        // Create a new DeadPathElimPartEdgePtr from an existing outPartEdge. To ensure that the 
+        // original is not deallocated when the shared pointer goes out of scope, we keep the shared
+        // pointer in a cache data structure that persists.
+        //cache_outEdges.push_back(initPtr(dynamic_cast<DeadPathElimPartEdge*>(outPartEdge)));
+        cache_outEdges.push_back(DeadPathElimPartEdge::raw2shared(dynamic_cast<DeadPathElimPartEdge*>(outPartEdge)));
     }
     cacheInitialized_outEdges=true;
   }
@@ -109,15 +104,11 @@ list<PartEdgePtr> DeadPathElimPart::inEdges()
       if(deadPathElimAnalysisDebugLevel()>=2) dbg << "inPartEdge="<<inPartEdge->str()<<endl;
 
       if(inPartEdge->level==live)
-        // Create a new DeadPathElimPartEdgePtr from a copy of outPartEdge to ensure that the original is not deallocated
-        // when the shared pointer goes out of scope.
-        cache_inEdges.push_back(initPtr(dynamic_cast<DeadPathElimPartEdge*>(inPartEdge->copy())));
-        /*cache_inEdges.push_back(makePtr<DeadPathElimPartEdge>(
-                             // Create a shared pointer from a copy of the raw pointer to make sure that the original 
-                             // object is not deleted when the reference count drops to 0.
-                             / *initPtr(dynamic_cast<DeadPathElimPart*>(inPart->copy())),
-                             makePtrFromThis(shared_from_this()),* /
-                             *be, analysis));*/
+        // Create a new DeadPathElimPartEdgePtr from an existing inPartEdge. To ensure that the 
+        // original is not deallocated when the shared pointer goes out of scope, we keep the shared
+        // pointer in a cache data structure that persists.
+        //cache_inEdges.push_back(initPtr(dynamic_cast<DeadPathElimPartEdge*>(inPartEdge->copy())));
+        cache_inEdges.push_back(DeadPathElimPartEdge::raw2shared(dynamic_cast<DeadPathElimPartEdge*>(inPartEdge)));
     }
     cacheInitialized_inEdges=true;
   }
@@ -141,7 +132,7 @@ set<PartPtr> DeadPathElimPart::matchingCallParts() const {
     // Wrap the parts returned by the call to the parent Part with DeadPathElimPart
     set<PartPtr> parentMatchParts = getParent()->matchingCallParts();
     for(set<PartPtr>::iterator mp=parentMatchParts.begin(); mp!=parentMatchParts.end(); mp++) {
-      const_cast<DeadPathElimPart*>(this)->cache_matchingCallParts.insert(makePtr<DeadPathElimPart>(*mp, analysis));
+      const_cast<DeadPathElimPart*>(this)->cache_matchingCallParts.insert(DeadPathElimPart::create(*mp, analysis));
     }
     //const_cast<DeadPathElimPart*>(this)->cacheInitialized_matchingCallParts=true;
   }
@@ -177,22 +168,22 @@ list<PartPtr> DeadPathElimPart::getOperandPart(SgNode* anchor, SgNode* operand)
 // Returns a PartEdgePtr, where the source is a wild-card part (NULLPart) and the target is this Part
 PartEdgePtr DeadPathElimPart::inEdgeFromAny() { 
   if(!cacheInitialized_inEdgeFromAny) {
-    cache_inEdgeFromAny = makePtr<DeadPathElimPartEdge>(getParent()->inEdgeFromAny(), analysis);
+    cache_inEdgeFromAny = DeadPathElimPartEdge::create(getParent()->inEdgeFromAny(), analysis);
     cacheInitialized_inEdgeFromAny=true;
   }
   return cache_inEdgeFromAny;
-//  return makePtr<DeadPathElimPartEdge>(/*NULLPart, makePtrFromThis(shared_from_this()), */
+//  return DeadPathElimPartEdge::create(/*NULLPart, makePtrFromThis(shared_from_this()), */
 //                                        getParent()->inEdgeFromAny(), analysis);
 }
 
 // Returns a PartEdgePtr, where the target is a wild-card part (NULLPart) and the source is this Part
 PartEdgePtr DeadPathElimPart::outEdgeToAny() { 
   if(!cacheInitialized_outEdgeToAny) {
-    cache_outEdgeToAny = makePtr<DeadPathElimPartEdge>(getParent()->outEdgeToAny(), analysis);
+    cache_outEdgeToAny = DeadPathElimPartEdge::create(getParent()->outEdgeToAny(), analysis);
     cacheInitialized_outEdgeToAny=true;
   }
   return cache_outEdgeToAny;
-//  return makePtr<DeadPathElimPartEdge>(/*makePtrFromThis(shared_from_this()), NULLPart,*/
+//  return DeadPathElimPartEdge::create(/*makePtrFromThis(shared_from_this()), NULLPart,*/
 //                                        getParent()->outEdgeToAny(), analysis);
 }
 
@@ -241,8 +232,8 @@ DeadPathElimPartEdge::DeadPathElimPartEdge(DeadPathElimPartPtr src, DeadPathElim
 DeadPathElimPartEdge::DeadPathElimPartEdge(PartEdgePtr baseEdge, ComposedAnalysis* analysis, DPELevel level) : 
         Lattice(baseEdge), FiniteLattice(baseEdge), PartEdge(analysis, baseEdge)
 {
-  src = latPEdge->source() ? makePtr<DeadPathElimPart>(latPEdge->source(), analysis) : dynamicPtrCast<DeadPathElimPart>(NULLPart);
-  tgt = latPEdge->target() ? makePtr<DeadPathElimPart>(latPEdge->target(), analysis) : dynamicPtrCast<DeadPathElimPart>(NULLPart);
+  src = latPEdge->source() ? DeadPathElimPart::create(latPEdge->source(), analysis) : dynamicPtrCast<DeadPathElimPart>(NULLPart);
+  tgt = latPEdge->target() ? DeadPathElimPart::create(latPEdge->target(), analysis) : dynamicPtrCast<DeadPathElimPart>(NULLPart);
   /*dbg << "DeadPathElimPartEdge::DeadPathElimPartEdge()"<<endl;
   dbg << "latPEdge="<<latPEdge->str()<<endl;
   dbg << "src="<<(src? src->str() : "NULL")<<endl;
@@ -258,14 +249,14 @@ DeadPathElimPartEdge::DeadPathElimPartEdge(PartEdgePtr baseEdge, ComposedAnalysi
 DeadPathElimPartEdge::DeadPathElimPartEdge(PartEdgePtr baseEdge, ComposedAnalysis* analysis) : 
         Lattice(baseEdge), FiniteLattice(baseEdge), PartEdge(analysis, baseEdge)
 {
-  /*src = base.source() ? makePtr<DeadPathElimPart>(base.source(), analysis, bottom) : NULLPart;
-  tgt = base.target() ? makePtr<DeadPathElimPart>(base.target(), analysis, bottom) : NULLPart;
+  /*src = base.source() ? DeadPathElimPart::create(base.source(), analysis, bottom) : NULLPart;
+  tgt = base.target() ? DeadPathElimPart::create(base.target(), analysis, bottom) : NULLPart;
   level = bottom;*/
 
   // Look up this edge in the results of the DeadPathElimAnalysis results and copy data from that edge into this object
   //DeadPathElimPartEdge* dpeEdge;
-  if(latPEdge->source()) src=makePtr<DeadPathElimPart>(latPEdge->source(), analysis);
-  if(latPEdge->target()) tgt=makePtr<DeadPathElimPart>(latPEdge->target(), analysis);
+  if(latPEdge->source()) src=DeadPathElimPart::create(latPEdge->source(), analysis);
+  if(latPEdge->target()) tgt=DeadPathElimPart::create(latPEdge->target(), analysis);
 
   // If the source is not a wildcard, look for the record in the source part, which maintains separate information
   // for all the outgoing edges
@@ -273,7 +264,7 @@ DeadPathElimPartEdge::DeadPathElimPartEdge(PartEdgePtr baseEdge, ComposedAnalysi
   //dbg << "this="<<str()<<endl;
   // If the edge has a concrete source and target
   if(latPEdge->source() && latPEdge->target()) {
-    /*DeadPathElimPartPtr sourceDPEPart = makePtr<DeadPathElimPart>(latPEdge->source(), analysis, bottom);
+    /*DeadPathElimPartPtr sourceDPEPart = DeadPathElimPart::create(latPEdge->source(), analysis, bottom);
     dbg << "seEdge->source()="<<latPEdge->source()->str()<<endl;
     dbg << "seEdge->target()="<<latPEdge->target()->str()<<endl;
     dbg << "sourceDPEPart="<<sourceDPEPart->str()<<endl;*/
@@ -319,7 +310,7 @@ DeadPathElimPartEdge::DeadPathElimPartEdge(PartEdgePtr baseEdge, ComposedAnalysi
   // If the source is a wildcard, look for the record in the target part where all the edges are aggregated
   } else if(latPEdge->target()) {
     assert(latPEdge->target());
-    DeadPathElimPartPtr targetDPEPart = makePtr<DeadPathElimPart>(latPEdge->target(), analysis);
+    DeadPathElimPartPtr targetDPEPart = DeadPathElimPart::create(latPEdge->target(), analysis);
     //#SA: record is aggregated on the wildcard edge
     NodeState* state = NodeState::getNodeState(analysis, latPEdge->target());
     DeadPathElimPartEdge* dpeEdge = dynamic_cast<DeadPathElimPartEdge*>(state->getLatticeAbove(analysis, latPEdge, 0));
@@ -334,9 +325,9 @@ DeadPathElimPartEdge::DeadPathElimPartEdge(PartEdgePtr baseEdge, ComposedAnalysi
   // for results of getOperandPartEdge() and in this case the dpeEdge will not have the source because
   level = dpeEdge->level;
   if(dpeEdge->src) src = dpeEdge->src;
-  else if(latPEdge->source()) src = makePtr<DeadPathElimPart>(latPEdge->source(), analysis);
+  else if(latPEdge->source()) src = DeadPathElimPart::create(latPEdge->source(), analysis);
   if(dpeEdge->tgt) tgt = dpeEdge->tgt;
-  else if(latPEdge->target()) tgt = makePtr<DeadPathElimPart>(latPEdge->target(), analysis);*/
+  else if(latPEdge->target()) tgt = DeadPathElimPart::create(latPEdge->target(), analysis);*/
 }
 
 DeadPathElimPartEdge::DeadPathElimPartEdge(const DeadPathElimPartEdge& that) :
@@ -371,8 +362,8 @@ bool DeadPathElimPartEdge::setPartEdge(PartEdgePtr latPEdge)
   PartEdge::setParent(latPEdge);
   
   // Look up this edge in the results of the DeadPathElimAnalysis results and copy data from that edge into this object
-  if(latPEdge->source()) src=makePtr<DeadPathElimPart>(latPEdge->source(), analysis);
-  if(latPEdge->target()) tgt=makePtr<DeadPathElimPart>(latPEdge->target(), analysis);
+  if(latPEdge->source()) src=DeadPathElimPart::create(latPEdge->source(), analysis);
+  if(latPEdge->target()) tgt=DeadPathElimPart::create(latPEdge->target(), analysis);
   
   return modified;
 }
@@ -421,7 +412,7 @@ std::list<PartEdgePtr> DeadPathElimPartEdge::getOperandPartEdge(SgNode* anchor, 
       std::list<PartEdgePtr> baseEdges = getParent()->getOperandPartEdge(anchor, operand);
       for(std::list<PartEdgePtr>::iterator e=baseEdges.begin(); e!=baseEdges.end(); e++) {
         if(deadPathElimAnalysisDebugLevel()>=1) dbg << "e="<<(*e)->str()<<endl;
-        PartEdgePtr dpeEdge = makePtr<DeadPathElimPartEdge>(*e, analysis);
+        PartEdgePtr dpeEdge = DeadPathElimPartEdge::create(*e, analysis);
         { scope reg("dpeEdge", scope::low, attrGE("deadPathElimAnalysisDebugLevel", 2));
         if(deadPathElimAnalysisDebugLevel()>=1) dbg<<dpeEdge->str()<<endl; }
         cache_getOperandPartEdge[anchor][operand].push_back(dpeEdge);
@@ -435,8 +426,8 @@ std::list<PartEdgePtr> DeadPathElimPartEdge::getOperandPartEdge(SgNode* anchor, 
           dbg << "e->target() = "<<(*e)->target()->str()<<endl;* /
           assert(src || tgt);
           DeadPathElimAnalysis* analysis = (src? src->analysis : tgt->analysis);
-          PartEdgePtr edge = makePtr<DeadPathElimPartEdge>(makePtr<DeadPathElimPart>((*opP)->inEdgeFromAny(), analysis), 
-                                                            makePtr<DeadPathElimPart>((*e)->target()->inEdgeFromAny(), analysis));
+          PartEdgePtr edge = DeadPathElimPartEdge::create(DeadPathElimPart::create((*opP)->inEdgeFromAny(), analysis), 
+                                                            DeadPathElimPart::create((*e)->target()->inEdgeFromAny(), analysis));
           //dbg << "edge = "<<edge->str()<<endl;
           l.push_back(edge);
         }
@@ -531,7 +522,7 @@ void DeadPathElimPartEdge::initialize() { }
 
 // Returns a copy of this lattice
 Lattice* DeadPathElimPartEdge::copy() const
-{ return new DeadPathElimPartEdge(*this); }
+{ return DeadPathElimPartEdge::createRaw(*this); }
 
 // Overwrites the state of "this" Lattice with "that" Lattice
 void DeadPathElimPartEdge::copy(Lattice* that_arg)
@@ -803,7 +794,7 @@ void DeadPathElimTransfer::visit2OutNode(SgNode* sgn, ValueObjectPtr val, maymus
         }
 
         // Set this dpeEdge's target to be the same as the target of the current server edge but using the edge's level
-        dpeEdge->tgt = makePtr<DeadPathElimPart>((*e)->target(), dpea);
+        dpeEdge->tgt = DeadPathElimPart::create((*e)->target(), dpea);
 
         // Set this dpeEdges's baseEdge to be the current edge using both Lattice API (setPartEdge) and Part API (setParent)
         dpeEdge->setPartEdge(*e);
@@ -893,7 +884,7 @@ void DeadPathElimTransfer::visit(SgNode *sgn)
     assert(dpeEdge);
     
     // Set this dpeEdge's target to be the same as the current server edge's target but with the dfEdge's level
-    dpeEdge->tgt = makePtr<DeadPathElimPart>((*e)->target(), dpea);
+    dpeEdge->tgt = DeadPathElimPart::create((*e)->target(), dpea);
     
     // Set this dpeEdges's baseEdge to be the current edge using both Lattice API (setPartEdge) and PartEdge API (setParent)
     dpeEdge->setPartEdge(*e);
@@ -905,7 +896,7 @@ void DeadPathElimTransfer::visit(SgNode *sgn)
   }
 }
 
-DeadPathElimAnalysis::DeadPathElimAnalysis()
+DeadPathElimAnalysis::DeadPathElimAnalysis(bool trackBase2RefinedPartEdgeMapping): FWDataflow(trackBase2RefinedPartEdgeMapping)
 {
   cacheInitialized_GetStartAStates_Spec=false;
   cacheInitialized_GetEndAStates_Spec=false;
@@ -916,7 +907,7 @@ DeadPathElimAnalysis::DeadPathElimAnalysis()
 void DeadPathElimAnalysis::genInitLattice(PartPtr part, PartEdgePtr pedge, 
                                           std::vector<Lattice*>& initLattices)
 {
-  DeadPathElimPartEdge* newPartEdge = new DeadPathElimPartEdge(pedge, this, bottom);
+  DeadPathElimPartEdge* newPartEdge = DeadPathElimPartEdge::createRaw(pedge, this, bottom);
   
   /*dbg << "DeadPathElimAnalysis::genInitLattice()"<<endl;
   indent ind;
@@ -1038,7 +1029,6 @@ set<PartPtr> DeadPathElimAnalysis::GetEndAStates_Spec()
       assert(endDPEPartEdge);
 
       cache_GetEndAStates_Spec.insert(endDPEPartEdge->target());
-      //return initPtr(new DeadPathElimPart(*endDPEPart));
     }
     cacheInitialized_GetEndAStates_Spec = true;
   }

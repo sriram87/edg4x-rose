@@ -1,4 +1,4 @@
-
+#pragma fuse lc(t(cp, pt))
 void CompDebugAssert(bool expr);
 
 int main()

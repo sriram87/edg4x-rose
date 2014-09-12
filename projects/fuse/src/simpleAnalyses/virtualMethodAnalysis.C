@@ -1,0 +1,953 @@
+#include "sage3basic.h"
+#include "virtualMethodAnalysis.h"
+#include "sight.h"
+#include "sageInterface.h"
+#include "midend/programAnalysis/CallGraphAnalysis/CallGraph.h"
+using namespace std;
+using namespace sight;
+using namespace SageInterface;
+
+namespace fuse {
+DEBUG_LEVEL(VirtualMethodAnalysisDebugLevel, 0);
+
+/********************************
+ ***** ClassInheritanceTree *****
+ ********************************/
+ 
+// Points to the object that stores the entire class hierarchy of all types
+ClassHierarchyWrapper* ClassInheritanceTree::classHierarchy=NULL;
+
+// Initializes the ClassHierarchyGraph, if needed
+void ClassInheritanceTree::initCHG() {
+  if(classHierarchy==NULL) {
+    classHierarchy = new ClassHierarchyWrapper(getProject());
+    ROSE_ASSERT(classHierarchy);
+  }
+}
+
+ClassInheritanceTree::ClassInheritanceTree(PartEdgePtr latPEdge): Lattice(latPEdge), FiniteLattice(latPEdge) {
+  state = empty;
+  inclusive = false;
+}
+
+// Creates a tree that captures the inheritance of the given SgClassDefinition
+ClassInheritanceTree::ClassInheritanceTree(SgClassDefinition* classDecl, PartEdgePtr latPEdge): Lattice(latPEdge), FiniteLattice(latPEdge) {
+  scope s(txt()<<"ClassInheritanceTree::ClassInheritanceTree("<<SgNode2Str(classDecl)<<")", attrGE("VirtualMethodAnalysisDebugLevel", 1));
+  state = tree;
+  inclusive = true;
+  initCHG();
+
+  // Records the SgClassDefinition sets from which classDecl inherits along different 
+  // paths as a list of individual SgClassDefinitions from which classDecl
+  // inherits and their immediate ancestors.
+  std::list<std::pair<NodePtr, ClassHierarchyWrapper::ClassDefSet> > worklist;
+
+  // Create a Node for classDecl and set it to be the tree's leaf
+  NodePtr classDeclNode = makePtr<Node>(classDecl);
+  leaves.push_back(classDeclNode);
+
+  // Initialize the worklist with the single set of classDecl's parents
+  ClassHierarchyWrapper::ClassDefSet parents = classHierarchy->getDirectAncestorClasses(classDecl);
+  if(parents.size()>0) {
+    worklist.push_back(make_pair(classDeclNode, parents));
+
+    // Keep working over the inheritance hierarchy while the worklist is still non-empty
+    while(worklist.size()>0) {
+      // Grab another element from the worklist
+      std::pair<NodePtr, ClassHierarchyWrapper::ClassDefSet> cur = worklist.front();
+      worklist.pop_front();        
+      scope s("worklist iter");
+      if(VirtualMethodAnalysisDebugLevel()>=1) dbg << "cur.first="<<cur.first->str()<<", #cur.second="<<cur.second.size()<<endl;
+
+      // Iterate over all the SgClassDefinitions in the current ancestor set
+      for(ClassHierarchyWrapper::ClassDefSet::const_iterator i=cur.second.begin(); i!=cur.second.end(); i++) {
+        if(VirtualMethodAnalysisDebugLevel()>=1) dbg << "    ancestor="<<SgNode2Str(*i)<<endl;
+        // Create a tree node for the current parents SgClassDefinition
+        NodePtr parentNode = makePtr<Node>(*i);
+
+        // Connect the derived class' node to the current ancestor and vice versa
+        cur.first->parents.insert(parentNode);
+        parentNode->child = cur.first;
+
+        // Add the current parent node's parents to the worklist
+        ClassHierarchyWrapper::ClassDefSet grandparents = classHierarchy->getDirectAncestorClasses(*i);
+        if(VirtualMethodAnalysisDebugLevel()>=1) dbg << "#grandparents="<<grandparents.size()<<endl;
+        if(grandparents.size()>0)
+          worklist.push_back(make_pair(parentNode, grandparents));
+        // If this parent SgClassDefinition has no parents, record it as a base node of the tree
+        else
+          bases.push_back(parentNode);
+      }
+    }
+  } else {
+    // If this class doesn't inherit from another, add it as a base as well as a leaf
+    bases.push_back(classDeclNode);
+  }
+  
+  if(VirtualMethodAnalysisDebugLevel()>=1) dbg << "final:"<<endl<<str()<<endl;
+}
+
+ClassInheritanceTree::ClassInheritanceTree(const ClassInheritanceTree& that) : Lattice(that), FiniteLattice(that) {
+  copyFrom(that);
+}
+
+ClassInheritanceTree& ClassInheritanceTree::operator=(const ClassInheritanceTree& that) {
+  copyFrom(that);
+  return *this;
+}
+
+// Copies the state of that tree over this tree.
+void ClassInheritanceTree::copyFrom(const ClassInheritanceTree& that) {
+  state = that.state;
+  inclusive = that.inclusive;
+  /*
+  bases = that.bases;
+  leaves = that.leaves;*/
+  list<pair<NodePtr, NodePtr> > worklist;
+  for(list<NodePtr>::const_iterator l=that.leaves.begin(); l!=that.leaves.end(); l++) {
+    NodePtr newLeaf = makePtr<Node>((*l)->def);
+    leaves.push_back(newLeaf);
+    worklist.push_back(make_pair(newLeaf, *l));
+  }
+  
+  while(worklist.size()>0) {
+    // Get the next node in the tree
+    pair<NodePtr, NodePtr> cur=worklist.front();
+    worklist.pop_front();
+    
+    if(cur.second->parents.size()==0)
+      bases.push_back(cur.first);
+    else {
+      // Create copies of the current node's parents and push them onto the worklist
+      for(std::set<NodePtr>::const_iterator p=cur.second->parents.begin(); p!=cur.second->parents.end(); p++) {
+        NodePtr newNode = makePtr<Node>((*p)->def);
+        newNode->child = cur.first;
+        cur.first->parents.insert(newNode);
+        worklist.push_front(make_pair(newNode, *p));
+      }
+    }
+  }
+}
+
+// returns a copy of this lattice
+Lattice* ClassInheritanceTree::copy() const {
+  return new ClassInheritanceTree(*this);
+}
+
+// Computes the meet of this and that and saves the result in this
+// returns true if this causes this to change and false otherwise
+// The part of this object is to be used for AbstractObject comparisons.
+// Meet update finds the common tree prefix among the two treeS
+bool ClassInheritanceTree::meetUpdate(Lattice* that_arg) {
+  scope reg("ClassInheritanceTree::meetUpdate()", scope::medium, attrGE("VirtualMethodAnalysisDebugLevel", 1));
+  ClassInheritanceTree* that = dynamic_cast<ClassInheritanceTree*>(that_arg);
+  ROSE_ASSERT(that);
+
+  if(VirtualMethodAnalysisDebugLevel()>=1) {
+    dbg << "state="<<state2Str(state)<<", that->state="<<state2Str(that->state)<<endl;
+    { scope s("this", scope::low); dbg << "this="<<str()<<endl; }
+    { scope s("that", scope::low); dbg << "that="<<that->str()<<endl; }
+  }
+  // Full trees cannot become any more relaxed
+  if(state==full) return false;
+  // If that tree is full, make this tree full as well
+  if(that->state==full) {
+    if(state==full) return false;
+    else { setToFull(); return true; }
+  }
+  // Neither tree is full
+
+  // If this tree is empty, copy the state of that tree over this tree
+  if(state==empty) {
+    if(that->state==empty) return false;
+    else { copyFrom(*that); return true; }
+  }
+  // If that is empty, don't modify this
+  if(that->state==empty) return false;
+  
+  // Both trees are neither full nor empty
+
+  // If the two inheritance trees don't have the same base classes, they have
+  // nothing in common, which makes this the full hierarchy (no constraints)
+  if(bases.size() != that->bases.size()) {
+    if(VirtualMethodAnalysisDebugLevel()>=1) dbg << "Inconsistent bases: setting to Full. #bases="<<bases.size()<<", #that->bases="<<that->bases.size()<<endl;
+    setToFull();
+    return true;
+  }
+
+  // Records whether this tree was modified during the merge
+  bool modified = false;
+
+  // Iterate from the bases to their children looking for the point in the 
+  // iteration where the trees stop being identical. The identical portions
+  // are left in the merged tree and the non-identical ones are removed.
+
+  // The worklist contains a list of pairs, one node from each tree
+  std::list<std::pair<NodePtr, NodePtr> > worklist;
+
+  // Initialize the list with the base nodes
+  for(std::list<NodePtr>::iterator thisB=bases.begin(), thatB=that->bases.begin();
+      thisB!=bases.end(); ++thisB, ++thatB) {
+    // If the two inheritance trees don't have the same base classes, they have
+    // nothing in common, which makes this the full hierarchy (no constraints)
+    if((*thisB)->def != (*thatB)->def) { 
+      if(VirtualMethodAnalysisDebugLevel()>=1) dbg << "Inconsistent bases: setting to Full. (*thisB)->def="<<(*thisB)->def<<"="<<SgNode2Str((*thisB)->def)<<" != (*thatB)->def="<<(*thatB)->def<<"="<<SgNode2Str((*thatB)->def)<<endl;
+      setToFull();
+      return true;
+    }
+    worklist.push_back(make_pair(*thisB, *thatB));
+  }
+  if(VirtualMethodAnalysisDebugLevel()>=1) dbg << "#worklist="<<worklist.size()<<", #bases="<<bases.size()<<endl;
+          
+  // Erase the bases and leaves of this tree. The leaves will be regenerated as the set of
+  // nodes that are common among the two trees the children of which are 
+  // non-existent or different between the trees
+  bases.clear();
+  leaves.clear();
+  
+  // The merged tree will be inclusive if the two trees agree on any leaf. 
+  // Thus, we initialize inclusive to false and set it to true if we ever see leaf agreement.
+  bool origInclusive=inclusive;
+  inclusive = false;
+
+  // Keep iterating through the worklist until as long as the node pairs 
+  // have identical SgClassDefinitions.
+  while(worklist.size()>0) {
+    scope reg("worklist", scope::low, attrGE("VirtualMethodAnalysisDebugLevel", 1));
+    if(VirtualMethodAnalysisDebugLevel()>=1) dbg << "#worklist="<<worklist.size()<<endl;
+    
+    pair<NodePtr, NodePtr> cur = worklist.front();
+    worklist.pop_front();
+    if(VirtualMethodAnalysisDebugLevel()>=1) 
+      dbg << "cur=<"<<cur.first->str()<<","<<endl<<
+             "    "<<cur.second->str()<<">"<<endl;
+
+    // If the children of the current nodes on both trees are the same 
+    if(cur.first->child == cur.second->child) {
+      // If they're both NULL, add the current node in this tree to leaves
+      // and don't add anything else to the worklist
+      if(!cur.first->child) {
+        if(VirtualMethodAnalysisDebugLevel()>=1) dbg << "NULL children"<<endl;
+        leaves.push_back(cur.first);
+        
+        // The merged tree is inclusive since both the trees agreed on at least
+        // one path from bases to a leaf
+        inclusive = true;
+      // If they're not NULL, move on to the children of the current nodes
+      // by pushing them onto the worklist
+      } else {
+        if(VirtualMethodAnalysisDebugLevel()>=1) dbg << "same non-NULL children"<<endl;
+        worklist.push_back(make_pair(cur.first->child, cur.second->child));
+      }
+      
+      // If the cur corresponds to a base, add it to bases
+      if(cur.first->parents.size()==0)
+        bases.push_back(cur.first);
+      
+    // Otherwise, cut the current tree at this node by replacing the node
+    // with another one that has no children. We do the replacement instead
+    // of modifying the node directly to keep the all instances of Node immutable.
+    // This makes it possible for multiple nodes to share Node instances 
+    // without worrying about code in one tree corrupting another tree.
+    } else {
+      if(VirtualMethodAnalysisDebugLevel()>=1) dbg << "different children, #cur.first->parents="<<cur.first->parents.size()<<endl;
+      // Create the new node
+      NodePtr newLeaf = makePtr<Node>(cur.first->def);
+
+      // Point all of cur.first's parents in the tree to newLeaf
+      // (we know that we've already passed them in the loop)
+      for(set<NodePtr>::iterator p=cur.first->parents.begin(); p!=cur.first->parents.end(); ++p) {
+        NodePtr parent = *p;
+        parent->child = newLeaf;
+        newLeaf->parents.insert(*p);
+      }
+
+      // The new node is now a leaf of the merged tree
+      leaves.push_back(newLeaf);
+      
+      // If the cur corresponds to a base, add newLeaf to bases
+      if(cur.first->parents.size()==0)
+        bases.push_back(newLeaf);
+
+      // This tree was modified as a result of the merge
+      modified = true;
+    }
+  }
+  
+  if(inclusive!=origInclusive) modified = true;
+  
+  if(VirtualMethodAnalysisDebugLevel()>=1) {
+    dbg << "Leaves="<<endl;
+    for(list<NodePtr>::iterator l=leaves.begin(); l!=leaves.end(); l++) {
+      dbg << "    "<<SgNode2Str((*l)->def)<<endl;
+    }
+  }
+
+  return modified;
+}
+
+// Returns the set of functions the given SgFunctionCallExp may refer to given
+// the type constraints encoded in this tree
+set<SgFunctionDeclaration*> ClassInheritanceTree::getCalleeDefs(SgFunctionCallExp* call) {
+  scope s(txt()<<"ClassInheritanceTree::getCalleeDefs("<<SgNode2Str(call)<<")", attrGE("VirtualMethodAnalysisDebugLevel", 2));
+  ClassHierarchyWrapper::ClassDefSet allSubClasses;
+  // Add to allSubClasses all of the tree's leaf classes (if inclusive) and 
+  // all the classes that inherit from them
+  for(list<NodePtr>::iterator l=leaves.begin(); l!=leaves.end(); l++) {
+    if(inclusive) allSubClasses.insert((*l)->def);
+    const ClassHierarchyWrapper::ClassDefSet& children = classHierarchy->getSubclasses((*l)->def);
+    allSubClasses.insert(children.begin(), children.end());
+  }
+  
+  if(VirtualMethodAnalysisDebugLevel()>=2) { 
+    scope s1("allSubClasses");
+    for(ClassHierarchyWrapper::ClassDefSet::iterator sub=allSubClasses.begin(); sub!=allSubClasses.end(); sub++)
+      dbg << "    "<<SgNode2Str(*sub)<<endl;
+  }
+  
+  // Get all the functions that may possibly be referred to by call
+  Rose_STL_Container<SgFunctionDeclaration*> approxCallees;
+  CallTargetSet::getDeclarationsForExpression(call, classHierarchy, approxCallees);
+  
+  if(VirtualMethodAnalysisDebugLevel()>=2) { 
+    scope s1("approxCallees");
+    for(Rose_STL_Container<SgFunctionDeclaration*>::iterator c=approxCallees.begin(); c!=approxCallees.end(); c++)
+      dbg << "    "<<SgNode2Str(*c)<<endl;
+  }
+  
+  // Copy to callees the functions in approxCallees that belong to some
+  // class in allSubClasses
+  set<SgFunctionDeclaration*> callees;
+  for(Rose_STL_Container<SgFunctionDeclaration*>::iterator c=approxCallees.begin(); 
+      c!=approxCallees.end(); c++) {
+    // Check if the current callee is actually possible given the known class type constraints
+    SgClassDefinition* scope = isSgClassDefinition((*c)->get_scope());
+    if(VirtualMethodAnalysisDebugLevel()>=2) dbg << "scope="<<SgNode2Str(scope)<<endl;
+    ROSE_ASSERT(scope);
+    if(allSubClasses.find(scope) != allSubClasses.end()) {
+      if(VirtualMethodAnalysisDebugLevel()>=2) dbg << "   Possible callee: "<<SgNode2Str(*c)<<endl;
+      callees.insert(isSgFunctionDeclaration((*c)->get_definingDeclaration()));
+    }
+  }
+  return callees;
+}
+
+bool ClassInheritanceTree::operator==(Lattice* that_arg) {
+  ClassInheritanceTree* that = dynamic_cast<ClassInheritanceTree*>(that_arg);
+  ROSE_ASSERT(that);
+
+  // These trees are identical if their leaves lists contain the same SgClassDefinitions.
+  // This is because the ancestry of a given SgClassDefinitions is the same and 
+  // acyclical no matter where it appears. Thus, even if the tree got truncated
+  // because multiple trees were merged together and their un-shared leaves got 
+  // chopped, if the new leaves are the same, this means that all the deeper parts
+  // of the tree (their ancestors) must be the same.
+  // NOTE: this check assumes that the same leaf SgClassDefinitions appear in the
+  //       same order in multiple ClassInheritanceTrees.
+  if(leaves.size() != that->leaves.size()) return false;
+
+  for(std::list<NodePtr>::iterator thisL=leaves.begin(), thatL=that->leaves.begin();
+      thisL!=leaves.end(); ++thisL, ++thatL) {
+    if((*thisL)->def != (*thatL)->def) return false;
+  }
+  
+  if(inclusive != that->inclusive) return false;
+  return true;
+}
+
+// Set this Lattice object to represent the set of all possible execution prefixes.
+// Return true if this causes the object to change and false otherwise.
+bool ClassInheritanceTree::setToFull() {
+  if(state==full) return false;
+  state = full;
+  bases.clear();
+  leaves.clear();
+  inclusive = false;
+  return true;
+}
+
+// Set this Lattice object to represent the of no execution prefixes (empty set).
+// Return true if this causes the object to change and false otherwise.
+bool ClassInheritanceTree::setToEmpty() {
+  if(state==empty) return false;
+  state = empty;
+  bases.clear();
+  leaves.clear();
+  inclusive = false;
+  return true;
+}
+
+// Set all the value information that this Lattice object associates with this MemLocObjectPtr to full.
+// Return true if this causes the object to change and false otherwise.
+bool ClassInheritanceTree::setMLValueToFull(MemLocObjectPtr ml) {
+  // Do nothing since this object does not maintain information at the granularity of memory locations
+  return false;
+}
+
+// Returns whether this lattice denotes the set of all possible execution prefixes.
+bool ClassInheritanceTree::isFullLat() { return state == full; }
+
+// Returns whether this lattice denotes the empty set.
+bool ClassInheritanceTree::isEmptyLat() { return state == empty; }
+
+std::string ClassInheritanceTree::str(std::string indent) const {
+  if(state == full)  return "[ClassInheritanceTree: FULL]";
+  if(state == empty) return "[ClassInheritanceTree: EMPTY]";
+  
+  ostringstream s;
+  s << "<u>ClassInheritanceTree (inclusive="<<inclusive<<") :</u>"<<endl;
+  s << "<table border=1>"<<endl;
+  // The worklist is a list of Nodes that have not yet been printed, along with
+  // the indentation space to place before each one, which is based on its depth
+  // in the tree.
+  std::list<std::pair<NodePtr, std::string> > worklist;
+  for(std::list<NodePtr>::const_iterator l=leaves.begin(); l!=leaves.end(); l++)
+    worklist.push_back(make_pair(*l, "  "));
+
+  while(worklist.size()>0) {
+    // Get the next node in the tree
+    std::pair<NodePtr, std::string> cur=worklist.front();
+    worklist.pop_front();
+    
+    // Print it out with appropriate indentation
+    s << "<tr><td>"<<cur.second << cur.first->str()<<"</td></tr>"<<endl;
+
+    // Push its parents onto the front of the worklist so that they're printed 
+    // immediately after it, with deeper indentation.
+    for(std::set<NodePtr>::iterator p=cur.first->parents.begin(); p!=cur.first->parents.end(); p++)
+      worklist.push_front(make_pair(*p, cur.second+"    "));
+  }
+  s << "</table>"<<endl;
+  
+  s << "bases=";
+  s << "<table border=1>"<<endl;
+  for(list<NodePtr>::const_iterator b=bases.begin(); b!=bases.end(); b++)
+    s << "<tr><td>"<<(*b)->str()<<"</td></tr>"<<endl;
+  s << "</table>"<<endl;
+  
+  s << "leaves=";
+  s << "<table border=1>"<<endl;
+  for(list<NodePtr>::const_iterator l=leaves.begin(); l!=leaves.end(); l++)
+    s << "<tr><td>"<<(*l)->str()<<"</td></tr>"<<endl;
+  s << "</table>"<<endl;
+  return s.str();
+}
+
+/****************************
+ ***** VirtualMethodPart *****
+ ****************************/
+
+VirtualMethodPart::VirtualMethodPart(PartPtr base, ComposedAnalysis* analysis) :
+  Part(analysis, base)
+{
+  cacheInitialized_outEdges=false;
+  cacheInitialized_inEdges=false;
+  cacheInitialized_CFGNodes=-false;
+  cacheInitialized_matchingCallParts=false;
+  cacheInitialized_inEdgeFromAny=false;
+  cacheInitialized_outEdgeToAny=false;
+}
+
+VirtualMethodPart::VirtualMethodPart(const VirtualMethodPart& that) :
+  Part((const Part&)that)
+{
+  cacheInitialized_outEdges          = that.cacheInitialized_outEdges;
+  cache_outEdges                     = that.cache_outEdges;
+  cacheInitialized_inEdges           = that.cacheInitialized_inEdges;
+  cache_inEdges                      = that.cache_inEdges;
+  cacheInitialized_CFGNodes          = that.cacheInitialized_CFGNodes;
+  cache_CFGNodes                     = that.cache_CFGNodes;
+  cacheInitialized_matchingCallParts = that.cacheInitialized_matchingCallParts;
+  cache_matchingCallParts            = that.cache_matchingCallParts;
+  cacheInitialized_inEdgeFromAny     = that.cacheInitialized_inEdgeFromAny;
+  cache_inEdgeFromAny                = that.cache_inEdgeFromAny;
+  cacheInitialized_outEdgeToAny      = that.cacheInitialized_outEdgeToAny;
+  cache_outEdgeToAny                 = that.cache_outEdgeToAny;
+  cache_equal                        = that.cache_equal;
+  cache_less                         = that.cache_less;
+}
+
+// Returns a shared pointer to this of type VirtualMethodPartPtr
+VirtualMethodPartPtr VirtualMethodPart::get_shared_this()
+{ return dynamicPtrCast<VirtualMethodPart>(makePtrFromThis(shared_from_this())); }
+
+// -------------------------------------------
+// Functions that need to be defined for Parts
+// -------------------------------------------
+
+// Returns whether the given function call according to the available information
+// about object types
+bool VirtualMethodPart::isPossibleFunctionCall(const Function& calleeFunc, SgFunctionCallExp* call, AbstractObjectMap* aom, PartEdgePtr baseEdge) {
+  /*dbg << "call->get_function()="<<SgNode2Str(call->get_function())<<endl;
+  if(isSgArrowExp(call->get_function())) {
+    dbg << "isSgArrowExp(call->get_function())->get_lhs_operand()="<<SgNode2Str(isSgArrowExp(call->get_function())->get_lhs_operand())<<endl;
+    dbg << "isSgArrowExp(call->get_function())->get_lhs_operand()="<<SgNode2Str(unwrapCasts(isSgArrowExp(call->get_function())->get_lhs_operand()))<<endl;
+  }*/
+  // If this is a regular function call or a call on the current object
+  if(isSgFunctionRefExp(call->get_function()) ||
+     (isSgArrowExp(call->get_function()) && isSgThisExp(unwrapCasts(isSgArrowExp(call->get_function())->get_lhs_operand())))) {
+    if(VirtualMethodAnalysisDebugLevel()>=2) dbg << "regular call. Adding."<<endl;
+    // This is not a virtual call, so we conservatively say it is possible since
+    // type information says nothing about this call
+    return true;
+  // If this function call is done through a variable (E.g. var.foo())
+  } else {
+    MemLocObjectPtr ml = analysis->getComposer()->Expr2MemLoc(call->get_function(), baseEdge, analysis);
+    if(VirtualMethodAnalysisDebugLevel()>=2) dbg << "call through variable "<<ml->str()<<endl;
+    ClassInheritanceTreePtr tree = dynamic_pointer_cast<ClassInheritanceTree>(aom->get(ml));
+    if(VirtualMethodAnalysisDebugLevel()>=2) dbg << "tree at variable="<<endl<<tree->str()<<endl;
+    ROSE_ASSERT(tree);
+    set<SgFunctionDeclaration*> callees = tree->getCalleeDefs(call);
+    /*{ scope s("Checking for possibility");
+    dbg << "calleeFunc.get_declaration()="<<calleeFunc.get_declaration()<<"="<<SgNode2Str(calleeFunc.get_declaration())<<endl;
+    dbg << "calleeFunc.get_declaration()->get_definingDeclaration()="<<calleeFunc.get_declaration()->get_definingDeclaration()<<"="<<SgNode2Str(calleeFunc.get_declaration()->get_definingDeclaration())<<endl;
+    dbg << "callees="<<endl;
+    for(set<SgFunctionDeclaration*>::iterator c=callees.begin(); c!=callees.end(); c++) {
+      dbg << "    base callee:"<<(*c)<<"="<<SgNode2Str(*c)<<endl;
+      dbg << "    definingcallee: "<<(*c)->get_definingDeclaration()<<"="<<SgNode2Str((*c)->get_definingDeclaration())<<endl;
+    }
+    dbg << "found="<<(callees.find(calleeFunc.get_declaration()) != callees.end())<<endl;*/
+    // This call is possible if the callee function is a member of callees
+    if(callees.find(calleeFunc.get_definingDeclaration()) != callees.end()) {
+      if(VirtualMethodAnalysisDebugLevel()>=2) dbg << "call edge is possible. Adding."<<endl;
+      return true;
+    }
+  }
+  
+  return false;
+}
+
+list<PartEdgePtr> VirtualMethodPart::outEdges()
+{
+  if(!cacheInitialized_outEdges) {
+    scope reg(txt()<<"VirtualMethodPart::outEdges()", scope::medium, attrGE("VirtualMethodAnalysisDebugLevel", 2));
+    list<PartEdgePtr> baseEdges = getParent()->outEdges();
+
+    if(VirtualMethodAnalysisDebugLevel()>=2) dbg << "#baseEdges="<<baseEdges.size()<<endl;
+
+    // The NodeState at the current part
+    NodeState* curPartState = NodeState::getNodeState(analysis, getParent());
+    if(VirtualMethodAnalysisDebugLevel()>=2) dbg << "curPartState="<<curPartState->str(analysis)<<endl;
+    
+    // Consider all the VirtualMethodParts along all of this part's outgoing edges. Since this is a forward
+    // analysis, they are maintained separately
+    for(list<PartEdgePtr>::iterator be=baseEdges.begin(); be!=baseEdges.end(); be++) {
+      scope beS(txt()<<"be="<<be->str(), scope::low, attrGE("VirtualMethodAnalysisDebugLevel", 2));
+      
+      // If this edge enters a function
+      //SgFunctionParameterList* calleeEntry = (*be)->target()->mustSgNodeAll<SgFunctionParameterList>();
+      //if(calleeEntry) {
+      set<CFGNode> matchNodes;
+      if((*be)->source()->mustOutgoingFuncCall(matchNodes)) {
+        SgFunctionParameterList* calleeEntry = (*be)->target()->mustSgNodeAll<SgFunctionParameterList>();
+        ROSE_ASSERT(calleeEntry);
+        Function curCalleeFunc(SageInterface::getEnclosingFunctionDeclaration(calleeEntry));
+        if(VirtualMethodAnalysisDebugLevel()>=2) dbg << "edge is call to function "<<curCalleeFunc.str()<<endl;
+
+        AbstractObjectMap* curPartAOM = dynamic_cast<AbstractObjectMap*>(curPartState->getLatticeBelow(analysis, *be, 0)); ROSE_ASSERT(curPartAOM);
+        
+        set<CFGNode> nodes=(*be)->source()->CFGNodes();
+        for(set<CFGNode>::iterator n=nodes.begin(); n!=nodes.end(); n++) {
+          if(VirtualMethodAnalysisDebugLevel()>=2) dbg << "    n="<<CFGNode2Str(*n)<<endl;
+          SgFunctionCallExp* call = isSgFunctionCallExp(n->getNode());
+          if(call && n->getIndex()==2 && isPossibleFunctionCall(curCalleeFunc, call, curPartAOM, *be))
+            cache_outEdges.push_back(VirtualMethodPartEdge::create(*be, analysis));
+        }
+      
+      // If this edge exits a function
+      } else if((*be)->target()->mustIncomingFuncCall(matchNodes)) {
+        SgFunctionDefinition* calleeExit = (*be)->source()->mustSgNodeAll<SgFunctionDefinition>();
+        ROSE_ASSERT(calleeExit);
+        Function curCalleeFunc(calleeExit);
+        if(VirtualMethodAnalysisDebugLevel()>=2) dbg << "edge is an exit from function "<<curCalleeFunc.str()<<endl;
+        
+        std::set<PartPtr> callParts = (*be)->target()->matchingCallParts();
+        assert(callParts.size()==1); 
+        PartPtr callPart = *callParts.begin();        
+        // The NodeState at the call part of this exit edge
+        NodeState* callPartState = NodeState::getNodeState(analysis, callPart);
+        //dbg << "callPartState="<<callPartState->str(analysis)<<endl;
+        if(VirtualMethodAnalysisDebugLevel()>=2) dbg << "callPartState="<<callPartState->str(analysis)<<endl;
+        AbstractObjectMap* callPartAOM = dynamic_cast<AbstractObjectMap*>(callPartState->getLatticeAbove(analysis, callPart->inEdgeFromAny(), 0)); ROSE_ASSERT(callPartAOM);
+        
+        set<CFGNode> nodes=(*be)->target()->CFGNodes();
+        for(set<CFGNode>::iterator n=nodes.begin(); n!=nodes.end(); n++) {
+          if(VirtualMethodAnalysisDebugLevel()>=2) dbg << "    n="<<CFGNode2Str(*n)<<endl;
+          SgFunctionCallExp* call = isSgFunctionCallExp(n->getNode());
+          if(call && n->getIndex()==3 && isPossibleFunctionCall(curCalleeFunc, call, callPartAOM, *be))
+            cache_outEdges.push_back(VirtualMethodPartEdge::create(*be, analysis));
+        }
+      // Not a function call, so we leave this edge as it is  
+      } else 
+        cache_outEdges.push_back(VirtualMethodPartEdge::create(*be, analysis));
+    }
+    
+    if(VirtualMethodAnalysisDebugLevel()>=1) {
+      scope s("cache_outEdges");
+      for(list<PartEdgePtr>::iterator e=cache_outEdges.begin(); e!=cache_outEdges.end(); e++)
+        dbg << "    "<<(*e)->str()<<endl;
+    }
+    
+    cacheInitialized_outEdges=true;
+  }
+  
+  return cache_outEdges;
+}
+
+list<PartEdgePtr> VirtualMethodPart::inEdges()
+{
+  assert(0);
+/*  if(!cacheInitialized_inEdges) {
+    list<PartEdgePtr> baseEdges = getParent()->inEdges();
+
+  //  scope reg(txt()<<"VirtualMethodPart::inEdges() #baseEdges="<<baseEdges.size(), scope::medium, attrGE("VirtualMethodAnalysisDebugLevel", 2));
+
+    // Since this is a forward analysis, information from preceding parts is aggregated under the NULL edge
+    // of this part. As such, to get the parts that lead to this part we need to iterate over the incoming edges
+    // and then look at the parts they arrive from.
+    for(list<PartEdgePtr>::iterator be=baseEdges.begin(); be!=baseEdges.end(); be++) {
+      if(VirtualMethodAnalysisDebugLevel()>=2) dbg << "be="<<be->str()<<endl;
+      NodeState* inState = NodeState::getNodeState(analysis, (*be)->source());
+      { scope inscope("inState", scope::low, attrGE("VirtualMethodAnalysisDebugLevel", 2)); if(VirtualMethodAnalysisDebugLevel()>=2) dbg << inState->str()<<endl; }
+      VirtualMethodPartEdge* inPartEdge = dynamic_cast<VirtualMethodPartEdge*>(inState->getLatticeBelow(analysis, *be, 0));
+      assert(inPartEdge);
+      if(VirtualMethodAnalysisDebugLevel()>=2) dbg << "inPartEdge="<<inPartEdge->str()<<endl;
+
+      if(inPartEdge->level==live)
+        // Create a new VirtualMethodPartEdgePtr from an existing inPartEdge. To ensure that the 
+        // original is not deallocated when the shared pointer goes out of scope, we keep the shared
+        // pointer in a cache data structure that persists.
+        //cache_inEdges.push_back(initPtr(dynamic_cast<VirtualMethodPartEdge*>(inPartEdge->copy())));
+        cache_inEdges.push_back(VirtualMethodPartEdge::raw2shared(dynamic_cast<VirtualMethodPartEdge*>(inPartEdge)));
+    }
+    cacheInitialized_inEdges=true;
+  }
+  return cache_inEdges;*/
+}
+
+set<CFGNode> VirtualMethodPart::CFGNodes() const
+{
+  if(!cacheInitialized_CFGNodes) {
+    const_cast<VirtualMethodPart*>(this)->cache_CFGNodes = getParent()->CFGNodes();
+    const_cast<VirtualMethodPart*>(this)->cacheInitialized_CFGNodes = true;
+  }
+  return cache_CFGNodes;
+  //return getParent()->CFGNodes();
+}
+
+// If this Part corresponds to a function call/return, returns the set of Parts that contain
+// its corresponding return/call, respectively.
+set<PartPtr> VirtualMethodPart::matchingCallParts() const {
+  if(!cacheInitialized_matchingCallParts) {
+    // Wrap the parts returned by the call to the parent Part with VirtualMethodPart
+    set<PartPtr> parentMatchParts = getParent()->matchingCallParts();
+    for(set<PartPtr>::iterator mp=parentMatchParts.begin(); mp!=parentMatchParts.end(); mp++) {
+      const_cast<VirtualMethodPart*>(this)->cache_matchingCallParts.insert(VirtualMethodPart::create(*mp, analysis));
+    }
+    //const_cast<VirtualMethodPart*>(this)->cacheInitialized_matchingCallParts=true;
+  }
+  return cache_matchingCallParts;
+}
+
+// Returns a PartEdgePtr, where the source is a wild-card part (NULLPart) and the target is this Part
+PartEdgePtr VirtualMethodPart::inEdgeFromAny() { 
+  if(!cacheInitialized_inEdgeFromAny) {
+    cache_inEdgeFromAny = VirtualMethodPartEdge::create(getParent()->inEdgeFromAny(), analysis);
+    cacheInitialized_inEdgeFromAny=true;
+  }
+  return cache_inEdgeFromAny;
+}
+
+// Returns a PartEdgePtr, where the target is a wild-card part (NULLPart) and the source is this Part
+PartEdgePtr VirtualMethodPart::outEdgeToAny() { 
+  if(!cacheInitialized_outEdgeToAny) {
+    cache_outEdgeToAny = VirtualMethodPartEdge::create(getParent()->outEdgeToAny(), analysis);
+    cacheInitialized_outEdgeToAny=true;
+  }
+  return cache_outEdgeToAny;
+}
+
+bool VirtualMethodPart::equal(const PartPtr& o) const
+{
+  const VirtualMethodPartPtr that = dynamicConstPtrCast<VirtualMethodPart>(o);
+  assert(that.get());
+  assert(analysis == that->analysis);
+  
+  if(cache_equal.find(that.get()) == cache_equal.end())
+    const_cast<VirtualMethodPart*>(this)->cache_equal[that.get()] = (getParent() == that->getParent());
+  return const_cast<VirtualMethodPart*>(this)->cache_equal[that.get()];
+  //return getParent() == that->getParent();
+}
+
+bool VirtualMethodPart::less(const PartPtr& o) const
+{
+  const VirtualMethodPartPtr that = dynamicConstPtrCast<VirtualMethodPart>(o);
+  assert(that.get());
+  assert(analysis == that->analysis);
+  
+  if(cache_less.find(that.get()) == cache_less.end())
+    const_cast<VirtualMethodPart*>(this)->cache_less[that.get()] = (getParent() < that->getParent());
+  return const_cast<VirtualMethodPart*>(this)->cache_less[that.get()];
+  //return getParent() < that->getParent();
+}
+
+// Pretty print for the object
+std::string VirtualMethodPart::str(std::string indent) const
+{
+  ostringstream oss;
+  oss << "[VMPart: "<<getParent()->str()<<"]";
+  return oss.str();
+}
+
+/************************************
+ ***** VirtualMethodPartEdge *****
+ ************************************/
+
+// Constructor to be used when traversing the part graph created by the VirtualMethodAnalysis, after
+// all the VirtualMethodPartEdges have been constructed and stored in NodeStates.
+VirtualMethodPartEdge::VirtualMethodPartEdge(PartEdgePtr baseEdge, ComposedAnalysis* analysis) : 
+        PartEdge(analysis, baseEdge)
+{
+  // Look up this edge in the results of the VirtualMethodAnalysis results and copy data from that edge into this object
+
+  if(baseEdge->source()) src=VirtualMethodPart::create(baseEdge->source(), analysis);
+  if(baseEdge->target()) tgt=VirtualMethodPart::create(baseEdge->target(), analysis);
+  
+  cacheInitialized_getPredicateValue=false;
+}
+
+VirtualMethodPartEdge::VirtualMethodPartEdge(const VirtualMethodPartEdge& that) :
+  PartEdge((const PartEdge&)that), 
+  src(that.src), tgt(that.tgt)
+{
+  cache_getOperandPartEdge           = that.cache_getOperandPartEdge;
+  cacheInitialized_getPredicateValue = that.cacheInitialized_getPredicateValue;
+}
+
+// Returns a shared pointer to this of type VirtualMethodPartEdgePtr
+VirtualMethodPartEdgePtr VirtualMethodPartEdge::get_shared_this()
+{ return dynamicPtrCast<VirtualMethodPartEdge>(makePtrFromThis(shared_from_this())); }
+
+
+PartPtr VirtualMethodPartEdge::source() const
+{ return src; }
+
+PartPtr VirtualMethodPartEdge::target() const
+{ return tgt; }
+
+// Sets this PartEdge's parent
+void VirtualMethodPartEdge::setParent(PartEdgePtr parent)
+{
+  PartEdge::setParent(parent);
+}
+
+// Let A={ set of execution prefixes that terminate at the given anchor SgNode }
+// Let O={ set of execution prefixes that terminate at anchor's operand SgNode }
+// Since to reach a given SgNode an execution must first execute all of its operands it must
+//    be true that there is a 1-1 mapping m() : O->A such that o in O is a prefix of m(o).
+// This function is the inverse of m: given the anchor node and operand as well as the
+//    PartEdge that denotes a subset of A (the function is called on this PartEdge), 
+//    it returns a list of PartEdges that partition O.
+std::list<PartEdgePtr> VirtualMethodPartEdge::getOperandPartEdge(SgNode* anchor, SgNode* operand)
+{
+  if(cache_getOperandPartEdge.find(anchor) == cache_getOperandPartEdge.end() ||
+     cache_getOperandPartEdge[anchor].find(operand) == cache_getOperandPartEdge[anchor].end()) {
+    
+    // operand precedes anchor in the CFG, either immediately or at some distance. As such, the edge
+    //   we're looking for is not necessarily the edge from operand to anchor but rather the first
+    //   edge along the path from operand to anchor. Since operand is part of anchor's expression
+    //   tree we're guaranteed that there is only one such path.
+    // The implementor of the partition we're running on may have created multiple parts for 
+    //   operand to provide path sensitivity and indeed, may have created additional outgoing edges
+    //   from each of the operand's parts. Fortunately, since in the original program the original
+    //   edge led from operand to anchor and the implementor of the partition could have only hierarchically 
+    //   refined the original partition, all the new edges must also lead from operand to anchor.
+    //   As such, the returned list contains all the outgoing edges from all the parts that correspond
+    //   to operand.
+    // Note: if the partitioning process is not hierarchical we may run into minor trouble since the 
+    //   new edges from operand may lead to parts other than anchor. However, this is just an issue
+    //   of precision since we'll account for paths that are actually infeasible.
+
+    // The target of this edge identifies the termination point of all the execution prefixes
+    // denoted by this edge. We thus use it to query for the parts of the operands and only both
+    // if this part is itself live.
+    scope reg("VirtualMethodPartEdge::getOperandPartEdge()", scope::medium, attrGE("VirtualMethodAnalysisDebugLevel", 1));
+    if(VirtualMethodAnalysisDebugLevel()>=1) dbg << "anchor="<<SgNode2Str(anchor)<<" operand="<<SgNode2Str(operand)<<endl;
+
+    std::list<PartEdgePtr> baseEdges = getParent()->getOperandPartEdge(anchor, operand);
+    for(std::list<PartEdgePtr>::iterator e=baseEdges.begin(); e!=baseEdges.end(); e++) {
+      if(VirtualMethodAnalysisDebugLevel()>=1) dbg << "e="<<(*e)->str()<<endl;
+      PartEdgePtr dpeEdge = VirtualMethodPartEdge::create(*e, analysis);
+      { scope reg("vmEdge", scope::low, attrGE("VirtualMethodAnalysisDebugLevel", 2));
+      if(VirtualMethodAnalysisDebugLevel()>=1) dbg<<dpeEdge->str()<<endl; }
+      cache_getOperandPartEdge[anchor][operand].push_back(dpeEdge);
+    }
+  }
+  return cache_getOperandPartEdge[anchor][operand];
+}
+
+// If the source Part corresponds to a conditional of some sort (if, switch, while test, etc.)
+// it must evaluate some predicate and depending on its value continue, execution along one of the
+// outgoing edges. The value associated with each outgoing edge is fixed and known statically.
+// getPredicateValue() returns the value associated with this particular edge. Since a single 
+// Part may correspond to multiple CFGNodes getPredicateValue() returns a map from each CFG node
+// within its source part that corresponds to a conditional to the value of its predicate along 
+// this edge. 
+std::map<CFGNode, boost::shared_ptr<SgValueExp> > VirtualMethodPartEdge::getPredicateValue()
+{
+  if(!cacheInitialized_getPredicateValue) {
+    cache_getPredicateValue = getParent()->getPredicateValue();
+    cacheInitialized_getPredicateValue = true;
+  }
+  return cache_getPredicateValue;
+  //return latPEdge->getPredicateValue();
+}
+
+// Adds a mapping from a CFGNode to the outcome of its predicate
+void VirtualMethodPartEdge::mapPred2Val(CFGNode n, boost::shared_ptr<SgValueExp> val)
+{
+  predVals[n] = val;
+}
+
+// Empties out the mapping of CFGNodes to the outcomes of their predicates
+void VirtualMethodPartEdge::clearPred2Val()
+{
+  predVals.clear();
+}
+
+bool VirtualMethodPartEdge::equal(const PartEdgePtr& o) const
+{
+  const VirtualMethodPartEdgePtr that = dynamicConstPtrCast<VirtualMethodPartEdge>(o);
+  assert(that.get());
+  return src==that->src && tgt==that->tgt;
+}
+
+bool VirtualMethodPartEdge::less(const PartEdgePtr& o)  const
+{
+  const VirtualMethodPartEdgePtr that = dynamicConstPtrCast<VirtualMethodPartEdge>(o);
+  assert(that.get());
+
+  return (src < that->src) ||
+         (src==that->src && tgt<that->tgt);
+}
+
+// Pretty print for the object
+std::string VirtualMethodPartEdge::str(std::string indent) const
+{
+  ostringstream oss;
+  oss << "[VMPEdge: "<<
+                      (src ? src->str(indent+"&nbsp;&nbsp;&nbsp;&nbsp;"): "NULL")<<" ==&gt; " <<
+                      (tgt ? tgt->str(indent+"&nbsp;&nbsp;&nbsp;&nbsp;"): "NULL")<<
+                      ", "<<endl;
+  oss << indent /*<<", parent=<"<<getParent()->str()*/<<"]";
+  return oss.str();
+}
+
+/*********************************
+ ***** VirtualMethodAnalysis *****
+ *********************************/
+
+VirtualMethodAnalysis::VirtualMethodAnalysis(bool trackBase2RefinedPartEdgeMapping) : 
+      FWDataflow(trackBase2RefinedPartEdgeMapping) { 
+  cacheInitialized_GetStartAStates_Spec = false;
+  cacheInitialized_GetEndAStates_Spec = false;
+}
+
+void VirtualMethodAnalysis::genInitLattice(PartPtr part, PartEdgePtr pedge,
+                                      std::vector<Lattice*>& initLattices)
+{
+  AbstractObjectMap* productlattice = new AbstractObjectMap(boost::make_shared<ClassInheritanceTree>(pedge),
+                                                            pedge,
+                                                            getComposer(),
+                                                            this);
+  initLattices.push_back(productlattice);                                                                                                  
+}
+
+
+boost::shared_ptr<DFTransferVisitor>
+VirtualMethodAnalysis::getTransferVisitor(PartPtr part, CFGNode cn, NodeState& state, 
+                                     std::map<PartEdgePtr, std::vector<Lattice*> >& dfInfo)                                     
+{
+  VirtualMethodAnalysisTransfer* ptat = new VirtualMethodAnalysisTransfer(part, cn, state, dfInfo, getComposer(), this);
+  return boost::shared_ptr<DFTransferVisitor>(ptat);
+}
+
+// Return the anchor Parts of the application
+set<PartPtr> VirtualMethodAnalysis::GetStartAStates_Spec()
+{
+  scope reg("VirtualMethodAnalysis::GetStartAStates_Spec()", scope::medium, attrGE("VirtualMethodAnalysisDebugLevel", 1));
+  if(!cacheInitialized_GetStartAStates_Spec) {
+    set<PartPtr> baseStartParts = getComposer()->GetStartAStates(this);
+    if(VirtualMethodAnalysisDebugLevel()>=1) dbg << "#baseStartParts="<<baseStartParts.size()<<endl;
+    for(set<PartPtr>::iterator baseSPart=baseStartParts.begin(); baseSPart!=baseStartParts.end(); baseSPart++) {
+      if(VirtualMethodAnalysisDebugLevel()>=1) dbg << "    "<<(*baseSPart)->str()<<endl;
+      cache_GetStartAStates_Spec.insert(VirtualMethodPart::create(*baseSPart, this));
+    }
+    if(VirtualMethodAnalysisDebugLevel()>=1) dbg << "#cache_GetStartAStates_Spec="<<cache_GetStartAStates_Spec.size()<<endl;
+    cacheInitialized_GetStartAStates_Spec = true;
+  }
+  return cache_GetStartAStates_Spec;
+}
+
+set<PartPtr> VirtualMethodAnalysis::GetEndAStates_Spec()
+{
+  scope reg("VirtualMethodAnalysis::GetEndAStates_Spec()", scope::medium, attrGE("VirtualMethodAnalysisDebugLevel", 1)); 
+  if(!cacheInitialized_GetEndAStates_Spec) {
+    set<PartPtr> endParts = getComposer()->GetEndAStates(this);
+    if(VirtualMethodAnalysisDebugLevel()>=1) dbg << "#endParts="<<endParts.size()<<endl;
+    for(set<PartPtr>::iterator baseEPart=endParts.begin(); baseEPart!=endParts.end(); baseEPart++) {
+      if(VirtualMethodAnalysisDebugLevel()>=1) dbg << "    "<<(*baseEPart)->str()<<endl;
+      cache_GetEndAStates_Spec.insert(VirtualMethodPart::create(*baseEPart, this));
+    }
+    if(VirtualMethodAnalysisDebugLevel()>=1) dbg << "#cache_GetEndAStates_Spec="<<cache_GetEndAStates_Spec.size()<<endl;
+    cacheInitialized_GetEndAStates_Spec = true;
+  }
+  return cache_GetEndAStates_Spec;
+}
+
+/*****************************************
+ ***** VirtualMethodAnalysisTransfer *****
+ *****************************************/
+  
+VirtualMethodAnalysisTransfer::VirtualMethodAnalysisTransfer(
+          PartPtr part, CFGNode cn, NodeState& state, 
+          map<PartEdgePtr, vector<Lattice*> >& dfInfo, 
+          Composer* composer, VirtualMethodAnalysis* analysis)
+   : VariableStateTransfer<ClassInheritanceTree, VirtualMethodAnalysis>
+                       (state, dfInfo, boost::make_shared<ClassInheritanceTree>(part->inEdgeFromAny()), 
+                        composer, analysis, part, cn, 
+                        VirtualMethodAnalysisDebugLevel, "VirtualMethodAnalysisDebugLevel")
+{}
+
+void VirtualMethodAnalysisTransfer::visit(SgVarRefExp *vref) {
+  scope reg("VirtualMethodAnalysisTransfer::visit(SgVarRefExp)", scope::medium, attrGE("VirtualMethodAnalysisDebugLevel", 1));
+  
+  if(SgClassType* ctype = isSgClassType(vref->get_type())) {
+    SgClassDeclaration* cdecl=isSgClassDeclaration(ctype->get_declaration()->get_definingDeclaration());
+    ROSE_ASSERT(cdecl);
+    if(VirtualMethodAnalysisDebugLevel()>=1) dbg << "cdecl="<<SgNode2Str(cdecl)<<endl;
+    SgClassDefinition* cdef = isSgClassDefinition(cdecl->get_definition());
+    ROSE_ASSERT(cdef);
+    if(VirtualMethodAnalysisDebugLevel()>=1) dbg << "cdef="<<SgNode2Str(cdef)<<endl;
+    
+    setLattice(vref, boost::make_shared<ClassInheritanceTree>(cdef, part->inEdgeFromAny()));
+  }
+}
+
+void VirtualMethodAnalysisTransfer::visit(SgInitializedName *name) {
+  scope reg("VirtualMethodAnalysisTransfer::visit(SgInitializedName)", scope::medium, attrGE("VirtualMethodAnalysisDebugLevel", 1));
+  
+  if(SgClassType* ctype = isSgClassType(name->get_type())) {
+    SgClassDeclaration* cdecl=isSgClassDeclaration(ctype->get_declaration()->get_definingDeclaration());
+    ROSE_ASSERT(cdecl);
+    if(VirtualMethodAnalysisDebugLevel()>=1) dbg << "cdecl="<<SgNode2Str(cdecl)<<endl;
+    if(VirtualMethodAnalysisDebugLevel()>=1) dbg << "cdef="<<SgNode2Str(cdecl->get_definition())<<endl;
+    SgClassDefinition* cdef = isSgClassDefinition(cdecl->get_definition());
+    ROSE_ASSERT(cdef);
+    if(VirtualMethodAnalysisDebugLevel()>=1) dbg << "cdef="<<SgNode2Str(cdef)<<endl;
+    
+    setLattice(name, boost::make_shared<ClassInheritanceTree>(cdef, part->inEdgeFromAny()));
+  }
+}
+
+} // namespace fuse

@@ -56,7 +56,8 @@ typedef enum {Unknown=-1, False=0, True=1} knowledgeT;
 class Composer
 {
   public:
-    Composer();
+  
+  Composer();
     
   // The types of functions we may be interested in calling
   typedef enum {any, codeloc, val, memloc, memregion, atsGraph} reqType;
@@ -190,7 +191,13 @@ class Composer
   virtual std::set<PartPtr> GetStartAStates(ComposedAnalysis* client)=0;
   // There may be multiple terminal points in the application (multiple calls to exit(), returns from main(), etc.)
   virtual std::set<PartPtr> GetEndAStates(ComposedAnalysis* client)=0;
-  
+ 
+  // Returns all the edges implemented by the entire composer that refine the given
+  // base PartEdge
+  // NOTE: Once we change ChainComposer to derive from ComposedAnalysis, we can modify
+  //       this to implement that interface.
+  virtual const std::set<PartEdgePtr>& getRefinedPartEdges(PartEdgePtr base) const=0;
+   
   /*
   // Returns whether dom is a dominator of part
   virtual std::set<PartPtr> isDominator(PartPtr part, PartPtr dom, ComposedAnalysis* client);
@@ -372,6 +379,8 @@ class ChainComposer : public Composer, public UndirDataflow
   // Returns a shared pointer to a freshly-allocated copy of this ComposedAnalysis object
   ComposedAnalysisPtr copy() 
   { return boost::make_shared<ChainComposer>(*this); }
+
+  ~ChainComposer();
   
   private:
 
@@ -551,6 +560,21 @@ class ChainComposer : public Composer, public UndirDataflow
   // Return the anchor Parts of an application
   std::set<PartPtr> GetStartAStates(ComposedAnalysis* client);
   std::set<PartPtr> GetEndAStates(ComposedAnalysis* client);
+
+  // Returns all the edges implemented by the entire composer that refine the given
+  // base PartEdge
+  const std::set<PartEdgePtr>& getRefinedPartEdges(PartEdgePtr base) const;
+
+  protected:
+  // Maps base parts from the ATS on which this analysis runs to the parts implemented
+  // by this analysis that refine themto the edges that refine them. Set inside 
+  // registerBase2RefinedMapping(), which is called inside the PartEdge constructor
+  // when the connection between a given refined part and its base part is first established.
+  // NOTE: Once we change ChainComposer to derive from ComposedAnalysis, we can modify
+  //       this to implement that interface.
+  std::map<PartEdgePtr, boost::shared_ptr<std::set<PartEdgePtr> > > base2RefinedPartEdge;
+
+  public:
   
   // -----------------------------------------
   // ----- Methods from ComposedAnalysis -----
@@ -719,6 +743,13 @@ class LooseParallelComposer : public Composer, public UndirDataflow
   
   std::set<PartPtr> GetStartOrEndAStates_Spec(callStartOrEndAStates& caller, std::string funcName);
   
+  // Returns all the edges implemented by the entire composer that refine the given
+  // base PartEdge
+  // NOTE: Once we change ChainComposer to derive from ComposedAnalysis, we can modify
+  //       this to implement that interface.
+  const std::set<PartEdgePtr>& getRefinedPartEdges(PartEdgePtr base) const
+  { assert(0); }
+
   // -----------------------------------------
   // ----- Methods from ComposedAnalysis -----
   // -----------------------------------------

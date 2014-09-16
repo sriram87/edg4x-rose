@@ -155,13 +155,6 @@ FUSETIGHT_CP_PT_TESTS=\
 	simplePtrTestTight4.cpp \
 	simplePtrTestTight5.cpp
 
-#.PHONY: check-fusetight
-#check-fusetight: $(FUSETIGHT_CHECKS)
-#
-#.PHONY: clean-fusetight
-#clean-fusetight:
-#	rm -rf fuseTight fuseTight-*.o
-
 FUSE_C_CHECKS = $(addprefix fuse_C_, $(addsuffix .passed, $(FUSE_C_TESTS)))
 FUSE_C_EXPENSIVE_CHECKS = $(addprefix fuse_C_EXP_, $(addsuffix .passed, $(FUSE_C_EXPENSIVE_TESTS)))
 FUSE_CPP_CHECKS = $(addprefix fuse_cpp_, $(addsuffix .passed, $(FUSE_CPP_TESTS)))
@@ -443,4 +436,4 @@ clean-debug:
 clean-check:
 	rm -f *.passed *.failed *.out *.err
 
-clean-local: clean-fuse clean-fusetight clean-check clean-debug
+clean-local: clean-fuse clean-check clean-debug

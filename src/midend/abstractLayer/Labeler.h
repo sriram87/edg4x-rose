@@ -81,7 +81,7 @@ class LabelProperty {
   * \author Markus Schordan
   * \date 2012.
  */
-class LabelSet : public set<Label> {
+class LabelSet : public std::set<Label> {
  public:
 
    // temporary until all sets are properly using the std:algorithms for set operations
@@ -135,7 +135,7 @@ class Labeler {
      A return value of NO_LABEL means that this node has no label.
   */
   Label getLabel(SgNode* node);
-  LabelSet getLabelSet(set<SgNode*>& nodeSet);
+  LabelSet getLabelSet(std::set<SgNode*>& nodeSet);
 
   /* Returns the node with the label 'label'. If the return value is 0 then no node exists for this label -
      this can only be the case if label is errornously higher than the number of labeled nodes or NO_LABEL.

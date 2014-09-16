@@ -185,7 +185,7 @@ namespace SgNodeHelper {
      (=relevant) loop. This function can be used for:
      SgWhile,SgDoWhile,SgForStatement, SgSwitch.
   */
-  set<SgNode*> LoopRelevantBreakStmtNodes(SgNode* node);
+  std::set<SgNode*> LoopRelevantBreakStmtNodes(SgNode* node);
 
   //! returns the first child of an arbitrary AST node (throws exception if numChildren==0)
   SgNode* getFirstChild(SgNode* node);
@@ -200,7 +200,7 @@ namespace SgNodeHelper {
   SgType* getFunctionReturnType(SgNode* node);
 
   //! returns the set of all local variable-declarations of a function
-  set<SgVariableDeclaration*> localVariableDeclarationsOfFunction(SgFunctionDefinition* funDef);
+  std::set<SgVariableDeclaration*> localVariableDeclarationsOfFunction(SgFunctionDefinition* funDef);
 
   //! returns the child of SgExprStatement (which is guaranteed to be unique and to exist)
   SgNode* getExprStmtChild(SgNode* node);

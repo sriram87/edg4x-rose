@@ -32,7 +32,7 @@ class VariableIdMapping {
 
  public:
   //typedef boost::unordered_set<VariableId> VariableIdSet;
-  typedef set<VariableId> VariableIdSet;
+  typedef std::set<VariableId> VariableIdSet;
 
   // the computation of the ROSE-based variable-symbol mapping
   // creates a mapping of variableNames and its computed UniqueVariableSymbol
@@ -83,7 +83,7 @@ class VariableIdMapping {
 
   VariableIdSet getVariableIdSet();
 
-  VariableIdSet determineVariableIdsOfVariableDeclarations(set<SgVariableDeclaration*> varDecls);
+  VariableIdSet determineVariableIdsOfVariableDeclarations(std::set<SgVariableDeclaration*> varDecls);
   VariableIdSet determineVariableIdsOfSgInitializedNames(SgInitializedNamePtrList& namePtrList);
   VariableIdSet variableIdsOfAstSubTree(SgNode* node);
 
@@ -93,7 +93,7 @@ class VariableIdMapping {
   string generateDotSgSymbol(SgSymbol* sym);
   typedef pair<string,SgSymbol*> MapPair;
   typedef pair<VariableId,VariableName> PairOfVarIdAndVarName;
-  typedef set<PairOfVarIdAndVarName> TemporaryVariableIdMapping;
+  typedef std::set<PairOfVarIdAndVarName> TemporaryVariableIdMapping;
   TemporaryVariableIdMapping temporaryVariableIdMapping;
   VariableId addNewSymbol(SgSymbol* sym);
   // used for mapping in both directions

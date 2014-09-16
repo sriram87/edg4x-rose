@@ -106,13 +106,21 @@ typedef CompSharedPtr<StxPartEdge> StxPartEdgePtr;
 // Returns the set of all the function calls that may call the given function
 const std::set<SgFunctionCallExp*>& func2Calls(Function func);
 
+class StxFuncContext;
+typedef CompSharedPtr<StxFuncContext> StxFuncContextPtr;
 class StxFuncContext: public PartContext
 {
   Function func;
   CFGNode n;
+
+  // Caches the function contexts of all the SgNodes
+  static std::map<SgNode*, StxFuncContextPtr> FC_cache;
   public:
-  //StxFuncContext(Function func);
   StxFuncContext(CFGNode n);
+
+  // Returns the StxFuncContext associated with the given CFGNode, using a previously cached
+  // instance of the object, if possible
+  static StxFuncContextPtr getContext(CFGNode n);
     
   // Returns a list of PartContextPtr objects that denote more detailed context information about
   // this PartContext's internal contexts. If there aren't any, the function may just return a list containing
@@ -124,7 +132,6 @@ class StxFuncContext: public PartContext
   
   std::string str(std::string indent="") const;
 };
-typedef CompSharedPtr<StxFuncContext> StxFuncContextPtr;
 
 class StxPart : public Part
 {
@@ -138,7 +145,7 @@ class StxPart : public Part
   
   protected:
   StxPart(CFGNode n, ComposedAnalysis* analysis, bool (*f) (CFGNode) = defaultFilter): 
-    Part(analysis, NULLPart, makePtr<StxFuncContext>(n)), n(n), filter(f) {}
+    Part(analysis, NULLPart, StxFuncContext::getContext(n)), n(n), filter(f) {}
   StxPart(const StxPart& part):    Part((const Part&)part), n(part.n), filter(part.filter) {} 
   StxPart(const StxPartPtr& part): Part((const Part&)part), n(part->n), filter(part->filter) {} 
   StxPart(const StxPart& part,    bool (*f) (CFGNode) = defaultFilter): Part((const Part&)part), n(part.n), filter (f) {}
@@ -414,6 +421,14 @@ class StxMemRegionType: public sight::printable
   // Returns true if this object is live at the given part and false otherwise
   virtual bool isLiveMR(PartEdgePtr pedge)=0;
   
+  // Returns true if this MemRegionObject denotes a finite set of concrete regions
+  virtual bool isConcrete()=0;
+  // Returns the type of the concrete regions (if there is one)
+  virtual SgType* getConcreteType()=0;
+  // Returns the set of concrete memory regions as SgExpressions, which allows callers to use
+  // the normal ROSE mechanisms to decode it
+  virtual std::set<SgNode* > getConcrete()=0;
+  
   StxMemRegionType() {};
 };
 
@@ -454,6 +469,14 @@ class StxMemRegionObject : public MemRegionObject
   // Returns whether this AbstractObject denotes the empty set.
   bool isEmptyMR(PartEdgePtr pedge);
   
+  // Returns true if this MemRegionObject denotes a finite set of concrete regions
+  bool isConcrete() { return type->isConcrete(); }
+  // Returns the type of the concrete regions (if there is one)
+  SgType* getConcreteType() { return type->getConcreteType(); }
+  // Returns the set of concrete memory regions as SgExpressions, which allows callers to use
+  // the normal ROSE mechanisms to decode it
+  std::set<SgNode*> getConcrete() { return type->getConcrete(); }
+  
   // Returns a ValueObject that denotes the size of this memory region
   ValueObjectPtr getRegionSize(PartEdgePtr pedge) const;
   
@@ -492,6 +515,14 @@ class StxExprMemRegionType : public StxMemRegionType
   // Returns true if this object is live at the given part and false otherwise
   bool isLiveMR(PartEdgePtr pedge);
   
+  // Returns true if this MemRegionObject denotes a finite set of concrete regions
+  bool isConcrete() { return true; }
+  // Returns the type of the concrete regions (if there is one)
+  SgType* getConcreteType() { return expr->get_type(); }
+  // Returns the set of concrete memory regions as SgExpressions, which allows callers to use
+  // the normal ROSE mechanisms to decode it
+  std::set<SgNode* > getConcrete() { std::set<SgNode* > ret; ret.insert(expr); return ret; }
+  
   std::string str(std::string indent) const; // pretty print for the object
 };
 
@@ -525,6 +556,14 @@ class StxNamedMemRegionType : public StxMemRegionType
   // Returns true if this object is live at the given part and false otherwise
   bool isLiveMR(PartEdgePtr pedge);
   
+  // Returns true if this MemRegionObject denotes a finite set of concrete regions
+  bool isConcrete() { return symbol && isSgVariableSymbol(symbol); }
+  // Returns the type of the concrete regions (if there is one)
+  SgType* getConcreteType() { return (symbol? symbol->get_type(): NULL); }
+  // Returns the set of concrete memory regions as SgExpressions, which allows callers to use
+  // the normal ROSE mechanisms to decode it
+  std::set<SgNode* > getConcrete() { std::set<SgNode* > ret; ret.insert(isSgVariableSymbol(symbol)); return ret; }
+  
   std::string str(std::string indent) const; // pretty print for the object
 };
 
@@ -555,6 +594,14 @@ class StxStorageMemRegionType : public StxMemRegionType
   // Returns true if this object is live at the given part and false otherwise
   bool isLiveMR(PartEdgePtr pedge) { return true; }
   
+  // Returns true if this MemRegionObject denotes a finite set of concrete regions
+  bool isConcrete() { return false; }
+  // Returns the type of the concrete regions (if there is one)
+  SgType* getConcreteType() { return NULL; }
+  // Returns the set of concrete memory regions as SgExpressions, which allows callers to use
+  // the normal ROSE mechanisms to decode it
+  std::set<SgNode* > getConcrete() { std::set<SgNode* > empty; return empty; }
+  
   std::string str(std::string indent) const; // pretty print for the object
 };
 
@@ -582,8 +629,23 @@ class StxAllMemRegionType : public StxMemRegionType
   // Returns true if this object is live at the given part and false otherwise
   bool isLiveMR(PartEdgePtr pedge) { return true; }
   
+  // Returns true if this MemRegionObject denotes a finite set of concrete regions
+  bool isConcrete() { return false; }
+  // Returns the type of the concrete regions (if there is one)
+  SgType* getConcreteType() { return NULL; }
+  // Returns the set of concrete memory regions as SgExpressions, which allows callers to use
+  // the normal ROSE mechanisms to decode it
+  std::set<SgNode* > getConcrete() { std::set<SgNode* > empty; return empty; }
+  
   std::string str(std::string indent) const; // pretty print for the object
 };
+
+/*********************
+ ***** Utilities *****
+ *********************/
+// Given a vector for base VirtualCFG edges, get the corresponding refined edges from
+// this attributes composer and add them to the given set of refined edges
+void collectRefinedEdges(Composer* composer, std::set<PartEdgePtr>& refined, const std::vector<CFGEdge>& base);
 
 }; //namespace fuse
 

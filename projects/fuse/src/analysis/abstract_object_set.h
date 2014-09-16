@@ -191,7 +191,7 @@ public:
 /*protected:
     iterator begin() { return items.begin(); }
     iterator end() { return items.end(); }*/
-};
+}; // class AbstractObjectSet
 } // end namespace
 
 #endif // end _MEMORYOBJECTCONTAINER_H

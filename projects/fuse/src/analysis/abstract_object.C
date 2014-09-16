@@ -1443,26 +1443,39 @@ std::set<boost::shared_ptr<SgValueExp> > CombinedValueObject<defaultMayEq>::getC
 {
   assert(isConcrete());
   
-  //return (*vals.begin())->getConcreteValue();
-  std::set<boost::shared_ptr<SgValueExp> > concreteVals;
+  // If this is a union type (defaultMayEq=true), the result is the Union of the sets returned by getConcreteValue() on all the vals.
+  // If this is an intersection type (defaultMayEq=false), an object is their Intersection.
+  
+  // Maps each concrete value to the number of elements in vals for which it was returned
+  std::map<boost::shared_ptr<SgValueExp>, size_t> concreteVals;
   for(list<ValueObjectPtr>::iterator v=vals.begin(); v!=vals.end(); v++) {
-    // Iterate through the current sub-ValueObject's concrete values and add to concreteVals
-    // any values that are not already in it.
+    // Iterate through the current sub-ValueObject's concrete values and increment each 
+    // concrete value's counter in concreteVals.
     std::set<boost::shared_ptr<SgValueExp> > curConcr = (*v)->getConcreteValue();
     for(std::set<boost::shared_ptr<SgValueExp> >::iterator i1=curConcr.begin(); i1!=curConcr.end(); i1++) {
-      std::set<boost::shared_ptr<SgValueExp> >::iterator i2=concreteVals.begin();
+      // Find the key in concrete vals with an equivalent SgValueExp to *i1
+      std::map<boost::shared_ptr<SgValueExp>, size_t>::iterator i2=concreteVals.begin();
       for(; i2!=concreteVals.end(); i2++) {
-        // If the given value from the current sub-ValueObject is already in concreteVals, break out
-        if(ValueObject::equalValueExp(i1->get(), i2->get()))
-          break;
+        if(ValueObject::equalValueExp(i1->get(), i2->first.get()))
+          ++i2->second;
       }
       
-      // If the given value from the current sub-ValueObject is not already in concreteVals, add it
+      // If the current concrete value *i1 does not appear in concreteVals, add it
       if(i2==concreteVals.end())
-        concreteVals.insert(*i1);
+        concreteVals[*i1] = 1;
     }
   }
-  return concreteVals;
+  
+  // Collect the union or intersection of all results from concreteVals as a set
+  std::set<boost::shared_ptr<SgValueExp> > ret;
+  for(std::map<boost::shared_ptr<SgValueExp>, size_t>::iterator i=concreteVals.begin(); i!=concreteVals.end(); i++) {
+    // Union: add every key in concreteVals to ret
+    if(defaultMayEq) ret.insert(i->first);
+    // Intersection: only add the keys that appear in every ValueObject in vals
+    else if(!defaultMayEq && i->second == vals.size()) ret.insert(i->first);
+  }
+
+  return ret;
 }
 
 // Allocates a copy of this object and returns a pointer to it
@@ -1914,36 +1927,43 @@ SgType* MappedValueObject<Key, mostAccurate>::getConcreteType() {
 }
 
 template<class Key, bool mostAccurate>
-bool MappedValueObject<Key, mostAccurate>::find(boost::shared_ptr<SgValueExp> item,
-                                                const set<boost::shared_ptr<SgValueExp> >& valueSet) {
-  set<boost::shared_ptr<SgValueExp> >::const_iterator c_it = valueSet.begin();
-  for( ; c_it != valueSet.end(); ++c_it) {
-    // if found return immediately
-    if(ValueObject::equalValueExp(c_it->get(), item.get())) return true;
-  }
-  // item not found
-  return false;
-}
-
-
-template<class Key, bool mostAccurate>
 set<boost::shared_ptr<SgValueExp> > MappedValueObject<Key, mostAccurate>::getConcreteValue() {
   assert(isConcrete());
-  set<boost::shared_ptr<SgValueExp> > concValues;
-  // Iterate through value objects in the map.
-  // Get the set of values for each value object.
-  // Iterate through the values set and build the set of concrete values (concValues).
-  // Not very efficient as the objects to be compared are pointers.
-  typename map<Key, ValueObjectPtr>::iterator v_it = valuesMap.begin();
-  for( ; v_it != valuesMap.end(); ++v_it) {
-    set<boost::shared_ptr<SgValueExp> > c_valueSet = v_it->second->getConcreteValue();
-    set<boost::shared_ptr<SgValueExp> >::iterator s_it = c_valueSet.begin();
-    for( ; s_it != c_valueSet.end(); ++s_it) {
-      // if item not found add it to concValues
-      if(!find(*s_it, concValues)) concValues.insert(*s_it);
+  // If this is a union type (defaultMayEq=true), the result is the Union of the sets returned by getConcrete() on all the memRegions.
+  // If this is an intersection type (defaultMayEq=false), an object is their Intersection.
+  
+  // Maps each concrete value to the number of elements in valuesMap for which it was returned
+  std::map<boost::shared_ptr<SgValueExp>, size_t> concreteVals;
+  for(typename map<Key, ValueObjectPtr>::iterator v_it = valuesMap.begin(); v_it != valuesMap.end(); ++v_it) {
+    // Iterate through the current sub-MemRegion's concrete values and increment each 
+    // concrete value's counter in concreteMRs.
+    std::set<boost::shared_ptr<SgValueExp> > c_valueSet = v_it->second->getConcreteValue();
+    for(std::set<boost::shared_ptr<SgValueExp> >::iterator s_it=c_valueSet.begin(); s_it!=c_valueSet.end(); ++s_it) {
+      map<boost::shared_ptr<SgValueExp>, size_t>::iterator c_it = concreteVals.begin();
+      for( ; c_it != concreteVals.end(); ++c_it) {
+        // If we've found the same value, increment its counter
+        if(ValueObject::equalValueExp(c_it->first.get(), (*s_it).get())) {
+          c_it->second++;
+          break;
+        }
+      }
+        
+      // If we did not find the value, add it to concreteVals;
+      if(c_it == concreteVals.end())
+        concreteVals[*s_it] = 1;
     }
   }
-  return concValues;
+
+  // Collect the union or intersection of all results from concreteMRs as a set
+  std::set<boost::shared_ptr<SgValueExp> > ret;
+  for(std::map<boost::shared_ptr<SgValueExp>, size_t>::iterator i=concreteVals.begin(); i!=concreteVals.end(); i++) {
+    // Union: add every key in concreteMRs to ret
+    if(union_) ret.insert(i->first);
+    // Intersection: only add the keys that appear in every MemRegion in memRegions
+    else if(intersect_ && i->second == valuesMap.size()) ret.insert(i->first);
+  }
+
+  return ret;
 }
 
 template<class Key, bool mostAccurate>
@@ -2533,6 +2553,75 @@ bool CombinedMemRegionObject<defaultMayEq>::isEmptyMR(PartEdgePtr pedge)
   return defaultMayEq;
 }
 
+// Returns true if this MemRegionObject denotes a finite set of concrete regions
+template <bool defaultMayEq>
+bool CombinedMemRegionObject<defaultMayEq>::isConcrete() {
+  SgType* commonType=NULL;
+  
+  // If this is a union type (defaultMayEq=true), an object is concrete if all of its components are concrete weakest constraint).
+  // If this is an intersection type (defaultMayEq=false), an object is concrete if any of its components are concrete (strongest constraint)
+  // Further, in both cases an MR is not concrete if there is disagreement about its type
+  for(list<MemRegionObjectPtr>::const_iterator mr=memRegions.begin(); mr!=memRegions.end(); mr++) {
+    if((*mr)->isConcrete() != defaultMayEq) return !defaultMayEq;
+
+    if(commonType==NULL) commonType = (*mr)->getConcreteType();
+    else if(commonType != (*mr)->getConcreteType()) return false;
+  }
+  
+  return defaultMayEq;
+}
+
+// Returns the type of the concrete regions (if there is one)
+template <bool defaultMayEq>
+SgType* CombinedMemRegionObject<defaultMayEq>::getConcreteType() { 
+  SgType* commonType=NULL;
+  for(list<MemRegionObjectPtr>::const_iterator mr=memRegions.begin(); mr!=memRegions.end(); mr++) {
+    if(commonType==NULL) commonType = (*mr)->getConcreteType();
+    else if(commonType != (*mr)->getConcreteType()) return NULL;
+  }
+  assert(commonType);
+  return commonType;
+}
+
+// Returns the set of concrete memory regions as SgExpressions, which allows callers to use
+// the normal ROSE mechanisms to decode it
+template <bool defaultMayEq>
+std::set<SgNode* > CombinedMemRegionObject<defaultMayEq>::getConcrete() {
+  assert(isConcrete());
+  
+  // If this is a union type (defaultMayEq=true), the result is the Union of the sets returned by getConcrete() on all the memRegions.
+  // If this is an intersection type (defaultMayEq=false), an object is their Intersection.
+  
+  // Maps each concrete value to the number of elements in memRegions for which it was returned
+  std::map<SgNode*, size_t> concreteMRs;
+  for(list<MemRegionObjectPtr>::iterator mr=memRegions.begin(); mr!=memRegions.end(); mr++) {
+    // Iterate through the current sub-MemRegion's concrete values and increment each 
+    // concrete value's counter in concreteMRs.
+    std::set<SgNode* > curConcr = (*mr)->getConcrete();
+    for(std::set<SgNode* >::iterator i1=curConcr.begin(); i1!=curConcr.end(); i1++) {
+      // Find the key in concrete memRegions with an equivalent SgExpression to *i1
+      std::map<SgNode*, size_t>::iterator i2=concreteMRs.find(*i1);
+      if(i2 != concreteMRs.end())
+        ++i2->second;
+      
+      // If the current concrete value *i1 does not appear in concreteMRs, add it
+      if(i2==concreteMRs.end())
+        concreteMRs[*i1] = 1;
+    }
+  }
+
+  // Collect the union or intersection of all results from concreteMRs as a set
+  std::set<SgNode* > ret;
+  for(std::map<SgNode*, size_t>::iterator i=concreteMRs.begin(); i!=concreteMRs.end(); i++) {
+    // Union: add every key in concreteMRs to ret
+    if(defaultMayEq) ret.insert(i->first);
+    // Intersection: only add the keys that appear in every MemRegion in memRegions
+    else if(!defaultMayEq && i->second == memRegions.size()) ret.insert(i->first);
+  }
+
+  return ret;
+}
+
 // Returns a ValueObject that denotes the size of this memory region
 template <bool defaultMayEq>
 ValueObjectPtr CombinedMemRegionObject<defaultMayEq>::getRegionSize(PartEdgePtr pedge) const
@@ -2927,21 +3016,100 @@ void MappedMemRegionObject<Key, mostAccurate>::setMRToFull() {
 
 template<class Key, bool mostAccurate>
 bool MappedMemRegionObject<Key, mostAccurate>::isFullMR(PartEdgePtr pedge) {
+  return isFullMR();
+}
+
+template<class Key, bool mostAccurate>
+bool MappedMemRegionObject<Key, mostAccurate>::isEmptyMR(PartEdgePtr pedge) {
+  return isEmptyMR();
+}
+
+template<class Key, bool mostAccurate>
+bool MappedMemRegionObject<Key, mostAccurate>::isFullMR() {
   if(n_FullMR > 0 && memRegionsMap.size() == 0) return true;
   return false;
 }
 
 template<class Key, bool mostAccurate>
-bool MappedMemRegionObject<Key, mostAccurate>::isEmptyMR(PartEdgePtr pedge) {
+bool MappedMemRegionObject<Key, mostAccurate>::isEmptyMR() {
   if(n_FullMR == 0 && memRegionsMap.size() == 0) return true;
   return false;
+}
+
+template<class Key, bool mostAccurate>
+bool MappedMemRegionObject<Key, mostAccurate>::isConcrete() {
+  if(isFullMR()) return false;
+  if(isEmptyMR()) return false;
+  if(union_ && n_FullMR > 0) return false;
+  
+  typename map<Key, MemRegionObjectPtr>::iterator it = memRegionsMap.begin();
+  for( ; it != memRegionsMap.end(); ++it) {
+    bool isConc = it->second->isConcrete();
+    // we have atleast one that is not concrete under union
+    if(union_ && !isConc) return false;
+    // we have atleast one that is concrete under intersection
+    else if(intersect_ && isConc) return true;
+  }
+
+  // All the objects are concrete (return true above) union
+  if(union_) return true;
+  // All the objects not concrete (return false above) under intersection
+  else if(intersect_) return false;
+  else assert(0);
+}
+
+template<class Key, bool mostAccurate>
+SgType* MappedMemRegionObject<Key, mostAccurate>::getConcreteType() {
+  assert(isConcrete());
+  typename map<Key, MemRegionObjectPtr>::iterator it = memRegionsMap.begin();
+  SgType* c_type = it->second->getConcreteType();
+  // assert that all other objects have the same type
+  for( ++it; it != memRegionsMap.end(); ++it) {
+    SgType* votype = it->second->getConcreteType();
+    assert(c_type == votype);
+  }
+  return c_type;
+}
+
+template<class Key, bool mostAccurate>
+set<SgNode* > MappedMemRegionObject<Key, mostAccurate>::getConcrete() {
+  assert(isConcrete());
+  // If this is a union type (defaultMayEq=true), the result is the Union of the sets returned by getConcrete() on all the memRegions.
+  // If this is an intersection type (defaultMayEq=false), an object is their Intersection.
+  
+  // Maps each concrete value to the number of elements in memRegions for which it was returned
+  std::map<SgNode*, size_t> concreteMRs;
+  for(typename map<Key, MemRegionObjectPtr>::iterator mr_it = memRegionsMap.begin(); mr_it != memRegionsMap.end(); ++mr_it) {
+    // Iterate through the current sub-MemRegion's concrete values and increment each 
+    // concrete value's counter in concreteMRs.
+    std::set<SgNode* > c_memregionSet = mr_it->second->getConcrete();
+    for(std::set<SgNode* >::iterator s_it=c_memregionSet.begin(); s_it!=c_memregionSet.end(); s_it++) {
+      // Find the key in concrete memRegions with an equivalent SgExpression to *s_it
+      std::map<SgNode*, size_t>::iterator c_it=concreteMRs.find(*s_it);
+      if(c_it != concreteMRs.end())
+        ++c_it->second;
+      // If the current concrete value *s_it does not appear in concreteMRs, add it
+      else
+        concreteMRs[*s_it] = 1;
+    }
+  }
+  
+  // Collect the union or intersection of all results from concreteMRs as a set
+  std::set<SgNode* > ret;
+  for(std::map<SgNode*, size_t>::iterator i=concreteMRs.begin(); i!=concreteMRs.end(); i++) {
+    // Union: add every key in concreteMRs to ret
+    if(union_) ret.insert(i->first);
+    // Intersection: only add the keys that appear in every MemRegion in memRegions
+    else if(intersect_ && i->second == memRegionsMap.size()) ret.insert(i->first);
+  }
+
+  return ret;
 }
 
 //! Size of the memory region denoted by this memory object represented by a ValueObject
 //! Useful only if the object is not full
 template<class Key, bool mostAccurate>
 ValueObjectPtr MappedMemRegionObject<Key, mostAccurate>::getRegionSize(PartEdgePtr pedge) const {
-  
   // Assert for atleast one element in the map
   // Should we handle full MR by returning FullValueObject?
   assert(memRegionsMap.size() > 0);
@@ -3063,6 +3231,14 @@ void PartEdgeUnionMemRegionObject::setMRToFull() {
   unionMR_p = boost::make_shared<FullMemRegionObject>();
 }
 
+// Returns true if this MemRegionObject denotes a finite set of concrete regions
+bool PartEdgeUnionMemRegionObject::isConcrete() { return unionMR_p->isConcrete(); }
+// Returns the type of the concrete regions (if there is one)
+SgType* PartEdgeUnionMemRegionObject::getConcreteType() { return unionMR_p->getConcreteType(); }
+// Returns the set of concrete memory regions as SgExpressions, which allows callers to use
+// the normal ROSE mechanisms to decode it
+std::set<SgNode* > PartEdgeUnionMemRegionObject::getConcrete() { return unionMR_p->getConcrete(); }
+
 ValueObjectPtr PartEdgeUnionMemRegionObject::getRegionSize(PartEdgePtr pedge) const {
   return unionMR_p->getRegionSize(pedge);
 }
@@ -3078,7 +3254,18 @@ string PartEdgeUnionMemRegionObject::str(string indent) const {
    ######################## */
 
 MemLocObjectPtr NULLMemLocObject;
-  
+
+MemLocObject::MemLocObject(const MemLocObject& that) : 
+    AbstractObject(that), 
+    region(that.region!=NULLMemRegionObject? that.region->copyMR(): NULLMemRegionObject), 
+    index (that.index!=NULLValueObject     ? that.index->copyV()  : NULLValueObject)
+{
+ // cout << "MemLocObject::MemLocObject("<<this<<") region="<<region.get()<<" that.region="<<that.region.get()<<"="<<(that.region? that.region->str(): "NULL")<<endl;
+}
+
+MemRegionObjectPtr MemLocObject::getRegion() const { /*cout << "MemLocObject::getRegion("<<this<<") region="<<(region==NULLMemRegionObject?"NULL":region->str())<<endl; */return region; }
+ValueObjectPtr     MemLocObject::getIndex() const  { /*cout << "MemLocObject::getIndex("<<this<<") index="<<(index==NULLValueObject?"NULL":index->str())<<endl; */ return index; }
+
 // Returns whether this object may/must be equal to o within the given Part p
 // These methods are called by composers and should not be called by analyses.
 bool MemLocObject::mayEqualML(MemLocObjectPtr that, PartEdgePtr pedge) {
@@ -3354,6 +3541,34 @@ template boost::shared_ptr<CombinedMemLocObject<true> > CombinedMemLocObject<tru
 template boost::shared_ptr<CombinedMemLocObject<false> > CombinedMemLocObject<false>::create(const std::list<MemLocObjectPtr>& memLocs);
 */
 
+
+template <bool defaultMayEq>
+MemRegionObjectPtr CombinedMemLocObject<defaultMayEq>::getRegion() const {
+  //cout << "CombinedMemLocObject::getRegion("<<this<<")"<<endl;
+  if(region==NULLMemRegionObject) {
+    // Collect all the memRegions of the memLocs in this object and create a CombinedMemRegionObject out of them
+    std::list<MemRegionObjectPtr> memRegions;
+    for(list<MemLocObjectPtr>::const_iterator ml=memLocs.begin(); ml!=memLocs.end(); ml++)
+      memRegions.push_back((*ml)->getRegion());
+
+    ((CombinedMemLocObject<defaultMayEq>*)this)->region = boost::make_shared<CombinedMemRegionObject<defaultMayEq> > (memRegions);
+  }
+  return region;
+}
+
+template <bool defaultMayEq>
+ValueObjectPtr     CombinedMemLocObject<defaultMayEq>::getIndex() const {
+  if(index==NULLValueObject) {
+    // Collect all the indexes of the memLocs in this object and create a CombinedValueObject out of them
+    std::list<ValueObjectPtr> indexes;
+    for(list<MemLocObjectPtr>::const_iterator ml=memLocs.begin(); ml!=memLocs.end(); ml++)
+      indexes.push_back((*ml)->getIndex());
+
+    ((CombinedMemLocObject<defaultMayEq>*)this)->index = boost::make_shared<CombinedValueObject<defaultMayEq> > (indexes);
+  }
+  return index;
+}
+
 template <bool defaultMayEq>
 void CombinedMemLocObject<defaultMayEq>::add(MemLocObjectPtr memLoc) {
   memLocs.push_back(memLoc);
@@ -3523,6 +3738,34 @@ std::string CombinedMemLocObject<defaultMayEq>::str(std::string indent) const
 /* ##############################
    ##### MappedMemLocObject #####
    ############################## */
+
+template<class Key, bool mostAccurate>
+MemRegionObjectPtr MappedMemLocObject<Key, mostAccurate>::getRegion() const {
+  if(region==NULLMemRegionObject) {
+    // Collect all the memRegions of the memLocs in this object and create a CombinedMemRegionObject out of them
+    map<Key, MemRegionObjectPtr> memRegions;
+    for(typename map<Key, MemLocObjectPtr>::const_iterator it = memLocsMap.begin(); it != memLocsMap.end(); ++it) {
+      memRegions[it->first] = it->second->getRegion();
+    }  
+
+    ((MappedMemLocObject<Key, mostAccurate>*)this)->region = boost::make_shared<MappedMemRegionObject<Key, mostAccurate> > (memRegions);
+  }
+  return region;
+}
+
+template<class Key, bool mostAccurate>
+ValueObjectPtr     MappedMemLocObject<Key, mostAccurate>::getIndex() const {
+  if(index==NULLValueObject) {
+    // Collect all the indexes of the memlocs in memLocsMap and create a CombinedValueObject out of them
+    map<Key, ValueObjectPtr> indexes;
+    for(typename map<Key, MemLocObjectPtr>::const_iterator it = memLocsMap.begin(); it != memLocsMap.end(); ++it) {
+      indexes[it->first] = it->second->getIndex();
+    }
+
+    ((MappedMemLocObject<Key, mostAccurate>*)this)->index = boost::make_shared<MappedValueObject<Key, mostAccurate> > (indexes);
+  }
+  return index;
+}
 
 //! Method to add mls to the map.
 //! MLs that are full are never added to the map.

@@ -752,6 +752,10 @@ class IntersectionPartEdge : public PartEdge
   std::string str(std::string indent="") const;
 };
 
+/**********************
+ ****** Utilities *****
+ **********************/
+
 }; // namespace fuse
 
 

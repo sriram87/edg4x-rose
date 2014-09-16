@@ -330,6 +330,9 @@ class NodeState
   
   // Returns the string representation of the Lattices stored in the given map
   static std::string str(const std::map<PartEdgePtr, std::vector<Lattice*> >& dfInfo, std::string indent="");
+  
+  // Returns a human-readable representation of the nodeStateMap at the given part
+  static std::string NodeStateMap2Str(PartPtr p);
 };
 }; // namespace fuse
 #endif

@@ -6,7 +6,7 @@ using namespace sight;
 
 namespace fuse
 {
-  DEBUG_LEVEL(pointsToAnalysisDebugLevel, 0);
+  DEBUG_LEVEL(pointsToAnalysisDebugLevel, 2);
 
   /****************************
    * PointsToAnalysisTransfer *
@@ -199,8 +199,7 @@ namespace fuse
     case V_SgPointerDerefExp: {
       MemLocObjectPtr opML_p = getComposer()->OperandExpr2MemLoc(sgn, isSgPointerDerefExp(sgn)->get_operand(), pedge, this);
 
-      Lattice* lattice;
-
+      Lattice* lattice=NULL;
       // Incoming information is stored Above for Forward analysis
       if(pedge->target()) {
         NodeState* state = NodeState::getNodeState(this, pedge->target());
@@ -208,6 +207,7 @@ namespace fuse
       }
       // Incoming information is stored Below for Backward analysis
       else if(pedge->source()) {
+      //if(pedge->source()) {
         NodeState* state = NodeState::getNodeState(this, pedge->source());
         lattice = state->getLatticeBelow(this, pedge, 0);
       }
@@ -253,6 +253,33 @@ namespace fuse
     aos_p = boost::make_shared<AbstractObjectSet>(*(thatPTML.aos_p));
   }
 
+  MemRegionObjectPtr PTMemLocObject::getRegion() const {
+    // Collect the MemRegions of all the MemLocs in aos and create from a UnionMemRegion
+    if(region==NULLMemRegionObject) {
+      std::list<MemRegionObjectPtr> memRegions;
+      for(AbstractObjectSet::const_iterator ml=aos_p->begin(); ml!=aos_p->end(); ml++) {
+        MemLocObjectPtr  curML = boost::dynamic_pointer_cast<MemLocObject>(*ml);
+        memRegions.push_back(curML->getRegion());
+      }
+      ((PTMemLocObject*)this)->region = boost::make_shared<UnionMemRegionObject> (memRegions);
+    }
+    return region;
+  }
+  
+  ValueObjectPtr     PTMemLocObject::getIndex() const {
+    if(index==NULLValueObject) {
+      // Collect all the indexes of the memLocs in this object and create a CombinedValueObject out of them
+      std::list<ValueObjectPtr> indexes;
+      for(AbstractObjectSet::const_iterator ml=aos_p->begin(); ml!=aos_p->end(); ml++) {
+        MemLocObjectPtr  curML = boost::dynamic_pointer_cast<MemLocObject>(*ml);
+        indexes.push_back(curML->getIndex());
+      }
+
+      ((PTMemLocObject*)this)->index = boost::make_shared<UnionValueObject> (indexes);
+    }
+    return index;
+  }
+  
   void PTMemLocObject::add(MemLocObjectPtr ml_p, PartEdgePtr pedge) {
     if(ml_p->isFullML(pedge)) {
       // Set the set to full
@@ -324,7 +351,7 @@ namespace fuse
     // If the sets are not singleton they are not mustEquals.
     if(aos_p->size() != 1 || thatMLSet.size() != 1) return false;
 
-    assert(aos_p->size() == thatMLSet.size() == 1);
+    assert(aos_p->size() == (thatMLSet.size() == 1));
 
     // The object in the set should also mustEqual each other
     const AbstractObjectPtr thatAO_p = boost::static_pointer_cast<AbstractObject>(*thatMLSet.begin());

@@ -1,6 +1,7 @@
 #include "sage3basic.h"
 #include "virtualMethodAnalysis.h"
 #include "sight.h"
+#include "sight_verbosity.h"
 #include "sageInterface.h"
 #include "midend/programAnalysis/CallGraphAnalysis/CallGraph.h"
 using namespace std;
@@ -8,7 +9,7 @@ using namespace sight;
 using namespace SageInterface;
 
 namespace fuse {
-DEBUG_LEVEL(VirtualMethodAnalysisDebugLevel, 0);
+#define VirtualMethodAnalysisDebugLevel 0
 
 /********************************
  ***** ClassInheritanceTree *****
@@ -32,7 +33,7 @@ ClassInheritanceTree::ClassInheritanceTree(PartEdgePtr latPEdge): Lattice(latPEd
 
 // Creates a tree that captures the inheritance of the given SgClassDefinition
 ClassInheritanceTree::ClassInheritanceTree(SgClassDefinition* classDecl, PartEdgePtr latPEdge): Lattice(latPEdge), FiniteLattice(latPEdge) {
-  scope s(txt()<<"ClassInheritanceTree::ClassInheritanceTree("<<SgNode2Str(classDecl)<<")", attrGE("VirtualMethodAnalysisDebugLevel", 1));
+  SIGHT_VERB(scope s(txt()<<"ClassInheritanceTree::ClassInheritanceTree("<<SgNode2Str(classDecl)<<")"), 1, VirtualMethodAnalysisDebugLevel)
   state = tree;
   inclusive = true;
   initCHG();
@@ -57,11 +58,11 @@ ClassInheritanceTree::ClassInheritanceTree(SgClassDefinition* classDecl, PartEdg
       std::pair<NodePtr, ClassHierarchyWrapper::ClassDefSet> cur = worklist.front();
       worklist.pop_front();        
       scope s("worklist iter");
-      if(VirtualMethodAnalysisDebugLevel()>=1) dbg << "cur.first="<<cur.first->str()<<", #cur.second="<<cur.second.size()<<endl;
+      SIGHT_VERB(dbg << "cur.first="<<cur.first->str()<<", #cur.second="<<cur.second.size()<<endl, 1, VirtualMethodAnalysisDebugLevel)
 
       // Iterate over all the SgClassDefinitions in the current ancestor set
       for(ClassHierarchyWrapper::ClassDefSet::const_iterator i=cur.second.begin(); i!=cur.second.end(); i++) {
-        if(VirtualMethodAnalysisDebugLevel()>=1) dbg << "    ancestor="<<SgNode2Str(*i)<<endl;
+        SIGHT_VERB(dbg << "    ancestor="<<SgNode2Str(*i)<<endl, 1, VirtualMethodAnalysisDebugLevel)
         // Create a tree node for the current parents SgClassDefinition
         NodePtr parentNode = makePtr<Node>(*i);
 
@@ -71,7 +72,7 @@ ClassInheritanceTree::ClassInheritanceTree(SgClassDefinition* classDecl, PartEdg
 
         // Add the current parent node's parents to the worklist
         ClassHierarchyWrapper::ClassDefSet grandparents = classHierarchy->getDirectAncestorClasses(*i);
-        if(VirtualMethodAnalysisDebugLevel()>=1) dbg << "#grandparents="<<grandparents.size()<<endl;
+        SIGHT_VERB(dbg << "#grandparents="<<grandparents.size()<<endl, 1, VirtualMethodAnalysisDebugLevel)
         if(grandparents.size()>0)
           worklist.push_back(make_pair(parentNode, grandparents));
         // If this parent SgClassDefinition has no parents, record it as a base node of the tree
@@ -84,7 +85,7 @@ ClassInheritanceTree::ClassInheritanceTree(SgClassDefinition* classDecl, PartEdg
     bases.push_back(classDeclNode);
   }
   
-  if(VirtualMethodAnalysisDebugLevel()>=1) dbg << "final:"<<endl<<str()<<endl;
+  SIGHT_VERB(dbg << "final:"<<endl<<str()<<endl, 1, VirtualMethodAnalysisDebugLevel)
 }
 
 ClassInheritanceTree::ClassInheritanceTree(const ClassInheritanceTree& that) : Lattice(that), FiniteLattice(that) {
@@ -139,15 +140,15 @@ Lattice* ClassInheritanceTree::copy() const {
 // The part of this object is to be used for AbstractObject comparisons.
 // Meet update finds the common tree prefix among the two treeS
 bool ClassInheritanceTree::meetUpdate(Lattice* that_arg) {
-  scope reg("ClassInheritanceTree::meetUpdate()", scope::medium, attrGE("VirtualMethodAnalysisDebugLevel", 1));
+  SIGHT_VERB(scope reg("ClassInheritanceTree::meetUpdate()", scope::medium), 1, VirtualMethodAnalysisDebugLevel)
   ClassInheritanceTree* that = dynamic_cast<ClassInheritanceTree*>(that_arg);
   ROSE_ASSERT(that);
 
-  if(VirtualMethodAnalysisDebugLevel()>=1) {
+  SIGHT_VERB_IF(1, VirtualMethodAnalysisDebugLevel)
     dbg << "state="<<state2Str(state)<<", that->state="<<state2Str(that->state)<<endl;
     { scope s("this", scope::low); dbg << "this="<<str()<<endl; }
     { scope s("that", scope::low); dbg << "that="<<that->str()<<endl; }
-  }
+  SIGHT_VERB_FI()
   // Full trees cannot become any more relaxed
   if(state==full) return false;
   // If that tree is full, make this tree full as well
@@ -170,7 +171,7 @@ bool ClassInheritanceTree::meetUpdate(Lattice* that_arg) {
   // If the two inheritance trees don't have the same base classes, they have
   // nothing in common, which makes this the full hierarchy (no constraints)
   if(bases.size() != that->bases.size()) {
-    if(VirtualMethodAnalysisDebugLevel()>=1) dbg << "Inconsistent bases: setting to Full. #bases="<<bases.size()<<", #that->bases="<<that->bases.size()<<endl;
+    SIGHT_VERB(dbg << "Inconsistent bases: setting to Full. #bases="<<bases.size()<<", #that->bases="<<that->bases.size()<<endl, 1, VirtualMethodAnalysisDebugLevel)
     setToFull();
     return true;
   }
@@ -191,13 +192,13 @@ bool ClassInheritanceTree::meetUpdate(Lattice* that_arg) {
     // If the two inheritance trees don't have the same base classes, they have
     // nothing in common, which makes this the full hierarchy (no constraints)
     if((*thisB)->def != (*thatB)->def) { 
-      if(VirtualMethodAnalysisDebugLevel()>=1) dbg << "Inconsistent bases: setting to Full. (*thisB)->def="<<(*thisB)->def<<"="<<SgNode2Str((*thisB)->def)<<" != (*thatB)->def="<<(*thatB)->def<<"="<<SgNode2Str((*thatB)->def)<<endl;
+      SIGHT_VERB(dbg << "Inconsistent bases: setting to Full. (*thisB)->def="<<(*thisB)->def<<"="<<SgNode2Str((*thisB)->def)<<" != (*thatB)->def="<<(*thatB)->def<<"="<<SgNode2Str((*thatB)->def)<<endl, 1, VirtualMethodAnalysisDebugLevel)
       setToFull();
       return true;
     }
     worklist.push_back(make_pair(*thisB, *thatB));
   }
-  if(VirtualMethodAnalysisDebugLevel()>=1) dbg << "#worklist="<<worklist.size()<<", #bases="<<bases.size()<<endl;
+  SIGHT_VERB(dbg << "#worklist="<<worklist.size()<<", #bases="<<bases.size()<<endl, 1, VirtualMethodAnalysisDebugLevel)
           
   // Erase the bases and leaves of this tree. The leaves will be regenerated as the set of
   // nodes that are common among the two trees the children of which are 
@@ -213,21 +214,19 @@ bool ClassInheritanceTree::meetUpdate(Lattice* that_arg) {
   // Keep iterating through the worklist until as long as the node pairs 
   // have identical SgClassDefinitions.
   while(worklist.size()>0) {
-    scope reg("worklist", scope::low, attrGE("VirtualMethodAnalysisDebugLevel", 1));
-    if(VirtualMethodAnalysisDebugLevel()>=1) dbg << "#worklist="<<worklist.size()<<endl;
+    SIGHT_VERB(scope reg("worklist", scope::low), 1, VirtualMethodAnalysisDebugLevel)
+    SIGHT_VERB(dbg << "#worklist="<<worklist.size()<<endl, 1, VirtualMethodAnalysisDebugLevel)
     
     pair<NodePtr, NodePtr> cur = worklist.front();
     worklist.pop_front();
-    if(VirtualMethodAnalysisDebugLevel()>=1) 
-      dbg << "cur=<"<<cur.first->str()<<","<<endl<<
-             "    "<<cur.second->str()<<">"<<endl;
+    SIGHT_VERB(dbg << "cur=<"<<cur.first->str()<<","<<endl<<"    "<<cur.second->str()<<">"<<endl, 1, VirtualMethodAnalysisDebugLevel)
 
     // If the children of the current nodes on both trees are the same 
     if(cur.first->child == cur.second->child) {
       // If they're both NULL, add the current node in this tree to leaves
       // and don't add anything else to the worklist
       if(!cur.first->child) {
-        if(VirtualMethodAnalysisDebugLevel()>=1) dbg << "NULL children"<<endl;
+        SIGHT_VERB(dbg << "NULL children"<<endl, 1, VirtualMethodAnalysisDebugLevel)
         leaves.push_back(cur.first);
         
         // The merged tree is inclusive since both the trees agreed on at least
@@ -236,7 +235,7 @@ bool ClassInheritanceTree::meetUpdate(Lattice* that_arg) {
       // If they're not NULL, move on to the children of the current nodes
       // by pushing them onto the worklist
       } else {
-        if(VirtualMethodAnalysisDebugLevel()>=1) dbg << "same non-NULL children"<<endl;
+        SIGHT_VERB(dbg << "same non-NULL children"<<endl, 1, VirtualMethodAnalysisDebugLevel)
         worklist.push_back(make_pair(cur.first->child, cur.second->child));
       }
       
@@ -250,7 +249,7 @@ bool ClassInheritanceTree::meetUpdate(Lattice* that_arg) {
     // This makes it possible for multiple nodes to share Node instances 
     // without worrying about code in one tree corrupting another tree.
     } else {
-      if(VirtualMethodAnalysisDebugLevel()>=1) dbg << "different children, #cur.first->parents="<<cur.first->parents.size()<<endl;
+      SIGHT_VERB(dbg << "different children, #cur.first->parents="<<cur.first->parents.size()<<endl, 1, VirtualMethodAnalysisDebugLevel)
       // Create the new node
       NodePtr newLeaf = makePtr<Node>(cur.first->def);
 
@@ -276,12 +275,12 @@ bool ClassInheritanceTree::meetUpdate(Lattice* that_arg) {
   
   if(inclusive!=origInclusive) modified = true;
   
-  if(VirtualMethodAnalysisDebugLevel()>=1) {
+  SIGHT_VERB_IF(1, VirtualMethodAnalysisDebugLevel)
     dbg << "Leaves="<<endl;
     for(list<NodePtr>::iterator l=leaves.begin(); l!=leaves.end(); l++) {
       dbg << "    "<<SgNode2Str((*l)->def)<<endl;
     }
-  }
+  SIGHT_VERB_FI()
 
   return modified;
 }
@@ -289,7 +288,7 @@ bool ClassInheritanceTree::meetUpdate(Lattice* that_arg) {
 // Returns the set of functions the given SgFunctionCallExp may refer to given
 // the type constraints encoded in this tree
 set<SgFunctionDeclaration*> ClassInheritanceTree::getCalleeDefs(SgFunctionCallExp* call) {
-  scope s(txt()<<"ClassInheritanceTree::getCalleeDefs("<<SgNode2Str(call)<<")", attrGE("VirtualMethodAnalysisDebugLevel", 2));
+  SIGHT_VERB(scope s(txt()<<"ClassInheritanceTree::getCalleeDefs("<<SgNode2Str(call)<<")"), 1, VirtualMethodAnalysisDebugLevel)
   ClassHierarchyWrapper::ClassDefSet allSubClasses;
   // Add to allSubClasses all of the tree's leaf classes (if inclusive) and 
   // all the classes that inherit from them
@@ -299,21 +298,21 @@ set<SgFunctionDeclaration*> ClassInheritanceTree::getCalleeDefs(SgFunctionCallEx
     allSubClasses.insert(children.begin(), children.end());
   }
   
-  if(VirtualMethodAnalysisDebugLevel()>=2) { 
+  SIGHT_VERB_IF(2, VirtualMethodAnalysisDebugLevel)
     scope s1("allSubClasses");
     for(ClassHierarchyWrapper::ClassDefSet::iterator sub=allSubClasses.begin(); sub!=allSubClasses.end(); sub++)
       dbg << "    "<<SgNode2Str(*sub)<<endl;
-  }
+  SIGHT_VERB_FI()
   
   // Get all the functions that may possibly be referred to by call
   Rose_STL_Container<SgFunctionDeclaration*> approxCallees;
   CallTargetSet::getDeclarationsForExpression(call, classHierarchy, approxCallees);
   
-  if(VirtualMethodAnalysisDebugLevel()>=2) { 
+  SIGHT_VERB_IF(2, VirtualMethodAnalysisDebugLevel)
     scope s1("approxCallees");
     for(Rose_STL_Container<SgFunctionDeclaration*>::iterator c=approxCallees.begin(); c!=approxCallees.end(); c++)
       dbg << "    "<<SgNode2Str(*c)<<endl;
-  }
+  SIGHT_VERB_FI()
   
   // Copy to callees the functions in approxCallees that belong to some
   // class in allSubClasses
@@ -322,10 +321,10 @@ set<SgFunctionDeclaration*> ClassInheritanceTree::getCalleeDefs(SgFunctionCallEx
       c!=approxCallees.end(); c++) {
     // Check if the current callee is actually possible given the known class type constraints
     SgClassDefinition* scope = isSgClassDefinition((*c)->get_scope());
-    if(VirtualMethodAnalysisDebugLevel()>=2) dbg << "scope="<<SgNode2Str(scope)<<endl;
+    SIGHT_VERB(dbg << "scope="<<SgNode2Str(scope)<<endl, 2, VirtualMethodAnalysisDebugLevel)
     ROSE_ASSERT(scope);
     if(allSubClasses.find(scope) != allSubClasses.end()) {
-      if(VirtualMethodAnalysisDebugLevel()>=2) dbg << "   Possible callee: "<<SgNode2Str(*c)<<endl;
+      SIGHT_VERB(dbg << "   Possible callee: "<<SgNode2Str(*c)<<endl, 2, VirtualMethodAnalysisDebugLevel)
       callees.insert(isSgFunctionDeclaration((*c)->get_definingDeclaration()));
     }
   }
@@ -486,16 +485,16 @@ bool VirtualMethodPart::isPossibleFunctionCall(const Function& calleeFunc, SgFun
   // If this is a regular function call or a call on the current object
   if(isSgFunctionRefExp(call->get_function()) ||
      (isSgArrowExp(call->get_function()) && isSgThisExp(unwrapCasts(isSgArrowExp(call->get_function())->get_lhs_operand())))) {
-    if(VirtualMethodAnalysisDebugLevel()>=2) dbg << "regular call. Adding."<<endl;
+    SIGHT_VERB(dbg << "regular call. Adding."<<endl, 2, VirtualMethodAnalysisDebugLevel)
     // This is not a virtual call, so we conservatively say it is possible since
     // type information says nothing about this call
     return true;
   // If this function call is done through a variable (E.g. var.foo())
   } else {
     MemLocObjectPtr ml = analysis->getComposer()->Expr2MemLoc(call->get_function(), baseEdge, analysis);
-    if(VirtualMethodAnalysisDebugLevel()>=2) dbg << "call through variable "<<ml->str()<<endl;
+    SIGHT_VERB(dbg << "call through variable "<<ml->str()<<endl, 2, VirtualMethodAnalysisDebugLevel)
     ClassInheritanceTreePtr tree = dynamic_pointer_cast<ClassInheritanceTree>(aom->get(ml));
-    if(VirtualMethodAnalysisDebugLevel()>=2) dbg << "tree at variable="<<endl<<tree->str()<<endl;
+    SIGHT_VERB(dbg << "tree at variable="<<endl<<tree->str()<<endl, 2, VirtualMethodAnalysisDebugLevel)
     ROSE_ASSERT(tree);
     set<SgFunctionDeclaration*> callees = tree->getCalleeDefs(call);
     /*{ scope s("Checking for possibility");
@@ -509,7 +508,7 @@ bool VirtualMethodPart::isPossibleFunctionCall(const Function& calleeFunc, SgFun
     dbg << "found="<<(callees.find(calleeFunc.get_declaration()) != callees.end())<<endl;*/
     // This call is possible if the callee function is a member of callees
     if(callees.find(calleeFunc.get_definingDeclaration()) != callees.end()) {
-      if(VirtualMethodAnalysisDebugLevel()>=2) dbg << "call edge is possible. Adding."<<endl;
+      SIGHT_VERB(dbg << "call edge is possible. Adding."<<endl, 2, VirtualMethodAnalysisDebugLevel)
       return true;
     }
   }
@@ -520,19 +519,19 @@ bool VirtualMethodPart::isPossibleFunctionCall(const Function& calleeFunc, SgFun
 list<PartEdgePtr> VirtualMethodPart::outEdges()
 {
   if(!cacheInitialized_outEdges) {
-    scope reg(txt()<<"VirtualMethodPart::outEdges()", scope::medium, attrGE("VirtualMethodAnalysisDebugLevel", 2));
+    SIGHT_VERB(scope reg(txt()<<"VirtualMethodPart::outEdges()", scope::medium), 2, VirtualMethodAnalysisDebugLevel)
     list<PartEdgePtr> baseEdges = getParent()->outEdges();
 
-    if(VirtualMethodAnalysisDebugLevel()>=2) dbg << "#baseEdges="<<baseEdges.size()<<endl;
+    SIGHT_VERB(dbg << "#baseEdges="<<baseEdges.size()<<endl, 2, VirtualMethodAnalysisDebugLevel)
 
     // The NodeState at the current part
     NodeState* curPartState = NodeState::getNodeState(analysis, getParent());
-    if(VirtualMethodAnalysisDebugLevel()>=2) dbg << "curPartState="<<curPartState->str(analysis)<<endl;
+    SIGHT_VERB(dbg << "curPartState="<<curPartState->str(analysis)<<endl, 2, VirtualMethodAnalysisDebugLevel)
     
     // Consider all the VirtualMethodParts along all of this part's outgoing edges. Since this is a forward
     // analysis, they are maintained separately
     for(list<PartEdgePtr>::iterator be=baseEdges.begin(); be!=baseEdges.end(); be++) {
-      scope beS(txt()<<"be="<<be->str(), scope::low, attrGE("VirtualMethodAnalysisDebugLevel", 2));
+      SIGHT_VERB(scope beS(txt()<<"be="<<be->str(), scope::low), 2, VirtualMethodAnalysisDebugLevel)
       
       // If this edge enters a function
       //SgFunctionParameterList* calleeEntry = (*be)->target()->mustSgNodeAll<SgFunctionParameterList>();
@@ -542,13 +541,13 @@ list<PartEdgePtr> VirtualMethodPart::outEdges()
         SgFunctionParameterList* calleeEntry = (*be)->target()->mustSgNodeAll<SgFunctionParameterList>();
         ROSE_ASSERT(calleeEntry);
         Function curCalleeFunc(SageInterface::getEnclosingFunctionDeclaration(calleeEntry));
-        if(VirtualMethodAnalysisDebugLevel()>=2) dbg << "edge is call to function "<<curCalleeFunc.str()<<endl;
+        SIGHT_VERB(dbg << "edge is call to function "<<curCalleeFunc.str()<<endl, 2, VirtualMethodAnalysisDebugLevel)
 
         AbstractObjectMap* curPartAOM = dynamic_cast<AbstractObjectMap*>(curPartState->getLatticeBelow(analysis, *be, 0)); ROSE_ASSERT(curPartAOM);
         
         set<CFGNode> nodes=(*be)->source()->CFGNodes();
         for(set<CFGNode>::iterator n=nodes.begin(); n!=nodes.end(); n++) {
-          if(VirtualMethodAnalysisDebugLevel()>=2) dbg << "    n="<<CFGNode2Str(*n)<<endl;
+          SIGHT_VERB(dbg << "    n="<<CFGNode2Str(*n)<<endl, 2, VirtualMethodAnalysisDebugLevel)
           SgFunctionCallExp* call = isSgFunctionCallExp(n->getNode());
           if(call && n->getIndex()==2 && isPossibleFunctionCall(curCalleeFunc, call, curPartAOM, *be))
             cache_outEdges.push_back(VirtualMethodPartEdge::create(*be, analysis));
@@ -559,7 +558,7 @@ list<PartEdgePtr> VirtualMethodPart::outEdges()
         SgFunctionDefinition* calleeExit = (*be)->source()->mustSgNodeAll<SgFunctionDefinition>();
         ROSE_ASSERT(calleeExit);
         Function curCalleeFunc(calleeExit);
-        if(VirtualMethodAnalysisDebugLevel()>=2) dbg << "edge is an exit from function "<<curCalleeFunc.str()<<endl;
+        SIGHT_VERB(dbg << "edge is an exit from function "<<curCalleeFunc.str()<<endl, 2, VirtualMethodAnalysisDebugLevel)
         
         std::set<PartPtr> callParts = (*be)->target()->matchingCallParts();
         assert(callParts.size()==1); 
@@ -567,12 +566,12 @@ list<PartEdgePtr> VirtualMethodPart::outEdges()
         // The NodeState at the call part of this exit edge
         NodeState* callPartState = NodeState::getNodeState(analysis, callPart);
         //dbg << "callPartState="<<callPartState->str(analysis)<<endl;
-        if(VirtualMethodAnalysisDebugLevel()>=2) dbg << "callPartState="<<callPartState->str(analysis)<<endl;
+        SIGHT_VERB(dbg << "callPartState="<<callPartState->str(analysis)<<endl, 2, VirtualMethodAnalysisDebugLevel)
         AbstractObjectMap* callPartAOM = dynamic_cast<AbstractObjectMap*>(callPartState->getLatticeAbove(analysis, callPart->inEdgeFromAny(), 0)); ROSE_ASSERT(callPartAOM);
         
         set<CFGNode> nodes=(*be)->target()->CFGNodes();
         for(set<CFGNode>::iterator n=nodes.begin(); n!=nodes.end(); n++) {
-          if(VirtualMethodAnalysisDebugLevel()>=2) dbg << "    n="<<CFGNode2Str(*n)<<endl;
+          SIGHT_VERB(dbg << "    n="<<CFGNode2Str(*n)<<endl, 2, VirtualMethodAnalysisDebugLevel)
           SgFunctionCallExp* call = isSgFunctionCallExp(n->getNode());
           if(call && n->getIndex()==3 && isPossibleFunctionCall(curCalleeFunc, call, callPartAOM, *be))
             cache_outEdges.push_back(VirtualMethodPartEdge::create(*be, analysis));
@@ -582,11 +581,11 @@ list<PartEdgePtr> VirtualMethodPart::outEdges()
         cache_outEdges.push_back(VirtualMethodPartEdge::create(*be, analysis));
     }
     
-    if(VirtualMethodAnalysisDebugLevel()>=1) {
+    SIGHT_VERB_IF(1, VirtualMethodAnalysisDebugLevel)
       scope s("cache_outEdges");
       for(list<PartEdgePtr>::iterator e=cache_outEdges.begin(); e!=cache_outEdges.end(); e++)
         dbg << "    "<<(*e)->str()<<endl;
-    }
+    SIGHT_VERB_FI()
     
     cacheInitialized_outEdges=true;
   }
@@ -771,15 +770,15 @@ std::list<PartEdgePtr> VirtualMethodPartEdge::getOperandPartEdge(SgNode* anchor,
     // The target of this edge identifies the termination point of all the execution prefixes
     // denoted by this edge. We thus use it to query for the parts of the operands and only both
     // if this part is itself live.
-    scope reg("VirtualMethodPartEdge::getOperandPartEdge()", scope::medium, attrGE("VirtualMethodAnalysisDebugLevel", 1));
-    if(VirtualMethodAnalysisDebugLevel()>=1) dbg << "anchor="<<SgNode2Str(anchor)<<" operand="<<SgNode2Str(operand)<<endl;
+    SIGHT_VERB(scope reg("VirtualMethodPartEdge::getOperandPartEdge()", scope::medium), 1, VirtualMethodAnalysisDebugLevel)
+    SIGHT_VERB(dbg << "anchor="<<SgNode2Str(anchor)<<" operand="<<SgNode2Str(operand)<<endl, 1, VirtualMethodAnalysisDebugLevel)
 
     std::list<PartEdgePtr> baseEdges = getParent()->getOperandPartEdge(anchor, operand);
     for(std::list<PartEdgePtr>::iterator e=baseEdges.begin(); e!=baseEdges.end(); e++) {
-      if(VirtualMethodAnalysisDebugLevel()>=1) dbg << "e="<<(*e)->str()<<endl;
+      SIGHT_VERB(dbg << "e="<<(*e)->str()<<endl, 1, VirtualMethodAnalysisDebugLevel)
       PartEdgePtr dpeEdge = VirtualMethodPartEdge::create(*e, analysis);
-      { scope reg("vmEdge", scope::low, attrGE("VirtualMethodAnalysisDebugLevel", 2));
-      if(VirtualMethodAnalysisDebugLevel()>=1) dbg<<dpeEdge->str()<<endl; }
+      SIGHT_VERB(scope reg("vmEdge", scope::low), 2, VirtualMethodAnalysisDebugLevel)
+      SIGHT_VERB(dbg<<dpeEdge->str()<<endl, 1, VirtualMethodAnalysisDebugLevel)
       cache_getOperandPartEdge[anchor][operand].push_back(dpeEdge);
     }
   }
@@ -875,15 +874,15 @@ VirtualMethodAnalysis::getTransferVisitor(PartPtr part, CFGNode cn, NodeState& s
 // Return the anchor Parts of the application
 set<PartPtr> VirtualMethodAnalysis::GetStartAStates_Spec()
 {
-  scope reg("VirtualMethodAnalysis::GetStartAStates_Spec()", scope::medium, attrGE("VirtualMethodAnalysisDebugLevel", 1));
+  SIGHT_VERB(scope reg("VirtualMethodAnalysis::GetStartAStates_Spec()", scope::medium), 1, VirtualMethodAnalysisDebugLevel)
   if(!cacheInitialized_GetStartAStates_Spec) {
     set<PartPtr> baseStartParts = getComposer()->GetStartAStates(this);
-    if(VirtualMethodAnalysisDebugLevel()>=1) dbg << "#baseStartParts="<<baseStartParts.size()<<endl;
+    SIGHT_VERB(dbg << "#baseStartParts="<<baseStartParts.size()<<endl, 1, VirtualMethodAnalysisDebugLevel)
     for(set<PartPtr>::iterator baseSPart=baseStartParts.begin(); baseSPart!=baseStartParts.end(); baseSPart++) {
-      if(VirtualMethodAnalysisDebugLevel()>=1) dbg << "    "<<(*baseSPart)->str()<<endl;
+      SIGHT_VERB(dbg << "    "<<(*baseSPart)->str()<<endl, 1, VirtualMethodAnalysisDebugLevel)
       cache_GetStartAStates_Spec.insert(VirtualMethodPart::create(*baseSPart, this));
     }
-    if(VirtualMethodAnalysisDebugLevel()>=1) dbg << "#cache_GetStartAStates_Spec="<<cache_GetStartAStates_Spec.size()<<endl;
+    SIGHT_VERB(dbg << "#cache_GetStartAStates_Spec="<<cache_GetStartAStates_Spec.size()<<endl, 1, VirtualMethodAnalysisDebugLevel)
     cacheInitialized_GetStartAStates_Spec = true;
   }
   return cache_GetStartAStates_Spec;
@@ -891,15 +890,15 @@ set<PartPtr> VirtualMethodAnalysis::GetStartAStates_Spec()
 
 set<PartPtr> VirtualMethodAnalysis::GetEndAStates_Spec()
 {
-  scope reg("VirtualMethodAnalysis::GetEndAStates_Spec()", scope::medium, attrGE("VirtualMethodAnalysisDebugLevel", 1)); 
+  SIGHT_VERB(scope reg("VirtualMethodAnalysis::GetEndAStates_Spec()", scope::medium), 1, VirtualMethodAnalysisDebugLevel)
   if(!cacheInitialized_GetEndAStates_Spec) {
     set<PartPtr> endParts = getComposer()->GetEndAStates(this);
-    if(VirtualMethodAnalysisDebugLevel()>=1) dbg << "#endParts="<<endParts.size()<<endl;
+    SIGHT_VERB(dbg << "#endParts="<<endParts.size()<<endl, 1, VirtualMethodAnalysisDebugLevel)
     for(set<PartPtr>::iterator baseEPart=endParts.begin(); baseEPart!=endParts.end(); baseEPart++) {
-      if(VirtualMethodAnalysisDebugLevel()>=1) dbg << "    "<<(*baseEPart)->str()<<endl;
+      SIGHT_VERB(dbg << "    "<<(*baseEPart)->str()<<endl, 1, VirtualMethodAnalysisDebugLevel)
       cache_GetEndAStates_Spec.insert(VirtualMethodPart::create(*baseEPart, this));
     }
-    if(VirtualMethodAnalysisDebugLevel()>=1) dbg << "#cache_GetEndAStates_Spec="<<cache_GetEndAStates_Spec.size()<<endl;
+    SIGHT_VERB(dbg << "#cache_GetEndAStates_Spec="<<cache_GetEndAStates_Spec.size()<<endl, 1, VirtualMethodAnalysisDebugLevel)
     cacheInitialized_GetEndAStates_Spec = true;
   }
   return cache_GetEndAStates_Spec;
@@ -920,31 +919,31 @@ VirtualMethodAnalysisTransfer::VirtualMethodAnalysisTransfer(
 {}
 
 void VirtualMethodAnalysisTransfer::visit(SgVarRefExp *vref) {
-  scope reg("VirtualMethodAnalysisTransfer::visit(SgVarRefExp)", scope::medium, attrGE("VirtualMethodAnalysisDebugLevel", 1));
+  SIGHT_VERB(scope reg("VirtualMethodAnalysisTransfer::visit(SgVarRefExp)", scope::medium), 1, VirtualMethodAnalysisDebugLevel)
   
   if(SgClassType* ctype = isSgClassType(vref->get_type())) {
     SgClassDeclaration* cdecl=isSgClassDeclaration(ctype->get_declaration()->get_definingDeclaration());
     ROSE_ASSERT(cdecl);
-    if(VirtualMethodAnalysisDebugLevel()>=1) dbg << "cdecl="<<SgNode2Str(cdecl)<<endl;
+    SIGHT_VERB(dbg << "cdecl="<<SgNode2Str(cdecl)<<endl, 1, VirtualMethodAnalysisDebugLevel)
     SgClassDefinition* cdef = isSgClassDefinition(cdecl->get_definition());
     ROSE_ASSERT(cdef);
-    if(VirtualMethodAnalysisDebugLevel()>=1) dbg << "cdef="<<SgNode2Str(cdef)<<endl;
+    SIGHT_VERB(dbg << "cdef="<<SgNode2Str(cdef)<<endl, 1, VirtualMethodAnalysisDebugLevel)
     
     setLattice(vref, boost::make_shared<ClassInheritanceTree>(cdef, part->inEdgeFromAny()));
   }
 }
 
 void VirtualMethodAnalysisTransfer::visit(SgInitializedName *name) {
-  scope reg("VirtualMethodAnalysisTransfer::visit(SgInitializedName)", scope::medium, attrGE("VirtualMethodAnalysisDebugLevel", 1));
+  SIGHT_VERB(scope reg("VirtualMethodAnalysisTransfer::visit(SgInitializedName)", scope::medium), 1, VirtualMethodAnalysisDebugLevel)
   
   if(SgClassType* ctype = isSgClassType(name->get_type())) {
     SgClassDeclaration* cdecl=isSgClassDeclaration(ctype->get_declaration()->get_definingDeclaration());
     ROSE_ASSERT(cdecl);
-    if(VirtualMethodAnalysisDebugLevel()>=1) dbg << "cdecl="<<SgNode2Str(cdecl)<<endl;
-    if(VirtualMethodAnalysisDebugLevel()>=1) dbg << "cdef="<<SgNode2Str(cdecl->get_definition())<<endl;
+    SIGHT_VERB(dbg << "cdecl="<<SgNode2Str(cdecl)<<endl, 1, VirtualMethodAnalysisDebugLevel);
+    SIGHT_VERB(dbg << "cdef="<<SgNode2Str(cdecl->get_definition())<<endl, 1, VirtualMethodAnalysisDebugLevel);
     SgClassDefinition* cdef = isSgClassDefinition(cdecl->get_definition());
     ROSE_ASSERT(cdef);
-    if(VirtualMethodAnalysisDebugLevel()>=1) dbg << "cdef="<<SgNode2Str(cdef)<<endl;
+    SIGHT_VERB(dbg << "cdef="<<SgNode2Str(cdef)<<endl, 1, VirtualMethodAnalysisDebugLevel)
     
     setLattice(name, boost::make_shared<ClassInheritanceTree>(cdef, part->inEdgeFromAny()));
   }

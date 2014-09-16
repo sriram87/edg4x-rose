@@ -152,6 +152,9 @@ class LDMemLocObject : public virtual MemLocObject
   MemLocObjectPtr parent;
   LiveDeadMemAnalysis* ldma;
 
+  // Cache of prior responses to isLiveML calls
+  std::map<PartEdgePtr, bool> isLive_cache;
+
   public:
   LDMemLocObject(SgNode* n, MemLocObjectPtr parent_, LiveDeadMemAnalysis* ldma);
   LDMemLocObject(const LDMemLocObject& that);

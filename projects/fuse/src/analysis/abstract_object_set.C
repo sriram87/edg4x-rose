@@ -2,14 +2,16 @@
 #include "abstract_object_set.h"
 #include <ostream>
 #include <typeinfo>
+#include "sight_verbosity.h"
 
 using namespace std;
 using namespace sight;
 
 namespace fuse
 {  
-//int AbstractObjectSetDebugLevel=0;
-DEBUG_LEVEL(AbstractObjectSetDebugLevel, 0);
+#define AbstractObjectSetDebugLevel 0
+#define SIGHT_VERB2(code, a, b)
+
 // returns true only if the list grows
 // false implies element is already present
 // insert(o) : In both modes we insert o unless o is must-equal to another AbstractObject already inside the set.
@@ -22,20 +24,20 @@ DEBUG_LEVEL(AbstractObjectSetDebugLevel, 0);
 bool AbstractObjectSet::insert(AbstractObjectPtr that)
 {
   assert(that);
-  scope reg(txt()<<"AbstractObjectSet::insert("<<that->str()<<")", scope::medium, attrGE("AbstractObjectSetDebugLevel", 1));
+  SIGHT_VERB2(scope reg(txt()<<"AbstractObjectSet::insert("<<that->str()<<")", scope::medium), 1, AbstractObjectSetDebugLevel)
   
   //dbg << "this="<<str()<<endl;
   
   // Do not insert mappings for dead keys
   if(!that->isLive(latPEdge, comp, analysis)) { 
-    if(AbstractObjectSetDebugLevel()>=1) dbg << "<b>AbstractObjectSet::insert() WARNING: attempt to insert dead element "<<that->strp(latPEdge)<<"<\b>"<<endl;
+    SIGHT_VERB2(dbg << "<b>AbstractObjectSet::insert() WARNING: attempt to insert dead element "<<that->strp(latPEdge)<<"<\b>"<<endl, 1, AbstractObjectSetDebugLevel)
     return false;
   }
     
   bool retval = false;
   if(!containsEqualSet(that)) {
-    indent(attrGE("AbstractObjectSetDebugLevel", 1));
-    if(AbstractObjectSetDebugLevel()>=1) dbg << "Object not contained. Adding..."<<endl;// Inserting into"<<endl<<str("")<<endl;
+    SIGHT_VERB2(indent ind, 1, AbstractObjectSetDebugLevel)
+    SIGHT_VERB2(dbg << "Object not contained. Adding..."<<endl, 1, AbstractObjectSetDebugLevel)
     
     items.push_back(that);
     retval = true;
@@ -92,7 +94,7 @@ bool AbstractObjectSet::insert(AbstractObjectPtr that)
 //             under-approximation.
 bool AbstractObjectSet::remove(const AbstractObjectPtr that)
 {
-    indent ind(attrGE("AbstractObjectSetDebugLevel", 1));
+    SIGHT_VERB2(indent ind, 1, AbstractObjectSetDebugLevel)
     bool retval = false;
     bool found = false;
     assert(that);
@@ -112,12 +114,12 @@ bool AbstractObjectSet::remove(const AbstractObjectPtr that)
     // if element not found issue a notice
     if(!found) {
         //try {
-        if(AbstractObjectSetDebugLevel()>=1) {
+        SIGHT_VERB_IF(1, AbstractObjectSetDebugLevel)
           dbg << "<b>AbstractObjectSet::remove()"<<endl;
-          indent ind(attrGE("AbstractObjectSetDebugLevel", 1));
+          indent ind;
           dbg << "Cannot find "<<that->str("")<<endl;
           dbg << str("&nbsp;&nbsp;&nbsp;&nbsp;")<<"</b>"<<endl;
-        }
+        SIGHT_VERB_FI()
         // throw "element not found";
     }
     // end for
@@ -147,13 +149,13 @@ bool AbstractObjectSet::containsMay(const AbstractObjectPtr that)
 {
   assert(that);
   bool retval = false;
-  scope reg("AbstractObjectSet::containsMay()", scope::medium, attrGE("AbstractObjectSetDebugLevel", 2));
-  if(AbstractObjectSetDebugLevel()>=2) dbg << "that="<<that->str()<<endl;
-  indent ind(attrGE("AbstractObjectSetDebugLevel", 2));
+  SIGHT_VERB2(scope reg("AbstractObjectSet::containsMay()", scope::medium), 2, AbstractObjectSetDebugLevel)
+  SIGHT_VERB2(dbg << "that="<<that->str()<<endl, 2, AbstractObjectSetDebugLevel)
+  SIGHT_VERB2(indent ind, 2, AbstractObjectSetDebugLevel)
   std::list<AbstractObjectPtr>::iterator it = items.begin();
   for( ; it != items.end(); it++) {
     bool mayEqual = (*it)->mayEqual(that, latPEdge, comp, analysis);
-    if(AbstractObjectSetDebugLevel()>=2) dbg << "it="<<(*it)->str("")<<") mayEqual="<<mayEqual<<endl;
+    SIGHT_VERB2(dbg << "it="<<(*it)->str("")<<") mayEqual="<<mayEqual<<endl, 2, AbstractObjectSetDebugLevel)
     if(mayEqual) {
       retval = true;
       break;
@@ -165,15 +167,15 @@ bool AbstractObjectSet::containsMay(const AbstractObjectPtr that)
 // Returns true if this set contains an AbstractObject that denotes the same set as that; false otherwise
 bool AbstractObjectSet::containsEqualSet(const AbstractObjectPtr that) 
 {
-  if(AbstractObjectSetDebugLevel()>=1) dbg << "AbstractObjectSet::containsEqualSet("<<that->str("")<<")"<<endl;
+  SIGHT_VERB2(dbg << "AbstractObjectSet::containsEqualSet("<<that->str("")<<")"<<endl, 1, AbstractObjectSetDebugLevel)
   assert(that);
   bool retval = false;
   std::list<AbstractObjectPtr>::iterator it = items.begin();
   for( ; it != items.end(); it++) {
-    if(AbstractObjectSetDebugLevel()>=1) {
+    SIGHT_VERB_IF(1, AbstractObjectSetDebugLevel)
       dbg << "it="<<(*it)->str()<<endl;
       dbg << "equalSet="<<(*it)->equalSet(that, latPEdge, comp, analysis)<<endl;
-    }
+    SIGHT_VERB_FI()
     if((*it)->equalSet(that, latPEdge, comp, analysis)) {
       retval = true;
       break;
@@ -226,7 +228,7 @@ bool AbstractObjectSet::isEmptyLat()
     if(!(*i)->isEmpty(getPartEdge(), comp, analysis)) return false;
     
     // If this item is empty, remove it from the items list
-    if(AbstractObjectSetDebugLevel()>=1) dbg << "AbstractObjectSet::isEmpty() removing "<<(*i)->str()<<endl;
+    SIGHT_VERB2(dbg << "AbstractObjectSet::isEmpty() removing "<<(*i)->str()<<endl, 1, AbstractObjectSetDebugLevel)
     items.erase(i++);
   }
   // If all are empty, return true
@@ -310,10 +312,10 @@ void AbstractObjectSet::copy(Lattice* thatL)
 //    included in the final set but o is not removed.
 Lattice* AbstractObjectSet::remapML(const std::set<MLMapping>& ml2ml, PartEdgePtr fromPEdge)
 {
-  scope remReg("AbstractObjectSet::remapML", scope::medium, attrGE("AbstractObjectSetDebugLevel", 1));
-  dbg << "latPEdge="<<latPEdge->str()<<endl;
-  dbg << "getPartEdge()="<<getPartEdge()->str()<<endl;
-  if(AbstractObjectSetDebugLevel()>=1) {
+  SIGHT_VERB2(scope remReg("AbstractObjectSet::remapML", scope::medium), 1, AbstractObjectSetDebugLevel)
+  /*dbg << "latPEdge="<<latPEdge->str()<<endl;
+  dbg << "getPartEdge()="<<getPartEdge()->str()<<endl;*/
+  SIGHT_VERB_IF(1, AbstractObjectSetDebugLevel)
     // If either the key or the value of this mapping is dead within its respective part, we skip it.
     // Print notices of this skipping once
     for(std::set<MLMapping>::const_iterator m=ml2ml.begin(); m!=ml2ml.end(); m++) {
@@ -322,18 +324,18 @@ Lattice* AbstractObjectSet::remapML(const std::set<MLMapping>& ml2ml, PartEdgePt
       if(!m->from->isLive(fromPEdge, comp, analysis) || (m->to && !m->to->isLive(latPEdge, comp, analysis)))
         dbg << "AbstractObjectSet::remapML() WARNING: Skipping dead ml2ml mapping "<<m->from->strp(fromPEdge)<<"(live="<<m->from->isLive(fromPEdge, comp, analysis)<<") =&gt; "<<(m->to ? m->to->strp(latPEdge) : "NULL")<<"(live="<<(m->to ? m->to->isLive(latPEdge, comp, analysis) : -1)<<")"<<endl;
     }
-  }
+  SIGHT_VERB_FI()
   
-  scope reg("AbstractObjectSet::remapML", scope::medium, attrGE("AbstractObjectSetDebugLevel", 1));
+  SIGHT_VERB2(scope reg("AbstractObjectSet::remapML", scope::medium), 1, AbstractObjectSetDebugLevel)
   
-  if(AbstractObjectSetDebugLevel()>=1) {
+  SIGHT_VERB_IF(1, AbstractObjectSetDebugLevel)
     dbg << "AbstractObjectSet::remapML"<<endl;
     for(std::set<MLMapping>::const_iterator m=ml2ml.begin(); m!=ml2ml.end(); m++) {
       if(!m->from) continue;
       dbg << m->from.get()->str() << " =&gt; " << (m->to? m->to.get()->strp(latPEdge): "NULL") << endl;
     }
     dbg << "this="<<str()<<endl;
-  }
+  SIGHT_VERB_FI()
   
   AbstractObjectSet* newS = new AbstractObjectSet(latPEdge, comp, analysis, mode);
   // Set of ml2ml values that need to be added to newS because they match (may-equal or must-equal)
@@ -341,36 +343,36 @@ Lattice* AbstractObjectSet::remapML(const std::set<MLMapping>& ml2ml, PartEdgePt
   set<MemLocObjectPtr> vals2add;
   
   for(std::list<AbstractObjectPtr>::iterator i=items.begin(); i!=items.end(); i++) {
-    scope regI(txt() << "item "<<i->get()->str(), scope::medium, attrGE("AbstractObjectSetDebugLevel", 2));
+    SIGHT_VERB2(scope regI(txt() << "item "<<i->get()->str(), scope::medium), 2, AbstractObjectSetDebugLevel)
     // Flags that indicate whether the current item is mayEqual or mustEqual any keys in ml2ml
     bool existsMustEqual=false;
     bool existsMayEqual=false;
 
     for(std::set<MLMapping>::const_iterator m=ml2ml.begin(); m!=ml2ml.end(); m++) {
       if(!m->from) continue;
-      scope regM(txt() << "m="<<m->str(), scope::low, attrGE("AbstractObjectSetDebugLevel", 2));
-      if(AbstractObjectSetDebugLevel()>=2) {
+      SIGHT_VERB2(scope regM(txt() << "m="<<m->str(), scope::low), 2, AbstractObjectSetDebugLevel)
+      SIGHT_VERB_IF(2, AbstractObjectSetDebugLevel)
         dbg << "m->from->isLive = "<<m->from->isLive(fromPEdge, comp, analysis)<<endl;
         dbg << "m->to->isLive = "<<(m->to? m->to->isLive(latPEdge, comp, analysis): -1)<<endl;
-      }
+      SIGHT_VERB_FI()
       // If either the key or the value of this mapping is dead within its respective part, skip it
       if(!m->from->isLive(fromPEdge, comp, analysis) || (m->to && !m->to->isLive(latPEdge, comp, analysis))) continue;
       
       // If the current item in this set may- or must-equals a key in ml2ml, record this and add the corresponding
       // value in ml2ml to be added to newS
       if((*i)->mustEqual(m->from, fromPEdge, comp, analysis)) {
-        if(AbstractObjectSetDebugLevel()>=2) dbg << "mustEqual"<<endl;
+        SIGHT_VERB2(dbg << "mustEqual"<<endl, 2, AbstractObjectSetDebugLevel)
         existsMustEqual = true;
         // Insert the corresponding value in ml2ml if it is not NULL
         if(m->to) vals2add.insert(m->to);
       } else if(mode == may && (*i)->mayEqual(m->from, fromPEdge, comp, analysis)) {
-        if(AbstractObjectSetDebugLevel()>=2) dbg << "mayEqual"<<endl;
+        SIGHT_VERB2(dbg << "mayEqual"<<endl, 2, AbstractObjectSetDebugLevel)
         existsMayEqual = true;
         // Insert the corresponding value in ml2ml if it is not NULL
         vals2add.insert(m->to);
       }
     }
-    if(AbstractObjectSetDebugLevel()>=2) dbg << "existsMustEqual="<<existsMustEqual<<" existsMayEqual="<<existsMayEqual<<endl;
+    SIGHT_VERB2(dbg << "existsMustEqual="<<existsMustEqual<<" existsMayEqual="<<existsMayEqual<<endl, 2, AbstractObjectSetDebugLevel)
     
     // If this item is not must-equal to some key(s) in ml2ml, copy it over to newS
     // This check ensures that if there are mappings in ml2ml from valid MemLocs to NULL (denote MemLocs the lifetime
@@ -384,10 +386,10 @@ Lattice* AbstractObjectSet::remapML(const std::set<MLMapping>& ml2ml, PartEdgePt
   }
   
   // Now add the values of all the keys in ml2ml that got matched to this set's items
-  if(AbstractObjectSetDebugLevel()>=1) dbg << "vals2add=" << endl;
+  SIGHT_VERB2(dbg << "vals2add=" << endl, 1, AbstractObjectSetDebugLevel)
   for(set<MemLocObjectPtr>::iterator v=vals2add.begin(); v!=vals2add.end(); v++) {
-    indent ind(attrGE("AbstractObjectSetDebugLevel", 1));
-    if(AbstractObjectSetDebugLevel()>=1) dbg << (*v)->str("") << endl;
+    SIGHT_VERB2(indent ind, 1, AbstractObjectSetDebugLevel)
+    SIGHT_VERB2(dbg << (*v)->str("") << endl, 1, AbstractObjectSetDebugLevel)
     newS->items.push_back(*v);
   }
   
@@ -424,14 +426,14 @@ bool AbstractObjectSet::replaceML(Lattice* newL)
 bool AbstractObjectSet::meetUpdate(Lattice* thatL)
 {
   try {
-    scope reg(txt()<<"AbstractObjectSet::meetUpdate("<<(mode==may? "may": "must")<<")", scope::medium, attrGE("AbstractObjectSetDebugLevel", 2));
+    SIGHT_VERB2(scope reg(txt()<<"AbstractObjectSet::meetUpdate("<<(mode==may? "may": "must")<<")", scope::medium), 2, AbstractObjectSetDebugLevel)
     AbstractObjectSet *that = dynamic_cast <AbstractObjectSet*> (thatL);
-    if(AbstractObjectSetDebugLevel()>=2) {
+    SIGHT_VERB_IF(2, AbstractObjectSetDebugLevel)
       { scope thisScope("this", scope::low);
       dbg << str()<<endl; }
       { scope thisScope("that", scope::low);
       dbg << that->str()<<endl; }
-    }
+    SIGHT_VERB_FI()
     if(setIsFull) return false;
     if(that->setIsFull) {
       setToFull();
@@ -441,18 +443,18 @@ bool AbstractObjectSet::meetUpdate(Lattice* thatL)
     // Copy over from that all the elements that don't already exist in this
     bool modified = false;
     if(mode == may) {
-      if(AbstractObjectSetDebugLevel()>=2) dbg << "latPEdge="<<latPEdge->str()<<endl;
-      if(AbstractObjectSetDebugLevel()>=2) dbg << "that->items("<<that->items.size()<<"="<<endl;
-      indent ind(attrGE("AbstractObjectSetDebugLevel", 2));
+      SIGHT_VERB2(dbg << "latPEdge="<<latPEdge->str()<<endl, 2, AbstractObjectSetDebugLevel)
+      SIGHT_VERB2(dbg << "that->items("<<that->items.size()<<"="<<endl, 2, AbstractObjectSetDebugLevel)
+      SIGHT_VERB2(indent ind, 2, AbstractObjectSetDebugLevel);
       for(std::list<AbstractObjectPtr>::iterator it=that->items.begin(); it!=that->items.end(); it++) {
         bool itLive = (*it)->isLive(latPEdge, comp, analysis);
-        if(AbstractObjectSetDebugLevel()>=2) dbg << "it(live="<<itLive<<")="<<it->get()->str()<<endl;
+        SIGHT_VERB2(dbg << "it(live="<<itLive<<")="<<it->get()->str()<<endl, 2, AbstractObjectSetDebugLevel)
         
         // Do not copy over mappings with keys that are dead in this set's host part
         if(!itLive) continue;
         
         modified = insert(*it) || modified;
-        if(AbstractObjectSetDebugLevel()>=2) dbg << "modified = "<<modified<<endl;
+        SIGHT_VERB2(dbg << "modified = "<<modified<<endl, 2, AbstractObjectSetDebugLevel)
       }
     } else if(mode==must) {
       // Remove all the AbstractObjects in this that do not also appear in that

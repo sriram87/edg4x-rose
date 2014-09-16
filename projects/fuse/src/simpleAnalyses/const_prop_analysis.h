@@ -530,7 +530,7 @@ class CPUnknownKind : public CPValueKind {
 class CPMemLocObject;
 typedef boost::shared_ptr<CPMemLocObject> CPMemLocObjectPtr;
 
-class CPMemLocObject: public MemLocObject, public FiniteLattice
+class CPMemLocObject: public virtual MemLocObject, public FiniteLattice
 {
   ConstantPropagationAnalysis* analysis;
   // Records whether this object is full or empty
@@ -539,24 +539,24 @@ class CPMemLocObject: public MemLocObject, public FiniteLattice
   
   public:
   CPMemLocObject(bool isCPFull, bool isCPEmpty, SgNode* base, PartEdgePtr pedge, ConstantPropagationAnalysis* analysis) : 
-    Lattice(pedge),
     MemLocObject(base),
+    Lattice(pedge),
     FiniteLattice(pedge),
     analysis(analysis),
     isCPFull(isCPFull), isCPEmpty(isCPEmpty)
   { }
   
   CPMemLocObject(MemRegionObjectPtr region, CPValueObjectPtr index, SgNode* base, PartEdgePtr pedge, ConstantPropagationAnalysis* analysis) : 
-    Lattice(pedge),
     MemLocObject(region, index, base),
+    Lattice(pedge),
     FiniteLattice(pedge),
     analysis(analysis),
     isCPFull(false), isCPEmpty(false)
   { }
   
   CPMemLocObject(const CPMemLocObject& that) : 
-    Lattice(that.getPartEdge()),
     MemLocObject(that), 
+    Lattice(that.getPartEdge()),
     FiniteLattice(that.getPartEdge()), 
     analysis(that.analysis),
     isCPFull(false), isCPEmpty(false)

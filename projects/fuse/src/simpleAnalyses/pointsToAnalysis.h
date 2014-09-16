@@ -110,6 +110,9 @@ namespace fuse
     PTMemLocObject(PartEdgePtr pedge, Composer* composer, PointsToAnalysis* ptanalysis);
     PTMemLocObject(const PTMemLocObject& thatPTML);
 
+    MemRegionObjectPtr getRegion() const;
+    ValueObjectPtr     getIndex() const;
+    
     void add(MemLocObjectPtr ml_p, PartEdgePtr pedge);
     void add(boost::shared_ptr<AbstractObjectSet> thataos_p, PartEdgePtr pedge);
     const AbstractObjectSet& getMLSet() const;

@@ -6,7 +6,7 @@
 #include <boost/enable_shared_from_this.hpp>
 #include <boost/make_shared.hpp>
 #include "VirtualCFGIterator.h"
-
+#include "sight_verbosity.h"
 
 #include <boost/function.hpp>
 #include <boost/bind.hpp>
@@ -19,7 +19,7 @@ using namespace sight;
 
 namespace fuse {
 
-DEBUG_LEVEL(stxAnalysisDebugLevel, 0);
+#define stxAnalysisDebugLevel 0
 
 /****************************************
  ***** Function structure detection *****
@@ -57,9 +57,9 @@ class FuncEntryExitFunctor
     // If this is a function declaration, AND
     if(SgFunctionDeclaration* decl=isSgFunctionDeclaration(n)) {
       Function func(decl);
-      scope sFunc("FuncEntryExitFunctor", scope::medium, attrGE("stxAnalysisDebugLevel", 2));
-       
-      if(stxAnalysisDebugLevel()>=2) {
+      SIGHT_VERB(scope sFunc("FuncEntryExitFunctor", scope::medium), 2, stxAnalysisDebugLevel)
+      
+      SIGHT_VERB_IF(2, stxAnalysisDebugLevel) 
         dbg << "Func "<<func.get_name().getString()<<endl;
         dbg << "Type = "<<SgNode2Str(decl->get_type())<<endl;
         dbg << "Declaration = "<<func.get_declaration()<<"="<<SgNode2Str(decl)<<endl;
@@ -69,7 +69,7 @@ class FuncEntryExitFunctor
           dbg << "Has defining Declaration: def="<<isSgFunctionDeclaration(decl->get_definingDeclaration())->get_definition()<<endl;
         else
           dbg << "Has not defining Declaration: def="<<isSgFunctionDeclaration(decl->get_firstNondefiningDeclaration())->get_definition()<<endl;*/
-      }
+      SIGHT_VERB_FI()
       
       if(// This is not a declaration defined in a templated class 
          // According to rose/src/backend/unparser/languageIndependenceSupport/modified_sage.C:1308
@@ -81,7 +81,7 @@ class FuncEntryExitFunctor
         CFGNode Entry;
         CFGNode Exit;
          
-        if(stxAnalysisDebugLevel()>=2) dbg << "Function "<<(Func2Entry.find(func)==Func2Entry.end()? "NOT": "")<<" Found\n";
+        SIGHT_VERB(dbg << "Function "<<(Func2Entry.find(func)==Func2Entry.end()? "NOT": "")<<" Found\n", 2, stxAnalysisDebugLevel)
         
         // If this function has no definition and we have not yet added it to the data structures, do so now
         if(func.get_definition()==NULL && Func2Entry.find(func)==Func2Entry.end()) {
@@ -96,19 +96,19 @@ class FuncEntryExitFunctor
           def->set_parent(decl);
           def->set_file_info(decl->get_file_info());
           Exit = CFGNode(def, 3);
-          if(stxAnalysisDebugLevel()>=2) {
+          SIGHT_VERB_IF(2, stxAnalysisDebugLevel)
             dbg << "Creating function "<<func.get_name().getString()<<endl;
             dbg << "decl="<<decl<<"="<<SgNode2Str(decl)<<endl;
             dbg << "def="<<def<<"="<<SgNode2Str(def)<<endl;
-          }
+          SIGHT_VERB_FI()
 
-          if(stxAnalysisDebugLevel()>=3) {
+          SIGHT_VERB_IF(3, stxAnalysisDebugLevel)
             dbg << "func2 Function "<<func.get_name().getString()<<endl;
 
             for(back_CFGIterator it(def->cfgForEnd()); it!=back_CFGIterator::end(); it++) {
               dbg << "it="<<CFGNode2Str(*it)<<endl;
             }
-          }
+          SIGHT_VERB_FI()
         // If this function has a definition
         } else {
           // The function's exit CFGNode
@@ -117,10 +117,11 @@ class FuncEntryExitFunctor
 
         // Since the function's definition now exists, find its entry point
         // Find the function's entry CFG node, which is the last SgFunctionParameterList node in the function body
-        { scope siter("Iteration", scope::low, attrGE("stxAnalysisDebugLevel", 2));
+        {
+        SIGHT_VERB(scope siter("Iteration", scope::low), 2, stxAnalysisDebugLevel)
         //for(back_CFGIterator it(func.get_definition()->cfgForEnd()); it!=back_CFGIterator::end(); it++) {
         for(CFGIterator it(func.get_definition()->cfgForBeginning()); it!=CFGIterator::end(); it++) {
-          if(stxAnalysisDebugLevel()>=2) dbg << "    it="<<CFGNode2Str(*it)<<endl;
+          SIGHT_VERB(dbg << "    it="<<CFGNode2Str(*it)<<endl, 2, stxAnalysisDebugLevel)
           // Look for the last SgFunctionParameterList node reachable from the start of the function
           if(isSgFunctionParameterList((*it).getNode())) {
             Entry = *it;
@@ -150,14 +151,14 @@ void initFuncEntryExit() {
     NodeQuery::querySubTree(SageInterface::getProject(), FuncEntryExitFunctor());
     FuncEntryExit_initialized=true;
 
-    if(stxAnalysisDebugLevel()>=3) {
-      scope reg("", scope::medium, attrGE("stxAnalysisDebugLevel", 3));
+    SIGHT_VERB_IF(3, stxAnalysisDebugLevel)
+      scope reg("", scope::medium);
       for(map<Function, CFGNode>::iterator i=Func2Entry.begin(); i!=Func2Entry.end(); i++) {
         dbg << i->first.get_name().getString() << " ==&gt; "<<endl;
         dbg << "entry:" << CFGNode2Str(i->second) << endl;
         dbg << " exit: "<< CFGNode2Str(Func2Exit[i->first]) << endl;
       }
-    }
+    SIGHT_VERB_FI()
   }
 }
 
@@ -225,13 +226,13 @@ bool func2AllCalls_initialized=false;
 
 // Given a function call, returns the set of all functions that it may invoke
 set<Function> getAllCalleeFuncs(SgFunctionCallExp* call) {
-  scope s(txt()<<"getAllCalleeFuncs("<<SgNode2Str(call)<<")", scope::medium, attrGE("stxAnalysisDebugLevel", 2));
+  SIGHT_VERB(scope s(txt()<<"getAllCalleeFuncs("<<SgNode2Str(call)<<")", scope::medium), 2, stxAnalysisDebugLevel)
   initFuncEntryExit();
   
   set<Function> callees;
   
   Function callee(call);
-  if(stxAnalysisDebugLevel()>=2) dbg << "callee.isKnown()="<<callee.isKnown()<<endl;
+  SIGHT_VERB(dbg << "callee.isKnown()="<<callee.isKnown()<<endl, 2, stxAnalysisDebugLevel)
   
   // If the function being called is statically known
   if(callee.isKnown())
@@ -242,7 +243,7 @@ set<Function> getAllCalleeFuncs(SgFunctionCallExp* call) {
   // !!! NOTE: This should be updated to compute type compatibility rather than strict equality !!!
   else {
     for(map<Function, CFGNode>::iterator f=Func2Entry.begin(); f!=Func2Entry.end(); f++) {
-      if(stxAnalysisDebugLevel()>=2) dbg << "f->first.get_type()="<<SgNode2Str(f->first.get_type())<<", call->get_function()->get_type()="<<SgNode2Str(call->get_function()->get_type())<<endl;
+      SIGHT_VERB(dbg << "f->first.get_type()="<<SgNode2Str(f->first.get_type())<<", call->get_function()->get_type()="<<SgNode2Str(call->get_function()->get_type())<<endl, 2, stxAnalysisDebugLevel)
       if(f->first.get_type() == call->get_function()->get_type())
         callees.insert(f->first);
     }
@@ -274,15 +275,15 @@ void init_func2AllCalls()
     NodeQuery::querySubTree(SageInterface::getProject(), func2AllCallsFunctor());
     func2AllCalls_initialized=true;
     
-    if(stxAnalysisDebugLevel()>=3) {
-      scope reg("func2AllCalls", scope::medium, attrGE("stxAnalysisDebugLevel", 3));
+    SIGHT_VERB_IF(3, stxAnalysisDebugLevel)
+      scope reg("func2AllCalls", scope::medium);
       for(map<Function, set<SgFunctionCallExp*> >::iterator i=func2AllCalls.begin(); i!=func2AllCalls.end(); i++) {
         dbg << i->first.get_name().getString() << " =&gt; "<<endl;
-        indent(attrGE("stxAnalysisDebugLevel", 1));
+        indent ind;
         for(set<SgFunctionCallExp*>::iterator j=i->second.begin(); j!=i->second.end(); j++)
           dbg << SgNode2Str(*j) << endl;
       }
-    }
+    SIGHT_VERB_FI()
   }
 }
 
@@ -370,10 +371,10 @@ void SyntacticAnalysis::initGlobalDeclarations() {
 
         if(isSgVariableDeclaration(*d)) {
           //dbg << "definition: "<<(isSgVariableDeclaration(*d)->get_definition()? SgNode2Str(isSgVariableDeclaration(*d)->get_definition()): "NULL")<<endl;
-          if(stxAnalysisDebugLevel()>=3) {
+          SIGHT_VERB_IF(3, stxAnalysisDebugLevel)
             dbg << "begin="<<CFGNode2Str((*d)->cfgForBeginning())<<endl;
             dbg << "end="<<CFGNode2Str((*d)->cfgForEnd())<<endl;
-          }
+          SIGHT_VERB_FI()
           globalDeclarations.insert(isSgVariableDeclaration(*d));
         }
       }
@@ -452,12 +453,12 @@ set<PartPtr> SyntacticAnalysis::GetEndAStates_Spec()
   endStates.insert(StxPart::create(getFunc2Exit(main), this, filter));*/
   
   initFuncEntryExit();
-  scope s("EndAStates", attrGE("stxAnalysisDebugLevel", 3));
+  SIGHT_VERB(scope s("EndAStates"), 3, stxAnalysisDebugLevel)
   for(map<Function, CFGNode>::iterator f=Func2Exit.begin(); f!=Func2Exit.end(); f++) {
     /*if(!SageInterface::isStatic(f->first.get_declaration()) &&
        !f->first.get_declaration()->get_file_info()->isCompilerGenerated()) {*/
     if(isExternallyCallable(f->first)) {
-      if(stxAnalysisDebugLevel()>3) dbg << CFGNode2Str(f->second)<<"()"<<endl;
+      SIGHT_VERB(dbg << CFGNode2Str(f->second)<<"()"<<endl, 3, stxAnalysisDebugLevel)
       endStates.insert(StxPart::create(f->second, this, filter));
     }
   }
@@ -478,12 +479,25 @@ StxPartEdgePtr NULLStxPartEdge;
 /**************************
  ***** StxFuncContext *****
  **************************/
-//StxFuncContext::StxFuncContext(Function func) : func(func) {}
+// Caches the function contexts of all the SgNodes
+std::map<SgNode*, StxFuncContextPtr> StxFuncContext::FC_cache;
 
 StxFuncContext::StxFuncContext(CFGNode n) :
   func(Function(SageInterface::getEnclosingFunctionDeclaration(n.getNode()))),
   n(n)
 { }
+
+// Returns the StxFuncContext associated with the given CFGNode, using a previously cached
+// instance of the object, if possible
+StxFuncContextPtr StxFuncContext::getContext(CFGNode n) {
+  map<SgNode*, StxFuncContextPtr>::iterator fcIt = FC_cache.find(n.getNode());
+  if(fcIt == FC_cache.end()) {
+    StxFuncContextPtr ctxt = makePtr<StxFuncContext>(n);
+    FC_cache[n.getNode()] = ctxt;
+    return ctxt;
+  } else
+    return fcIt->second;
+}
 
 // Returns a list of PartContextPtr objects that denote more detailed context information about
 // this PartContext's internal contexts. If there aren't any, the function may just return a list containing
@@ -538,7 +552,7 @@ void makeClosureDF_rec(CFGPath path, // The current set of CFG paths
         CFGPath (*merge)(const CFGPath&, const CFGPath&),  // merge two paths into one
         bool (*filter) (CFGNode))   // filter function 
 {
-  if(stxAnalysisDebugLevel()>=3) dbg << "makeClosureDF_rec: path: "<<CFGNode2Str(path.source())<<" ==&gt; "<<CFGNode2Str(path.target())<<endl;
+  SIGHT_VERB(dbg << "makeClosureDF_rec: path: "<<CFGNode2Str(path.source())<<" ==&gt; "<<CFGNode2Str(path.target())<<endl, 3, stxAnalysisDebugLevel);
   
   // If the edge of the current path is not interesting
   if(!filter((path.*otherSide)())) {
@@ -546,18 +560,18 @@ void makeClosureDF_rec(CFGPath path, // The current set of CFG paths
     vector<CFGEdge> extensions = ((path.*otherSide)().*closure)(); 
     //dbg << "otherSide="<<CFGNode2Str((path.*otherSide)())<<endl;
     for(vector<CFGEdge>::iterator e=extensions.begin(); e!=extensions.end(); e++) {
-      if(stxAnalysisDebugLevel()>=3) dbg << "extension "<<CFGNode2Str(e->source())<<" ==&gt; "<<CFGNode2Str(e->target())<<endl;
+      SIGHT_VERB(dbg << "extension "<<CFGNode2Str(e->source())<<" ==&gt; "<<CFGNode2Str(e->target())<<endl, 3, stxAnalysisDebugLevel);
 
       /* // Skip edges from the start of a short-circuit operation (|| and &&) to its end
       if(isShortCircuitEdge(*e)) { continue; }*/
       
-      indent ind(attrGE("stxAnalysisDebugLevel", 1));
+      SIGHT_VERB(indent ind, 3, stxAnalysisDebugLevel);
       CFGPath extension = (*merge)(path, *e);
       // Extend path with e to create the full extension of path
       makeClosureDF_rec(extension, allPaths, closure, otherSide, merge, filter);
     }
   } else {
-    if(stxAnalysisDebugLevel()>=3) dbg << "Interesting\n";
+    SIGHT_VERB(dbg << "Interesting\n", 3, stxAnalysisDebugLevel)
     // We've found an interesting extension, record it.
     allPaths.insert(path);
   }
@@ -573,11 +587,11 @@ map<StxPartEdgePtr, bool> makeClosureDF(const vector<CFGEdge>& orig, // raw in o
                                         bool (*filter) (CFGNode),   // filter function 
                                         ComposedAnalysis* analysis)
 {
-  scope reg("makeClosureDF", scope::medium, attrGE("stxAnalysisDebugLevel", 3));
+  SIGHT_VERB(scope reg("makeClosureDF", scope::medium), 3, stxAnalysisDebugLevel)
   indent ind;
   set<CFGPath> allPaths;
   for(vector<CFGEdge>::const_iterator e=orig.begin(); e!=orig.end(); e++) {
-    if(stxAnalysisDebugLevel()>=3) dbg << "edge "<<CFGNode2Str(e->source())<<" ==&gt; "<<CFGNode2Str(e->target())<<endl;
+    SIGHT_VERB(dbg << "edge "<<CFGNode2Str(e->source())<<" ==&gt; "<<CFGNode2Str(e->target())<<endl, 3, stxAnalysisDebugLevel)
     /* // Skip edges from the start of a short-circuit operation (|| and &&) to its end
     if(isShortCircuitEdge(*e)) { continue; }*/
     makeClosureDF_rec(*e, allPaths, closure, otherSide, merge, filter);
@@ -594,13 +608,13 @@ map<StxPartEdgePtr, bool> makeClosureDF(const vector<CFGEdge>& orig, // raw in o
       //edges.push_back(/*boost::static_pointer_cast<PartEdge>(*/boost::make_shared<StxPartEdge>(*i, filter)/*)*/);
       //edges.push_back(StxPartEdge::create(*i, analysis, filter));
       StxPartEdgePtr newEdge = StxPartEdge::create(*i, analysis, filter);
-      if(stxAnalysisDebugLevel()>=3) dbg << "newEdge="<<newEdge->str()<<endl;
+      SIGHT_VERB(dbg << "newEdge="<<newEdge->str()<<endl, 3, stxAnalysisDebugLevel)
       if(edges.find(newEdge) == edges.end()) edges[newEdge] = true;
     }
   }
-  //dbg << "makeClosure done: #edges=" << edges.size() << endl;
-  //for(vector<DataflowEdge>::iterator e=edges.begin(); e!=edges.end(); e++)
-  //    printf("Current Node %p<%s | %s>\n", e.target().getNode(), e.target().getNode()->unparseToString().c_str(), e.target().getNode()->class_name().c_str());
+  /*dbg << "makeClosure done: #edges=" << edges.size() << endl;
+  for(map<StxPartEdgePtr, bool>::iterator e=edges.begin(); e!=edges.end(); e++)
+    dbg << "    edge="<<e->first->str()<<endl;*/
   //for (list<StxPartEdgePtr>::iterator i = edges.begin(); i != edges.end(); ++i) {
   
   // Make sure that for each edge either the source or the target is interesting
@@ -630,14 +644,14 @@ map<StxPartEdgePtr, bool> StxPart::getOutEdges()
   // If current node is a function call, connect the call to the SgFunctionParameterList of the called function.
   } else if((call = isSgFunctionCallExp(n.getNode())) && n.getIndex()==2) {
     set<Function> callees = getAllCalleeFuncs(call);
-    
-    if(stxAnalysisDebugLevel()>=2) {
+   
+    SIGHT_VERB_IF(2, stxAnalysisDebugLevel) 
       dbg << "type = "<<SgNode2Str(isSgFunctionCallExp(n.getNode())->get_type())<<", funcCall->get_function()="<<(isSgFunctionCallExp(n.getNode())->get_function()? SgNode2Str(isSgFunctionCallExp(n.getNode())->get_function()): "NULL")<<endl;
       dbg << "function = "<<SgNode2Str(isSgFunctionCallExp(n.getNode())->get_function())<<" function type="<<SgNode2Str(isSgFunctionCallExp(n.getNode())->get_function()->get_type())<<endl;
       scope sCallees("Callees", scope::low);
       for(set<Function>::iterator c=callees.begin(); c!=callees.end(); c++)
         dbg << c->str()<<" declaration="<<c->get_declaration()<<"="<<SgNode2Str(c->get_declaration())<<endl;
-    }
+    SIGHT_VERB_FI()
     
     for(set<Function>::iterator c=callees.begin(); c!=callees.end(); c++)
       vStx[StxPartEdge::create(n, getFunc2Entry(*c), analysis)] = true;
@@ -682,11 +696,11 @@ map<StxPartEdgePtr, bool> StxPart::getOutEdges()
     // If this is the synthesized exit node a function without a body
     /*if(isFuncExit(n)) func = getExit2Func(n);
     else                   func = Function(def);*/
-    if(stxAnalysisDebugLevel()>=2) dbg << "Definition n="<<CFGNode2Str(n)<<" func="<<func.get_name().getString()<<" isFuncExit(n)="<<isFuncExit(n)<<endl;
+    SIGHT_VERB(dbg << "Definition n="<<CFGNode2Str(n)<<" func="<<func.get_name().getString()<<" isFuncExit(n)="<<isFuncExit(n)<<endl, 2, stxAnalysisDebugLevel)
     
     const set<SgFunctionCallExp*>& calls = func2Calls(func);
-    if(stxAnalysisDebugLevel()>=2) dbg << "#calls="<<calls.size()<<" Connecting n="<<CFGNode2Str(n)<<endl;
-    indent ind(attrGE("stxAnalysisDebugLevel", 2));
+    SIGHT_VERB(dbg << "#calls="<<calls.size()<<" Connecting n="<<CFGNode2Str(n)<<endl, 2, stxAnalysisDebugLevel)
+    SIGHT_VERB(indent ind, 2, stxAnalysisDebugLevel)
     for(set<SgFunctionCallExp*>::const_iterator c=calls.begin(); c!=calls.end(); c++) {
       CFGNode callNode(*c, 3);
       vStx[StxPartEdge::create(n, callNode, analysis, filter)]=1;
@@ -704,10 +718,10 @@ map<StxPartEdgePtr, bool> StxPart::getOutEdges()
   // If the current node is a return statement, connect it to the function's exit SgFunctionDefinition node
   } else if(SgReturnStmt* ret = isSgReturnStmt(n.getNode())) {
     Function func(SageInterface::getEnclosingFunctionDeclaration(ret));
-    if(stxAnalysisDebugLevel()>=2) {
+    SIGHT_VERB_IF(2, stxAnalysisDebugLevel)
       dbg << "returning from func="<<func.str()<<endl;
       dbg << "Exit node="<<CFGNode2Str(getFunc2Exit(func))<<endl;
-    }
+    SIGHT_VERB_FI()
     vStx[StxPartEdge::create(n, getFunc2Exit(func), analysis)] = true;
   //} else if(isSgFunctionParameterList(n.getNode())) {
   } else if(isFuncEntry(n)) {
@@ -748,6 +762,7 @@ list<StxPartEdgePtr> StxPart::outStxEdges() {
 
 map<StxPartEdgePtr, bool> StxPart::getInEdges()
 {
+//  scope s("StxPart::getInEdges()");
   map<StxPartEdgePtr, bool> vStx;
   SgFunctionCallExp* call;
 
@@ -755,11 +770,11 @@ map<StxPartEdgePtr, bool> StxPart::getInEdges()
   if((call = isSgFunctionCallExp(n.getNode())) && n.getIndex()==3) {
     Function callee(call);
     
-    if(stxAnalysisDebugLevel()>=2) dbg << "StxPart::getInEdges() Return side of Call: callee="<<callee.str()<<" known="<<callee.isKnown()<<endl;
+    SIGHT_VERB(dbg << "StxPart::getInEdges() Return side of Call: callee="<<callee.str()<<" known="<<callee.isKnown()<<endl, 2, stxAnalysisDebugLevel);
     
     // If the function is known
     if(callee.isKnown()) {
-      if(stxAnalysisDebugLevel()>=2) dbg << "exit="<<CFGNode2Str(getFunc2Exit(callee))<<endl;
+      SIGHT_VERB(dbg << "exit="<<CFGNode2Str(getFunc2Exit(callee))<<endl, 2, stxAnalysisDebugLevel)
       vStx[StxPartEdge::create(getFunc2Exit(callee), n, analysis)] = true;
     // Otherwise, find all the functions with the same type as this function call.
     // They are all possible referents of the call
@@ -774,28 +789,28 @@ map<StxPartEdgePtr, bool> StxPart::getInEdges()
   // If the current Node is the exit point of a function
   } else if(isFuncExit(n)) {
     Function func = getExit2Func(n);
-    if(stxAnalysisDebugLevel()>=2) dbg << "Function Exit n="<<CFGNode2Str(n)<<" func="<<func.get_name().getString()<<endl;
+    SIGHT_VERB(dbg << "Function Exit n="<<CFGNode2Str(n)<<" func="<<func.get_name().getString()<<endl, 2, stxAnalysisDebugLevel)
     
     // Connect it to the immediately preceding CFGNode
     vStx = makeClosureDF(n.inEdges(), &CFGNode::inEdges, &CFGPath::source, &mergePathsReversed, filter, analysis);
     
-    if(stxAnalysisDebugLevel()>=2) dbg << "-------------#vStx="<<vStx.size()<<"---------------------"<<endl;
+    SIGHT_VERB(dbg << "-------------#vStx="<<vStx.size()<<"---------------------"<<endl, 2, stxAnalysisDebugLevel)
     
     // Also connect it to all the SgReturnStmts in the function
     for(CFGIterator it(getFunc2Entry(func)); it!=CFGIterator::end(); it++) {
       if(isSgReturnStmt(it->getNode()) && it->getIndex()==1)
         vStx[StxPartEdge::create(*it, n, analysis)] = true;
     }
-    if(stxAnalysisDebugLevel()>=2) dbg << "-------------#vStx="<<vStx.size()<<"---------------------"<<endl;
+    SIGHT_VERB(dbg << "-------------#vStx="<<vStx.size()<<"---------------------"<<endl, 2, stxAnalysisDebugLevel)
   // If the current node is the entry point of a function
   } else if(isFuncEntry(n)) {
     Function func = getEntry2Func(n);
   
-    if(stxAnalysisDebugLevel()>=2) dbg << "Function Entry n="<<CFGNode2Str(n)<<" func="<<func.get_name().getString()<<endl;
+    SIGHT_VERB(dbg << "Function Entry n="<<CFGNode2Str(n)<<" func="<<func.get_name().getString()<<endl, 2, stxAnalysisDebugLevel)
     
     const set<SgFunctionCallExp*>& calls = func2Calls(func);
-    if(stxAnalysisDebugLevel()>=2) dbg << "#calls="<<calls.size()<<" Connecting n="<<CFGNode2Str(n)<<endl;
-    indent ind(attrGE("stxAnalysisDebugLevel", 2));
+    SIGHT_VERB(dbg << "#calls="<<calls.size()<<" Connecting n="<<CFGNode2Str(n)<<endl, 2, stxAnalysisDebugLevel)
+    SIGHT_VERB(indent ind, 2, stxAnalysisDebugLevel)
     for(set<SgFunctionCallExp*>::const_iterator c=calls.begin(); c!=calls.end(); c++) {
       CFGNode callNode(*c, 2);
       vStx[StxPartEdge::create(callNode, n, analysis, filter)]=1;
@@ -814,10 +829,10 @@ map<StxPartEdgePtr, bool> StxPart::getInEdges()
     if(isSgVariableDeclaration(n.getNode()) && n.getIndex()==0 &&
        SyntacticAnalysis::globalDeclarations.find(isSgVariableDeclaration(n.getNode())) != SyntacticAnalysis::globalDeclarations.end())
     {
-      if(stxAnalysisDebugLevel()>=2) dbg << "Beginning of declaration of global variable"<<endl;
+      SIGHT_VERB(dbg << "Beginning of declaration of global variable"<<endl, 2, stxAnalysisDebugLevel)
       return vStx;
     } else {
-      if(stxAnalysisDebugLevel()>=2) dbg << "Internal Node"<<endl;
+      SIGHT_VERB(dbg << "Internal Node"<<endl, 2, stxAnalysisDebugLevel)
       return makeClosureDF(n.inEdges(), &CFGNode::inEdges, &CFGPath::source, &mergePathsReversed, filter, analysis);
     }
   }
@@ -829,7 +844,7 @@ list<PartEdgePtr> StxPart::inEdges() {
 //  scope reg(txt()<<"StxPart::inEdges() part="<<str(), scope::medium, attrGE("stxAnalysisDebugLevel", 2));
   map<StxPartEdgePtr, bool> vStx = getInEdges();
  
-  if(stxAnalysisDebugLevel()>=2) dbg <<"#vStx="<<vStx.size()<<endl;
+  SIGHT_VERB(dbg <<"#vStx="<<vStx.size()<<endl, 2, stxAnalysisDebugLevel)
   list<PartEdgePtr> v;
   for(map<StxPartEdgePtr, bool>::iterator i=vStx.begin(); i!=vStx.end(); i++)
     v.push_back(dynamicPtrCast<PartEdge>(i->first));
@@ -1050,10 +1065,10 @@ StxValueObject::StxValueObject(SgNode* n) : ValueObject(n)
 {
   // If a valid node is passed, check if it is an SgValue
   if(n) {
-    if(stxAnalysisDebugLevel()>=1) {
+    SIGHT_VERB_IF(1, stxAnalysisDebugLevel)
       dbg << "StxValueObject::StxValueObject("<<SgNode2Str(n)<<")";
       dbg << " isSgCastExp(n)="<<isSgCastExp(n)<<" unwrapCasts(isSgCastExp(n))="<<(isSgCastExp(n) ? SgNode2Str(unwrapCasts(isSgCastExp(n))) : "NULL")<<" iscast="<<(isSgCastExp(n) ? isSgValueExp(unwrapCasts(isSgCastExp(n))) : 0)<<endl;
-    }
+    SIGHT_VERB_FI()
     if(isSgValueExp(n)) 
       val = isSgValueExp(n);
     // If this is a value that has been wrapped in many casts
@@ -2054,4 +2069,20 @@ bool isOperand(SgNode* n, SgExpression* op) {
 
   return false;
 }
+
+
+// Given a vector for base VirtualCFG edges, get the corresponding refined edges from
+// this attributes composer and add them to the given set of refined edges
+void collectRefinedEdges(Composer* composer, std::set<PartEdgePtr>& refined, const std::vector<CFGEdge>& base) {
+  dbg << "collectRefinedEdges() #b="<<base.size()<<endl;
+  for(std::vector<CFGEdge>::const_iterator b=base.begin(); b!=base.end(); b++) {
+    dbg << "    b="<<CFGEdge2Str(*b)<<endl;
+    StxPartEdgePtr stxEdge = StxPartEdge::create(*b, SyntacticAnalysis::instance());
+    const std::set<PartEdgePtr>& refinedEdges = composer->getRefinedPartEdges(stxEdge);
+    dbg << "    #refinedEdges="<<refinedEdges.size()<<endl;
+    refined.insert(refinedEdges.begin(), refinedEdges.end());
+  }
+  //assert(refined.size()>0);
+}
+
 }; // namespace fuse

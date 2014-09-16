@@ -44,6 +44,7 @@ include_HEADERS =\
 	simpleAnalyses/saveDotAnalysis.h \
 	simpleAnalyses/taintAnalysis.h \
 	simpleAnalyses/virtualMethodAnalysis.h \
+	simpleAnalyses/defsAnalysis.h \
 	simpleAnalyses/VariableStateTransfer.h \
 	sparse/constantAnalysis.h \
 	sparse/heapDefsAndUsesTraversal.h \
@@ -106,6 +107,7 @@ fuse_SOURCES = \
 	simpleAnalyses/saveDotAnalysis.C \
 	simpleAnalyses/taintAnalysis.C \
 	simpleAnalyses/virtualMethodAnalysis.C \
+	simpleAnalyses/defsAnalysis.C \
         sparse/constantAnalysis.C \
 	sparse/heapDefsAndUsesTraversal.C \
 	sparse/heapSSA.C \
@@ -141,52 +143,6 @@ FUSE_CPP_TESTS = \
 	simplePtrTest.cpp \
 	sas13Fig1Example.cpp
 
-#############
-# FUSETIGHT #
-#############
-#fuseTight_CXXFLAGS = $(SIGHT_CFLAGS) -DROSE_PREFIX="\"${top_builddir}\""
-#fuseTight_LDADD = -lrose
-#fuseTight_LDFLAGS = $(ROSE_LIBS) $(LIBS_WITH_RPATH) $(SIGHT_LINKFLAGS)
-#
-#fuseTight_DEPENDENCIES=fuseLayout
-#
-#fuseTight_SOURCES = \
-#	analysis/abstract_object.C \
-#	analysis/abstract_object_map.C \
-#	analysis/abstract_object_set.C \
-#	analysis/analysis.C \
-#	analysis/analysis_tester.C \
-#	analysis/compose.C \
-#	analysis/composed_analysis.C \
-#	analysis/factor_trans_system.C \
-#	analysis/graphIterator.C \
-#	analysis/partitions.C \
-#	analysis/stx_analysis.C \
-#	analysis/tight_composer.C \
-#	cfgUtils/CallGraphTraverse.C \
-#	cfgUtils/cfgUtils.C \
-#	cfgUtils/DataflowCFG.C \
-#	cfgUtils/VirtualCFGIterator.C \
-#	sight/widgets/ats_graph_structure.C \
-#	lattice/lattice.C \
-#	simpleAnalyses/call_context_sensitivity_analysis.C \
-#	simpleAnalyses/const_prop_analysis.C \
-#	simpleAnalyses/dead_path_elim_analysis.C \
-#	simpleAnalyses/live_dead_analysis.C \
-#	simpleAnalyses/pointsToAnalysis.C \
-#	simpleAnalyses/printAnalysisStates.C \
-#	simpleAnalyses/saveDotAnalysis.C \
-#	simpleAnalyses/taintAnalysis.C \
-#	simpleAnalyses/virtualMethodAnalysis.C \
-#	sparse/constantAnalysis.C \
-#	sparse/heapDefsAndUsesTraversal.C \
-#	sparse/heapSSA.C \
-#	sparse/hssaMemObject.C \
-#	sparse/pointerAnalysis.C \
-#	sparse/valueNumbering.C \
-#	state/nodeState.C \
-#	tightCompositionTest.C
-
 #SA 8/15/2014
 # Adding checks for testing tight composition
 # Tests are simple pointer manipulations
@@ -199,18 +155,6 @@ FUSETIGHT_CP_PT_TESTS=\
 	simplePtrTestTight4.cpp \
 	simplePtrTestTight5.cpp
 
-#FUSETIGHT_CP_ARR_TESTS = arrayPtrTestTight.cpp
-#
-#FUSETIGHT_TESTS = ${FUSETIGHT_CP_PT_TESTS}
-#
-#FUSETIGHT_CHECKS = $(addprefix fusetight_, $(addsuffix .passed, $(FUSETIGHT_TESTS)))
-#
-#FUSETIGHT = ./fuseTight
-#
-#$(FUSETIGHT_CHECKS): fusetight_%.passed: $(TESTS_DIR)/% $(TEST_EXIT_STATUS) $(FUSETIGHT)
-#	@$(RTH_RUN) CMD="./fuseTight  -I$(TESTS_DIR) -c $<" $(TEST_EXIT_STATUS) $@
-#
-#
 #.PHONY: check-fusetight
 #check-fusetight: $(FUSETIGHT_CHECKS)
 #

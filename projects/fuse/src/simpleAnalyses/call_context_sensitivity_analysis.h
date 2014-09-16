@@ -333,6 +333,14 @@ class CallCtxSensMR : public MemRegionObject
     // Set this Lattice object to represent the empty set of MemLocs.
     // Return true if this causes the object to change and false otherwise.
     bool setToEmpty();
+    
+    // Returns true if this MemRegionObject denotes a finite set of concrete regions
+    bool isConcrete() { return baseMR->isConcrete(); }
+    // Returns the type of the concrete regions (if there is one)
+    SgType* getConcreteType() { return baseMR->getConcreteType(); }
+    // Returns the set of concrete memory regions as SgExpressions, which allows callers to use
+    // the normal ROSE mechanisms to decode it
+    std::set<SgNode* > getConcrete() { return baseMR->getConcrete(); }
 }; // CallCtxSensMR
 
 /* #########################

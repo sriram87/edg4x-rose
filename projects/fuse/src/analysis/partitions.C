@@ -858,7 +858,8 @@ PartEdge::PartEdge(const PartEdge& that) :
 // to the caller. It is called outside of the PartEdge constructor, which makes it possible to
 // place code inside that registers a shared pointer to this PartEdge with a directory of some kind.
 void PartEdge::init() {
-  analysis->registerBase2RefinedMapping(parent, shared_from_this());
+  if(analysis) 
+    analysis->registerBase2RefinedMapping(parent, shared_from_this());
   /*dbg << "PartEdge::init() mapping base "<<(parent?parent->str():"NULL")<<" to "<<endl;
   dbg << "     refined "<<str()<<endl;*/
 }
@@ -1793,5 +1794,9 @@ std::string IntersectionPartEdge::str(std::string indent) const
   oss << "]"; //", parent="<<(getParent()? getParent()->str(): "NULL")<<", analysis="<<analysis<<"]";
   return oss.str();
 }
+
+/**********************
+ ****** Utilities *****
+ **********************/
 
 }; // namespace fuse

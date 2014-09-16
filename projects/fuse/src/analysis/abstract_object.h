@@ -593,7 +593,7 @@ public:
   // Allocates a copy of this object and returns a pointer to it
   virtual ValueObjectPtr copyV() const=0;
   AbstractObjectPtr copyAO() const;
-};
+}; // class ValueObject
 
 // The default implementation of ValueObjects that denotes the set of all ValueObjects
 //! NOTE:Its sufficient to create only a single instance of this object globally.
@@ -722,6 +722,8 @@ class MappedValueObject : public ValueObject
 
 public:
   MappedValueObject() : ValueObject(NULL), n_FullV(0), union_(!mostAccurate), intersect_(mostAccurate) { }
+  MappedValueObject(const std::map<Key, ValueObjectPtr>& valuesMap) : 
+    ValueObject(NULL), valuesMap(valuesMap), union_(!mostAccurate), intersect_(mostAccurate) { }
   MappedValueObject(const MappedValueObject& that) : 
     ValueObject(that), 
     valuesMap(that.valuesMap), 
@@ -787,7 +789,7 @@ public:
   ValueObjectPtr copyV() const;
   
   std::string str(std::string indent="") const;
-};
+}; // class MappedValueObject
 
 typedef MappedValueObject<ComposedAnalysis*, false> UnionAnalMapValueObject;
 typedef boost::shared_ptr<MappedValueObject<ComposedAnalysis*, false> > UnionAnalMapValueObjectPtr;
@@ -939,6 +941,14 @@ public:
   bool isFull(PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis);
   bool isEmpty(PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis);
   
+  // Returns true if this MemRegionObject denotes a finite set of concrete regions
+  virtual bool isConcrete()=0;
+  // Returns the type of the concrete regions (if there is one)
+  virtual SgType* getConcreteType()=0;
+  // Returns the set of concrete memory regions as SgExpressions, which allows callers to use
+  // the normal ROSE mechanisms to decode it
+  virtual std::set<SgNode* > getConcrete()=0;
+  
   // Returns a ValueObject that denotes the size of this memory region
   virtual ValueObjectPtr getRegionSize(PartEdgePtr pedge) const=0;
     
@@ -978,6 +988,14 @@ class FuncResultMemRegionObject : public MemRegionObject
   bool isFullMR(PartEdgePtr pedge);
   // Returns whether this AbstractObject denotes the empty set.
   bool isEmptyMR(PartEdgePtr pedge);
+  
+  // Returns true if this MemRegionObject denotes a finite set of concrete regions
+  bool isConcrete() { return false; }
+  // Returns the type of the concrete regions (if there is one)
+  SgType* getConcreteType() { return NULL; }
+  // Returns the set of concrete memory regions as SgExpressions, which allows callers to use
+  // the normal ROSE mechanisms to decode it
+  std::set<SgNode* > getConcrete() { std::set<SgNode* > empty; return empty; }
   
   // Returns a ValueObject that denotes the size of this memory region
   ValueObjectPtr getRegionSize(PartEdgePtr pedge) const;
@@ -1023,6 +1041,14 @@ class FullMemRegionObject : public MemRegionObject
 
   // Returns whether this AbstractObject denotes the empty set.
   bool isEmptyMR(PartEdgePtr pedge);
+  
+  // Returns true if this MemRegionObject denotes a finite set of concrete regions
+  bool isConcrete() { return false; }
+  // Returns the type of the concrete regions (if there is one)
+  SgType* getConcreteType() { return NULL; }
+  // Returns the set of concrete memory regions as SgExpressions, which allows callers to use
+  // the normal ROSE mechanisms to decode it
+  std::set<SgNode* > getConcrete() { std::set<SgNode* > empty; return empty; }
 
   // Returns a ValueObject that denotes the size of this memory region
   ValueObjectPtr getRegionSize(PartEdgePtr pedge) const;
@@ -1086,6 +1112,14 @@ class CombinedMemRegionObject : public virtual MemRegionObject
   // Returns whether this AbstractObject denotes the empty set.
   bool isEmptyMR(PartEdgePtr pedge);
   
+  // Returns true if this MemRegionObject denotes a finite set of concrete regions
+  bool isConcrete();
+  // Returns the type of the concrete regions (if there is one)
+  SgType* getConcreteType();
+  // Returns the set of concrete memory regions as SgExpressions, which allows callers to use
+  // the normal ROSE mechanisms to decode it
+  std::set<SgNode* > getConcrete();
+  
   // Returns a ValueObject that denotes the size of this memory region
   ValueObjectPtr getRegionSize(PartEdgePtr pedge) const;
   
@@ -1117,6 +1151,8 @@ class MappedMemRegionObject : public MemRegionObject
 
 public:
   MappedMemRegionObject() : MemRegionObject(NULL), n_FullMR(0), union_(!mostAccurate), intersect_(mostAccurate) { }
+  MappedMemRegionObject(const std::map<Key, MemRegionObjectPtr>& memRegionsMap) : 
+    MemRegionObject(NULL), memRegionsMap(memRegionsMap), union_(!mostAccurate), intersect_(mostAccurate) { }
   MappedMemRegionObject(const MappedMemRegionObject& that) : 
     MemRegionObject(that), 
     memRegionsMap(that.memRegionsMap), 
@@ -1160,6 +1196,19 @@ public:
   bool isFullMR(PartEdgePtr pedge);
   // Returns whether this AbstractObject denotes the empty set.
   bool isEmptyMR(PartEdgePtr pedge);
+  
+  // Returns whether this AbstractObject denotes the set of all possible execution prefixes.
+  bool isFullMR();
+  // Returns whether this AbstractObject denotes the empty set.
+  bool isEmptyMR();
+  
+  // Returns true if this MemRegionObject denotes a finite set of concrete regions
+  bool isConcrete();
+  // Returns the type of the concrete regions (if there is one)
+  SgType* getConcreteType();
+  // Returns the set of concrete memory regions as SgExpressions, which allows callers to use
+  // the normal ROSE mechanisms to decode it
+  std::set<SgNode* > getConcrete();
 
   ValueObjectPtr getRegionSize(PartEdgePtr pedge) const;
   
@@ -1202,6 +1251,13 @@ public:
   bool isEmptyMR(PartEdgePtr pedge);
   MemRegionObjectPtr copyMR() const;
   void setMRToFull();
+  // Returns true if this MemRegionObject denotes a finite set of concrete regions
+  bool isConcrete();
+  // Returns the type of the concrete regions (if there is one)
+  SgType* getConcreteType();
+  // Returns the set of concrete memory regions as SgExpressions, which allows callers to use
+  // the normal ROSE mechanisms to decode it
+  std::set<SgNode* > getConcrete();  
   ValueObjectPtr getRegionSize(PartEdgePtr pedge) const;
   std::string str(std::string indent="") const;
 };
@@ -1237,10 +1293,7 @@ class MemLocObject : public AbstractObject
   // should the default mutable value be conservatively true ?
   MemLocObject(SgNode* base) : AbstractObject(base) {}
   MemLocObject(MemRegionObjectPtr region, ValueObjectPtr index, SgNode* base) : AbstractObject(base), region(region), index(index) {}
-  MemLocObject(const MemLocObject& that) : 
-    AbstractObject(that), 
-    region(that.region? that.region->copyMR(): that.region), 
-    index (that.index ? that.index->copyV()  : that.index) {}
+  MemLocObject(const MemLocObject& that);
 
   // Wrapper for shared_from_this that returns an instance of this class rather than its parent
   MemLocObjectPtr shared_from_this() { return boost::static_pointer_cast<MemLocObject>(AbstractObject::shared_from_this()); }
@@ -1253,8 +1306,8 @@ class MemLocObject : public AbstractObject
   bool isMemLocObject()     { return true;  }
   AOType getAOType() { return AbstractObject::MemLoc; }
   
-  MemRegionObjectPtr getRegion() const { return region; }
-  ValueObjectPtr     getIndex() const  { return index; }
+  virtual MemRegionObjectPtr getRegion() const;
+  virtual ValueObjectPtr     getIndex() const;
   
 //private:
   // Returns whether this object may/must be equal to o within the given Part p
@@ -1421,6 +1474,9 @@ class CombinedMemLocObject : public virtual MemLocObject
   /*static boost::shared_ptr<CombinedMemLocObject<defaultMayEq> > create(MemLocObjectPtr memLoc);
   static boost::shared_ptr<CombinedMemLocObject<defaultMayEq> > create(const std::list<MemLocObjectPtr>& memLocs);*/
   
+  MemRegionObjectPtr getRegion() const;
+  ValueObjectPtr     getIndex() const;
+  
   void add(MemLocObjectPtr memLoc);
   
   // Returns whether this object may/must be equal to o within the given Part p
@@ -1539,6 +1595,8 @@ class MappedMemLocObject : public MemLocObject
 
 public:
   MappedMemLocObject() : MemLocObject(NULL), n_FullML(0), union_(!mostAccurate), intersect_(mostAccurate) { }
+  MappedMemLocObject(const std::map<Key, MemLocObjectPtr>& memLocsMap) : 
+    MemLocObject(NULL), memLocsMap(memLocsMap), union_(!mostAccurate), intersect_(mostAccurate) { }
   MappedMemLocObject(const MappedMemLocObject& that) : 
     MemLocObject(that), 
     memLocsMap(that.memLocsMap), 
@@ -1546,6 +1604,9 @@ public:
     union_(that.union_),
     intersect_(that.intersect_) { }
 
+  MemRegionObjectPtr getRegion() const;
+  ValueObjectPtr     getIndex() const;
+  
   void add(Key key, MemLocObjectPtr clo_p, PartEdgePtr pedge);
   const std::map<Key, MemLocObjectPtr>& getMemLocsMap() const { return memLocsMap; }
   

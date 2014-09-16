@@ -940,4 +940,18 @@ string NodeState::str(const map<PartEdgePtr, vector<Lattice*> >& dfInfo, string 
   return oss.str();
 }
 
+// Returns a human-readable representation of the nodeStateMap at the given part
+std::string NodeState::NodeStateMap2Str(PartPtr p) {
+  ostringstream s;
+  s << "[NodeStateMap:"<<endl;
+  for(std::map<ComposedAnalysis*, std::map<PartPtr, NodeState*> >::iterator i=nodeStateMap.begin();
+      i!=nodeStateMap.end(); i++) {
+    s << "    "<<i->first->str()<<endl;
+    if(i->second.find(p) != i->second.end())
+      s << "        "<<i->second.find(p)->second->str("            ")<<endl;
+  }
+  s << "]";
+  return s.str();
+}
+
 }; // namespace fuse

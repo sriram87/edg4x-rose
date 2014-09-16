@@ -9,6 +9,7 @@
 #include "printAnalysisStates.h"
 #include "pointsToAnalysis.h"
 #include "virtualMethodAnalysis.h"
+#include "defsAnalysis.h"
 #include "analysis_tester.h"
 #include <vector>
 #include <ctype.h>
@@ -159,30 +160,45 @@ class ValueASTAttribute: public CPAstAttributeInterface {
   public:
   typedef enum {above, below} dirT;
   dirT dir;
+  std::string label;
+  std::list<SgVariableSymbol *> allInScopeVars;
+  CFGNode cn;
 
-  // Given a vector for base VirtualCFG edges, get the corresponding refined edges from
-  // this attributes composer and add them to the given set of refined edges
-  void collectRefinedEdges(std::set<PartEdgePtr>& refined, const std::vector<CFGEdge>& base) {
-    dbg << "collectRefinedEdges() #b="<<base.size()<<endl;
-    for(std::vector<CFGEdge>::const_iterator b=base.begin(); b!=base.end(); b++) {
-      dbg << "    b="<<CFGEdge2Str(*b)<<endl;
-      StxPartEdgePtr stxEdge = StxPartEdge::create(*b, SyntacticAnalysis::instance());
-      const std::set<PartEdgePtr>& refinedEdges = composer->getRefinedPartEdges(stxEdge);
-      dbg << "    #refinedEdges="<<refinedEdges.size()<<endl;
-      refined.insert(refinedEdges.begin(), refinedEdges.end());
+  // Returns a list of all the variables declared in the given scope
+  std::list<SgVariableSymbol*> getAllVarSymbolsInScope(SgScopeStatement *scope) {
+    list<SgVariableSymbol*> vars;
+    SgVariableSymbol* var = scope->first_variable_symbol();
+    while(var) {
+      vars.push_back(var);
+      var = scope->next_variable_symbol();
     }
-    //assert(refined.size()>0);
+    return vars;
   }
 
-  ValueASTAttribute(SgNode* n, Composer* composer, checkDataflowInfoPass* cdip, dirT dir): 
-        composer(composer), cdip(cdip), dir(dir) {
+  // Returns a list of all the variables declared in the scopes that contain this node
+  std::list<SgVariableSymbol*> getAllVarSymbols(SgNode *n) {
+    n = n->get_parent();
+    list<SgVariableSymbol*> allVars;
+    while(n) {
+      if(SgScopeStatement* scope = isSgScopeStatement(n)) {
+        list<SgVariableSymbol*> scopeVars = getAllVarSymbolsInScope(scope);
+        for(list<SgVariableSymbol*>::iterator v=scopeVars.begin(); v!=scopeVars.end(); v++) {
+          allVars.push_back(*v);
+        }
+      }
+      n = n->get_parent();
+    }
+    return allVars;
+  }
+
+  ValueASTAttribute(SgNode* n, Composer* composer, checkDataflowInfoPass* cdip, dirT dir, std::string label): 
+        composer(composer), cdip(cdip), dir(dir), label(label) {
     scope s(txt()<<"ValueASTAttribute("<<SgNode2Str(n)<<")");
  
     // NOTE: this is a temporary hack where we assume the appropriate index for the CFGNode
     //       that represents SgNode n. In the future we should change Expr2* to accept CFGNodes
-    CFGNode cn;
-    if(isSgBinaryOp(n))
-      cn = CFGNode(n, 2);
+    if(isSgInitializedName(n)) cn = CFGNode(n, 1);
+    else if(isSgBinaryOp(n)) cn = CFGNode(n, 2);
     else if(isSgUnaryOp(n)) {
       if(isSgCastExp(n)) cn = CFGNode(n, 0);
       else if(isSgAddressOfOp(n) || isSgPointerDerefExp(n) || isSgPlusPlusOp(n) || isSgMinusMinusOp(n)) cn = CFGNode(n, 1);
@@ -193,7 +209,9 @@ class ValueASTAttribute: public CPAstAttributeInterface {
  
     // Collect the PartEdges (computed by the given composer) that refine the incoming or
     // outgoing edges of the given SgNode
-    collectRefinedEdges(refinedEdges, cn.outEdges());// (dir==above? cn.inEdges(): cn.outEdges()));
+    collectRefinedEdges(composer, refinedEdges, (dir==above? cn.inEdges(): cn.outEdges()));
+
+    allInScopeVars = getAllVarSymbols(n);
   }
  
   // Apply Expr2Value for the given expression to all the edges in refinedEdges and return
@@ -262,15 +280,58 @@ class ValueASTAttribute: public CPAstAttributeInterface {
   ~ValueASTAttribute() {}
 
   string toString() {
-    return "hi";
+    if(isSgExprStatement(cn.getNode())) {
+      ValueASTAttribute exprLabel(isSgExprStatement(cn.getNode())->get_expression(), composer, cdip, dir, label);
+      return exprLabel.toString();
+    } else if(isSgReturnStmt(cn.getNode())) {
+      ValueASTAttribute exprLabel(isSgReturnStmt(cn.getNode())->get_expression(), composer, cdip, dir, label);
+      return exprLabel.toString();
+    } else if(isSgIfStmt(cn.getNode())) {
+      ValueASTAttribute exprLabel(isSgIfStmt(cn.getNode())->get_conditional(), composer, cdip, dir, label);
+      return exprLabel.toString();
+    } else if(isSgCastExp(cn.getNode())) {
+      ValueASTAttribute exprLabel(isSgCastExp(cn.getNode())->get_operand(), composer, cdip, dir, label);
+      return exprLabel.toString();
+    } else if(isSgBasicBlock(cn.getNode())) {
+      // Recursively call toString on the first statement in the block
+      const SgStatementPtrList & stmt = isSgBasicBlock(cn.getNode())->get_statements();
+      if(stmt.size()==0) return "[]";
+      ValueASTAttribute exprLabel(*stmt.begin(), composer, cdip, dir, label);
+      return exprLabel.toString();
+    } else if(isSgFunctionDeclaration(cn.getNode()) || isSgFunctionDefinition(cn.getNode()) || isSgPragmaDeclaration(cn.getNode())) {
+      return "[]";
+    }
+    
+    ostringstream s;
+    s << "["<<label<<" : "<<SgNode2Str(cn.getNode())<<": ";
+    //cout << CFGNode2Str(cn) << ": "<<endl;;
+    int numConstants=0;
+    for(list<SgVariableSymbol *>::iterator v=allInScopeVars.begin(); v!=allInScopeVars.end(); v++) {
+      SgVarRefExp* ref = buildVarRefExp(*v);
+      //cout << "    "<<ref->unparseToString() << ":";
+      //s << ref->unparseToString()<<"=";
+      if(isConstantInteger(ref)) {
+        if(numConstants>0) { s << ", "; }
+        s << ref->unparseToString() << "=" << getConstantInteger(ref);
+        //s << getConstantInteger(ref);
+        //cout << "        "<<ref->unparseToString() << "=" << getConstantInteger(ref)<<endl;;
+        numConstants++;
+      }/* else 
+        s << "?";*/
+      
+      //delete ref;
+    }
+    s << "]";
+    //cout << endl;
+    return s.str();
   }
 
   static void place(Composer* composer, checkDataflowInfoPass* cdip) {
     RoseAst ast(getProject());
     for(RoseAst::iterator i=ast.begin(); i!=ast.end();++i) {
       if(isSgExpression(*i)) {
-        (*i)->setAttribute("fuse_cp_above", new ValueASTAttribute(*i, composer, cdip, above));
-        (*i)->setAttribute("fuse_cp_below", new ValueASTAttribute(*i, composer, cdip, below));
+        //(*i)->setAttribute("fuse_cp_above", new ValueASTAttribute(*i, composer, cdip, above, "fuse_cp_above"));
+        (*i)->setAttribute("fuse_cp_below", new ValueASTAttribute(*i, composer, cdip, below, "fuse_cp_below"));
       }
     }
   }
@@ -279,8 +340,8 @@ class ValueASTAttribute: public CPAstAttributeInterface {
     for(Labeler::iterator i=labeler.begin();i!=labeler.end();++i) {
       SgNode* node=labeler.getNode(*i);
       ROSE_ASSERT(node);
-      node->setAttribute("fuse_cp_above", new ValueASTAttribute(node, composer, cdip, above));
-      node->setAttribute("fuse_cp_below", new ValueASTAttribute(node, composer, cdip, below));
+      //node->setAttribute("fuse_cp_above", new ValueASTAttribute(node, composer, cdip, above, "fuse_cp_above"));
+      node->setAttribute("fuse_cp_below", new ValueASTAttribute(node, composer, cdip, below, "fuse_cp_below"));
     }
   }
 
@@ -442,17 +503,25 @@ int main(int argc, char** argv)
       cout << "Elapsed="<<((end.tv_sec*1000000+end.tv_usec) - 
                            (start.tv_sec*1000000+start.tv_usec))/1000000.0<<"s"<<endl;
   
-/*      VariableIdMapping vIDMap;
+      VariableIdMapping vIDMap;
       vIDMap.computeVariableSymbolMapping(getProject());
-      ValueASTAttribute::place(rootComposer, cdip);
-      ValueASTAttribute::show(rootComposer, vIDMap);
+//      ValueASTAttribute::place(rootComposer, cdip);
+//      ValueASTAttribute::show(rootComposer, vIDMap);
       Labeler labeler(getProject());
 //      labeler.createLabels(getProject());
       ValueASTAttribute::placeLabeler(rootComposer, cdip, labeler);
-/ *      AstAnnotator ara(&labeler);
-      ara.annotateAstAttributesAsCommentsBeforeStatements(getProject(), "fuse_cp_above");* /
-      printAttributes<ValueASTAttribute>(&labeler, &vIDMap, "fuse_cp_above");*/
+      FuseRDAstAttribute::placeLabeler(rootComposer, cdip, vIDMap, labeler);
+      AstAnnotator ara(&labeler);
+      ara.annotateAstAttributesAsCommentsBeforeStatements(getProject(), "fuse_cp_below");
+      ara.annotateAstAttributesAsCommentsBeforeStatements(getProject(), "fuse_rd");
+//      printAttributes<ValueASTAttribute>(&labeler, &vIDMap, "fuse_cp_above");
 
+/*      ValueASTAttribute::placeLabeler(rootComposer, cdip, labeler);
+      AstAnnotator ara(&labeler);
+      ara.annotateAstAttributesAsCommentsBeforeStatements(getProject(), "fuse_cp_below");
+      FuseRDAstAttribute::placeLabeler(rootComposer, cdip, vIDMap, labeler);
+      printAttributes<FuseRDAstAttribute>(&labeler, &vIDMap, "fuse_rd");*/
+      
       //cout << "rootComposer="<<rootComposer<<" cdip->getNumErrors()="<<cdip->getNumErrors()<<endl;
       if(cdip->getNumErrors() > 0) cout << cdip->getNumErrors() << " Errors Reported!"<<endl;
       else                         cout << "PASS"<<endl;

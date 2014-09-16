@@ -132,6 +132,23 @@ const ClassHierarchyWrapper::ClassDefSet& ClassHierarchyWrapper::getDirectSubcla
     return *result;
 }
 
+const ClassHierarchyWrapper::ClassDefSet& ClassHierarchyWrapper::getDirectAncestorClasses(SgClassDefinition *cls) const
+{
+    const ClassDefSet* result = NULL;
+    MangledNameToClassDefsMap::const_iterator children = directParents.find(cls->get_declaration()->get_mangled_name());
+    if (children == directParents.end())
+    {
+        static ClassDefSet emptySet;
+        result = &emptySet;
+    }
+    else
+    {
+        result = &children->second;
+    }
+
+    return *result;
+}
+
 void findParents(const string& classMangledName,
         const ClassHierarchyWrapper::MangledNameToClassDefsMap& parents,
         ClassHierarchyWrapper::MangledNameToClassDefsMap& transitiveParents,

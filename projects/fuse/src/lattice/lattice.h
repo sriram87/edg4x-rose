@@ -9,6 +9,8 @@
 #include <map>
 
 namespace fuse {
+class Lattice;
+typedef boost::shared_ptr<Lattice> LatticePtr;
 class Lattice : public sight::printable
 {
   public:
@@ -28,6 +30,7 @@ class Lattice : public sight::printable
   virtual void initialize()=0;
   // returns a copy of this lattice
   virtual Lattice* copy() const=0;
+  LatticePtr copySharedPtr() const { return boost::shared_ptr<Lattice>(copy()); }
   // overwrites the state of this Lattice with that of that Lattice
   virtual void copy(Lattice* that)
   { latPEdge = that->latPEdge; }
@@ -55,11 +58,13 @@ class Lattice : public sight::printable
   {
     return false;
   }
+  bool replaceML(LatticePtr newL) { return replaceML(newL.get()); }
   
   // Computes the meet of this and that and saves the result in this
   // returns true if this causes this to change and false otherwise
   // The part of this object is to be used for AbstractObject comparisons.
   virtual bool meetUpdate(Lattice* that)=0;
+  bool meetUpdate(LatticePtr that) { return meetUpdate(that.get()); }
   
   // Returns true if this Lattice implies that lattice (its constraints are equal to or tighter than those of 
   // that Lattice) and false otherwise.
@@ -81,6 +86,7 @@ class Lattice : public sight::printable
     delete thatCopy;
     return true;
   }
+  bool implies(LatticePtr that) { return implies(that.get()); }
   
   // Returns true if this Lattice is semantically equivalent to that lattice (both correspond to the same set
   // of application executions).
@@ -101,6 +107,7 @@ class Lattice : public sight::printable
     delete thatCopy;
     return true;
   }
+  bool equiv(LatticePtr that) { return implies(that.get()); }
   
   // Computes the meet of this and that and returns the result
   virtual bool finiteLattice()=0;

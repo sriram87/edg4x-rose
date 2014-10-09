@@ -50,7 +50,7 @@ class VariableStateTransfer : public DFTransferVisitor
   // Returns a Lattice object that corresponds to the memory location denoted by the given operand of sgn 
   // in the current part
   LatticePtr getLatticeOperand(SgNode *sgn, SgExpression* operand) {
-    SIGHT_VERB(scope s("VariableStateTransfer::getLatticeOperand()", scope::medium), 1, dLevel)
+    SIGHT_VERB_DECL(scope, ("VariableStateTransfer::getLatticeOperand()", scope::medium), 1, dLevel)
     SIGHT_VERB_IF(1, dLevel)
       dbg << "sgn="<<SgNode2Str(sgn)<<endl;
       dbg << "operand="<<SgNode2Str(operand)<<endl;
@@ -97,7 +97,12 @@ class VariableStateTransfer : public DFTransferVisitor
     assert(sgn);
     // MemLocObjectPtrPair p = composer->Expr2MemLoc(sgn, part->inEdgeFromAny(), analysis);
     MemLocObjectPtr p = composer->Expr2MemLoc(sgn, part->inEdgeFromAny(), analysis);
-    SIGHT_VERB(dbg << "setLattice() edge="<<part->inEdgeFromAny()->str()<<" p="<<p->strp(part->inEdgeFromAny(), "&nbsp;&nbsp;&nbsp;&nbsp;")<<endl, 1, dLevel)
+    SIGHT_VERB_IF(1, dLevel)
+      scope s("setLattice()");
+      dbg << "edge="<<part->inEdgeFromAny()->str()<<endl;
+      dbg << "p="<<p->strp(part->inEdgeFromAny(), "&nbsp;&nbsp;&nbsp;&nbsp;")<<endl;
+      dbg << "lat="<<lat->str()<<endl;
+    SIGHT_VERB_FI()
     
     setLattice(p, lat);
   }
@@ -108,7 +113,13 @@ class VariableStateTransfer : public DFTransferVisitor
     assert(sgn);
     // MemLocObjectPtrPair p = composer->OperandExpr2MemLoc(sgn, operand, part->inEdgeFromAny(), analysis);
     MemLocObjectPtr p = composer->OperandExpr2MemLoc(sgn, operand, part->inEdgeFromAny(), analysis);
-    SIGHT_VERB(dbg << "setLatticeOperand() p="<<p->strp(part->inEdgeFromAny(), "&nbsp;&nbsp;&nbsp;&nbsp;")<<endl, 1, dLevel)
+    SIGHT_VERB_IF(1, dLevel)
+          scope s(sight::txt()<<"setLatticeOperand("<<SgNode2Str(operand)<<")");
+          dbg << "edge="<<part->inEdgeFromAny()->str()<<endl;
+          dbg << "p="<<p->strp(part->inEdgeFromAny(), "&nbsp;&nbsp;&nbsp;&nbsp;")<<endl;
+          dbg << "lat="<<lat->str()<<endl;
+        SIGHT_VERB_FI()
+
     
     setLattice(p, lat);
   }
@@ -218,11 +229,11 @@ public:
   void visit(SgAssignInitializer *sgn)
   {
     LatticePtr asgnLat = getLatticeOperand(sgn, sgn->get_operand());
-    LatticePtr resLat  = getLattice(sgn);
+    //LatticePtr resLat  = getLattice(sgn);
     
     SIGHT_VERB_IF(1, dLevel)
       dbg << "asgnLat="; { indent ind; dbg << asgnLat->str("")<<"\n"; }
-      dbg << "resLat=";  { indent ind; dbg << resLat->str("") <<"\n"; }
+      //dbg << "resLat=";  { indent ind; dbg << resLat->str("") <<"\n"; }
     SIGHT_VERB_FI()
 
     setLattice(sgn, asgnLat); modified = true;
@@ -245,7 +256,7 @@ public:
       setLattice(sgn, initsCopy);
     }
     else
-        setLattice(sgn, res);
+      setLattice(sgn, res);
   }
 
   // XXX: This needs to be handled by an inter-procedural analysis
@@ -266,7 +277,7 @@ public:
       setLattice(sgn, initsCopy);
     }
     else
-        setLattice(sgn, res);
+      setLattice(sgn, res);
   }
 
   // XXX: I don't even know what this is - Phil

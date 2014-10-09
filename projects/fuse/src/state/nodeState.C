@@ -1,14 +1,14 @@
 #include "sage3basic.h"
 #include "nodeState.h"
 #include "compose.h"
-
+#include "sight_verbosity.h"
 #include <boost/make_shared.hpp>
 
 using namespace std;
+using namespace sight;
 
 namespace fuse {
-//int nodeStateDebugLevel=2;
-DEBUG_LEVEL(nodeStateDebugLevel, 0);
+#define nodeStateDebugLevel 0
 
 // Records that this analysis has initialized its state at this node
 void NodeState::initialized(Analysis* init)
@@ -104,7 +104,7 @@ Lattice* NodeState::meetLatticeMapInfo(const LatticeMap& dfMap,
                                        Analysis* analysis,
                                        int latticeName,
                                        bool isAbove) const {
-  scope reg("NodeState::meetLatticeMapInfo", scope::medium, attrGE("nodeStateDebugLevel", 2));
+  SIGHT_VERB_DECL(scope, ("NodeState::meetLatticeMapInfo", scope::medium), 2, nodeStateDebugLevel)
   LatticeMap::const_iterator a;
   a = dfMap.find(analysis);
   if(a == dfMap.end()) {
@@ -151,22 +151,22 @@ Lattice* NodeState::meetLatticeMapInfo(const LatticeMap& dfMap,
   // pedges should be concrete at this point
   assert(pedge && pedge->source() && pedge->target()); 
   retLattice = (eLM->second)[latticeName]->copy();
-  if(nodeStateDebugLevel() >= 2) {
+  SIGHT_VERB_IF(2, nodeStateDebugLevel)
     dbg << "pedge=" << pedge->str()
         << ", lat@pedge=" << (eLM->second)[latticeName]->str()
         << ", retLattice=" << retLattice->str() << endl;
-  }
+  SIGHT_VERB_FI()
   ++eLM;
   // meet with all other lattices
   for( ; eLM != edgeToLatticeMap.end(); ++eLM) {
     pedge = eLM->first;
     assert(pedge->source() && pedge->target());
     retLattice->meetUpdate((eLM->second)[latticeName]);
-    if(nodeStateDebugLevel() >= 2) {
+    SIGHT_VERB_IF(2, nodeStateDebugLevel)
       dbg << "pedge=" << pedge->str()
         << ", lat@pedge=" << (eLM->second)[latticeName]->str()
         << ", retLattice=" << retLattice->str() << endl;
-    }
+    SIGHT_VERB_FI()
   }
   return retLattice;
 }
@@ -192,65 +192,72 @@ Lattice* NodeState::meetLatticeMapInfo(const LatticeMap& dfMap,
 // Returns the given lattice above the node from the given analysis along the given departing edge
 Lattice* NodeState::getLatticeAbove(Analysis* analysis, PartEdgePtr departEdge, int latticeName) const
 {
-  Lattice* retLattice;
-  scope reg("NodeState::getLatticeAbove", scope::medium, attrGE("nodeStateDebugLevel", 2));
-  if(nodeStateDebugLevel() >= 2) {
+  SIGHT_VERB_DECL(scope, ("NodeState::getLatticeAbove", scope::medium), 2, nodeStateDebugLevel);
+  SIGHT_VERB_IF(2, nodeStateDebugLevel)
     dbg << "analysis=" << dynamic_cast<ComposedAnalysis*>(analysis)->str() 
         << ", PartEdge=" << (departEdge? departEdge->str() : "NULL")
         << ", latticeName=" << latticeName << endl;    
-  }
+  SIGHT_VERB_FI()
+
   // We must get either a concrete edge or inEdgeFromAny
   assert(departEdge && departEdge->target());
 
-  // given concrete edge or inEdgeFromAny verify that the state queried upon (this) 
-  // and the state associated with the edge are same
-  // otherwise the given departEdge is invalid for this state
-  assert(this==getNodeState(dynamic_cast<ComposedAnalysis*>(analysis), departEdge->target()));
-
-  // departEdge is either inEdgeFromAny or concrete here
-  retLattice = getLattice_ex(dfInfoAbove, analysis, departEdge, latticeName);
-
-  // If departEdge is concrete and the info above is at inEdgeFromAny, we’ll return that info
-  // If departEdge is inEdgeFromAny, and the info above is stored separately among concrete edges, we merge their lattices
-  if(!retLattice) retLattice = meetLatticeMapInfo(dfInfoAbove, analysis, latticeName, true);
-
-  if(nodeStateDebugLevel() >= 2) {
-    dbg << "retLattice=" << (retLattice? retLattice->str() : "NULL") << endl;
-  }
-  return retLattice;
+  // If the analysis has data mapped abode this part
+  if(analysisDataExists(dfInfoAbove, analysis)) {
+    Lattice* retLattice;
+    
+    // given concrete edge or inEdgeFromAny verify that the state queried upon (this) 
+    // and the state associated with the edge are same
+    // otherwise the given departEdge is invalid for this state
+    assert(this==getNodeState(dynamic_cast<ComposedAnalysis*>(analysis), departEdge->target()));
+  
+    // departEdge is either inEdgeFromAny or concrete here
+    retLattice = getLattice_ex(dfInfoAbove, analysis, departEdge, latticeName);
+  
+    // If departEdge is concrete and the info above is at inEdgeFromAny, we'll return that info
+    // If departEdge is inEdgeFromAny, and the info above is stored separately among concrete edges, we merge their lattices
+    if(!retLattice/* && departEdge->source()==NULLPart*/) 
+      retLattice = meetLatticeMapInfo(dfInfoAbove, analysis, latticeName, true);
+  
+    SIGHT_VERB(dbg << "retLattice=" << (retLattice? retLattice->str() : "NULL") << endl, 2, nodeStateDebugLevel)
+    return retLattice;
+  } else
+    return NULL;
 }
 
 // Returns the given lattice below the node from the given analysis along the given departing edge
 Lattice* NodeState::getLatticeBelow(Analysis* analysis, PartEdgePtr departEdge, int latticeName) const
 {
-  Lattice* retLattice;
-  scope reg("NodeState::getLatticeBelow", scope::medium, attrGE("nodeStateDebugLevel", 2));
-  if(nodeStateDebugLevel() >= 2) {
+  SIGHT_VERB_DECL(scope, ("NodeState::getLatticeBelow", scope::medium), 2, nodeStateDebugLevel);
+  SIGHT_VERB_IF(2, nodeStateDebugLevel)
     dbg << "analysis=" << dynamic_cast<ComposedAnalysis*>(analysis)->str() 
         << ", PartEdge=" << (departEdge? departEdge->str() : "NULL")
         << ", latticeName=" << latticeName << endl;
-  }
+  SIGHT_VERB_FI()
 
   // We must get a concrete edge or outEdgeToAny
   assert(departEdge && departEdge->source());
 
-  // given concrete edge or outEdgeToAny verify that the state queried upon (this) 
-  // and the state associated with the edge are same
-  // otherwise the given departEdge is invalid for this state
-  assert(this==getNodeState(dynamic_cast<ComposedAnalysis*>(analysis), departEdge->source()));
+  // If the analysis has data mapped abode this part
+  if(analysisDataExists(dfInfoBelow, analysis)) {
+    Lattice* retLattice;
+    // given concrete edge or outEdgeToAny verify that the state queried upon (this) 
+    // and the state associated with the edge are same
+    // otherwise the given departEdge is invalid for this state
+    assert(this==getNodeState(dynamic_cast<ComposedAnalysis*>(analysis), departEdge->source()));
 
-  // departEdge is either outEdgeToAny or concrete here
-  retLattice = getLattice_ex(dfInfoBelow, analysis, departEdge, latticeName);
+    // departEdge is either outEdgeToAny or concrete here
+    retLattice = getLattice_ex(dfInfoBelow, analysis, departEdge, latticeName);
 
-  // If departEdge is concrete and the info above is at outEdgeToAny, we’ll return that info
-  // If departEdge is outEdgeToAny, and the info above is stored separately among concrete edges, we merge their lattices
-  if(!retLattice) retLattice = meetLatticeMapInfo(dfInfoBelow, analysis, latticeName, false);
+    // If departEdge is concrete and the info above is at outEdgeToAny, we'll return that info
+    // If departEdge is outEdgeToAny, and the info above is stored separately among concrete edges, we merge their lattices
+    if(!retLattice && departEdge->target()==NULLPart) retLattice = meetLatticeMapInfo(dfInfoBelow, analysis, latticeName, false);
 
-  if(nodeStateDebugLevel() >= 2) {
-    dbg << "retLattice=" << (retLattice? retLattice->str() : "NULL") << endl;
-  }
+    SIGHT_VERB(dbg << "retLattice=" << (retLattice? retLattice->str() : "NULL") << endl, 2, nodeStateDebugLevel)
 
-  return retLattice;
+    return retLattice;
+  } else
+    return NULL;
 }
 
 
@@ -340,6 +347,11 @@ void NodeState::setLattice_ex(LatticeMap& dfMap, Analysis* analysis, PartEdgePtr
   initialized((Analysis*)analysis);
 }
 
+// Return whether the given analysis has state mapped at the given dfMap
+bool NodeState::analysisDataExists(const LatticeMap& dfMap, Analysis* analysis) const {
+  return (dfMap.find((Analysis*)analysis) != dfMap.end());
+}
+
 // General lattice getter function
 Lattice* NodeState::getLattice_ex(const LatticeMap& dfMap, Analysis* analysis, 
                                   PartEdgePtr departEdge, int latticeName) const
@@ -347,8 +359,10 @@ Lattice* NodeState::getLattice_ex(const LatticeMap& dfMap, Analysis* analysis,
   LatticeMap::const_iterator a;
   std::map<PartEdgePtr, std::vector<Lattice*> >::const_iterator w;
 
-  if(dfMap.find((Analysis*)analysis) == dfMap.end()) {
-    scope reg("NodeState::getLattice_ex: Analysis not found!", scope::medium);
+  /* GB: no longer checking for this since sometimes it is possible for a client
+   *     to ask a server about Parts where the server does not have state*/
+  if(!analysisDataExists(dfMap, analysis)) {
+    scope s("NodeState::getLattice_ex: Analysis not found!", scope::medium);
     ComposedAnalysis* compAnalysis = dynamic_cast<ComposedAnalysis*>(analysis);
     if(compAnalysis) dbg<<"analysis="<<compAnalysis->str()<<endl;
     dbg << "#dfMap="<<dfMap.size()<<endl;
@@ -357,6 +371,9 @@ Lattice* NodeState::getLattice_ex(const LatticeMap& dfMap, Analysis* analysis,
     { dbg << "i="<<i->first<<endl; }
     assert(0);
   }
+  /* No analysis state was mapped at this edge
+  if(dfMap.find((Analysis*)analysis) == dfMap.end()) return NULL;*/
+
   /*if((a=dfMap.find((Analysis*)analysis)) != dfMap.end()) {
     dbg << "a->second.find("<<(departEdge? departEdge->str(): "NULL")<<")!= a->second.end() = "<<(a->second.find(departEdge) != a->second.end())<<endl;
     dbg << "a->second="<<endl;
@@ -504,7 +521,7 @@ void NodeState::unionLattices(set<Analysis*>& unionSet, Analysis* master)
 bool NodeState::unionLatticeMaps(map<PartEdgePtr, vector<Lattice*> >& to, 
                                  const map<PartEdgePtr, vector<Lattice*> >& from)
 {
-  scope reg("NodeState::unionLatticeMaps()", scope::medium, attrGE("saveDotAnalysisDebugLevel", 2));
+  SIGHT_VERB_DECL(scope, ("NodeState::unionLatticeMaps()", scope::medium), 2, nodeStateDebugLevel);
   // All the analyses in unionSet must have the same number of edges
   assert(to.size() == from.size());
 
@@ -512,6 +529,8 @@ bool NodeState::unionLatticeMaps(map<PartEdgePtr, vector<Lattice*> >& to,
   
   map<PartEdgePtr, vector<Lattice*> >::iterator       eTo;
   map<PartEdgePtr, vector<Lattice*> >::const_iterator eFrom;
+  SIGHT_VERB(dbg << "#from="<<from.size()<<", #to="<<to.size()<<endl, 1, nodeStateDebugLevel)
+  
   for(eTo=to.begin(), eFrom=from.begin(); eTo!=to.end(); eTo++, eFrom++) {
     // All the analyses in unionSet must have the same number of lattices associated with each edge
     assert(eTo->second.size() == eFrom->second.size());
@@ -519,11 +538,17 @@ bool NodeState::unionLatticeMaps(map<PartEdgePtr, vector<Lattice*> >& to,
     // Union the Above lattices 
     vector<Lattice*>::iterator       lTo;
     vector<Lattice*>::const_iterator lFrom;
+    SIGHT_VERB_IF(2, nodeStateDebugLevel)
+      dbg << "eFrom->first="<<eFrom->first->str()<<endl;
+      dbg << "eTo->first="<<eTo->first->str()<<endl;
+      dbg << "#eFrom->second="<<eFrom->second.size()<<", #eTo->second="<<eTo->second.size()<<endl;
+    SIGHT_VERB_FI()
     for(lTo=eTo->second.begin(), lFrom=eFrom->second.begin(); lTo!=eTo->second.end(); lTo++, lFrom++) {
-      if(nodeStateDebugLevel()>=1) {
+      SIGHT_VERB_IF(1, nodeStateDebugLevel)
         dbg << "lTo="<<(*lTo? (*lTo)->str() : "NULL")<<endl;
         dbg << "lFrom="<<(*lFrom? (*lFrom)->str() : "NULL")<<endl;
-      }
+        dbg << "(*lTo)->finiteLattice()="<<(*lTo)->finiteLattice()<<endl;
+      SIGHT_VERB_FI()
       if((*lTo)->finiteLattice()) {
         modified = (*lTo)->meetUpdate(*lFrom) || modified;
       } else {
@@ -838,7 +863,7 @@ void NodeState::copyLattices(map<PartEdgePtr, vector<Lattice*> >& dfInfoTo,   Pa
 void NodeState::copyLatticesOW(map<PartEdgePtr, vector<Lattice*> >& dfInfoTo,   PartEdgePtr toDepartEdge,
                          const map<PartEdgePtr, vector<Lattice*> >& dfInfoFrom, PartEdgePtr fromDepartEdge, bool adjustPEdge)
 {
-  /*scope reg("NodeState::copyLatticesOW()", scope::medium, 1, 1);
+  /*SIGHT_VERB_DECL(scope, ("NodeState::copyLatticesOW()", scope::medium, 1, 1);
   dbg << "toDepartEdge="<<(toDepartEdge?toDepartEdge->str():"NULLPtr")<<" fromDepartEdge="<<(fromDepartEdge?fromDepartEdge->str():"NULLPtr")<<endl;*/
   
   assert(dfInfoFrom.find(fromDepartEdge) != dfInfoFrom.end());

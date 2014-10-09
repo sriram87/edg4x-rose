@@ -13,7 +13,7 @@
 #include <map>
 #include <boost/make_shared.hpp>
 #include "sight.h"
-
+#include "sight_verbosity.h"
 using namespace std;
 using namespace sight;
 
@@ -35,7 +35,7 @@ using namespace std;
 
 namespace fuse {
 
-DEBUG_LEVEL(analysisDebugLevel, 1);
+#define analysisDebugLevel 1
 
 // Initializes Fuse
 void FuseInit(int argc, char **argv) {
@@ -73,13 +73,13 @@ Analysis::~Analysis() {}
 // state - the function's NodeState
 void UnstructuredPassAnalysis::runAnalysis()
 {
-  if(analysisDebugLevel()>=2)
-    dbg << "UnstructuredPassAnalysis::runAnalysis()"<<endl;
+  SIGHT_VERB(dbg << "UnstructuredPassAnalysis::runAnalysis()"<<endl, 2, analysisDebugLevel)
   
   // Iterate over all the nodes in this function
   
   for(fw_graphEdgeIterator<PartEdgePtr, PartPtr> it(analysis->getComposer()->GetStartAStates(analysis)); 
-          it!=fw_graphEdgeIterator<PartEdgePtr, PartPtr>::end(); 
+//          it!=fw_graphEdgeIterator<PartEdgePtr, PartPtr>::end(); 
+          !it.isEnd();         
           it++)
   {
     PartPtr p = it.getPart();
@@ -112,7 +112,7 @@ bool ComposedAnalysis::propagateStateToNextNode(
                 map<PartEdgePtr, vector<Lattice*> >& curNodeState, PartPtr curNode, 
                 map<PartEdgePtr, vector<Lattice*> >& nextNodeState, PartPtr nextNode)
 {
-  scope reg("propagateStateToNextNode", scope::medium, attrGE("analysisDebugLevel", 1));
+  SIGHT_VERB_DECL(scope, ("propagateStateToNextNode", scope::medium), 1, analysisDebugLevel)
   bool modified = false;
   
   // curNodeState should have a single mapping to the NULLPartEdge
@@ -120,14 +120,14 @@ bool ComposedAnalysis::propagateStateToNextNode(
   assert(curNodeState.begin()->first == curNodeWildCardPartEdge);
   
   vector<Lattice*>::const_iterator itC, itN;
-  if(analysisDebugLevel()>=1) {
+  SIGHT_VERB_IF(1, analysisDebugLevel)
     dbg << endl << "Propagating to Next Node: "<<nextNode->str()<<endl;
     dbg << "Cur Node Lattice "<<endl;
-    { indent ind(attrGE("analysisDebugLevel", 1)); dbg<<NodeState::str(curNodeState); }
+    { indent ind; dbg<<NodeState::str(curNodeState); }
     
     dbg << "Next Node Lattice "<<endl;
-    { indent ind(attrGE("analysisDebugLevel", 1)); dbg<<NodeState::str(nextNodeState); }
-  }
+    { indent ind; dbg<<NodeState::str(nextNodeState); }
+  SIGHT_VERB_FI()
 
   // Update forward info above nextNode from the forward info below curNode.
   
@@ -135,7 +135,7 @@ bool ComposedAnalysis::propagateStateToNextNode(
   // next node's current state one Lattice at a time and save the result above the next node.
   
   // If nextNodeState is non-empty, we union curNodeState into it
-  if(analysisDebugLevel()>=1) dbg << "---------------------- #nextNodeState="<<nextNodeState.size()<<endl;
+  SIGHT_VERB(dbg << " #nextNodeState="<<nextNodeState.size()<<endl, 1, analysisDebugLevel)
   if(nextNodeState.size()>0)
     modified = NodeState::unionLatticeMaps(nextNodeState, curNodeState) || modified;
   // Otherwise, we copy curNodeState[NULLPartEdge] over it
@@ -148,16 +148,16 @@ bool ComposedAnalysis::propagateStateToNextNode(
   //dbg << "Result:"<<endl;  
   //{ indent ind(attrGE("analysisDebugLevel", 1)); dbg<<NodeState::str(nextNodeState); }
 
-  if(analysisDebugLevel()>=1) {
-    indent ind(attrGE("analysisDebugLevel", 1));
+  SIGHT_VERB_IF(1, analysisDebugLevel)
+    indent ind;
     if(modified) {
       dbg << "Next node's in-data modified. Adding..."<<endl;
       dbg << "Propagated: Lattice "<<endl;
-      { indent ind(attrGE("analysisDebugLevel", 1)); dbg<<NodeState::str(nextNodeState); }
+      { indent ind; dbg<<NodeState::str(nextNodeState); }
     }
     else
       dbg << "  No modification on this node"<<endl;
-  }
+  SIGHT_VERB_FI()
 
   return modified;
 }

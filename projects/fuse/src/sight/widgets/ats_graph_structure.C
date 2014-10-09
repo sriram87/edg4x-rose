@@ -475,7 +475,8 @@ void atsGraph::genDotGraph()
   // Maps contexts to the set of parts in each context
   Ctxt2PartsMap_atsGraph ctxt2parts(false, boost::make_shared<Ctxt2PartsMap_Generator_atsGraph>(),
                                            boost::make_shared<Ctxt2PartsMap_Leaf_Generator_atsGraph>());
-  for(fw_partEdgeIterator state(startParts); state!=fw_partEdgeIterator::end(); state++) {
+  //for(fw_partEdgeIterator state(startParts); state!=fw_partEdgeIterator::end(); state++) {
+  for(fw_partEdgeIterator state(startParts); !state.isEnd(); state++) {
     PartPtr part = state.getPart();
     
     list<list<PartContextPtr> > key = part->getContext()->getDetailedPartContexts();

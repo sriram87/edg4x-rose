@@ -280,7 +280,7 @@ class CallCtxSensPartEdge : public PartEdge {
 
 // Memory region object that wraps server-provided MemRegionObjects but adds to them the context
 // from which they were derived.
-class CallCtxSensMR : public MemRegionObject
+class CallCtxSensMR : public MemRegionObject, public AbstractObjectHierarchy
 {
   protected:
     // The server MemRegionObject that this object wraps
@@ -325,22 +325,33 @@ class CallCtxSensMR : public MemRegionObject
     bool isEmptyMR(PartEdgePtr pedge);
     
     // Returns a ValueObject that denotes the size of this memory region
-    ValueObjectPtr getRegionSize(PartEdgePtr pedge) const;
+    ValueObjectPtr getRegionSizeMR(PartEdgePtr pedge);
     
     // Set this object to represent the set of all possible MemLocs
     // Return true if this causes the object to change and false otherwise.
     bool setToFull();
-    // Set this Lattice object to represent the empty set of MemLocs.
+    // Set this LattCallCtxSensMLice object to represent the empty set of MemLocs.
     // Return true if this causes the object to change and false otherwise.
     bool setToEmpty();
     
     // Returns true if this MemRegionObject denotes a finite set of concrete regions
     bool isConcrete() { return baseMR->isConcrete(); }
+    // Returns the number of concrete values in this set
+    int concreteSetSize() { return baseMR->concreteSetSize(); }
     // Returns the type of the concrete regions (if there is one)
     SgType* getConcreteType() { return baseMR->getConcreteType(); }
     // Returns the set of concrete memory regions as SgExpressions, which allows callers to use
     // the normal ROSE mechanisms to decode it
     std::set<SgNode* > getConcrete() { return baseMR->getConcrete(); }
+    
+    // Returns whether all instances of this class form a hierarchy. Every instance of the same
+    // class created by the same analysis must return the same value from this method!
+    bool isHierarchy() const;
+    // AbstractObjects that form a hierarchy must inherit from the AbstractObjectHierarchy class
+    
+    // Returns a key that uniquely identifies this particular AbstractObject in the 
+    // set hierarchy.
+    const hierKeyPtr& getHierKey() const;
 }; // CallCtxSensMR
 
 /* #########################
@@ -372,26 +383,26 @@ class CallCtxSensML : public MemLocObject
     // copy this object and return a pointer to it
     MemLocObjectPtr copyML() const;
 
-    bool mayEqualML(MemLocObjectPtr that, PartEdgePtr pedge);
-    bool mustEqualML(MemLocObjectPtr that, PartEdgePtr pedge);
+    bool mayEqual(MemLocObjectPtr that, PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis);
+    bool mustEqual(MemLocObjectPtr that, PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis);
     
     // Returns whether the two abstract objects denote the same set of concrete objects
-    bool equalSetML(MemLocObjectPtr o, PartEdgePtr pedge);
+    bool equalSet(MemLocObjectPtr o, PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis);
     
     // Returns whether this abstract object denotes a non-strict subset (the sets may be equal) of the set denoted
     // by the given abstract object.
-    bool subSetML(MemLocObjectPtr o, PartEdgePtr pedge);
+    bool subSet(MemLocObjectPtr o, PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis);
     
-    bool isLiveML(PartEdgePtr pedge);
+    bool isLive(PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis);
     
     // Computes the meet of this and that and saves the result in this
     // returns true if this causes this to change and false otherwise
-    bool meetUpdateML(MemLocObjectPtr that, PartEdgePtr pedge);
+    bool meetUpdate(MemLocObjectPtr that, PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis);
     
     // Returns whether this AbstractObject denotes the set of all possible execution prefixes.
-    bool isFullML(PartEdgePtr pedge);
+    bool isFull(PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis);
     // Returns whether this AbstractObject denotes the empty set.
-    bool isEmptyML(PartEdgePtr pedge);
+    bool isEmpty(PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis);
     
     // Set this object to represent the set of all possible MemLocs
     // Return true if this causes the object to change and false otherwise.
@@ -399,6 +410,15 @@ class CallCtxSensML : public MemLocObject
     // Set this Lattice object to represent the empty set of MemLocs.
     // Return true if this causes the object to change and false otherwise.
     bool setToEmpty();
+    
+    // Returns whether all instances of this class form a hierarchy. Every instance of the same
+    // class created by the same analysis must return the same value from this method!
+    bool isHierarchy() const;
+    // AbstractObjects that form a hierarchy must inherit from the AbstractObjectHierarchy class
+    
+    // Returns a key that uniquely identifies this particular AbstractObject in the 
+    // set hierarchy.
+    const hierKeyPtr& getHierKey() const;
 }; // CallCtxSensML
 
 /* ##############################

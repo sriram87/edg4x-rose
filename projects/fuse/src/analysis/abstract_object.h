@@ -59,6 +59,45 @@ class ValueObject;
 class MemLocObject;
 class MemRegionObject;
 
+// DESIGN NOTE:
+// The most common use-case under which AbstractObjects are used by analyses are:
+// - relations: mayEqual, mustEqual, subSet, equalsSet
+// - combination: meetUpdate
+// - property check: isLive, isFull, isEmpty, isConcrete, concreteSetSize, etc.
+// These operations are methods within AbstractObjects, allowing any analysis to call
+//   them without worrying what type of object it has. This means that the base versions
+//   of the methods that apply to multiple AbstractObjects, must take a generic AbstractObjectPtr
+//   as an argument rather than a CodeLocPtr, ValueObjectPtr MemLocObjectPtr or MemRegionObjectPtr.
+// Further, since the results of these operations depend on the PartEdge from where the
+//   question is asked, this PartEdge is provided as an argument to each of these methods.
+//   A challenge to this design is that the analysis that implemented of the AbstractObject
+//   may not have run on the same ATS as the client analysis that asked the question. This
+//   makes it necessary to translate from the client's PartEdge to the corresponding PartEdge
+//   of the server analysis. This is done by a composer, which is passed in as an argument
+//   to these methods (along with the client analysis, in case the composer needs this).
+// Given the above issues the classes below implement the above operations on AbstractObjects
+//   as follows.
+// - Each implements an abstract virtual method from the base AbstractObject class
+//   (operand argument is optional)
+//   type op(AbstractObjectPtr operand, PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis)
+// - For methods that take an operand AbstractObjectPtr, we cast it to the correct sub-type
+//   (CodeLocObjectPTr, ValueObjectPtr, ...) and call a more specific version of the method:
+//   type op(SpecializedObjectPtr operand, PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis)
+// - To convert the given PartEdge to one that is valid for the server analysis that implements the query,
+//   these methods calls comp->opZZ(operand, pedge, analysis). This call converts the PartEdge appropriately
+//   and ultimately calls method
+//   type opZZ(SpecializedObjectPtr operand, PartEdgePtr pedge)
+//   where ZZ is an abbreviation of the type of the object: CL:CodeLoc, V:Value, ML:MemLoc, MR:MemRegion
+// - This method performs the logic of the query and returns the result.
+// Note that analyses must call the op() methods rather than the opZZ() methods since the former will do
+// appropriate PartEdge conversion while the latter will not.
+//
+// The logic is somewhat different for compound objects: MemLocs, Combined*, and Mapped*. These objects
+// implement the above functions from AbstractObject by forwarding them to the op() functions in the
+// objects inside them. If these are themselves compount, they continue the forwarding process. If
+// they're not compound, they perform the above logic, converting PartEdges and calling opZZ() methods.
+// Compound objects thus have no need for opZZ() methods.
+
 class AbstractObject : public sight::printable, public boost::enable_shared_from_this<AbstractObject>
 {
   SgNode* base;
@@ -126,20 +165,189 @@ class AbstractObject : public sight::printable, public boost::enable_shared_from
   virtual bool isFull(PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis=NULL)=0;
   virtual bool isEmpty(PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis=NULL)=0;
   
+  // Returns true if this AbstractObject corresponds to a concrete value that is statically-known
+  virtual bool isConcrete()=0;
+  // Returns the number of concrete values in this set
+  virtual int concreteSetSize()=0;
+  
   // Allocates a copy of this object and returns a pointer to it
   virtual AbstractObjectPtr copyAO() const=0;
 
   /* Don't have good idea how to represent a finite number of options 
   virtual bool isFiniteSet()=0;
   virtual set<AbstractObj> getValueSet()=0;*/
+ 
+  // ------------------------------------------------------------------------
+  // ----- Constraints on relationships among different AbstractObjects -----
+  // ------------------------------------------------------------------------
+ 
+  // In the general case AbstractObjects may denote arbitrary sets. Without any constraints about how such sets may
+  // relate to each other, it is not possible to create efficient data structures that store and organize them. 
+  // However, many implementations of AbstractObjects place constraints on possible inter-object relationships
+  // that can be used to improve the efficiency of data structures.
+  //
+  // Support for AbstractObjects with different kinds of constraints is implemented by having each object instance
+  // implement a function that returns whether it supports a given type of constraints. All objects of a given type
+  // returned by the same analysis (i.e. those that may ever be compared to each other) must return the same 
+  // value for this method. For each kind of constraints there's a class that contains the special methods of
+  // that constraint kind and objects that have this constraint must inherit from this class and implement its
+  // abstract virtual methods
   
-  //virtual std::string str(const std::string& indent)=0;
+  // ----------------------------------------
+  // Objects that form a hierarchy, where 
+  // - objects at each level of the hierarchy are disjoint and form a total order
+  // - objects at each level are contained in some object in a prior level
+  // Example: memory abstraction
+  //                       Full set
+  // Heap Memory,      Named Variables,       Expressions
+  //                   varX, varY, ...        a=b, q++, ...
+  
+  // Returns whether all instances of this class form a hierarchy. Every instance of the same
+  // class created by the same analysis must return the same value from this method!
+  virtual bool isHierarchy() const { return false; }
+  // AbstractObjects that form a hierarchy must inherit from the AbstractObjectHierarchy class
+  
+  // ----------------------------------------
+  // Objects that denote disjoint sets. Because no two sets may overlap, they can be 
+  // represented using unique numbers, which enables efficient data structure implementations.
+  virtual bool isDisjoint() const { return false; }
+  // AbstractObjects that form a hierarchy must inherit from the AbstractObjectDisjoint class
   
   // Variant of the str method that can produce information specific to the current Part.
   // Useful since AbstractObjects can change from one Part to another.
   virtual std::string strp(PartEdgePtr pedge, std::string indent="")
   { return str(indent); }
 };
+
+class AbstractObjectHierarchy;
+typedef boost::shared_ptr<AbstractObjectHierarchy> AbstractObjectHierarchyPtr;
+class AbstractObjectHierarchy {
+  public:
+  // The key that identifies different sets in the hierarchy. The key a list that
+  // encodes a path through the hierarchy from 
+  // the root to this specific node, which may be internal or leaf. Different 
+  // objects are compared by comparing these paths. Two objects are mayEqual if 
+  // they share a prefix and they are equalSet if their entire paths are identical. 
+  // Each element in the path is some object that implements the < and == 
+  // comparison operations, which is ensured by having them derived from the 
+  // comparable class.
+  // Empty key lists denote the full set.
+  // The empty set can be denoted by any key that can never be a prefix of 
+  // another key.
+  class hierKey;
+  typedef boost::shared_ptr<hierKey> hierKeyPtr;
+  class hierKey {
+    std::list<comparablePtr> keyList;
+    
+    public:
+    hierKey() {}
+    hierKey(const std::list<comparablePtr>& keyList): keyList(keyList) {}
+    hierKey(comparablePtr subKey) { keyList.push_back(subKey); }
+    
+    std::list<comparablePtr>::const_iterator begin() { return keyList.begin(); }
+    std::list<comparablePtr>::const_iterator end()   { return keyList.end(); }
+    void add(comparablePtr c) { keyList.push_back(c); }
+    void add(std::list<comparablePtr>::const_iterator beginIt, std::list<comparablePtr>::const_iterator endIt)
+    { keyList.insert(keyList.end(), beginIt, endIt); }
+    const std::list<comparablePtr>& getList() { return keyList; }
+    
+    // Returns whether the set denoted by key is live at the given PartEdge
+    virtual bool isLive(PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis)=0;
+  };
+  
+  // An implementation of hierKey that uses an instance of some representative
+  // AbstractObject (that denotes the same set as the key) to answer isLive queries
+  class AOSHierKey: public hierKey {
+    AbstractObjectPtr obj;
+    public:
+    AOSHierKey(AbstractObjectPtr obj): hierKey(), obj(obj) {}
+    AOSHierKey(AbstractObjectPtr obj, const std::list<comparablePtr>& keyList): hierKey(keyList), obj(obj) {}
+    AOSHierKey(AbstractObjectPtr obj, comparablePtr subKey): hierKey(subKey), obj(obj) { }
+    bool isLive(PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis);
+  }; // class AOSHierKey
+  
+  protected:
+  bool isHierKeyCached;
+  hierKeyPtr cachedHierKey;
+  
+  public:
+    
+  // Returns a key that uniquely identifies this particular AbstractObject in the 
+  // set hierarchy
+  virtual const hierKeyPtr& getHierKey() const=0;
+  
+  AbstractObjectHierarchy() : isHierKeyCached(false) {}
+  AbstractObjectHierarchy(const AbstractObjectHierarchy& that) : 
+    isHierKeyCached(that.isHierKeyCached), cachedHierKey(that.cachedHierKey) {}
+  
+  // The possible ways in which two hierarchical AbstractObjects may be related to each other
+  typedef enum {equal,         // Their keys are the same
+                leftContains,  // The key of the left operand is a prefix of the key of the 
+                               //   right operand and thus, the left set contains the right one.
+                rightContains, // Inverse of above
+                disjoint}      // The two keys are not equal, meaning that the corresponding
+                               //   sets are disjoint.
+           hierRel;
+  
+  // Generic comparison method for hierarchical objects
+  hierRel hierCompare(AbstractObjectHierarchyPtr left, AbstractObjectHierarchyPtr right);
+  
+  bool operator==(AbstractObjectHierarchyPtr that) { 
+    return getHierKey() == that->getHierKey();
+  }
+  bool operator<(AbstractObjectHierarchyPtr that) { 
+    return getHierKey() < that->getHierKey();
+  }
+}; // class AbstractObjectHierarchy
+
+// Stringification of hierKeys
+std::ostream& operator<<(std::ostream& s, AbstractObjectHierarchy::hierKeyPtr k);
+
+class AbstractObjectDisjoint;
+typedef boost::shared_ptr<AbstractObjectDisjoint> AbstractObjectDisjointPtr;
+class AbstractObjectDisjoint {
+  public:
+  // Return a number that uniquely identifies this object
+  virtual long long getHashCode() const=0;
+}; // class AbstractObjectDisjoint
+
+
+/* GB: Commented to avoid having to think of how to implement isLive in AbstractObjectDisjointHierWrap. 
+
+// Wrapper class for AbstractObjectDisjoint that implements the AbstractObjectHierarchy
+// API for use with data structures that support hierarchical objects but not disjoint ones.
+class AbstractObjectDisjointHierWrap;
+typedef boost::shared_ptr<AbstractObjectDisjointHierWrap> AbstractObjectDisjointHierWrapPtr;
+class AbstractObjectDisjointHierWrap : public AbstractObjectHierarchy, public AbstractObjectDisjoint,  public boost::enable_shared_from_this<AbstractObjectDisjointHierWrap>
+{
+  class hashCodeWrapper : public comparable {
+    long long code;
+    public:
+    hashCodeWrapper(long long code): code(code) {}
+
+    // Operations that derived classes must implement
+    bool equal(const comparable& that_arg) const {
+      const hashCodeWrapper& that = dynamic_cast<const hashCodeWrapper&> (that_arg);
+      return code == that.code;
+    }
+        
+    bool less(const comparable& that_arg) const {
+      const hashCodeWrapper& that = dynamic_cast<const hashCodeWrapper&> (that_arg);
+      return code < that.code;
+    }
+    
+    std::string str(std::string indent="") const { return sight::txt()<<code; }
+  }; 
+  CompSharedPtr<hashCodeWrapper> keyCode;
+  public:
+  
+  // Returns a key that uniquely identifies this particular AbstractObject in the 
+  // set hierarchy. 
+  const hierKeyPtr& getHierKey() const;
+  
+//  AbstractObjectDisjointHierWrapPtr shared_from_this() { return boost::static_pointer_cast<AbstractObjectDisjointHierWrap>(shared_from_this()); }
+}; // class AbstractObjectDisjointHierWrap
+*/
 
 /* #########################
    ##### CodeLocObject ##### 
@@ -257,10 +465,7 @@ public:
   bool isEmpty(PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis=NULL);
   
   // Allocates a copy of this object and returns a pointer to it
-  virtual CodeLocObjectPtr copyCL() const;
-  
-  // Allocates a copy of this object and returns a regular pointer to it
-  virtual CodeLocObject* copyCLPtr() const;
+  virtual CodeLocObjectPtr copyCL() const=0;
   
   AbstractObjectPtr copyAO() const
   { return copyCL(); }
@@ -273,8 +478,9 @@ public:
    ################################ */
 
 //! NOTE:Its sufficient to create only a single instance of this object globally.
-class FullCodeLocObject : public CodeLocObject {
-public:
+class FullCodeLocObject : public CodeLocObject, public AbstractObjectHierarchy
+{
+  public:
   FullCodeLocObject() : CodeLocObject(NULL) { }
 
   // Returns whether this object may/must be equal to o within the given Part p
@@ -300,11 +506,29 @@ public:
   bool isFullCL(PartEdgePtr pedge);
   // Returns whether this AbstractObject denotes the empty set.
   bool isEmptyCL(PartEdgePtr pedge);
+
+  // Returns true if this ValueObject corresponds to a concrete value that is statically-known
+  bool isConcrete();
+  // Returns the number of concrete values in this set
+  int concreteSetSize();
   
   // Allocates a copy of this object and returns a pointer to it
   CodeLocObjectPtr copyCL() const;
   
-  std::string str(std::string indent="") const;    
+  std::string str(std::string indent="") const;
+  
+  // Returns whether all instances of this class form a hierarchy. Every instance of the same
+  // class created by the same analysis must return the same value from this method!
+  bool isHierarchy() const { 
+    // The full object has no way to know. May need to change return value to allow dont-know
+    ROSE_ASSERT(0);
+  }
+  
+  // Returns a key that uniquely identifies this particular AbstractObject in the 
+  // set hierarchy.
+  const hierKeyPtr& getHierKey() const
+  // The key of a full object is empty, so return the cachedHierKey, which is guaranteed to be empty
+  { return cachedHierKey; }
 };
 
 
@@ -316,7 +540,7 @@ public:
 //   are only compared if they include the same types of CodeLocObjects in the same order. Otherwise, 
 //   the comparisons will be uselessly inaccurate.
 template <bool defaultMayEq>
-class CombinedCodeLocObject: public CodeLocObject
+class CombinedCodeLocObject: public CodeLocObject, public AbstractObjectHierarchy
 {
   public:
   std::list<CodeLocObjectPtr> codeLocs;
@@ -352,11 +576,24 @@ class CombinedCodeLocObject: public CodeLocObject
   // Returns whether this AbstractObject denotes the empty set.
   bool isEmptyCL(PartEdgePtr pedge);
   
+  // Returns true if this ValueObject corresponds to a concrete value that is statically-known
+  bool isConcrete();
+  // Returns the number of concrete values in this set
+  int concreteSetSize();
+  
   // Allocates a copy of this object and returns a pointer to it
   CodeLocObjectPtr copyCL() const;
   
   std::string str(std::string indent="") const;
-};
+  
+  // Returns whether all instances of this class form a hierarchy. Every instance of the same
+  // class created by the same analysis must return the same value from this method!
+  bool isHierarchy() const;
+  
+  // Returns a key that uniquely identifies this particular AbstractObject in the 
+  // set hierarchy.
+  const hierKeyPtr& getHierKey() const;
+}; // class CombinedCodeLocObject
 typedef CombinedCodeLocObject<false> IntersectCodeLocObject;
 typedef boost::shared_ptr<IntersectCodeLocObject> IntersectCodeLocObjectPtr;
 typedef CombinedCodeLocObject<true> UnionCodeLocObject;
@@ -375,7 +612,7 @@ extern template class CombinedCodeLocObject<false>;
 //! MostAccurate=true -> query is answered based on intersection of sub-executions.
 //! MostAccurate=false -> query is answered based on union of sub-executions.
 template<class Key, bool mostAccurate>
-class MappedCodeLocObject : public CodeLocObject
+class MappedCodeLocObject : public CodeLocObject, public AbstractObjectHierarchy
 {
   std::map<Key, CodeLocObjectPtr> codeLocsMap;
   int n_FullCL;
@@ -388,12 +625,13 @@ public:
   MappedCodeLocObject() : CodeLocObject(NULL), n_FullCL(0), union_(!mostAccurate), intersect_(mostAccurate) { }
   MappedCodeLocObject(const MappedCodeLocObject& that) : 
     CodeLocObject(that), 
+    AbstractObjectHierarchy(that), 
     codeLocsMap(that.codeLocsMap), 
     n_FullCL(that.n_FullCL), 
     union_(that.union_),
     intersect_(that.intersect_) { }
 
-  void add(Key key, CodeLocObjectPtr clo_p, PartEdgePtr pedge);
+  void add(Key key, CodeLocObjectPtr clo_p, PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis);
   const std::map<Key, CodeLocObjectPtr>& getCodeLocsMap() const { return codeLocsMap; }
   
 private:
@@ -430,10 +668,23 @@ public:
   // Returns whether this AbstractObject denotes the empty set.
   bool isEmptyCL(PartEdgePtr pedge);
   
+  // Returns true if this ValueObject corresponds to a concrete value that is statically-known
+  bool isConcrete();
+  // Returns the number of concrete values in this set
+  int concreteSetSize();
+  
   // Allocates a copy of this object and returns a pointer to it
   CodeLocObjectPtr copyCL() const;
   
   std::string str(std::string indent="") const;
+  
+  // Returns whether all instances of this class form a hierarchy. Every instance of the same
+  // class created by the same analysis must return the same value from this method!
+  bool isHierarchy() const;
+  
+  // Returns a key that uniquely identifies this particular AbstractObject in the 
+  // set hierarchy.
+  const AbstractObjectHierarchy::hierKeyPtr& getHierKey() const;
 };
 
 typedef MappedCodeLocObject<ComposedAnalysis*, false> UnionAnalMapCodeLocObject;
@@ -455,7 +706,7 @@ class PartEdgeUnionCodeLocObject : public CodeLocObject {
 public:
   PartEdgeUnionCodeLocObject();
   PartEdgeUnionCodeLocObject(const PartEdgeUnionCodeLocObject& that);
-  void add(CodeLocObjectPtr cl_p, PartEdgePtr pedge);
+  void add(CodeLocObjectPtr cl_p, PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis);
   CodeLocObjectPtr getUnionCL() { return unionCL_p; }
 
   bool mayEqualCL(CodeLocObjectPtr o, PartEdgePtr pedge);
@@ -466,6 +717,12 @@ public:
   bool meetUpdateCL(CodeLocObjectPtr that, PartEdgePtr pedge);
   bool isFullCL(PartEdgePtr pedge);
   bool isEmptyCL(PartEdgePtr pedge);
+
+  // Returns true if this ValueObject corresponds to a concrete value that is statically-known
+  bool isConcrete();
+  // Returns the number of concrete values in this set
+  int concreteSetSize();
+  
   CodeLocObjectPtr copyCL() const;
   void setCLToFull();
   std::string str(std::string indent="") const;
@@ -570,8 +827,6 @@ public:
   bool isFull(PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis);
   bool isEmpty(PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis);
   
-  // Returns true if this ValueObject corresponds to a concrete value that is statically-known
-  virtual bool isConcrete()=0;
   // Returns the type of the concrete value (if there is one)
   virtual SgType* getConcreteType()=0;
   // Returns the concrete value (if there is one) as an SgValueExp, which allows callers to use
@@ -597,7 +852,7 @@ public:
 
 // The default implementation of ValueObjects that denotes the set of all ValueObjects
 //! NOTE:Its sufficient to create only a single instance of this object globally.
-class FullValueObject : public ValueObject
+class FullValueObject : public ValueObject, public AbstractObjectHierarchy
 {
   public:
   FullValueObject() {}
@@ -625,6 +880,8 @@ class FullValueObject : public ValueObject
   
   // Returns true if this ValueObject corresponds to a concrete value that is statically-known
   bool isConcrete();
+  // Returns the number of concrete values in this set
+  int concreteSetSize();
   // Returns the type of the concrete value (if there is one)
   SgType* getConcreteType();
   // Returns the concrete value (if there is one) as an SgValueExp, which allows callers to use
@@ -635,6 +892,19 @@ class FullValueObject : public ValueObject
   ValueObjectPtr copyV() const;
   
   std::string str(std::string indent="") const;
+  
+  // Returns whether all instances of this class form a hierarchy. Every instance of the same
+  // class created by the same analysis must return the same value from this method!
+  bool isHierarchy() const { 
+    // The full object has no way to know. May need to change return value to allow dont-know
+    ROSE_ASSERT(0);
+  }
+  
+  // Returns a key that uniquely identifies this particular AbstractObject in the 
+  // set hierarchy.
+  const AbstractObjectHierarchy::hierKeyPtr& getHierKey() const
+  // The key of a full object is empty, so return the cachedHierKey, which is guaranteed to be empty
+  { return cachedHierKey; }
 };
 
 // The combination of multiple ValueObjects. Maintains multiple ValueObjects and responds to
@@ -645,7 +915,7 @@ class FullValueObject : public ValueObject
 //   are only compared if they include the same types of ValueObjects in the same order. Otherwise, 
 //   the comparisons will be uselessly inaccurate.
 template <bool defaultMayEq>
-class CombinedValueObject : public ValueObject
+class CombinedValueObject : public ValueObject, public AbstractObjectHierarchy
 {
   std::list<ValueObjectPtr> vals;
   
@@ -684,6 +954,8 @@ class CombinedValueObject : public ValueObject
   
   // Returns true if this ValueObject corresponds to a concrete value that is statically-known
   bool isConcrete();
+  // Returns the number of concrete values in this set
+  int concreteSetSize();
   // Returns the type of the concrete value (if there is one)
   SgType* getConcreteType();
   // Returns the concrete value (if there is one) as an SgValueExp, which allows callers to use
@@ -694,6 +966,15 @@ class CombinedValueObject : public ValueObject
   ValueObjectPtr copyV() const;
   
   std::string str(std::string indent="") const;
+  
+  // Returns whether all instances of this class form a hierarchy. Every instance of the same
+  // class created by the same analysis must return the same value from this method!
+  virtual bool isHierarchy() const;
+  // AbstractObjects that form a hierarchy must inherit from the AbstractObjectHierarchy class
+  
+  // Returns a key that uniquely identifies this particular AbstractObject in the 
+  // set hierarchy.
+  const AbstractObjectHierarchy::hierKeyPtr& getHierKey() const;
 };
 typedef CombinedValueObject<false> IntersectValueObject;
 typedef boost::shared_ptr<IntersectValueObject> IntersectValueObjectPtr;
@@ -711,7 +992,7 @@ extern template class CombinedValueObject<false>;
 
 
 template<class Key, bool mostAccurate>
-class MappedValueObject : public ValueObject
+class MappedValueObject : public ValueObject, public AbstractObjectHierarchy
 {
   std::map<Key, ValueObjectPtr> valuesMap;
   int n_FullV; 
@@ -726,12 +1007,13 @@ public:
     ValueObject(NULL), valuesMap(valuesMap), union_(!mostAccurate), intersect_(mostAccurate) { }
   MappedValueObject(const MappedValueObject& that) : 
     ValueObject(that), 
+    AbstractObjectHierarchy(that), 
     valuesMap(that.valuesMap), 
     n_FullV(that.n_FullV), 
     union_(that.union_),
     intersect_(that.intersect_) { }
 
-  void add(Key key, ValueObjectPtr vo_p, PartEdgePtr pedge);
+  void add(Key key, ValueObjectPtr vo_p, PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis);
   const std::map<Key, ValueObjectPtr>& getValuesMap() const { return valuesMap; }
   
 private:
@@ -777,6 +1059,9 @@ public:
 
   // Is this object enumerable?
   bool isConcrete();
+  
+  // Returns the number of concrete values in this set
+  int concreteSetSize();
 
   // Type of concrete value
   SgType* getConcreteType();
@@ -789,6 +1074,15 @@ public:
   ValueObjectPtr copyV() const;
   
   std::string str(std::string indent="") const;
+  
+    // Returns whether all instances of this class form a hierarchy. Every instance of the same
+  // class created by the same analysis must return the same value from this method!
+  virtual bool isHierarchy() const;
+  // AbstractObjects that form a hierarchy must inherit from the AbstractObjectHierarchy class
+  
+  // Returns a key that uniquely identifies this particular AbstractObject in the 
+  // set hierarchy.
+  const AbstractObjectHierarchy::hierKeyPtr& getHierKey() const;
 }; // class MappedValueObject
 
 typedef MappedValueObject<ComposedAnalysis*, false> UnionAnalMapValueObject;
@@ -810,7 +1104,7 @@ class PartEdgeUnionValueObject : public ValueObject {
 public:
   PartEdgeUnionValueObject();
   PartEdgeUnionValueObject(const PartEdgeUnionValueObject& that);
-  void add(ValueObjectPtr v_p, PartEdgePtr pedge);
+  void add(ValueObjectPtr v_p, PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis);
   ValueObjectPtr getUnionV() { return unionV_p; }
 
   bool mayEqualV(ValueObjectPtr o, PartEdgePtr pedge);
@@ -824,6 +1118,8 @@ public:
   ValueObjectPtr copyV() const;
   void setVToFull();
   bool isConcrete();
+  // Returns the number of concrete values in this set
+  int concreteSetSize();
   SgType* getConcreteType();
   std::set<boost::shared_ptr<SgValueExp> > getConcreteValue();
   std::string str(std::string indent="") const;
@@ -925,7 +1221,7 @@ public:
   virtual bool meetUpdateMR(MemRegionObjectPtr that, PartEdgePtr pedge)=0;
   
   // General version of meetUpdate that accounts for framework details before routing the call to the derived class' 
-  // meetUpdateML check. Specifically, it routes the call through the composer to make sure the meetUpdateML 
+  // meetUpdateMR check. Specifically, it routes the call through the composer to make sure the meetUpdateMR
   // call gets the right PartEdge
   bool meetUpdate(MemRegionObjectPtr that, PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis);
   bool meetUpdate(AbstractObjectPtr that, PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis);
@@ -941,8 +1237,6 @@ public:
   bool isFull(PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis);
   bool isEmpty(PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis);
   
-  // Returns true if this MemRegionObject denotes a finite set of concrete regions
-  virtual bool isConcrete()=0;
   // Returns the type of the concrete regions (if there is one)
   virtual SgType* getConcreteType()=0;
   // Returns the set of concrete memory regions as SgExpressions, which allows callers to use
@@ -950,8 +1244,13 @@ public:
   virtual std::set<SgNode* > getConcrete()=0;
   
   // Returns a ValueObject that denotes the size of this memory region
-  virtual ValueObjectPtr getRegionSize(PartEdgePtr pedge) const=0;
-    
+  virtual ValueObjectPtr getRegionSizeMR(PartEdgePtr pedge)=0;
+
+  // General version of getRegionSize that accounts for framework details before routing the call to the
+  // derived class' getRegionSizeMR(). Specifically, it routes the call through the composer to make
+  // sure the getRegionSize call gets the right PartEdge
+  virtual ValueObjectPtr getRegionSize(PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis);
+
   // Allocates a copy of this object and returns a pointer to it
   virtual MemRegionObjectPtr copyMR() const=0;
   AbstractObjectPtr copyAO() const
@@ -959,8 +1258,20 @@ public:
 }; // class MemRegionObject
 
 // Special MemRegionObject used internally by the framework to associate with the return value of a function
-class FuncResultMemRegionObject : public MemRegionObject
+class FuncResultMemRegionObject : public MemRegionObject, public AbstractObjectHierarchy
 {
+  // Special type of comparable object that is only equal to other instances of its type.
+  // This makes it possible to use the generic FuncResultMemLocObject together with other
+  // objects implemented by individual analyses while ensuring that a FuncResultMemLocObject
+  // is always considered to be disjoint from the others
+  class FuncResultMemRegionObject_comparable: public comparable {
+    public:
+    bool equal(const comparable& that) const;
+    bool less(const comparable& that) const;
+    std::string str(std::string indent="") const { return "FuncResultMemRegionObject"; }
+  }; // class FuncResultMemRegionObject_comparable
+
+  
   Function func;
   public:
   FuncResultMemRegionObject(Function func);
@@ -990,21 +1301,34 @@ class FuncResultMemRegionObject : public MemRegionObject
   bool isEmptyMR(PartEdgePtr pedge);
   
   // Returns true if this MemRegionObject denotes a finite set of concrete regions
-  bool isConcrete() { return false; }
+  bool isConcrete() { return true; }
+  // Returns the number of concrete values in this set
+  int concreteSetSize() { return 1; }
   // Returns the type of the concrete regions (if there is one)
-  SgType* getConcreteType() { return NULL; }
+  SgType* getConcreteType() { return func.get_type(); }
   // Returns the set of concrete memory regions as SgExpressions, which allows callers to use
   // the normal ROSE mechanisms to decode it
-  std::set<SgNode* > getConcrete() { std::set<SgNode* > empty; return empty; }
+  std::set<SgNode*> getConcrete() { std::set<SgNode* > ret; ret.insert(func.get_definition()); return ret; }
   
   // Returns a ValueObject that denotes the size of this memory region
-  ValueObjectPtr getRegionSize(PartEdgePtr pedge) const;
+  ValueObjectPtr getRegionSizeMR(PartEdgePtr pedge);
   
   std::string str(std::string indent="") const { return "FuncResultMemRegionObject"; }  
   std::string strp(PartEdgePtr pedge, std::string indent="") { return "FuncResultMemRegionObject"; }
   
   // Allocates a copy of this object and returns a pointer to it
   MemRegionObjectPtr copyMR() const;
+  
+  // Returns whether all instances of this class form a hierarchy. Every instance of the same
+  // class created by the same analysis must return the same value from this method!
+  bool isHierarchy() const { 
+    // The full object has no way to know. May need to change return value to allow dont-know
+    ROSE_ASSERT(0);
+  }
+  
+  // Returns a key that uniquely identifies this particular AbstractObject in the 
+  // set hierarchy.
+  const AbstractObjectHierarchy::hierKeyPtr& getHierKey() const;
 };
 typedef boost::shared_ptr<FuncResultMemRegionObject> FuncResultMemRegionObjectPtr;
 
@@ -1012,7 +1336,7 @@ typedef boost::shared_ptr<FuncResultMemRegionObject> FuncResultMemRegionObjectPt
 //! Composers use the objects to conservatively answer queries
 //! Analyses should never see these objects
 //! NOTE:Its sufficient to create only a single instance of this object globally.
-class FullMemRegionObject : public MemRegionObject
+class FullMemRegionObject : public MemRegionObject, public AbstractObjectHierarchy
 {
  public:
   FullMemRegionObject() : MemRegionObject(NULL) { }
@@ -1043,7 +1367,9 @@ class FullMemRegionObject : public MemRegionObject
   bool isEmptyMR(PartEdgePtr pedge);
   
   // Returns true if this MemRegionObject denotes a finite set of concrete regions
-  bool isConcrete() { return false; }
+  bool isConcrete();
+  // Returns the number of concrete values in this set
+  int concreteSetSize();
   // Returns the type of the concrete regions (if there is one)
   SgType* getConcreteType() { return NULL; }
   // Returns the set of concrete memory regions as SgExpressions, which allows callers to use
@@ -1051,9 +1377,22 @@ class FullMemRegionObject : public MemRegionObject
   std::set<SgNode* > getConcrete() { std::set<SgNode* > empty; return empty; }
 
   // Returns a ValueObject that denotes the size of this memory region
-  ValueObjectPtr getRegionSize(PartEdgePtr pedge) const;
+  ValueObjectPtr getRegionSizeMR(PartEdgePtr pedge);
 
   std::string str(std::string indent="") const;
+  
+  // Returns whether all instances of this class form a hierarchy. Every instance of the same
+  // class created by the same analysis must return the same value from this method!
+  bool isHierarchy() const { 
+    // The full object has no way to know. May need to change return value to allow dont-know
+    ROSE_ASSERT(0);
+  }
+  
+  // Returns a key that uniquely identifies this particular AbstractObject in the 
+  // set hierarchy.
+  const AbstractObjectHierarchy::hierKeyPtr& getHierKey() const
+  // The key of a full object is empty, so return the cachedHierKey, which is guaranteed to be empty
+  { return cachedHierKey; }
 };
 
 
@@ -1065,7 +1404,7 @@ class FullMemRegionObject : public MemRegionObject
 //   are only compared if they include the same types of MemRegionObjects in the same order. Otherwise, 
 //   the comparisons will be uselessly inaccurate.
 template <bool defaultMayEq>
-class CombinedMemRegionObject : public virtual MemRegionObject
+class CombinedMemRegionObject : public virtual MemRegionObject, public AbstractObjectHierarchy
 {
   std::list<MemRegionObjectPtr> memRegions;
   
@@ -1114,6 +1453,8 @@ class CombinedMemRegionObject : public virtual MemRegionObject
   
   // Returns true if this MemRegionObject denotes a finite set of concrete regions
   bool isConcrete();
+  // Returns the number of concrete values in this set
+  int concreteSetSize();
   // Returns the type of the concrete regions (if there is one)
   SgType* getConcreteType();
   // Returns the set of concrete memory regions as SgExpressions, which allows callers to use
@@ -1121,9 +1462,17 @@ class CombinedMemRegionObject : public virtual MemRegionObject
   std::set<SgNode* > getConcrete();
   
   // Returns a ValueObject that denotes the size of this memory region
-  ValueObjectPtr getRegionSize(PartEdgePtr pedge) const;
+  ValueObjectPtr getRegionSizeMR(PartEdgePtr pedge);
   
   std::string str(std::string indent="") const;
+    
+  // Returns whether all instances of this class form a hierarchy. Every instance of the same
+  // class created by the same analysis must return the same value from this method!
+  bool isHierarchy() const;
+  
+  // Returns a key that uniquely identifies this particular AbstractObject in the 
+  // set hierarchy.
+  const AbstractObjectHierarchy::hierKeyPtr& getHierKey() const;
 };
 typedef CombinedMemRegionObject<false> IntersectMemRegionObject;
 typedef boost::shared_ptr<IntersectMemRegionObject> IntersectMemRegionObjectPtr;
@@ -1140,7 +1489,7 @@ extern template class CombinedMemRegionObject<false>; // not sure if this is nee
    ############################### */
 
 template<class Key, bool mostAccurate>
-class MappedMemRegionObject : public MemRegionObject
+class MappedMemRegionObject : public MemRegionObject, public AbstractObjectHierarchy
 {
   std::map<Key, MemRegionObjectPtr> memRegionsMap;
   int n_FullMR; 
@@ -1155,12 +1504,13 @@ public:
     MemRegionObject(NULL), memRegionsMap(memRegionsMap), union_(!mostAccurate), intersect_(mostAccurate) { }
   MappedMemRegionObject(const MappedMemRegionObject& that) : 
     MemRegionObject(that), 
+    AbstractObjectHierarchy(that), 
     memRegionsMap(that.memRegionsMap), 
     n_FullMR(that.n_FullMR), 
     union_(that.union_),
     intersect_(that.intersect_) { }
 
-  void add(Key key, MemRegionObjectPtr clo_p, PartEdgePtr pedge);
+  void add(Key key, MemRegionObjectPtr clo_p, PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis);
   const std::map<Key, MemRegionObjectPtr>& getMemRegionsMap() const { return memRegionsMap; }
   
 private:
@@ -1204,18 +1554,28 @@ public:
   
   // Returns true if this MemRegionObject denotes a finite set of concrete regions
   bool isConcrete();
+  // Returns the number of concrete values in this set
+  int concreteSetSize();
   // Returns the type of the concrete regions (if there is one)
   SgType* getConcreteType();
   // Returns the set of concrete memory regions as SgExpressions, which allows callers to use
   // the normal ROSE mechanisms to decode it
   std::set<SgNode* > getConcrete();
 
-  ValueObjectPtr getRegionSize(PartEdgePtr pedge) const;
+  ValueObjectPtr getRegionSizeMR(PartEdgePtr pedge);
   
   // Allocates a copy of this object and returns a pointer to it
   MemRegionObjectPtr copyMR() const;
   
   std::string str(std::string indent="") const;
+    
+  // Returns whether all instances of this class form a hierarchy. Every instance of the same
+  // class created by the same analysis must return the same value from this method!
+  bool isHierarchy() const;
+  
+  // Returns a key that uniquely identifies this particular AbstractObject in the 
+  // set hierarchy.
+  const AbstractObjectHierarchy::hierKeyPtr& getHierKey() const;
 };
 
 
@@ -1238,7 +1598,7 @@ class PartEdgeUnionMemRegionObject : public MemRegionObject {
 public:
   PartEdgeUnionMemRegionObject();
   PartEdgeUnionMemRegionObject(const PartEdgeUnionMemRegionObject& that);
-  void add(MemRegionObjectPtr mr_p, PartEdgePtr pedge);
+  void add(MemRegionObjectPtr mr_p, PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis);
   MemRegionObjectPtr getUnionMR() { return unionMR_p; }
 
   bool mayEqualMR(MemRegionObjectPtr o, PartEdgePtr pedge);
@@ -1251,14 +1611,16 @@ public:
   bool isEmptyMR(PartEdgePtr pedge);
   MemRegionObjectPtr copyMR() const;
   void setMRToFull();
-  // Returns true if this MemRegionObject denotes a finite set of concrete regions
+  // Returns true if this ValueObject corresponds to a concrete value that is statically-known
   bool isConcrete();
+  // Returns the number of concrete values in this set
+  int concreteSetSize();
   // Returns the type of the concrete regions (if there is one)
   SgType* getConcreteType();
   // Returns the set of concrete memory regions as SgExpressions, which allows callers to use
   // the normal ROSE mechanisms to decode it
   std::set<SgNode* > getConcrete();  
-  ValueObjectPtr getRegionSize(PartEdgePtr pedge) const;
+  ValueObjectPtr getRegionSizeMR(PartEdgePtr pedge);
   std::string str(std::string indent="") const;
 };
 
@@ -1282,7 +1644,7 @@ typedef boost::shared_ptr<MemLocObject> MemLocObjectPtr;
 //typedef boost::shared_ptr<const MemLocObject> ConstMemLocObjectPtr;
 extern MemLocObjectPtr NULLMemLocObject;
 
-class MemLocObject : public AbstractObject
+class MemLocObject : public AbstractObject, public AbstractObjectHierarchy
 { 
   protected:
   MemRegionObjectPtr region;
@@ -1291,8 +1653,8 @@ class MemLocObject : public AbstractObject
 //  MemLocObject() {}
   //# SA
   // should the default mutable value be conservatively true ?
-  MemLocObject(SgNode* base) : AbstractObject(base) {}
-  MemLocObject(MemRegionObjectPtr region, ValueObjectPtr index, SgNode* base) : AbstractObject(base), region(region), index(index) {}
+  MemLocObject(SgNode* base) : AbstractObject(base), AbstractObjectHierarchy() {}
+  MemLocObject(MemRegionObjectPtr region, ValueObjectPtr index, SgNode* base) : AbstractObject(base), AbstractObjectHierarchy(), region(region), index(index) {}
   MemLocObject(const MemLocObject& that);
 
   // Wrapper for shared_from_this that returns an instance of this class rather than its parent
@@ -1310,78 +1672,82 @@ class MemLocObject : public AbstractObject
   virtual ValueObjectPtr     getIndex() const;
   
 //private:
-  // Returns whether this object may/must be equal to o within the given Part p
-  // These methods are called by composers and should not be called by analyses.
-  virtual bool mayEqualML(MemLocObjectPtr o, PartEdgePtr pedge);
-  virtual bool mustEqualML(MemLocObjectPtr o, PartEdgePtr pedge);
+//  // Returns whether this object may/must be equal to o within the given Part p
+//  // These methods are called by composers and should not be called by analyses.
+//  virtual bool mayEqualML(MemLocObjectPtr o, PartEdgePtr pedge);
+//  virtual bool mustEqualML(MemLocObjectPtr o, PartEdgePtr pedge);
   
   // General version of mayEqual and mustEqual that accounts for framework details before routing the call to the 
   // derived class' may/mustEqual check. Specifically, it checks may/must equality with respect to ExprObj and routes
   // the call through the composer to make sure the may/mustEqual call gets the right PartEdge
-  bool mayEqual (MemLocObjectPtr o, PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis);
-  bool mustEqual(MemLocObjectPtr o, PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis);
+  virtual bool mayEqual (MemLocObjectPtr o, PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis);
+  virtual bool mustEqual(MemLocObjectPtr o, PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis);
   
   // Check whether that is a MemLocObject and if so, call the version of may/mustEqual specific to MemLocObjects
-  bool mayEqual (AbstractObjectPtr o, PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis);
-  bool mustEqual(AbstractObjectPtr o, PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis);
+  virtual bool mayEqual (AbstractObjectPtr o, PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis);
+  virtual bool mustEqual(AbstractObjectPtr o, PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis);
   
 //private:
+//  // Returns whether the two abstract objects denote the same set of concrete objects
+//  // These methods are called by composers and should not be called by analyses.
+//  virtual bool equalSetML(MemLocObjectPtr o, PartEdgePtr pedge);
+//
+//  // Returns whether this abstract object denotes a non-strict subset (the sets may be equal) of the set denoted
+//  // by the given abstract object.
+//  // These methods are called by composers and should not be called by analyses.
+//  virtual bool subSetML(MemLocObjectPtr o, PartEdgePtr pedge);
+  
   // Returns whether the two abstract objects denote the same set of concrete objects
-  // These methods are called by composers and should not be called by analyses.
-  virtual bool equalSetML(MemLocObjectPtr o, PartEdgePtr pedge);
+  virtual bool equalSet(MemLocObjectPtr o, PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis);
   
   // Returns whether this abstract object denotes a non-strict subset (the sets may be equal) of the set denoted
   // by the given abstract object.
-  // These methods are called by composers and should not be called by analyses.
-  virtual bool subSetML(MemLocObjectPtr o, PartEdgePtr pedge);
+  virtual bool subSet(MemLocObjectPtr o, PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis);
   
   // Returns whether the two abstract objects denote the same set of concrete objects
-  bool equalSet(MemLocObjectPtr o, PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis);
+  virtual bool equalSet(AbstractObjectPtr o, PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis);
   
   // Returns whether this abstract object denotes a non-strict subset (the sets may be equal) of the set denoted
   // by the given abstract object.
-  bool subSet(MemLocObjectPtr o, PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis);
-  
-  // Returns whether the two abstract objects denote the same set of concrete objects
-  bool equalSet(AbstractObjectPtr o, PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis);
-  
-  // Returns whether this abstract object denotes a non-strict subset (the sets may be equal) of the set denoted
-  // by the given abstract object.
-  bool subSet(AbstractObjectPtr o, PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis);
+  virtual bool subSet(AbstractObjectPtr o, PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis);
 
-//private:
-  // Returns true if this object is live at the given part and false otherwise
-  virtual bool isLiveML(PartEdgePtr pedge);
-public:
+//  // Returns true if this object is live at the given part and false otherwise
+//  virtual bool isLiveML(PartEdgePtr pedge);
+  public:
   
   // General version of isLive that accounts for framework details before routing the call to the derived class' 
   // isLiveML check. Specifically, it routes the call through the composer to make sure the isLiveML call gets the 
   // right PartEdge
-  bool isLive(PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis);
+  virtual bool isLive(PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis);
 
 // private:
-  // Computes the meet of this and that and saves the result in this
-  // returns true if this causes this to change and false otherwise
-  virtual bool meetUpdateML(MemLocObjectPtr that, PartEdgePtr pedge);
+//  // Computes the meet of this and that and saves the result in this
+//  // returns true if this causes this to change and false otherwise
+//  virtual bool meetUpdateML(MemLocObjectPtr that, PartEdgePtr pedge);
   
   // General version of meetUpdate that accounts for framework details before routing the call to the derived class' 
   // meetUpdateML check. Specifically, it routes the call through the composer to make sure the meetUpdateML 
   // call gets the right PartEdge
-  bool meetUpdate(MemLocObjectPtr that, PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis);
-  bool meetUpdate(AbstractObjectPtr that, PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis);
+  virtual bool meetUpdate(MemLocObjectPtr that, PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis);
+  virtual bool meetUpdate(AbstractObjectPtr that, PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis);
   
-  // Returns whether this AbstractObject denotes the set of all possible execution prefixes.
-  virtual bool isFullML(PartEdgePtr pedge);
-  // Returns whether this AbstractObject denotes the empty set.
-  virtual bool isEmptyML(PartEdgePtr pedge);
+//  // Returns whether this AbstractObject denotes the set of all possible execution prefixes.
+//  virtual bool isFullML(PartEdgePtr pedge);
+//  // Returns whether this AbstractObject denotes the empty set.
+//  virtual bool isEmptyML(PartEdgePtr pedge);
     
   // General versions of isFull() and isEmpty that account for framework details before routing the call to the 
   // derived class' isFull() and isEmpty()  check. Specifically, it routes the call through the composer to make 
   // sure the isFullML() and isEmptyML() call gets the right PartEdge.
   // These functions are just aliases for the real implementations in AbstractObject
-  bool isFull(PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis=NULL);
-  bool isEmpty(PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis=NULL);
+  virtual bool isFull(PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis=NULL);
+  virtual bool isEmpty(PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis=NULL);
 
+  // Returns true if this AbstractObject corresponds to a concrete value that is statically-known
+  virtual bool isConcrete();
+  // Returns the number of concrete values in this set
+  virtual int concreteSetSize();
+  
   // Allocates a copy of this object and returns a pointer to it
   virtual MemLocObjectPtr copyML() const;
   
@@ -1396,12 +1762,32 @@ public:
   { return isSgVarRefExp(expr) || isSgPntrArrRefExp(expr) || isSgPointerDerefExp(expr); }
   
   virtual std::string str(std::string indent="") const; // pretty print for the object
+  
+  // Returns whether all instances of this class form a hierarchy. Every instance of the same
+  // class created by the same analysis must return the same value from this method!
+  virtual bool isHierarchy() const;
+  // AbstractObjects that form a hierarchy must inherit from the AbstractObjectHierarchy class
+  
+  // Returns a key that uniquely identifies this particular AbstractObject in the 
+  // set hierarchy.
+  const hierKeyPtr& getHierKey() const;
 }; // MemLocObject
 
 // Special MemLocObject used internally by the framework to associate with the return value of a function.
 // This is just a MemLoc dedicated to wrapping FuncResultMemLocRegion
 class FuncResultMemLocObject : public MemLocObject
 {
+  // Special type of comparable object that is only equal to other instances of its type.
+  // This makes it possible to use the generic FuncResultMemLocObject together with other
+  // objects implemented by individual analyses while ensuring that a FuncResultMemLocObject
+  // is always considered to be disjoint from the others
+/*  class FuncResultMemLocObject_comparable: public comparable {
+    public:
+    bool operator==(const comparable& that);
+    bool operator<(const comparable& that);
+    std::string str(std::string indent="") const { return "FuncResultMemLocObject"; }
+  }; // class FuncResultMemLocObject_comparable
+  */
   public:
   FuncResultMemLocObject(Function func);
   FuncResultMemLocObject(const FuncResultMemLocObject& that);
@@ -1411,6 +1797,17 @@ class FuncResultMemLocObject : public MemLocObject
   
   // Allocates a copy of this object and returns a shared pointer to it
   MemLocObjectPtr copyML() const;
+  
+  // Returns whether all instances of this class form a hierarchy. Every instance of the same
+  // class created by the same analysis must return the same value from this method!
+  bool isHierarchy() const { 
+    // The full object has no way to know. May need to change return value to allow dont-know
+    ROSE_ASSERT(0);
+  }
+  
+  // Returns a key that uniquely identifies this particular AbstractObject in the 
+  // set hierarchy.
+  const AbstractObjectHierarchy::hierKeyPtr& getHierKey() const;
 };
 typedef boost::shared_ptr<FuncResultMemLocObject> FuncResultMemLocObjectPtr;
 
@@ -1447,7 +1844,25 @@ public:
   // Returns whether this AbstractObject denotes the empty set.
   bool isEmptyML(PartEdgePtr pedge);
   
+  // Returns true if this AbstractObject corresponds to a concrete value that is statically-known
+  bool isConcrete();
+  // Returns the number of concrete values in this set
+  int concreteSetSize();
+  
   std::string str(std::string indent="") const;
+
+  // Returns whether all instances of this class form a hierarchy. Every instance of the same
+  // class created by the same analysis must return the same value from this method!
+  bool isHierarchy() const { 
+    // The full object has no way to know. May need to change return value to allow dont-know
+    ROSE_ASSERT(0);
+  }
+  
+  // Returns a key that uniquely identifies this particular AbstractObject in the 
+  // set hierarchy.
+  const AbstractObjectHierarchy::hierKeyPtr& getHierKey() const
+  // The key of a full object is empty, so return the cachedHierKey, which is guaranteed to be empty
+  { return cachedHierKey; }
 };
 
 // The combination of multiple MemLocObjects. Maintains multiple MemLocObjects and responds to
@@ -1464,8 +1879,8 @@ class CombinedMemLocObject : public virtual MemLocObject
   std::list<MemLocObjectPtr> memLocs;
   
   public:
-  CombinedMemLocObject(MemLocObjectPtr memLoc) : MemLocObject(NULL) {   memLocs.push_back(memLoc); }
-  CombinedMemLocObject(const std::list<MemLocObjectPtr>& memLocs) : MemLocObject(NULL), memLocs(memLocs) {}
+  CombinedMemLocObject(MemLocObjectPtr memLoc) : MemLocObject(NULL) { memLocs.push_back(memLoc); }
+  CombinedMemLocObject(const std::list<MemLocObjectPtr>& memLocs) : MemLocObject(NULL), memLocs(memLocs) { }
   
   const std::list<MemLocObjectPtr>& getMemLocs() const { return memLocs; }
     
@@ -1480,32 +1895,56 @@ class CombinedMemLocObject : public virtual MemLocObject
   void add(MemLocObjectPtr memLoc);
   
   // Returns whether this object may/must be equal to o within the given Part p
-  bool mayEqualML(MemLocObjectPtr o, PartEdgePtr pedge);
-  bool mustEqualML(MemLocObjectPtr o, PartEdgePtr pedge);
+  //bool mayEqualML(MemLocObjectPtr o, PartEdgePtr pedge);
+  //bool mustEqualML(MemLocObjectPtr o, PartEdgePtr pedge);
+  bool mayEqual(AbstractObjectPtr that, PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis);
+  bool mustEqual(AbstractObjectPtr that, PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis);
   
   // Returns whether the two abstract objects denote the same set of concrete objects
-  bool equalSetML(MemLocObjectPtr o, PartEdgePtr pedge);
+  //bool equalSetML(MemLocObjectPtr o, PartEdgePtr pedge);
+  bool equalSet(AbstractObjectPtr that, PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis);
   
   // Returns whether this abstract object denotes a non-strict subset (the sets may be equal) of the set denoted
   // by the given abstract object.
-  bool subSetML(MemLocObjectPtr o, PartEdgePtr pedge);
+  //bool subSetML(MemLocObjectPtr o, PartEdgePtr pedge);
+  bool subSet(AbstractObjectPtr that, PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis);
   
   // Allocates a copy of this object and returns a pointer to it
   MemLocObjectPtr copyML() const;
   
   // Returns true if this object is live at the given part and false otherwise
-  bool isLiveML(PartEdgePtr pedge);
-  
+//  bool isLiveML(PartEdgePtr pedge);
+
+  // General version of isLive that accounts for framework details before routing the call to the derived class' 
+  // isLiveML check. Specifically, it routes the call through the composer to make sure the isLiveML call gets the 
+  bool isLive(PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis);
+
   // Computes the meet of this and that and saves the result in this
   // returns true if this causes this to change and false otherwise
-  bool meetUpdateML(MemLocObjectPtr that, PartEdgePtr pedge);
+  //bool meetUpdateML(MemLocObjectPtr that, PartEdgePtr pedge);
+  bool meetUpdate(AbstractObjectPtr that, PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis);
   
   // Returns whether this AbstractObject denotes the set of all possible execution prefixes.
-  bool isFullML(PartEdgePtr pedge);
+  //bool isFullML(PartEdgePtr pedge);
+  bool isFull(PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis);
   // Returns whether this AbstractObject denotes the empty set.
-  bool isEmptyML(PartEdgePtr pedge);
+  //bool isEmptyML(PartEdgePtr pedge);
+  bool isEmpty(PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis);
+  
+  // Returns true if this AbstractObject corresponds to a concrete value that is statically-known
+  bool isConcrete();
+  // Returns the number of concrete values in this set
+  int concreteSetSize();
   
   std::string str(std::string indent="") const;
+  
+  // Returns whether all instances of this class form a hierarchy. Every instance of the same
+  // class created by the same analysis must return the same value from this method!
+  bool isHierarchy() const;
+  
+  // Returns a key that uniquely identifies this particular AbstractObject in the 
+  // set hierarchy.
+  const AbstractObjectHierarchy::hierKeyPtr& getHierKey() const;
 };
 typedef CombinedMemLocObject<false> IntersectMemLocObject;
 typedef boost::shared_ptr<IntersectMemLocObject> IntersectMemLocObjectPtr;
@@ -1607,48 +2046,72 @@ public:
   MemRegionObjectPtr getRegion() const;
   ValueObjectPtr     getIndex() const;
   
-  void add(Key key, MemLocObjectPtr clo_p, PartEdgePtr pedge);
+  void add(Key key, MemLocObjectPtr clo_p, PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis);
   const std::map<Key, MemLocObjectPtr>& getMemLocsMap() const { return memLocsMap; }
   
 private:
   //! Helper methods.
-  bool mayEqualMLWithKey(Key key, const std::map<Key, MemLocObjectPtr>& thatMLMap, PartEdgePtr pedge);
-  bool mustEqualMLWithKey(Key key, const std::map<Key, MemLocObjectPtr>& thatMLMap, PartEdgePtr pedge);
-  bool equalSetMLWithKey(Key key,const std::map<Key, MemLocObjectPtr>& thatMLMap, PartEdgePtr pedge);
-  bool subSetMLWithKey(Key key,const std::map<Key, MemLocObjectPtr>& thatMLMap, PartEdgePtr pedge);
+  bool mayEqualMLWithKey(Key key, const std::map<Key, MemLocObjectPtr>& thatMLMap, PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis);
+  bool mustEqualMLWithKey(Key key, const std::map<Key, MemLocObjectPtr>& thatMLMap, PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis);
+  bool equalSetMLWithKey(Key key,const std::map<Key, MemLocObjectPtr>& thatMLMap, PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis);
+  bool subSetMLWithKey(Key key,const std::map<Key, MemLocObjectPtr>& thatMLMap, PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis);
 
 public:  
   // Returns whether this object may/must be equal to o within the given Part p
   // These methods are private to prevent analyses from calling them directly.
-  bool mayEqualML(MemLocObjectPtr o, PartEdgePtr pedge);
-  bool mustEqualML(MemLocObjectPtr o, PartEdgePtr pedge);
-  
+  //bool mayEqualML(MemLocObjectPtr o, PartEdgePtr pedge);
+  //bool mustEqualML(MemLocObjectPtr o, PartEdgePtr pedge);
+  bool mayEqual(MemLocObjectPtr o, PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis);
+  bool mustEqual(MemLocObjectPtr o, PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis);
+
   // Returns whether the two abstract objects denote the same set of concrete objects
-  bool equalSetML(MemLocObjectPtr o, PartEdgePtr pedge);
+  //bool equalSetML(MemLocObjectPtr o, PartEdgePtr pedge);
+  bool equalSet(MemLocObjectPtr o, PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis);
   
   // Returns whether this abstract object denotes a non-strict subset (the sets may be equal) of the set denoted
   // by the given abstract object.
-  bool subSetML(MemLocObjectPtr o, PartEdgePtr pedge);
+  //bool subSetML(MemLocObjectPtr o, PartEdgePtr pedge);
+  bool subSet(MemLocObjectPtr o, PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis);
   
   // Returns true if this object is live at the given part and false otherwise
-  bool isLiveML(PartEdgePtr pedge);
-  
+  //bool isLiveML(PartEdgePtr pedge);
+  // General version of isLive that accounts for framework details before routing the call to the derived class' 
+  // isLiveML check. Specifically, it routes the call through the composer to make sure the isLiveML call gets the 
+  // right PartEdge
+  bool isLive(PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis);
+
   // Computes the meet of this and that and saves the result in this
   // returns true if this causes this to change and false otherwise
-  bool meetUpdateML(MemLocObjectPtr that, PartEdgePtr pedge);
+  //bool meetUpdateML(MemLocObjectPtr that, PartEdgePtr pedge);
+  bool meetUpdate(MemLocObjectPtr that, PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis);
 
   void setMLToFull();
   
   // Returns whether this AbstractObject denotes the set of all possible execution prefixes.
-  bool isFullML(PartEdgePtr pedge);
+  //bool isFullML(PartEdgePtr pedge);
+  bool isFull(PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis);
   // Returns whether this AbstractObject denotes the empty set.
-  bool isEmptyML(PartEdgePtr pedge);
+  //bool isEmptyML(PartEdgePtr pedge);
+  bool isEmpty(PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis);
+  
+  // Returns true if this AbstractObject corresponds to a concrete value that is statically-known
+  bool isConcrete();
+  // Returns the number of concrete values in this set
+  int concreteSetSize();
   
   // Allocates a copy of this object and returns a pointer to it
   MemLocObjectPtr copyML() const;
   
   std::string str(std::string indent="") const;
-};
+  
+  // Returns whether all instances of this class form a hierarchy. Every instance of the same
+  // class created by the same analysis must return the same value from this method!
+  bool isHierarchy() const;
+  
+  // Returns a key that uniquely identifies this particular AbstractObject in the 
+  // set hierarchy.
+  const AbstractObjectHierarchy::hierKeyPtr& getHierKey() const;
+}; // class MappedMemLocObject
 
 typedef MappedMemLocObject<ComposedAnalysis*, false> UnionAnalMapMemLocObject;
 typedef boost::shared_ptr<MappedMemLocObject<ComposedAnalysis*, false> > UnionAnalMapMemLocObjectPtr;
@@ -1669,20 +2132,42 @@ class PartEdgeUnionMemLocObject : public MemLocObject {
 public:
   PartEdgeUnionMemLocObject();
   PartEdgeUnionMemLocObject(const PartEdgeUnionMemLocObject& that);
-  void add(MemLocObjectPtr ml_p, PartEdgePtr pedge);
+  void add(MemLocObjectPtr ml_p, PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis);
   MemLocObjectPtr getUnionML() { return unionML_p; }
 
-  bool mayEqualML(MemLocObjectPtr o, PartEdgePtr pedge);
-  bool mustEqualML(MemLocObjectPtr o, PartEdgePtr pedge);
-  bool equalSetML(MemLocObjectPtr o, PartEdgePtr pedge);
-  bool subSetML(MemLocObjectPtr o, PartEdgePtr pedge);
-  bool isLiveML(PartEdgePtr pedge);
-  bool meetUpdateML(MemLocObjectPtr that, PartEdgePtr pedge);
-  bool isFullML(PartEdgePtr pedge);
-  bool isEmptyML(PartEdgePtr pedge);
+//  bool mayEqualML(MemLocObjectPtr o, PartEdgePtr pedge);
+//  bool mustEqualML(MemLocObjectPtr o, PartEdgePtr pedge);
+//  bool equalSetML(MemLocObjectPtr o, PartEdgePtr pedge);
+//  bool subSetML(MemLocObjectPtr o, PartEdgePtr pedge);
+//  bool isLiveML(PartEdgePtr pedge);
+//  bool meetUpdateML(MemLocObjectPtr that, PartEdgePtr pedge);
+//  bool isFullML(PartEdgePtr pedge);
+//  bool isEmptyML(PartEdgePtr pedge);
+
+  bool mayEqual(MemLocObjectPtr o, PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis);
+  bool mustEqual(MemLocObjectPtr o, PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis);
+  bool equalSet(MemLocObjectPtr o, PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis);
+  bool subSet(MemLocObjectPtr o, PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis);
+  bool isLive(PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis);
+  bool meetUpdate(MemLocObjectPtr o, PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis);
+  bool isFull(PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis);
+  bool isEmpty(PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis);
+
+  // Returns true if this ValueObject corresponds to a concrete value that is statically-known
+  bool isConcrete();
+  // Returns the number of concrete values in this set
+  int concreteSetSize();
   MemLocObjectPtr copyML() const;
   void setMLToFull();
   std::string str(std::string indent="") const;
+  
+  // Returns whether all instances of this class form a hierarchy. Every instance of the same
+  // class created by the same analysis must return the same value from this method!
+  bool isHierarchy() const;
+  
+  // Returns a key that uniquely identifies this particular AbstractObject in the 
+  // set hierarchy.
+  const AbstractObjectHierarchy::hierKeyPtr& getHierKey() const;
 };
 
 

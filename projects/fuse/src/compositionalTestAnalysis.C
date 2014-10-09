@@ -503,24 +503,24 @@ int main(int argc, char** argv)
       cout << "Elapsed="<<((end.tv_sec*1000000+end.tv_usec) - 
                            (start.tv_sec*1000000+start.tv_usec))/1000000.0<<"s"<<endl;
   
-      VariableIdMapping vIDMap;
-      vIDMap.computeVariableSymbolMapping(getProject());
-//      ValueASTAttribute::place(rootComposer, cdip);
-//      ValueASTAttribute::show(rootComposer, vIDMap);
-      Labeler labeler(getProject());
-//      labeler.createLabels(getProject());
-      ValueASTAttribute::placeLabeler(rootComposer, cdip, labeler);
-      FuseRDAstAttribute::placeLabeler(rootComposer, cdip, vIDMap, labeler);
-      AstAnnotator ara(&labeler);
-      ara.annotateAstAttributesAsCommentsBeforeStatements(getProject(), "fuse_cp_below");
-      ara.annotateAstAttributesAsCommentsBeforeStatements(getProject(), "fuse_rd");
-//      printAttributes<ValueASTAttribute>(&labeler, &vIDMap, "fuse_cp_above");
-
-/*      ValueASTAttribute::placeLabeler(rootComposer, cdip, labeler);
-      AstAnnotator ara(&labeler);
-      ara.annotateAstAttributesAsCommentsBeforeStatements(getProject(), "fuse_cp_below");
-      FuseRDAstAttribute::placeLabeler(rootComposer, cdip, vIDMap, labeler);
-      printAttributes<FuseRDAstAttribute>(&labeler, &vIDMap, "fuse_rd");*/
+//      VariableIdMapping vIDMap;
+//      vIDMap.computeVariableSymbolMapping(getProject());
+////      ValueASTAttribute::place(rootComposer, cdip);
+////      ValueASTAttribute::show(rootComposer, vIDMap);
+//      Labeler labeler(getProject());
+////      labeler.createLabels(getProject());
+//      ValueASTAttribute::placeLabeler(rootComposer, cdip, labeler);
+//      FuseRDAstAttribute::placeLabeler(rootComposer, cdip, vIDMap, labeler);
+//      AstAnnotator ara(&labeler);
+//      ara.annotateAstAttributesAsCommentsBeforeStatements(getProject(), "fuse_cp_below");
+//      ara.annotateAstAttributesAsCommentsBeforeStatements(getProject(), "fuse_rd");
+////      printAttributes<ValueASTAttribute>(&labeler, &vIDMap, "fuse_cp_above");
+//
+///*      ValueASTAttribute::placeLabeler(rootComposer, cdip, labeler);
+//      AstAnnotator ara(&labeler);
+//      ara.annotateAstAttributesAsCommentsBeforeStatements(getProject(), "fuse_cp_below");
+//      FuseRDAstAttribute::placeLabeler(rootComposer, cdip, vIDMap, labeler);
+//      printAttributes<FuseRDAstAttribute>(&labeler, &vIDMap, "fuse_rd");*/
       
       //cout << "rootComposer="<<rootComposer<<" cdip->getNumErrors()="<<cdip->getNumErrors()<<endl;
       if(cdip->getNumErrors() > 0) cout << cdip->getNumErrors() << " Errors Reported!"<<endl;

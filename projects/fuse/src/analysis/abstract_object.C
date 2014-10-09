@@ -90,6 +90,53 @@ bool AbstractObject::isFull(PartEdgePtr pedge, Composer* comp, ComposedAnalysis*
 bool AbstractObject::isEmpty(PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis)
 { return comp->isEmpty(shared_from_this(), pedge, analysis); }*/
 
+/***********************************
+ ***** AbstractObjectHierarchy *****
+ ***********************************/
+
+bool AbstractObjectHierarchy::AOSHierKey::isLive(PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis) 
+{ 
+//  cout << "AbstractObjectHierarchy::AOSHierKey::isLive: "<<obj->isLive(pedge, comp, analysis)<<", obj="<<obj->str()<<endl;
+  return obj->isLive(pedge, comp, analysis); }
+
+AbstractObjectHierarchy::hierRel AbstractObjectHierarchy::hierCompare(AbstractObjectHierarchyPtr left, AbstractObjectHierarchyPtr right) {
+  const AbstractObjectHierarchy::hierKeyPtr& leftKey  = left->getHierKey();
+  const AbstractObjectHierarchy::hierKeyPtr& rightKey = right->getHierKey();
+  std::list<comparablePtr>::const_iterator l=leftKey->begin(), r=rightKey->begin();
+  for(; l!=leftKey->end() && r!=rightKey->end(); l++, r++) {
+    if(*l != *r) return disjoint;
+  }
+  // If we've reached the end of the right key but not the left and the prefix of the 
+  // left key is equal to the entirety of the right key
+  if(l!=leftKey->end()) return rightContains;
+  // Inverse of above
+  if(r!=rightKey->end()) return leftContains;
+
+  // The two keys must be the same
+  return equal;
+}
+
+// Stringification of hierKeys
+std::ostream& operator<<(std::ostream& s, AbstractObjectHierarchy::hierKeyPtr k)
+{ s << k->getList(); return s; }
+
+/******************************************
+ ***** AbstractObjectDisjointHierWrap *****
+ ****************************************** /
+
+// Returns a key that uniquely identifies this particular AbstractObject in the 
+// set hierarchy. 
+const AbstractObjectHierarchy::hierKeyPtr& AbstractObjectDisjointHierWrap::getHierKey() const {
+  if(!isHierKeyCached) {
+    // Set key to refer to the keyCode, which is allocated on the spot to wrap the hashCode()
+    // It is assumed that the hashCode doesn't change during an object's lifetime.
+    ((AbstractObjectDisjointHierWrap*)this)->cachedHierKey = boost::make_shared<AOSHierKey>(shared_from_this(), makePtr<hashCodeWrapper>(getHashCode()));
+    ((AbstractObjectDisjointHierWrap*)this)->isHierKeyCached = true;
+  }
+  return cachedHierKey;
+}
+*/
+
 /* #########################
    ##### CodeLocObject ##### 
    ######################### */
@@ -277,14 +324,6 @@ bool CodeLocObject::isFull(PartEdgePtr pedge, Composer* comp, ComposedAnalysis* 
 bool CodeLocObject::isEmpty(PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis)
 { return isEmptyCL(pedge); }
 
-// Allocates a copy of this object and returns a shared pointer to it
-CodeLocObjectPtr CodeLocObject::copyCL() const
-{ return boost::make_shared<CodeLocObject>(*this); }
-
-// Allocates a copy of this object and returns a regular pointer to it
-CodeLocObject* CodeLocObject::copyCLPtr() const
-{ return new CodeLocObject(*this); }
-
 std::string CodeLocObject::str(std::string indent) const { // pretty print for the object
   ostringstream oss; 
   oss << "[CodeLocObject: part="<<(part? part->str(indent+"    "): "ANY")<<", "<<endl;
@@ -328,6 +367,12 @@ bool FullCodeLocObject::isEmptyCL(PartEdgePtr pedge) {
   return false;
 }
   
+// Returns true if this AbstractObject corresponds to a concrete value that is statically-known
+bool FullCodeLocObject::isConcrete() { return false; }
+
+// Returns the number of concrete values in this set
+int FullCodeLocObject::concreteSetSize() { return -1; }
+
 CodeLocObjectPtr FullCodeLocObject::copyCL() const {
   return boost::make_shared<FullCodeLocObject>();
 }
@@ -501,6 +546,45 @@ bool CombinedCodeLocObject<defaultMayEq>::isLive(PartEdgePtr pedge)
   return !defaultMayEq;
 }*/
 
+// Returns true if this CodeLocObject corresponds to a concrete value that is statically-known
+template <bool defaultMayEq>
+bool CombinedCodeLocObject<defaultMayEq>::isConcrete()
+{
+  // The combined object is concrete if 
+  // intersect (defaultMayEq=false) : any sub-cl is concrete
+  // union (defaultMayEq=true) : all the sub-cl are concrete 
+  
+  // Intersection
+  if(defaultMayEq==false) {
+    for(list<CodeLocObjectPtr>::iterator cl=codeLocs.begin(); cl!=codeLocs.end(); cl++) {
+      if((*cl)->isConcrete()) return true;
+    }
+    return false;
+  // Union
+  } else {
+    assert(codeLocs.size()>0);
+    // The union is not concrete if 
+    for(list<CodeLocObjectPtr>::iterator cl=codeLocs.begin(); cl!=codeLocs.end(); cl++) {
+      // Any sub-value is not concrete
+      if(!(*cl)->isConcrete())
+        return false;
+    }
+    return true;
+  }
+}
+
+// Returns the number of concrete values in this set
+template <bool defaultMayEq>
+int CombinedCodeLocObject<defaultMayEq>::concreteSetSize() {
+  assert(isConcrete());
+  // This is an over-approximation of the set size that assumes that all the concrete sets of
+  // the sub-CodeLocs are disjoint
+  int size=0;
+  for(list<CodeLocObjectPtr>::const_iterator cl=codeLocs.begin(); cl!=codeLocs.end(); cl++)
+    size += (*cl)->concreteSetSize();
+  return size;
+}
+
 // Allocates a copy of this object and returns a pointer to it
 template <bool defaultMayEq>
 CodeLocObjectPtr CombinedCodeLocObject<defaultMayEq>::copyCL() const
@@ -523,6 +607,54 @@ std::string CombinedCodeLocObject<defaultMayEq>::str(std::string indent) const
   return oss.str();
 }
 
+// Returns whether all instances of this class form a hierarchy. Every instance of the same
+// class created by the same analysis must return the same value from this method!
+template <bool defaultMayEq>
+bool CombinedCodeLocObject<defaultMayEq>::isHierarchy() const {
+  // Combined CodeLocs form hierarchy if:
+  // - All the sub-CodeLocs form hierarchies of their own, AND
+  // - The combination is an intersection.
+  //   If the combination is a union then consider the following:
+  //            MLa     MLb
+  //   comb1 = {a,b}, {w, x}
+  //   comb2 = {a,b}, {y, z}
+  //   Note that MLs from analyses a and b are either identical sets or disjoint
+  //   However, comb1 U comb2 = {a, b, w, x, y, z}, for which this property does
+  //   not hold unless we work out a new hierarchy for MLb.
+  
+  // Unions are not hierarchical unless they're singletons
+  if(defaultMayEq) {
+    if(codeLocs.size()==1) return (*codeLocs.begin())->isHierarchy();
+    else return false;
+  }
+  
+  for(list<CodeLocObjectPtr>::const_iterator ml=codeLocs.begin(); ml!=codeLocs.end(); ml++)
+    if(!(*ml)->isHierarchy()) return false;
+  return true;
+}
+
+// Returns a key that uniquely identifies this particular AbstractObject in the 
+// set hierarchy.
+template <bool defaultMayEq>
+const AbstractObjectHierarchy::hierKeyPtr& CombinedCodeLocObject<defaultMayEq>::getHierKey() const {
+  // The intersection of multiple objects is just a filtering process from the full
+  // set of objects to the exact one, with each key in the hierarchy further filtering
+  // the set down. As such, a hierarchical key for the intersection of multiple objects
+  // is just the concatenation of the keys of all the individual objects.
+  if(!isHierKeyCached) {
+    ((CombinedCodeLocObject<defaultMayEq>*)this)->cachedHierKey = boost::make_shared<AOSHierKey>(((CombinedCodeLocObject<defaultMayEq>*)this)->shared_from_this());
+    
+    for(list<CodeLocObjectPtr>::const_iterator i=codeLocs.begin(); i!=codeLocs.end(); i++) {
+      AbstractObjectHierarchyPtr hierIt = boost::dynamic_pointer_cast<AbstractObjectHierarchy>(*i);
+      ROSE_ASSERT(hierIt);
+      
+      ((CombinedCodeLocObject<defaultMayEq>*)this)->cachedHierKey->add(hierIt->getHierKey()->begin(), hierIt->getHierKey()->end());
+    }
+    ((CombinedCodeLocObject<defaultMayEq>*)this)->isHierKeyCached = true;
+  }
+  return cachedHierKey;
+}
+
 // Create a function that uses examples of combined objects to force the compiler to generate these classes
 static void exampleCombinedCodeLocObjects2(CodeLocObjectPtr cl, std::list<CodeLocObjectPtr> cls, IntersectCodeLocObject& i, UnionCodeLocObject& u, IntersectCodeLocObject& i2, UnionCodeLocObject& u2);
 static void exampleCombinedCodeLocObjects(CodeLocObjectPtr cl, std::list<CodeLocObjectPtr> cls)
@@ -543,7 +675,7 @@ static void exampleCombinedCodeLocObjects2(CodeLocObjectPtr cl, std::list<CodeLo
    ############################### */
 
 template<class Key, bool mostAccurate>
-void MappedCodeLocObject<Key, mostAccurate>::add(Key key, CodeLocObjectPtr cl_p, PartEdgePtr pedge) {
+void MappedCodeLocObject<Key, mostAccurate>::add(Key key, CodeLocObjectPtr cl_p, PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis) {
   // If the object is already full don't add anything
   if(union_ && isFullCL(pedge)) return;
 
@@ -902,6 +1034,27 @@ bool MappedCodeLocObject<Key, mostAccurate>::isEmptyCL(PartEdgePtr pedge) {
   return false;
 }
 
+// Returns true if this AbstractObject corresponds to a concrete value that is statically-known
+template<class Key, bool mostAccurate>
+bool MappedCodeLocObject<Key, mostAccurate>::isConcrete() {
+  typename map<Key, CodeLocObjectPtr>::iterator it;
+  for(it = codeLocsMap.begin(); it != codeLocsMap.end(); ++it)
+    if(!it->second->isConcrete()) return false;
+  return true;
+}
+
+// Returns the number of concrete values in this set
+template<class Key, bool mostAccurate>
+int MappedCodeLocObject<Key, mostAccurate>::concreteSetSize() {
+  // This is an over-approximation of the set size that assumes that all the concrete sets of
+  // the sub-CodeLocs are disjoint
+  int size=0;
+  typename map<Key, CodeLocObjectPtr>::iterator it;
+  for(it = codeLocsMap.begin(); it != codeLocsMap.end(); ++it)
+    size += it->second->concreteSetSize();
+  return size;
+}
+
 template<class Key, bool mostAccurate>
 CodeLocObjectPtr MappedCodeLocObject<Key, mostAccurate>::copyCL() const {
   return boost::make_shared<MappedCodeLocObject<Key, mostAccurate> >(*this);
@@ -929,6 +1082,57 @@ string MappedCodeLocObject<Key, mostAccurate>::str(string indent) const {
   return oss.str();
 }
 
+// Returns whether all instances of this class form a hierarchy. Every instance of the same
+// class created by the same analysis must return the same value from this method!
+template<class Key, bool mostAccurate>
+bool MappedCodeLocObject<Key, mostAccurate>::isHierarchy() const {
+  // Combined CodeLocs form hierarchy if:
+  // - All the sub-CodeLocs form hierarchies of their own, AND
+  // - The combination is an intersection.
+  //   If the combination is a union then consider the following:
+  //            MLa     MLb
+  //   comb1 = {a,b}, {w, x}
+  //   comb2 = {a,b}, {y, z}
+  //   Note that MLs from analyses a and b are either identical sets or disjoint
+  //   However, comb1 U comb2 = {a, b, w, x, y, z}, for which this property does
+  //   not hold unless we work out a new hierarchy for MLb.
+  
+  // Unions are not hierarchical unless they're singletons
+  if(union_) {
+    if(codeLocsMap.size()==1) return codeLocsMap.begin()->second->isHierarchy();
+    else return false;
+  }
+  
+  typename map<Key, CodeLocObjectPtr>::const_iterator it;
+  for(it = codeLocsMap.begin(); it != codeLocsMap.end(); ++it)
+    if(!it->second->isHierarchy()) return false;
+  return true;
+}
+
+// Returns a key that uniquely identifies this particular AbstractObject in the 
+// set hierarchy.
+template<class Key, bool mostAccurate>
+const AbstractObjectHierarchy::hierKeyPtr& MappedCodeLocObject<Key, mostAccurate>::getHierKey() const {
+  // The intersection of multiple objects is just a filtering process from the full
+  // set of objects to the exact one, with each key in the hierarchy further filtering
+  // the set down. As such, a hierarchical key for the intersection of multiple objects
+  // is just the concatenation of the keys of all the individual objects.
+  if(!isHierKeyCached) {
+    ((MappedCodeLocObject<Key, mostAccurate>*)this)->cachedHierKey = boost::make_shared<AOSHierKey>(((MappedCodeLocObject<Key, mostAccurate>*)this)->shared_from_this());
+    
+    typename map<Key, CodeLocObjectPtr>::const_iterator it;
+    for(it = codeLocsMap.begin(); it != codeLocsMap.end(); ++it) {
+      AbstractObjectHierarchyPtr hierIt = boost::dynamic_pointer_cast<AbstractObjectHierarchy>(it->second);
+      ROSE_ASSERT(hierIt);
+      
+      ((MappedCodeLocObject<Key, mostAccurate>*)this)->cachedHierKey->add(hierIt->getHierKey()->begin(), hierIt->getHierKey()->end());
+    }
+    
+    ((MappedCodeLocObject<Key, mostAccurate>*)this)->isHierKeyCached = true;
+  }
+  return cachedHierKey;
+}
+
 /* ############################
    # PartEdgeUnionCodeLocObject #
    ############################ */
@@ -941,7 +1145,7 @@ PartEdgeUnionCodeLocObject::PartEdgeUnionCodeLocObject(const PartEdgeUnionCodeLo
   CodeLocObject(thatCL), unionCL_p(thatCL.copyCL()) {
 }
 
-void PartEdgeUnionCodeLocObject::add(CodeLocObjectPtr cl_p, PartEdgePtr pedge) {
+void PartEdgeUnionCodeLocObject::add(CodeLocObjectPtr cl_p, PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis) {
   // If this is the very first object
   if(!unionCL_p) unionCL_p = cl_p->copyCL();  
   // If Full return without adding
@@ -997,6 +1201,15 @@ bool PartEdgeUnionCodeLocObject::isEmptyCL(PartEdgePtr pedge) {
   return unionCL_p->isEmptyCL(pedge);
 }
 
+// Returns true if this ValueObject corresponds to a concrete value that is statically-known
+bool PartEdgeUnionCodeLocObject::isConcrete()
+{ return unionCL_p->isConcrete(); }
+
+// Returns the number of concrete values in this set
+int PartEdgeUnionCodeLocObject::concreteSetSize() {
+  return unionCL_p->concreteSetSize();
+}
+ 
 CodeLocObjectPtr PartEdgeUnionCodeLocObject::copyCL() const {
   return boost::make_shared<PartEdgeUnionCodeLocObject>(*this);
 }
@@ -1232,6 +1445,10 @@ bool FullValueObject::isEmptyV(PartEdgePtr pedge)
 bool FullValueObject::isConcrete()
 { return false; }
 
+// Returns the number of concrete values in this set
+int FullValueObject::concreteSetSize()
+{ return -1; }
+
 // Returns the type of the concrete value (if there is one)
 SgType* FullValueObject::getConcreteType()
 { return NULL; }
@@ -1427,6 +1644,13 @@ bool CombinedValueObject<defaultMayEq>::isConcrete()
   }
 }
 
+// Returns the number of concrete values in this set
+template <bool defaultMayEq>
+int CombinedValueObject<defaultMayEq>::concreteSetSize() {
+  assert(isConcrete());
+  return getConcreteValue().size();
+}
+
 // Returns the type of the concrete value (if there is one)
 template <bool defaultMayEq>
 SgType* CombinedValueObject<defaultMayEq>::getConcreteType()
@@ -1518,6 +1742,55 @@ static void exampleCombinedValueObjects2(ValueObjectPtr val, std::list<ValueObje
 }
 */
 
+// Returns whether all instances of this class form a hierarchy. Every instance of the same
+// class created by the same analysis must return the same value from this method!
+template <bool defaultMayEq>
+bool CombinedValueObject<defaultMayEq>::isHierarchy() const {
+  // Combined Values form hierarchy if:
+  // - All the sub-Values form hierarchies of their own, AND
+  // - The combination is an intersection.
+  //   If the combination is a union then consider the following:
+  //            MLa     MLb
+  //   comb1 = {a,b}, {w, x}
+  //   comb2 = {a,b}, {y, z}
+  //   Note that MLs from analyses a and b are either identical sets or disjoint
+  //   However, comb1 U comb2 = {a, b, w, x, y, z}, for which this property does
+  //   not hold unless we work out a new hierarchy for MLb.
+  
+  // Unions are not hierarchical unless they're singletons
+  if(defaultMayEq) {
+    if(vals.size()==1) return (*vals.begin())->isHierarchy();
+    else return false;
+  }
+  
+  for(list<ValueObjectPtr>::const_iterator ml=vals.begin(); ml!=vals.end(); ml++)
+    if(!(*ml)->isHierarchy()) return false;
+  return true;
+}
+
+// Returns a key that uniquely identifies this particular AbstractObject in the 
+// set hierarchy.
+template <bool defaultMayEq>
+const AbstractObjectHierarchy::hierKeyPtr& CombinedValueObject<defaultMayEq>::getHierKey() const {
+  // The intersection of multiple objects is just a filtering process from the full
+  // set of objects to the exact one, with each key in the hierarchy further filtering
+  // the set down. As such, a hierarchical key for the intersection of multiple objects
+  // is just the concatenation of the keys of all the individual objects.
+  if(!isHierKeyCached) {
+    ((CombinedValueObject<defaultMayEq>*)this)->cachedHierKey = boost::make_shared<AOSHierKey>(((CombinedValueObject<defaultMayEq>*)this)->shared_from_this());
+    
+    for(list<ValueObjectPtr>::const_iterator i=vals.begin(); i!=vals.end(); i++) {
+      AbstractObjectHierarchyPtr hierIt = boost::dynamic_pointer_cast<AbstractObjectHierarchy>(*i);
+      ROSE_ASSERT(hierIt);
+      
+      ((CombinedValueObject<defaultMayEq>*)this)->cachedHierKey->add(hierIt->getHierKey()->begin(), hierIt->getHierKey()->end());
+    }
+    ((CombinedValueObject<defaultMayEq>*)this)->isHierKeyCached = true;
+  }
+  return cachedHierKey;
+}
+
+
 /* ###########################
    #### MappedValueObject ####
    ########################### */
@@ -1526,7 +1799,7 @@ static void exampleCombinedValueObjects2(ValueObjectPtr val, std::list<ValueObje
 //! Vs that are full are never added to the map.
 //! If v_p is FullV or v_p->isFullV=true then mapped V is set to full only if mostAccurate=false.
 template<class Key, bool mostAccurate>
-void MappedValueObject<Key, mostAccurate>::add(Key key, ValueObjectPtr v_p, PartEdgePtr pedge) {
+void MappedValueObject<Key, mostAccurate>::add(Key key, ValueObjectPtr v_p, PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis) {
   // If the object is already full don't add anything
   if(union_ && isFullV(pedge)) return;
 
@@ -1913,6 +2186,13 @@ bool MappedValueObject<Key, mostAccurate>::isConcrete() {
   else assert(0);
 }
 
+// Returns the number of concrete values in this set
+template<class Key, bool mostAccurate>
+int MappedValueObject<Key, mostAccurate>::concreteSetSize() {
+  assert(isConcrete());
+  return getConcreteValue().size();
+}
+
 template<class Key, bool mostAccurate>
 SgType* MappedValueObject<Key, mostAccurate>::getConcreteType() {
   assert(isConcrete());
@@ -1993,6 +2273,57 @@ string MappedValueObject<Key, mostAccurate>::str(string indent) const {
   return oss.str();
 }
 
+// Returns whether all instances of this class form a hierarchy. Every instance of the same
+// class created by the same analysis must return the same value from this method!
+template<class Key, bool mostAccurate>
+bool MappedValueObject<Key, mostAccurate>::isHierarchy() const {
+  // Combined Values form hierarchy if:
+  // - All the sub-Values form hierarchies of their own, AND
+  // - The combination is an intersection.
+  //   If the combination is a union then consider the following:
+  //            MLa     MLb
+  //   comb1 = {a,b}, {w, x}
+  //   comb2 = {a,b}, {y, z}
+  //   Note that MLs from analyses a and b are either identical sets or disjoint
+  //   However, comb1 U comb2 = {a, b, w, x, y, z}, for which this property does
+  //   not hold unless we work out a new hierarchy for MLb.
+  
+  // Unions are not hierarchical unless they're singletons
+  if(union_) {
+    if(valuesMap.size()==1) return valuesMap.begin()->second->isHierarchy();
+    else return false;
+  }
+  
+  typename map<Key, ValueObjectPtr>::const_iterator it;
+  for(it = valuesMap.begin(); it != valuesMap.end(); ++it)
+    if(!it->second->isHierarchy()) return false;
+  return true;
+}
+
+// Returns a key that uniquely identifies this particular AbstractObject in the 
+// set hierarchy.
+template<class Key, bool mostAccurate>
+const AbstractObjectHierarchy::hierKeyPtr& MappedValueObject<Key, mostAccurate>::getHierKey() const {
+  // The intersection of multiple objects is just a filtering process from the full
+  // set of objects to the exact one, with each key in the hierarchy further filtering
+  // the set down. As such, a hierarchical key for the intersection of multiple objects
+  // is just the concatenation of the keys of all the individual objects.
+  if(!isHierKeyCached) {
+    ((MappedValueObject<Key, mostAccurate>*)this)->cachedHierKey = boost::make_shared<AOSHierKey>(((MappedValueObject<Key, mostAccurate>*)this)->shared_from_this());
+    
+    typename map<Key, ValueObjectPtr>::const_iterator it;
+    for(it = valuesMap.begin(); it != valuesMap.end(); ++it) {
+      AbstractObjectHierarchyPtr hierIt = boost::dynamic_pointer_cast<AbstractObjectHierarchy>(it->second);
+      ROSE_ASSERT(hierIt);
+      
+      ((MappedValueObject<Key, mostAccurate>*)this)->cachedHierKey->add(hierIt->getHierKey()->begin(), hierIt->getHierKey()->end());
+    }
+    
+    ((MappedValueObject<Key, mostAccurate>*)this)->isHierKeyCached = true;
+  }
+  return cachedHierKey;
+}
+
 /* ############################
    # PartEdgeUnionValueObject #
    ############################ */
@@ -2005,7 +2336,7 @@ PartEdgeUnionValueObject::PartEdgeUnionValueObject(const PartEdgeUnionValueObjec
   ValueObject(thatV), unionV_p(thatV.copyV()) {
 }
 
-void PartEdgeUnionValueObject::add(ValueObjectPtr v_p, PartEdgePtr pedge) {
+void PartEdgeUnionValueObject::add(ValueObjectPtr v_p, PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis) {
   // If this is the very first object
   if(!unionV_p) unionV_p = v_p->copyV();  
   // If Full return without adding
@@ -2073,6 +2404,11 @@ bool PartEdgeUnionValueObject::isConcrete() {
   return unionV_p->isConcrete();
 }
 
+// Returns the number of concrete values in this set
+int PartEdgeUnionValueObject::concreteSetSize() {
+  return unionV_p->concreteSetSize();
+}
+
 SgType* PartEdgeUnionValueObject::getConcreteType() {
   return unionV_p->getConcreteType();
 }
@@ -2092,7 +2428,7 @@ string PartEdgeUnionValueObject::str(string indent) const {
    ########################### */
 
 MemRegionObjectPtr NULLMemRegionObject;
-  
+
 // General version of mayEqual and mustEqual that accounts for framework details before routing the call to the 
 // derived class' may/mustEqual check. Specifically, it checks may/must equality with respect to ExprObj and routes
 // the call through the composer to make sure the may/mustEqual call gets the right PartEdge
@@ -2234,19 +2570,48 @@ bool MemRegionObject::meetUpdate(AbstractObjectPtr that, PartEdgePtr pedge, Comp
 }
 
 // General version of isFull/isEmpty that accounts for framework details before routing the call to the 
-  // derived class' isFullMR/isEmptyMR check. Specifically, it routes the call through the composer to make 
-  // sure the isFullMR/isEmptyMR call gets the right PartEdge
+// derived class' isFullMR/isEmptyMR check. Specifically, it routes the call through the composer to make
+// sure the isFullMR/isEmptyMR call gets the right PartEdge
 bool MemRegionObject::isFull(PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis)
 { return comp->isFullMR(shared_from_this(), pedge, analysis); }
 
 bool MemRegionObject::isEmpty(PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis)
 { return comp->isEmptyMR(shared_from_this(), pedge, analysis); }
 
+// General version of getRegionSize that accounts for framework details before routing the call to the
+// derived class' getRegionSizeMR(). Specifically, it routes the call through the composer to make
+// sure the getRegionSize call gets the right PartEdge
+ValueObjectPtr MemRegionObject::getRegionSize(PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis)
+{ return comp->getRegionSizeMR(shared_from_this(), pedge, analysis); }
+
 /* #####################################
    ##### FuncResultMemRegionObject ##### 
    ##################################### */
 
-// Special MemLocObject used internally by the framework to associate with the return value of a function
+// Special MemRegionObject used internally by the framework to associate with the return value of a function
+
+bool FuncResultMemRegionObject::FuncResultMemRegionObject_comparable::equal(const comparable& that_arg) const {
+  try {
+    const FuncResultMemRegionObject_comparable& that = dynamic_cast<const FuncResultMemRegionObject_comparable&>(that_arg);
+    // Since the argument has FuncResultMemRegionObject type, they're equal
+    return true;
+  } catch (std::bad_cast bc) {
+    // Since the argument does not have FuncResultMemRegionObject type, they're not equal
+    return false;
+  }
+}
+
+bool FuncResultMemRegionObject::FuncResultMemRegionObject_comparable::less(const comparable& that_arg) const {
+  try {
+    const FuncResultMemRegionObject_comparable& that = dynamic_cast<const FuncResultMemRegionObject_comparable&>(that_arg);
+    // Since the argument has FuncResultMemRe1gionObject type, they're equal, but not less-than
+    return false;
+  } catch (std::bad_cast bc) {
+    // Since the argument does not have FuncResultMemRegionObject type, they're not equal.
+    // We'll order FuncResultMemRegionObjects before all others, so return that this < that
+    return true;
+  }
+}
 
 FuncResultMemRegionObject::FuncResultMemRegionObject(Function func) : 
     MemRegionObject(NULL), func(func)
@@ -2298,7 +2663,7 @@ bool FuncResultMemRegionObject::isEmptyMR(PartEdgePtr pedge)
 }
 
 // Returns a ValueObject that denotes the size of this memory region
-ValueObjectPtr FuncResultMemRegionObject::getRegionSize(PartEdgePtr pedge) const
+ValueObjectPtr FuncResultMemRegionObject::getRegionSizeMR(PartEdgePtr pedge)
 {
   // The size of a function result is irrelevant since its internals cannot be accessed directly
   // (its possible to access the internals of its SgFunctionCallExp though) so we return an unknown size.
@@ -2309,6 +2674,19 @@ MemRegionObjectPtr FuncResultMemRegionObject::copyMR() const
 {
   return boost::make_shared<FuncResultMemRegionObject>(func);
 }
+
+// Returns a key that uniquely identifies this particular AbstractObject in the 
+// set hierarchy.
+const AbstractObjectHierarchy::hierKeyPtr& FuncResultMemRegionObject::getHierKey() const {
+  if(!isHierKeyCached) {
+    ((FuncResultMemRegionObject*)this)->cachedHierKey = boost::make_shared<AOSHierKey>(((FuncResultMemRegionObject*)this)->shared_from_this());
+    
+    ((FuncResultMemRegionObject*)this)->cachedHierKey->add(boost::make_shared<FuncResultMemRegionObject_comparable>());
+    ((FuncResultMemRegionObject*)this)->isHierKeyCached = true;
+  }
+  return cachedHierKey;
+}
+
 
 /* ##################################
    ##### FullMemRegionObject ##### 
@@ -2350,7 +2728,14 @@ bool FullMemRegionObject::isEmptyMR(PartEdgePtr pedge) {
   return false;
 }
 
-ValueObjectPtr FullMemRegionObject::getRegionSize(PartEdgePtr pedge) const {
+// Returns true if this AbstractObject corresponds to a concrete value that is statically-known
+bool FullMemRegionObject::isConcrete() { return false; }
+
+// Returns the number of concrete values in this set
+int FullMemRegionObject::concreteSetSize() { return -1; }
+ 
+
+ValueObjectPtr FullMemRegionObject::getRegionSizeMR(PartEdgePtr pedge) {
   return boost::make_shared<FullValueObject>();
 }
 
@@ -2400,7 +2785,8 @@ void CombinedMemRegionObject<defaultMayEq>::add(MemRegionObjectPtr memReg) {
 template <bool defaultMayEq>
 bool CombinedMemRegionObject<defaultMayEq>::mayEqualMR(MemRegionObjectPtr o, PartEdgePtr pedge)
 {
-  //dbg << "Comparing " << this->str("    ") << "with " << o->str("    ") << endl;
+  dbg << "Comparing " << this->str("    ") << "with " << o->str("    ") << endl;
+
   boost::shared_ptr<CombinedMemRegionObject<defaultMayEq> > that = boost::dynamic_pointer_cast<CombinedMemRegionObject<defaultMayEq> >(o);
   assert(that);
   
@@ -2497,7 +2883,7 @@ template <bool defaultMayEq>
 bool CombinedMemRegionObject<defaultMayEq>::isLiveMR(PartEdgePtr pedge)
 {
   assert(memRegions.size()>0);
-  
+//cout << "CombinedMemRegionObject<defaultMayEq>::isLiveMR"<<endl;  
   // If this is a union type (defaultMayEq=true), an object is live if any of its components are live (weakest constraint)
   // If this is an intersection type (defaultMayEq=false), an object is dead if any of its components are dead (strongest constraint)
   for(list<MemRegionObjectPtr>::const_iterator mr=memRegions.begin(); mr!=memRegions.end(); mr++)
@@ -2571,6 +2957,13 @@ bool CombinedMemRegionObject<defaultMayEq>::isConcrete() {
   return defaultMayEq;
 }
 
+// Returns the number of concrete values in this set
+template <bool defaultMayEq>
+int CombinedMemRegionObject<defaultMayEq>::concreteSetSize() {
+  assert(isConcrete());
+  return getConcrete().size();
+}
+
 // Returns the type of the concrete regions (if there is one)
 template <bool defaultMayEq>
 SgType* CombinedMemRegionObject<defaultMayEq>::getConcreteType() { 
@@ -2624,7 +3017,7 @@ std::set<SgNode* > CombinedMemRegionObject<defaultMayEq>::getConcrete() {
 
 // Returns a ValueObject that denotes the size of this memory region
 template <bool defaultMayEq>
-ValueObjectPtr CombinedMemRegionObject<defaultMayEq>::getRegionSize(PartEdgePtr pedge) const
+ValueObjectPtr CombinedMemRegionObject<defaultMayEq>::getRegionSizeMR(PartEdgePtr pedge)
 {
   assert(memRegions.size()>0);
   
@@ -2632,13 +3025,13 @@ ValueObjectPtr CombinedMemRegionObject<defaultMayEq>::getRegionSize(PartEdgePtr 
   // Merge the ValueObjects returned by calls to gerRegionSize on all sub-regions
   for(list<MemRegionObjectPtr>::const_iterator mr=memRegions.begin(); mr!=memRegions.end(); mr++) {
     if(mr==memRegions.begin())
-      res = (*mr)->getRegionSize(pedge)->copyV();
+      res = (*mr)->getRegionSizeMR(pedge)->copyV();
     else
       // !!! GB 2012-09-16 : this is not quite right. We should be calling meetUpdate() to make sure
       //        the call gets routed through the generic ValueObject machinery, if any, before being 
       //        forwarded to the meetUpdateV() method.
       // SA 2014/6/13: This will probably break if the ValueObjects stored in this collection are different
-      res->meetUpdateV((*mr)->getRegionSize(pedge), pedge);
+      res->meetUpdateV((*mr)->getRegionSizeMR(pedge), pedge);
   }
   return res;
 }
@@ -2660,6 +3053,54 @@ std::string CombinedMemRegionObject<defaultMayEq>::str(std::string indent) const
   return oss.str();
 }
 
+// Returns whether all instances of this class form a hierarchy. Every instance of the same
+// class created by the same analysis must return the same value from this method!
+template <bool defaultMayEq>
+bool CombinedMemRegionObject<defaultMayEq>::isHierarchy() const {
+  // Combined MemRegions form hierarchy if:
+  // - All the sub-MemRegions form hierarchies of their own, AND
+  // - The combination is an intersection.
+  //   If the combination is a union then consider the following:
+  //            MLa     MLb
+  //   comb1 = {a,b}, {w, x}
+  //   comb2 = {a,b}, {y, z}
+  //   Note that MLs from analyses a and b are either identical sets or disjoint
+  //   However, comb1 U comb2 = {a, b, w, x, y, z}, for which this property does
+  //   not hold unless we work out a new hierarchy for MLb.
+  
+  // Unions are not hierarchical unless they're singletons
+  if(defaultMayEq) {
+    if(memRegions.size()==1) return (*memRegions.begin())->isHierarchy();
+    else return false;
+  }
+  
+  for(list<MemRegionObjectPtr>::const_iterator ml=memRegions.begin(); ml!=memRegions.end(); ml++)
+    if(!(*ml)->isHierarchy()) return false;
+  return true;
+}
+
+// Returns a key that uniquely identifies this particular AbstractObject in the 
+// set hierarchy.
+template <bool defaultMayEq>
+const AbstractObjectHierarchy::hierKeyPtr& CombinedMemRegionObject<defaultMayEq>::getHierKey() const {
+  // The intersection of multiple objects is just a filtering process from the full
+  // set of objects to the exact one, with each key in the hierarchy further filtering
+  // the set down. As such, a hierarchical key for the intersection of multiple objects
+  // is just the concatenation of the keys of all the individual objects.
+  if(!isHierKeyCached) {
+    ((CombinedMemRegionObject<defaultMayEq>*)this)->cachedHierKey = boost::make_shared<AOSHierKey>(((CombinedMemRegionObject<defaultMayEq>*)this)->shared_from_this());
+    
+    for(list<MemRegionObjectPtr>::const_iterator i=memRegions.begin(); i!=memRegions.end(); i++) {
+      AbstractObjectHierarchyPtr hierIt = boost::dynamic_pointer_cast<AbstractObjectHierarchy>(*i);
+      ROSE_ASSERT(hierIt);
+      
+      ((CombinedMemRegionObject<defaultMayEq>*)this)->cachedHierKey->add(hierIt->getHierKey()->begin(), hierIt->getHierKey()->end());
+    }
+    ((CombinedMemRegionObject<defaultMayEq>*)this)->isHierKeyCached = true;
+  }
+  return cachedHierKey;
+}
+
 /* #################################
    ##### MappedMemRegionObject #####
    ################################# */
@@ -2668,7 +3109,7 @@ std::string CombinedMemRegionObject<defaultMayEq>::str(std::string indent) const
 //! MRs that are full are never added to the map.
 //! If mr_p is FullMR or mr_p->isFullMR=true then mapped MR is set to full only if mostAccurate=false.
 template<class Key, bool mostAccurate>
-void MappedMemRegionObject<Key, mostAccurate>::add(Key key, MemRegionObjectPtr mr_p, PartEdgePtr pedge) {
+void MappedMemRegionObject<Key, mostAccurate>::add(Key key, MemRegionObjectPtr mr_p, PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis) {
   // If the object is already full don't add anything
   if(union_ && isFullMR(pedge)) return;
 
@@ -3058,6 +3499,13 @@ bool MappedMemRegionObject<Key, mostAccurate>::isConcrete() {
   else assert(0);
 }
 
+// Returns the number of concrete values in this set
+template<class Key, bool mostAccurate>
+int MappedMemRegionObject<Key, mostAccurate>::concreteSetSize() {
+  assert(isConcrete());
+  return getConcrete().size();
+}
+
 template<class Key, bool mostAccurate>
 SgType* MappedMemRegionObject<Key, mostAccurate>::getConcreteType() {
   assert(isConcrete());
@@ -3109,7 +3557,7 @@ set<SgNode* > MappedMemRegionObject<Key, mostAccurate>::getConcrete() {
 //! Size of the memory region denoted by this memory object represented by a ValueObject
 //! Useful only if the object is not full
 template<class Key, bool mostAccurate>
-ValueObjectPtr MappedMemRegionObject<Key, mostAccurate>::getRegionSize(PartEdgePtr pedge) const {
+ValueObjectPtr MappedMemRegionObject<Key, mostAccurate>::getRegionSizeMR(PartEdgePtr pedge) {
   // Assert for atleast one element in the map
   // Should we handle full MR by returning FullValueObject?
   assert(memRegionsMap.size() > 0);
@@ -3120,9 +3568,9 @@ ValueObjectPtr MappedMemRegionObject<Key, mostAccurate>::getRegionSize(PartEdgeP
   boost::shared_ptr<MappedValueObject<Key, mostAccurate> > mvo_p = boost::make_shared<MappedValueObject<Key, mostAccurate> >();
   typename map<Key, MemRegionObjectPtr>::const_iterator it = memRegionsMap.begin();
   for( ; it != memRegionsMap.end(); ++it) {
-    ValueObjectPtr vo_p = it->second->getRegionSize(pedge);
+    ValueObjectPtr vo_p = it->second->getRegionSizeMR(pedge);
     Key k = it->first;    
-    mvo_p->add(k, vo_p, pedge);
+    mvo_p->add(k, vo_p, pedge, /*comp, analysis*/NULL, NULL);
   }
 
   return mvo_p;
@@ -3155,6 +3603,57 @@ string MappedMemRegionObject<Key, mostAccurate>::str(string indent) const {
   return oss.str();
 }
 
+// Returns whether all instances of this class form a hierarchy. Every instance of the same
+// class created by the same analysis must return the same value from this method!
+template<class Key, bool mostAccurate>
+bool MappedMemRegionObject<Key, mostAccurate>::isHierarchy() const {
+  // Combined MemRegions form hierarchy if:
+  // - All the sub-MemRegions form hierarchies of their own, AND
+  // - The combination is an intersection.
+  //   If the combination is a union then consider the following:
+  //            MLa     MLb
+  //   comb1 = {a,b}, {w, x}
+  //   comb2 = {a,b}, {y, z}
+  //   Note that MLs from analyses a and b are either identical sets or disjoint
+  //   However, comb1 U comb2 = {a, b, w, x, y, z}, for which this property does
+  //   not hold unless we work out a new hierarchy for MLb.
+  
+  // Unions are not hierarchical unless they're singletons
+  if(union_) {
+    if(memRegionsMap.size()==1) return memRegionsMap.begin()->second->isHierarchy();
+    else return false;
+  }
+  
+  typename map<Key, MemRegionObjectPtr>::const_iterator it;
+  for(it = memRegionsMap.begin(); it != memRegionsMap.end(); ++it)
+    if(!it->second->isHierarchy()) return false;
+  return true;
+}
+
+// Returns a key that uniquely identifies this particular AbstractObject in the 
+// set hierarchy.
+template<class Key, bool mostAccurate>
+const AbstractObjectHierarchy::hierKeyPtr& MappedMemRegionObject<Key, mostAccurate>::getHierKey() const {
+  // The intersection of multiple objects is just a filtering process from the full
+  // set of objects to the exact one, with each key in the hierarchy further filtering
+  // the set down. As such, a hierarchical key for the intersection of multiple objects
+  // is just the concatenation of the keys of all the individual objects.
+  if(!isHierKeyCached) {
+    ((MappedMemRegionObject<Key, mostAccurate>*)this)->cachedHierKey = boost::make_shared<AOSHierKey>(((MappedMemRegionObject<Key, mostAccurate>*)this)->shared_from_this());
+    
+    typename map<Key, MemRegionObjectPtr>::const_iterator it;
+    for(it = memRegionsMap.begin(); it != memRegionsMap.end(); ++it) {
+      AbstractObjectHierarchyPtr hierIt = boost::dynamic_pointer_cast<AbstractObjectHierarchy>(it->second);
+      ROSE_ASSERT(hierIt);
+      
+      ((MappedMemRegionObject<Key, mostAccurate>*)this)->cachedHierKey->add(hierIt->getHierKey()->begin(), hierIt->getHierKey()->end());
+    }
+    
+    ((MappedMemRegionObject<Key, mostAccurate>*)this)->isHierKeyCached = true;
+  }
+  return cachedHierKey;
+}
+
 /* ################################
    # PartEdgeUnionMemRegionObject #
    ################################ */
@@ -3167,7 +3666,7 @@ PartEdgeUnionMemRegionObject::PartEdgeUnionMemRegionObject(const PartEdgeUnionMe
   MemRegionObject(thatMR), unionMR_p(thatMR.copyMR()) {
 }
 
-void PartEdgeUnionMemRegionObject::add(MemRegionObjectPtr mr_p, PartEdgePtr pedge) {
+void PartEdgeUnionMemRegionObject::add(MemRegionObjectPtr mr_p, PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis) {
   // If this is the very first object
   if(!unionMR_p) unionMR_p = mr_p->copyMR();  
   // If Full return without adding
@@ -3233,14 +3732,16 @@ void PartEdgeUnionMemRegionObject::setMRToFull() {
 
 // Returns true if this MemRegionObject denotes a finite set of concrete regions
 bool PartEdgeUnionMemRegionObject::isConcrete() { return unionMR_p->isConcrete(); }
+// Returns the number of concrete values in this set
+int PartEdgeUnionMemRegionObject::concreteSetSize() { return unionMR_p->concreteSetSize(); }
 // Returns the type of the concrete regions (if there is one)
 SgType* PartEdgeUnionMemRegionObject::getConcreteType() { return unionMR_p->getConcreteType(); }
 // Returns the set of concrete memory regions as SgExpressions, which allows callers to use
 // the normal ROSE mechanisms to decode it
 std::set<SgNode* > PartEdgeUnionMemRegionObject::getConcrete() { return unionMR_p->getConcrete(); }
 
-ValueObjectPtr PartEdgeUnionMemRegionObject::getRegionSize(PartEdgePtr pedge) const {
-  return unionMR_p->getRegionSize(pedge);
+ValueObjectPtr PartEdgeUnionMemRegionObject::getRegionSizeMR(PartEdgePtr pedge) {
+  return unionMR_p->getRegionSizeMR(pedge);
 }
 
 string PartEdgeUnionMemRegionObject::str(string indent) const {
@@ -3257,37 +3758,39 @@ MemLocObjectPtr NULLMemLocObject;
 
 MemLocObject::MemLocObject(const MemLocObject& that) : 
     AbstractObject(that), 
+    AbstractObjectHierarchy(that), 
     region(that.region!=NULLMemRegionObject? that.region->copyMR(): NULLMemRegionObject), 
     index (that.index!=NULLValueObject     ? that.index->copyV()  : NULLValueObject)
 {
- // cout << "MemLocObject::MemLocObject("<<this<<") region="<<region.get()<<" that.region="<<that.region.get()<<"="<<(that.region? that.region->str(): "NULL")<<endl;
+  //cout << "MemLocObject::MemLocObject("<<this<<") isHierKeyCached="<<isHierKeyCached<<", region="<<region.get()<<" that.region="<<that.region.get()<<"="<<(that.region? that.region->str(): "NULL")<<endl;
+ 
 }
 
 MemRegionObjectPtr MemLocObject::getRegion() const { /*cout << "MemLocObject::getRegion("<<this<<") region="<<(region==NULLMemRegionObject?"NULL":region->str())<<endl; */return region; }
 ValueObjectPtr     MemLocObject::getIndex() const  { /*cout << "MemLocObject::getIndex("<<this<<") index="<<(index==NULLValueObject?"NULL":index->str())<<endl; */ return index; }
 
-// Returns whether this object may/must be equal to o within the given Part p
-// These methods are called by composers and should not be called by analyses.
-bool MemLocObject::mayEqualML(MemLocObjectPtr that, PartEdgePtr pedge) {
-  /*scope s("MemLocObject::mayEqualML");
-  dbg << "this="<<str()<<endl;
-  dbg << "that="<<that->str()<<endl;
-  
-  dbg << "eqRegion="<<(region->mayEqualMR(that->getRegion(), pedge))<<endl;
-  if(index && that->index) dbg << "eqIndex="<<(index->mayEqualV(that->getIndex(), pedge))<<endl;*/
-
-  return region && region->mayEqualMR(that->getRegion(), pedge) && 
-         ((!index && !that->index) || index->mayEqualV(that->getIndex(), pedge));
-}
-
-bool MemLocObject::mustEqualML(MemLocObjectPtr that, PartEdgePtr pedge) {
-  /*scope s("MemLocObject::mustEqualML");
-  dbg << "eqRegion="<<(region->mustEqualMR(that->getRegion(), pedge))<<endl;
-  if(index && that->index) dbg << "eqIndex="<<(index->mustEqualV(that->getIndex(), pedge))<<endl;*/
-  
-  return region->mustEqualMR(that->getRegion(), pedge) && 
-         ((!index && !that->index) || index->mustEqualV(that->getIndex(), pedge));
-}
+//// Returns whether this object may/must be equal to o within the given Part p
+//// These methods are called by composers and should not be called by analyses.
+//bool MemLocObject::mayEqualML(MemLocObjectPtr that, PartEdgePtr pedge) {
+//  /*scope s("MemLocObject::mayEqualML");
+//  dbg << "this="<<str()<<endl;
+//  dbg << "that="<<that->str()<<endl;
+//
+//  dbg << "eqRegion="<<(region->mayEqualMR(that->getRegion(), pedge))<<endl;
+//  if(index && that->index) dbg << "eqIndex="<<(index->mayEqualV(that->getIndex(), pedge))<<endl;*/
+//
+//  return region && region->mayEqualMR(that->getRegion(), pedge) &&
+//         ((!index && !that->index) || index->mayEqualV(that->getIndex(), pedge));
+//}
+//
+//bool MemLocObject::mustEqualML(MemLocObjectPtr that, PartEdgePtr pedge) {
+//  /*scope s("MemLocObject::mustEqualML");
+//  dbg << "eqRegion="<<(region->mustEqualMR(that->getRegion(), pedge))<<endl;
+//  if(index && that->index) dbg << "eqIndex="<<(index->mustEqualV(that->getIndex(), pedge))<<endl;*/
+//
+//  return region->mustEqualMR(that->getRegion(), pedge) &&
+//         ((!index && !that->index) || index->mustEqualV(that->getIndex(), pedge));
+//}
 
 // General version of mayEqual and mustEqual that accounts for framework details before routing the call to the 
 // derived class' may/mustEqual check. Specifically, it checks may/must equality with respect to ExprObj and routes
@@ -3298,11 +3801,29 @@ bool MemLocObject::mayEqual(MemLocObjectPtr that, PartEdgePtr pedge, Composer* c
          (boost::dynamic_pointer_cast<FuncResultMemLocObject>(that)==NULL))
     return false;
   
-  /*scope s("MemLocObject::mayEqual");
+  scope s("MemLocObject::mayEqual");
   dbg << "this="<<str()<<endl;
-  dbg << "that="<<that->str()<<endl;*/
+  dbg << "that="<<that->str()<<endl;
   
-  return mayEqualML(that, pedge);
+  //return mayEqualML(that, pedge);
+
+  // Returns true only if both this region and this index denot the same set as that region and index, respectively
+
+  // If this and that region overlap
+  if(getRegion()->mayEqual(that->getRegion(), pedge, comp, analysis)) {
+    if(getIndex()==NULLValueObject) {
+      // If both this->index and that->index are NULL, then their sets (full) overlap
+      if(that->getIndex()==NULLValueObject) return true;
+      // If both this->index is NULL (denotes the full set) but that->index is not, they overlap
+      else return true;
+    } else {
+      // If both that->index is NULL (denotes the full set) but this->index is not, they overlap
+      if(that->getIndex()==NULLValueObject) return true;
+      // If both are not NULL, forward the query to the implementation of this->index
+      else
+        return getIndex()->mayEqual(that->getIndex(), pedge, comp, analysis);
+    }
+  }
 }
 
 // General version of mayEqual and mustEqual that accounts for framework details before routing the call to the 
@@ -3313,7 +3834,26 @@ bool MemLocObject::mustEqual(MemLocObjectPtr that, PartEdgePtr pedge, Composer* 
   if((dynamic_cast<FuncResultMemLocObject*>(this)==NULL) !=
          (boost::dynamic_pointer_cast<FuncResultMemLocObject>(that)==NULL))
     return false;
-  return mustEqualML(that, pedge);
+  //return mustEqualML(that, pedge);
+
+  // Returns true only if both this region and this index denot the same set as that region and index, respectively
+
+  // If this region denotes the same set as that region in all executions
+  if(getRegion()->mustEqual(that->getRegion(), pedge, comp, analysis)) {
+    if(getIndex()==NULLValueObject) {
+      // If both this->index and that->index are NULL, we assume they're not mustEqual since
+      // NULL corresponds to the Full set of values
+      if(that->getIndex()==NULLValueObject) return false;
+      // If both this->index is NULL (denotes the full set) but that->index is not, they're not mustEqual
+      else return false;
+    } else {
+      // If both that->index is NULL (denotes the full set) but this->index is not, they're not mustEqual
+      if(that->getIndex()==NULLValueObject) return false;
+      // If both are not NULL, forward the query to the implementation of this->index
+      else
+        return getIndex()->mustEqual(that->getIndex(), pedge, comp, analysis);
+    }
+  }
 }
 
 // Check whether that is a MemLocObject and if so, call the version of mayEqual specific to MemLocObjects
@@ -3334,19 +3874,19 @@ bool MemLocObject::mustEqual(AbstractObjectPtr that, PartEdgePtr pedge, Composer
   else   return false;
 }
 
-// Returns whether the two abstract objects denote the same set of concrete objects
-// These methods are called by composers and should not be called by analyses.
-bool MemLocObject::equalSetML(MemLocObjectPtr that, PartEdgePtr pedge) {
-  return region->equalSetMR(that->getRegion(), pedge) && 
-         ((!index && !that->index) || index->equalSetV(that->getIndex(), pedge));
-}
-// Returns whether this abstract object denotes a non-strict subset (the sets may be equal) of the set denoted
-// by the given abstract object.
-// These methods are called by composers and should not be called by analyses.
-bool MemLocObject::subSetML(MemLocObjectPtr that, PartEdgePtr pedge) {
-  return region->subSetMR(that->getRegion(), pedge) && 
-         ((!index && !that->index) || index->subSetV(that->getIndex(), pedge));
-}
+//// Returns whether the two abstract objects denote the same set of concrete objects
+//// These methods are called by composers and should not be called by analyses.
+//bool MemLocObject::equalSetML(MemLocObjectPtr that, PartEdgePtr pedge) {
+//  return region->equalSetMR(that->getRegion(), pedge) &&
+//         ((!index && !that->index) || index->equalSetV(that->getIndex(), pedge));
+//}
+//// Returns whether this abstract object denotes a non-strict subset (the sets may be equal) of the set denoted
+//// by the given abstract object.
+//// These methods are called by composers and should not be called by analyses.
+//bool MemLocObject::subSetML(MemLocObjectPtr that, PartEdgePtr pedge) {
+//  return region->subSetMR(that->getRegion(), pedge) &&
+//         ((!index && !that->index) || index->subSetV(that->getIndex(), pedge));
+//}
 
 // Returns whether the two abstract objects denote the same set of concrete objects
 bool MemLocObject::equalSet(MemLocObjectPtr that, PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis) {
@@ -3354,8 +3894,36 @@ bool MemLocObject::equalSet(MemLocObjectPtr that, PartEdgePtr pedge, Composer* c
   if((dynamic_cast<FuncResultMemLocObject*>(this)==NULL) !=
          (boost::dynamic_pointer_cast<FuncResultMemLocObject>(that)==NULL))
     return false;
-  
-  return equalSetML(that, pedge);
+
+  //return equalSetML(that, pedge);
+
+  // Returns true only if both this region and this index denot the same set as that region and index, respectively
+
+  /*cout << "getRegion()="<<(region?region->str():"NULL")<<endl;
+    cout << "getRegion="<<(getRegion()?getRegion()->str():"NULL")<<endl;
+    cout << "this="<<str()<<endl;
+
+    cout << "that->region="<<(that->region?that->region->str():"NULL")<<endl;
+    cout << "that->getRegion="<<(that->getRegion()?that->getRegion()->str():"NULL")<<endl;
+    cout << "that="<<that->str()<<endl;*/
+
+  // If this region is denotes the same set as that region
+  if(getRegion()->equalSet(that->getRegion(), pedge, comp, analysis)) {
+    if(getIndex()==NULLValueObject) {
+      // If both this->index and that->index are NULL, then the subset property holds
+      if(that->getIndex()==NULLValueObject) return true;
+      // If both this->index is NULL (denotes the full set) but that->index is not,
+      // this->index is a equal to that->index only if that->index is Full
+      else return that->getIndex()->isFull(pedge, comp, analysis);
+    } else {
+      // If both that->index is NULL (denotes the full set) but this->index is not,
+      // this->index is a equal to that->index only if this->index is Full
+      if(that->getIndex()==NULLValueObject) return getIndex()->isFull(pedge, comp, analysis);
+      // If both are not NULL, forward the query to the implementation of this->index
+      else
+        return getIndex()->equalSet(that->getIndex(), pedge, comp, analysis);
+    }
+  }
 }
 
 // Returns whether this abstract object denotes a non-strict subset (the sets may be equal) of the set denoted
@@ -3366,7 +3934,26 @@ bool MemLocObject::subSet(MemLocObjectPtr that, PartEdgePtr pedge, Composer* com
          (boost::dynamic_pointer_cast<FuncResultMemLocObject>(that)==NULL))
     return false;
   
-  return subSetML(that, pedge);
+  //return subSetML(that, pedge);
+
+  // Returns true only if both this region and this index are a subset of that region and index, respectively
+
+  // If this region is a subset of that region
+  if(getRegion()->subSet(that->getRegion(), pedge, comp, analysis)) {
+    if(getIndex()==NULLValueObject) {
+      // If both this->index and that->index are NULL, then the subset property holds
+      if(that->getIndex()==NULLValueObject) return true;
+      // If both this->index is NULL (denotes the full set) but that->index is not,
+      // this->index is a subset of that->index only if that->index is Full
+      else return that->getIndex()->isFull(pedge, comp, analysis);
+    } else {
+      // If that->index is NULL (denotes the full set) but this->index is not
+      if(that->getIndex()==NULLValueObject) return true;
+      // If both are not NULL, forward the query to the implementation of this->index
+      else
+        return getIndex()->subSet(that->getIndex(), pedge, comp, analysis);
+    }
+  }
 }
 
 bool MemLocObject::equalSet(AbstractObjectPtr o, PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis)
@@ -3383,25 +3970,28 @@ bool MemLocObject::subSet(AbstractObjectPtr o, PartEdgePtr pedge, Composer* comp
   else   return false;
 }
 
-// Returns true if this object is live at the given part and false otherwise
-bool MemLocObject::isLiveML(PartEdgePtr pedge) {
-  return region->isLiveMR(pedge);
-}
+//// Returns true if this object is live at the given part and false otherwise
+//bool MemLocObject::isLiveML(PartEdgePtr pedge) {
+////cout << "MemLocObject::isLiveML(), region="<<region->str()<<endl;
+//  return region->isLiveMR(pedge);
+//}
 
 // General version of isLive that accounts for framework details before routing the call to the derived class' 
 // isLiveML check. Specifically, it routes the call through the composer to make sure the isLiveML call gets the 
 // right PartEdge
 bool MemLocObject::isLive(PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis)
-{ return isLiveML(pedge); }
+//{ return isLiveML(pedge); }
+{  return getRegion()->isLive(pedge, comp, analysis) &&
+         (!getIndex() || getIndex()->isLive(pedge, comp, analysis)); }
 
-// Computes the meet of this and that and saves the result in this
-// returns true if this causes this to change and false otherwise
-bool MemLocObject::meetUpdateML(MemLocObjectPtr that, PartEdgePtr pedge) { 
-  bool modified = false;
-  modified = region->meetUpdateMR(that->getRegion(), pedge) || modified;
-  if(index) modified = index->meetUpdateV(that->getIndex(), pedge) || modified;
-  return modified;
-}
+//// Computes the meet of this and that and saves the result in this
+//// returns true if this causes this to change and false otherwise
+//bool MemLocObject::meetUpdateML(MemLocObjectPtr that, PartEdgePtr pedge) {
+//  bool modified = false;
+//  modified = region->meetUpdateMR(that->getRegion(), pedge) || modified;
+//  if(index) modified = index->meetUpdateV(that->getIndex(), pedge) || modified;
+//  return modified;
+//}
 
 // General version of meetUpdate() that accounts for framework details before routing the call to the derived class' 
 // meetUpdateML check. Specifically, it routes the call through the composer to make sure the meetUpdateML 
@@ -3412,7 +4002,12 @@ bool MemLocObject::meetUpdate(MemLocObjectPtr that, PartEdgePtr pedge, Composer*
          (boost::dynamic_pointer_cast<FuncResultMemLocObject>(that)==NULL))
     assert(0);
   
-  return meetUpdateML(that, pedge);
+  //return meetUpdateML(that, pedge);
+  bool modified = false;
+  modified = getRegion()->meetUpdate(that->getRegion(), pedge, comp, analysis) || modified;
+  if(getIndex()!=NULLValueObject)
+    modified = getIndex()->meetUpdate(that->getIndex(), pedge, comp, analysis) || modified;
+  return modified;
 }
 
 bool MemLocObject::meetUpdate(AbstractObjectPtr that, PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis) {
@@ -3421,25 +4016,42 @@ bool MemLocObject::meetUpdate(AbstractObjectPtr that, PartEdgePtr pedge, Compose
   return meetUpdate(ml, pedge, comp, analysis);
 }
 
-// Returns whether this AbstractObject denotes the set of all possible execution prefixes.
-bool MemLocObject::isFullML(PartEdgePtr pedge) {
- return region->isFullMR(pedge) && (!index || index->isFullV(pedge));
-}
-
-// Returns whether this AbstractObject denotes the empty set.
-bool MemLocObject::isEmptyML(PartEdgePtr pedge) {
-  return region->isEmptyMR(pedge) && (!index || index->isEmptyV(pedge));
-}
+//// Returns whether this AbstractObject denotes the set of all possible execution prefixes.
+//bool MemLocObject::isFullML(PartEdgePtr pedge) {
+// return region->isFullMR(pedge) && (!index || index->isFullV(pedge));
+//}
+//
+//// Returns whether this AbstractObject denotes the empty set.
+//bool MemLocObject::isEmptyML(PartEdgePtr pedge) {
+//  return region->isEmptyMR(pedge) && (!index || index->isEmptyV(pedge));
+//}
 
 // General versions of isFull() and isEmpty that account for framework details before routing the call to the 
 // derived class' isFull() and isEmpty()  check. Specifically, it routes the call through the composer to make 
 // sure the isFull(PartEdgePtr) and isEmpty(PartEdgePtr) call gets the right PartEdge.
 // These functions are just aliases for the real implementations in AbstractObject
 bool MemLocObject::isFull(PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis)
-{ return isFullML(pedge); }
+//{ return isFullML(pedge); }
+// This MemLocObject is full if is region is Full and its index is either NULL or says its Full
+{ return getRegion()->isFull(pedge, comp, analysis) &&
+         (!getIndex() || getIndex()->isFull(pedge, comp, analysis)); }
 
 bool MemLocObject::isEmpty(PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis)
-{ return isEmptyML(pedge); }
+//{ return isEmptyML(pedge); }
+// This MemLocObject is Empty if either its region is empty or its index is empty,
+// with a NULL index considered to denote the full set
+{ return getRegion()->isEmpty(pedge, comp, analysis) ||
+         (!getIndex() && getIndex()->isEmpty(pedge, comp, analysis)); }
+
+// Returns true if this AbstractObject corresponds to a concrete value that is statically-known
+bool MemLocObject::isConcrete() {
+  return getRegion()->isConcrete() && (!getIndex() || getIndex()->isConcrete());
+}
+
+// Returns the number of concrete values in this set
+int MemLocObject::concreteSetSize()  {
+  return getRegion()->concreteSetSize() && (getIndex()? getIndex()->concreteSetSize(): 1);
+}
 
 // Allocates a copy of this object and returns a shared pointer to it
 MemLocObjectPtr MemLocObject::copyML() const
@@ -3452,13 +4064,45 @@ MemLocObject* MemLocObject::copyMLPtr() const
 
 std::string MemLocObject::str(std::string indent) const { // pretty print for the object
   ostringstream oss; 
-  oss << "[MemLocObject region="<<region->str(indent+"    ");
-  if(index) {
+  oss << "[MemLocObject region="<<getRegion()->str(indent+"    ");
+  if(getIndex()) {
     oss <<", "<<endl<<
-         indent << "             index="<<index->str(indent+"    ");
+         indent << "             index="<<getIndex()->str(indent+"    ");
   }
   oss <<"]";
   return oss.str();
+}
+
+// Returns whether all instances of this class form a hierarchy. Every instance of the same
+// class created by the same analysis must return the same value from this method!
+bool MemLocObject::isHierarchy() const {
+  //cout << "MemLocObject::isHierarchy() getRegion()->isHierarchy()="<<getRegion()->isHierarchy()<<", getIndex()->isHierarchy()="<<(getIndex()? getIndex()->isHierarchy(): -1)<<endl;
+  // MemLocs form a hierarchy only if their regions and indexes do
+  return getRegion()->isHierarchy() && (!getIndex() || getIndex()->isHierarchy());
+}
+
+// Returns a key that uniquely identifies this particular AbstractObject in the 
+// set hierarchy.
+const AbstractObjectHierarchy::hierKeyPtr& MemLocObject::getHierKey() const {
+  // The MemLoc denoted by region and index is essentially the intersection of the
+  // constraints imposed by each one. Thus, the key of a MemLoc combines
+  // their individual keys.
+  if(!isHierKeyCached) {
+    AbstractObjectHierarchyPtr hierRegion = boost::dynamic_pointer_cast<AbstractObjectHierarchy>(getRegion());
+    ROSE_ASSERT(hierRegion);
+    
+    ((MemLocObject*)this)->cachedHierKey = boost::make_shared<AOSHierKey>(((MemLocObject*)this)->shared_from_this(), hierRegion->getHierKey()->getList());
+    
+    if(getIndex()) {
+      AbstractObjectHierarchyPtr hierIndex = boost::dynamic_pointer_cast<AbstractObjectHierarchy>(getIndex());
+      ROSE_ASSERT(hierIndex);
+      
+      ((MemLocObject*)this)->cachedHierKey->add(hierIndex->getHierKey()->begin(), hierIndex->getHierKey()->end());
+    }
+    
+    ((MemLocObject*)this)->isHierKeyCached = true;
+  }
+  return cachedHierKey;
 }
 
 /* ##################################
@@ -3480,9 +4124,18 @@ MemLocObjectPtr FuncResultMemLocObject::copyML() const
   return boost::make_shared<FuncResultMemLocObject>(*this);
 }
 
-/* #############################
+// Returns a key that uniquely identifies this particular AbstractObject in the 
+// set hierarchy.
+const AbstractObjectHierarchy::hierKeyPtr& FuncResultMemLocObject::getHierKey() const {
+  AbstractObjectHierarchyPtr hierRegion = boost::dynamic_pointer_cast<AbstractObjectHierarchy>(getRegion());
+  ROSE_ASSERT(hierRegion);
+  return hierRegion->getHierKey();
+}
+
+
+/* ##########################
    #### FullMemLocObject ####
-   ############################# */
+   ########################## */
 
 bool FullMemLocObject::mayEqualML(MemLocObjectPtr o, PartEdgePtr pedge) {
   return true;
@@ -3519,7 +4172,13 @@ bool FullMemLocObject::isFullML(PartEdgePtr pedge) {
 bool FullMemLocObject::isEmptyML(PartEdgePtr pedge) {
   return false;
 }
-  
+
+// Returns true if this AbstractObject corresponds to a concrete value that is statically-known
+bool FullMemLocObject::isConcrete() { return false; }
+
+// Returns the number of concrete values in this set
+int FullMemLocObject::concreteSetSize() { return -1; }
+ 
 string FullMemLocObject::str(string indent) const {
   return "FullMemLocObject";
 }
@@ -3576,9 +4235,11 @@ void CombinedMemLocObject<defaultMayEq>::add(MemLocObjectPtr memLoc) {
 
 // Returns whether this object may/must be equal to o within the given Part p
 template <bool defaultMayEq>
-bool CombinedMemLocObject<defaultMayEq>::mayEqualML(MemLocObjectPtr o, PartEdgePtr pedge)
+//bool CombinedMemLocObject<defaultMayEq>::mayEqualML(MemLocObjectPtr o, PartEdgePtr pedge)
+bool CombinedMemLocObject<defaultMayEq>::mayEqual(AbstractObjectPtr o, PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis)
 {
-  //dbg << "Comparing " << this->str("    ") << "with " << o->str("    ") << endl;
+  scope s("CombinedMemLocObject<defaultMayEq>::mayEqual");
+  dbg << "Comparing " << this->str("    ") << "with " << o->str("    ") << endl;
   boost::shared_ptr<CombinedMemLocObject<defaultMayEq> > that = boost::dynamic_pointer_cast<CombinedMemLocObject<defaultMayEq> >(o);
   assert(that);
   
@@ -3593,14 +4254,16 @@ bool CombinedMemLocObject<defaultMayEq>::mayEqualML(MemLocObjectPtr o, PartEdgeP
       thisIt!=memLocs.end();
       thisIt++, thatIt++)
   {
-    if((*thisIt)->mayEqualML(*thatIt, pedge) == defaultMayEq) return defaultMayEq;
+    //if((*thisIt)->mayEqualML(*thatIt, pedge) == defaultMayEq) return defaultMayEq;
+    if((*thisIt)->mayEqual(*thatIt, pedge, comp, analysis) == defaultMayEq) return defaultMayEq;
   }
   
   return !defaultMayEq;
 }
 
 template <bool defaultMayEq>
-bool CombinedMemLocObject<defaultMayEq>::mustEqualML(MemLocObjectPtr o, PartEdgePtr pedge)
+//bool CombinedMemLocObject<defaultMayEq>::mustEqualML(MemLocObjectPtr o, PartEdgePtr pedge)
+bool CombinedMemLocObject<defaultMayEq>::mustEqual(AbstractObjectPtr o, PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis)
 {
   boost::shared_ptr<CombinedMemLocObject<defaultMayEq> > that = boost::dynamic_pointer_cast<CombinedMemLocObject<defaultMayEq> >(o);
   assert(that);
@@ -3615,7 +4278,8 @@ bool CombinedMemLocObject<defaultMayEq>::mustEqualML(MemLocObjectPtr o, PartEdge
       thisIt!=memLocs.end();
       thisIt++, thatIt++)
   {
-    if((*thisIt)->mustEqualML(*thatIt, pedge) == !defaultMayEq) return !defaultMayEq;
+    //if((*thisIt)->mustEqualML(*thatIt, pedge) == !defaultMayEq) return !defaultMayEq;
+    if((*thisIt)->mustEqual(*thatIt, pedge, comp, analysis) == !defaultMayEq) return !defaultMayEq;
   }
   
   return defaultMayEq;
@@ -3623,7 +4287,8 @@ bool CombinedMemLocObject<defaultMayEq>::mustEqualML(MemLocObjectPtr o, PartEdge
 
 // Returns whether the two abstract objects denote the same set of concrete objects
 template <bool defaultMayEq>
-bool CombinedMemLocObject<defaultMayEq>::equalSetML(MemLocObjectPtr o, PartEdgePtr pedge)
+//bool CombinedMemLocObject<defaultMayEq>::equalSetML(MemLocObjectPtr o, PartEdgePtr pedge)
+bool CombinedMemLocObject<defaultMayEq>::equalSet(AbstractObjectPtr o, PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis)
 {
   boost::shared_ptr<CombinedMemLocObject<defaultMayEq> > that = boost::dynamic_pointer_cast<CombinedMemLocObject<defaultMayEq> >(o);
   assert(that);
@@ -3634,14 +4299,16 @@ bool CombinedMemLocObject<defaultMayEq>::equalSetML(MemLocObjectPtr o, PartEdgeP
   list<MemLocObjectPtr>::const_iterator mlThis = memLocs.begin();
   list<MemLocObjectPtr>::const_iterator mlThat = that->memLocs.begin();
   for(; mlThis!=memLocs.end(); mlThis++, mlThat++)
-    if(!(*mlThis)->equalSetML(*mlThat, pedge)) return false;
+    //if(!(*mlThis)->equalSetML(*mlThat, pedge)) return false;
+    if(!(*mlThis)->equalSet(*mlThat, pedge, comp, analysis)) return false;
   return true;
 }
 
 // Returns whether this abstract object denotes a non-strict subset (the sets may be equal) of the set denoted
 // by the given abstract object.
 template <bool defaultMayEq>
-bool CombinedMemLocObject<defaultMayEq>::subSetML(MemLocObjectPtr o, PartEdgePtr pedge)
+//bool CombinedMemLocObject<defaultMayEq>::subSetML(MemLocObjectPtr o, PartEdgePtr pedge)
+bool CombinedMemLocObject<defaultMayEq>::subSet(AbstractObjectPtr o, PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis)
 {
   boost::shared_ptr<CombinedMemLocObject<defaultMayEq> > that = boost::dynamic_pointer_cast<CombinedMemLocObject<defaultMayEq> >(o);
   assert(that);
@@ -3654,19 +4321,28 @@ bool CombinedMemLocObject<defaultMayEq>::subSetML(MemLocObjectPtr o, PartEdgePtr
       thisIt!=memLocs.end();
       thisIt++, thatIt++)
   {
-    if((*thisIt)->subSetML(*thatIt, pedge) == defaultMayEq) return defaultMayEq;
+    //if((*thisIt)->subSetML(*thatIt, pedge) == defaultMayEq) return defaultMayEq;
+    if((*thisIt)->subSet(*thatIt, pedge, comp, analysis) == defaultMayEq) return defaultMayEq;
   }
   return !defaultMayEq;
 }
 
 // Returns true if this object is live at the given part and false otherwise
 template <bool defaultMayEq>
-bool CombinedMemLocObject<defaultMayEq>::isLiveML(PartEdgePtr pedge)
+//bool CombinedMemLocObject<defaultMayEq>::isLiveML(PartEdgePtr pedge)
+// General version of isLive that accounts for framework details before routing the call to the derived class' 
+// isLiveML check. Specifically, it routes the call through the composer to make sure the isLiveML call gets the 
+// right PartEdge
+bool CombinedMemLocObject<defaultMayEq>::isLive(PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis)
 {
+//cout << "CombinedMemLocObject<defaultMayEq>::isLiveML union="<<defaultMayEq<<", #memLocs="<<memLocs.size()<<endl;
   // If this is a union type (defaultMayEq=true), an object is live if any of its components are live (weakest constraint)
   // If this is an intersection type (defaultMayEq=false), an object is dead if any of its components are dead (strongest constraint)
-  for(list<MemLocObjectPtr>::const_iterator ml=memLocs.begin(); ml!=memLocs.end(); ml++)
-    if((*ml)->isLiveML(pedge) == defaultMayEq) return defaultMayEq;
+  for(list<MemLocObjectPtr>::const_iterator ml=memLocs.begin(); ml!=memLocs.end(); ml++) {
+//    cout << "  ml="<<(*ml)->str()<<endl;
+    //if((*ml)->isLiveML(pedge) == defaultMayEq) { /*cout << "    LIVE"<<endl; */return defaultMayEq; }
+    if((*ml)->isLive(pedge, comp, analysis) == defaultMayEq) { /*cout << "    LIVE"<<endl; */return defaultMayEq; }
+  }
   
   return !defaultMayEq;
 }
@@ -3674,7 +4350,8 @@ bool CombinedMemLocObject<defaultMayEq>::isLiveML(PartEdgePtr pedge)
 // Computes the meet of this and that and saves the result in this
 // returns true if this causes this to change and false otherwise
 template <bool defaultMayEq>
-bool CombinedMemLocObject<defaultMayEq>::meetUpdateML(MemLocObjectPtr o, PartEdgePtr pedge)
+//bool CombinedMemLocObject<defaultMayEq>::meetUpdateML(MemLocObjectPtr o, PartEdgePtr pedge)
+bool CombinedMemLocObject<defaultMayEq>::meetUpdate(AbstractObjectPtr o, PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis)
 {
   boost::shared_ptr<CombinedMemLocObject<defaultMayEq> > that = boost::dynamic_pointer_cast<CombinedMemLocObject<defaultMayEq> >(o);
   assert(that);
@@ -3685,32 +4362,56 @@ bool CombinedMemLocObject<defaultMayEq>::meetUpdateML(MemLocObjectPtr o, PartEdg
   list<MemLocObjectPtr>::const_iterator mlThis = memLocs.begin();
   list<MemLocObjectPtr>::const_iterator mlThat = that->memLocs.begin();
   for(; mlThis!=memLocs.end(); mlThis++, mlThat++)
-    modified = (*mlThis)->meetUpdateML(*mlThat, pedge) || modified;
+    //modified = (*mlThis)->meetUpdateML(*mlThat, pedge) || modified;
+    modified = (*mlThis)->meetUpdate(*mlThat, pedge, comp, analysis) || modified;
   return modified;
 }
 
 // Returns whether this AbstractObject denotes the set of all possible execution prefixes.
 template <bool defaultMayEq>
-bool CombinedMemLocObject<defaultMayEq>::isFullML(PartEdgePtr pedge)
+//bool CombinedMemLocObject<defaultMayEq>::isFullML(PartEdgePtr pedge)
+bool CombinedMemLocObject<defaultMayEq>::isFull(PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis)
 {
   // If this is a union type (defaultMayEq=true), an object is full if any of its components are full (weakest constraint)
   // If this is an intersection type (defaultMayEq=false), an object is not full if any of its components are not full (strongest constraint)
   for(list<MemLocObjectPtr>::const_iterator ml=memLocs.begin(); ml!=memLocs.end(); ml++)
-    if((*ml)->isFullML(pedge) == defaultMayEq) return defaultMayEq;
+    //if((*ml)->isFullML(pedge) == defaultMayEq) return defaultMayEq;
+    if((*ml)->isFull(pedge, comp, analysis) == defaultMayEq) return defaultMayEq;
   
   return !defaultMayEq;
 }
 
 // Returns whether this AbstractObject denotes the empty set.
 template <bool defaultMayEq>
-bool CombinedMemLocObject<defaultMayEq>::isEmptyML(PartEdgePtr pedge)
+//bool CombinedMemLocObject<defaultMayEq>::isEmptyML(PartEdgePtr pedge)
+bool CombinedMemLocObject<defaultMayEq>::isEmpty(PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis)
 {
   // If this is a union type (defaultMayEq=true), an object is not empty if any of its components are not empty (weakest constraint)
   // If this is an intersection type (defaultMayEq=false), an object is empty if any of its components are empty (strongest constraint)
   for(list<MemLocObjectPtr>::const_iterator ml=memLocs.begin(); ml!=memLocs.end(); ml++)
-    if((*ml)->isEmptyML(pedge) != defaultMayEq) return !defaultMayEq;
+    //if((*ml)->isEmptyML(pedge) != defaultMayEq) return !defaultMayEq;
+    if((*ml)->isEmpty(pedge, comp, analysis) != defaultMayEq) return !defaultMayEq;
   
   return defaultMayEq;
+}
+
+// Returns true if this AbstractObject corresponds to a concrete value that is statically-known
+template <bool defaultMayEq>
+bool CombinedMemLocObject<defaultMayEq>::isConcrete() {
+  for(list<MemLocObjectPtr>::const_iterator ml=memLocs.begin(); ml!=memLocs.end(); ml++)
+    if(!(*ml)->isConcrete()) return false;
+  return true;
+}
+
+// Returns the number of concrete values in this set
+template <bool defaultMayEq>
+int CombinedMemLocObject<defaultMayEq>::concreteSetSize() {
+  // This is an over-approximation of the set size that assumes that all the concrete sets of
+  // the sub-MemLocs are disjoint
+  int size=0;
+  for(list<MemLocObjectPtr>::const_iterator ml=memLocs.begin(); ml!=memLocs.end(); ml++)
+    size += (*ml)->concreteSetSize();
+  return size;
 }
 
 // Allocates a copy of this object and returns a pointer to it
@@ -3733,6 +4434,56 @@ std::string CombinedMemLocObject<defaultMayEq>::str(std::string indent) const
   if(memLocs.size()>1) oss << "]";
   
   return oss.str();
+}
+
+// Returns whether all instances of this class form a hierarchy. Every instance of the same
+// class created by the same analysis must return the same value from this method!
+template <bool defaultMayEq>
+bool CombinedMemLocObject<defaultMayEq>::isHierarchy() const {
+  // Combined MemLocs form hierarchy if:
+  // - All the sub-MemLocs form hierarchies of their own, AND
+  // - The combination is an intersection.
+  //   If the combination is a union then consider the following:
+  //            MLa     MLb
+  //   comb1 = {a,b}, {w, x}
+  //   comb2 = {a,b}, {y, z}
+  //   Note that MLs from analyses a and b are either identical sets or disjoint
+  //   However, comb1 U comb2 = {a, b, w, x, y, z}, for which this property does
+  //   not hold unless we work out a new hierarchy for MLb.
+  
+  // Unions are not hierarchical unless they're singletons
+  if(defaultMayEq) {
+    if(memLocs.size()==1) return (*memLocs.begin())->isHierarchy();
+    else return false;
+  }
+  
+  for(list<MemLocObjectPtr>::const_iterator ml=memLocs.begin(); ml!=memLocs.end(); ml++)
+    if(!(*ml)->isHierarchy()) return false;
+  return true;
+}
+
+// Returns a key that uniquely identifies this particular AbstractObject in the 
+// set hierarchy.
+template <bool defaultMayEq>
+const AbstractObjectHierarchy::hierKeyPtr& CombinedMemLocObject<defaultMayEq>::getHierKey() const {
+  // The intersection of multiple objects is just a filtering process from the full
+  // set of objects to the exact one, with each key in the hierarchy further filtering
+  // the set down. As such, a hierarchical key for the intersection of multiple objects
+  // is just the concatenation of the keys of all the individual objects.
+//  dbg << "CombinedMemLocObject<defaultMayEq>::getHierKey() isHierKeyCached="<<isHierKeyCached<<", #memLocs="<<memLocs.size()<<endl;
+  //cout << "CombinedMemLocObject<defaultMayEq>::getHierKey() isHierKeyCached="<<isHierKeyCached<<", #memLocs="<<memLocs.size()<<endl;
+  if(!isHierKeyCached) {
+    ((CombinedMemLocObject<defaultMayEq>*)this)->cachedHierKey = boost::make_shared<AOSHierKey>(((CombinedMemLocObject<defaultMayEq>*)this)->shared_from_this());
+    
+    for(list<MemLocObjectPtr>::const_iterator ml=memLocs.begin(); ml!=memLocs.end(); ml++) {
+//      dbg << "cur Key="<<(*ml)->getHierKey()<<endl;
+      ((CombinedMemLocObject<defaultMayEq>*)this)->cachedHierKey->add((*ml)->getHierKey()->begin(), (*ml)->getHierKey()->end());
+    }
+    ((CombinedMemLocObject<defaultMayEq>*)this)->isHierKeyCached = true;
+  }
+//  dbg << "cachedHierKey="<<cachedHierKey<<endl;
+  //cout << ">>> isHierKeyCached="<<isHierKeyCached<<"   cachedHierKey="<<cachedHierKey<<endl;
+  return cachedHierKey;
 }
 
 /* ##############################
@@ -3771,12 +4522,14 @@ ValueObjectPtr     MappedMemLocObject<Key, mostAccurate>::getIndex() const {
 //! MLs that are full are never added to the map.
 //! If ml_p is FullML or ml_p->isFullML=true then mapped ML is set to full only if mostAccurate=false.
 template<class Key, bool mostAccurate>
-void MappedMemLocObject<Key, mostAccurate>::add(Key key, MemLocObjectPtr ml_p, PartEdgePtr pedge) {
+void MappedMemLocObject<Key, mostAccurate>::add(Key key, MemLocObjectPtr ml_p, PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis) {
   // If the object is already full don't add anything
-  if(union_ && isFullML(pedge)) return;
+  //if(union_ && isFullML(pedge)) return;
+  if(union_ && isFull(pedge, comp, analysis)) return;
 
   // If the ml_p is not full add/update the map
-  if(!ml_p->isFullML(pedge)) {
+  //if(!ml_p->isFullML(pedge)) {
+  if(!ml_p->isFull(pedge, comp, analysis)) {
     memLocsMap[key] = ml_p;
   }
   else {
@@ -3788,11 +4541,12 @@ void MappedMemLocObject<Key, mostAccurate>::add(Key key, MemLocObjectPtr ml_p, P
 template<class Key, bool mostAccurate>
 bool MappedMemLocObject<Key, mostAccurate>::mayEqualMLWithKey(Key key,
                                                               const map<Key, MemLocObjectPtr>& thatMLMap, 
-                                                              PartEdgePtr pedge) {
+                                                              PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis) {
   typename map<Key, MemLocObjectPtr>::const_iterator s_it;
   s_it = thatMLMap.find(key);
   if(s_it == thatMLMap.end()) return true;
-  return memLocsMap[key]->mayEqualML(s_it->second, pedge);
+  //return memLocsMap[key]->mayEqualML(s_it->second, pedge);
+  return memLocsMap[key]->mayEqual(s_it->second, pedge, comp, analysis);
 }
 
 //! Two ML objects are may equals if there is atleast one execution or sub-exectuion
@@ -3808,7 +4562,8 @@ bool MappedMemLocObject<Key, mostAccurate>::mayEqualMLWithKey(Key key,
 //! MayEquality check on mapped ML is performed on intersection of sub-executions
 //! or union of sub-executions over the keyed ML objects. 
 template<class Key, bool mostAccurate>
-bool MappedMemLocObject<Key, mostAccurate>::mayEqualML(MemLocObjectPtr thatML, PartEdgePtr pedge) {
+//bool MappedMemLocObject<Key, mostAccurate>::mayEqualML(MemLocObjectPtr thatML, PartEdgePtr pedge) {
+bool MappedMemLocObject<Key, mostAccurate>::mayEqual(MemLocObjectPtr thatML, PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis) {
   // scope s(txt()<<"MappedMemLocObject::mayEqualML", scope::medium);
   boost::shared_ptr<MappedMemLocObject<Key, mostAccurate> > thatML_p = 
     boost::dynamic_pointer_cast<MappedMemLocObject<Key, mostAccurate> >(thatML);
@@ -3818,10 +4573,12 @@ bool MappedMemLocObject<Key, mostAccurate>::mayEqualML(MemLocObjectPtr thatML, P
   // dbg << "thatML=" << thatML_p->str() << endl;
 
   // This object denotes full set of ML (full set of executions)
-  if(isFullML(pedge)) return true;
+  //if(isFullML(pedge)) return true;
+  if(isFull(pedge, comp, analysis)) return true;
 
   // denotes empty set
-  if(isEmptyML(pedge)) return false;
+  //if(isEmptyML(pedge)) return false;
+  if(isEmpty(pedge, comp, analysis)) return false;
 
   // presence of one more full objects will result in full set over union
   if(union_ && n_FullML > 0) return true;
@@ -3833,7 +4590,7 @@ bool MappedMemLocObject<Key, mostAccurate>::mayEqualML(MemLocObjectPtr thatML, P
   typename map<Key, MemLocObjectPtr>::iterator it;
   for(it = memLocsMap.begin(); it != memLocsMap.end(); ++it) {
     // discharge query
-    bool isMayEq = mayEqualMLWithKey(it->first, thatMLMap, pedge);
+    bool isMayEq = mayEqualMLWithKey(it->first, thatMLMap, pedge, comp, analysis);
     
     // dbg << "key=" << (it->first)->str() << ", isMayEq=" << isMayEq << endl;
 
@@ -3867,11 +4624,12 @@ bool MappedMemLocObject<Key, mostAccurate>::mayEqualML(MemLocObjectPtr thatML, P
 template<class Key, bool mostAccurate>
 bool MappedMemLocObject<Key, mostAccurate>::mustEqualMLWithKey(Key key,
                                                                const map<Key, MemLocObjectPtr>& thatMLMap, 
-                                                               PartEdgePtr pedge) {
+                                                               PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis) {
   typename map<Key, MemLocObjectPtr>::const_iterator s_it;
   s_it = thatMLMap.find(key);
   if(s_it == thatMLMap.end()) return false;
-  return memLocsMap[key]->mustEqualML(s_it->second, pedge);
+  //return memLocsMap[key]->mustEqualML(s_it->second, pedge);
+  return memLocsMap[key]->mustEqual(s_it->second, pedge, comp, analysis);
 }
 
 //! Two ML objects are must equals if they represent the same single memory 
@@ -3887,16 +4645,19 @@ bool MappedMemLocObject<Key, mostAccurate>::mustEqualMLWithKey(Key key,
 //! MustEquality check on mapped ML is performed on intersection (mostAccurate=true) of sub-executions
 //! or union (mostAccurate=false) of sub-executions over the keyed ML objects. 
 template<class Key, bool mostAccurate>
-bool MappedMemLocObject<Key, mostAccurate>::mustEqualML(MemLocObjectPtr thatML, PartEdgePtr pedge) {
+//bool MappedMemLocObject<Key, mostAccurate>::mustEqualML(MemLocObjectPtr thatML, PartEdgePtr pedge) {
+bool MappedMemLocObject<Key, mostAccurate>::mustEqual(MemLocObjectPtr thatML, PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis) {
   boost::shared_ptr<MappedMemLocObject<Key, mostAccurate> > thatML_p = 
     boost::dynamic_pointer_cast<MappedMemLocObject<Key, mostAccurate> >(thatML);
   assert(thatML_p);
 
   // This object denotes full set of ML (full set of executions)
-  if(isFullML(pedge)) return false;
+  //if(isFullML(pedge)) return false;
+  if(isFull(pedge, comp, analysis)) return false;
 
   // denotes empty set
-  if(isEmptyML(pedge)) return false;
+  //if(isEmptyML(pedge)) return false;
+  if(isEmpty(pedge, comp, analysis)) return false;
 
   // presence of one more full objects will result in full set over union
   if(union_ && n_FullML > 0) return true;
@@ -3908,7 +4669,7 @@ bool MappedMemLocObject<Key, mostAccurate>::mustEqualML(MemLocObjectPtr thatML, 
   typename map<Key, MemLocObjectPtr>::iterator it;
   for(it = memLocsMap.begin(); it != memLocsMap.end(); ++it) {
     // discharge query
-    bool isMustEq = mustEqualMLWithKey(it->first, thatMLMap, pedge);
+    bool isMustEq = mustEqualMLWithKey(it->first, thatMLMap, pedge, comp, analysis);
 
     // 1. Union of sub-executions and the object does not contain any full objects
     // If the discharged query comes back as false for this case then we have found atleast one execution
@@ -3942,11 +4703,12 @@ bool MappedMemLocObject<Key, mostAccurate>::mustEqualML(MemLocObjectPtr thatML, 
 template<class Key, bool mostAccurate>
 bool MappedMemLocObject<Key, mostAccurate>::equalSetMLWithKey(Key key,
                                                               const map<Key, MemLocObjectPtr>& thatMLMap, 
-                                                              PartEdgePtr pedge) {
+                                                              PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis) {
   typename map<Key, MemLocObjectPtr>::const_iterator s_it;
   s_it = thatMLMap.find(key);
   if(s_it == thatMLMap.end()) return false;
-  return memLocsMap[key]->equalSetML(s_it->second, pedge);
+  //return memLocsMap[key]->equalSetML(s_it->second, pedge);
+  return memLocsMap[key]->equalSet(s_it->second, pedge, comp, analysis);
 }
 
 //! Two objects are equal sets if they denote the same set of memory locations
@@ -3955,23 +4717,26 @@ bool MappedMemLocObject<Key, mostAccurate>::equalSetMLWithKey(Key key,
 //! Simply discharge the queries to all keyed MemLoc objects
 //! If all the discharged queries come back equal then the two objects are equal otherwise not.
 template<class Key, bool mostAccurate>
-bool MappedMemLocObject<Key, mostAccurate>::equalSetML(MemLocObjectPtr thatML, PartEdgePtr pedge) {
+//bool MappedMemLocObject<Key, mostAccurate>::equalSetML(MemLocObjectPtr thatML, PartEdgePtr pedge) {
+bool MappedMemLocObject<Key, mostAccurate>::equalSet(MemLocObjectPtr thatML, PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis) {
   boost::shared_ptr<MappedMemLocObject<Key, mostAccurate> > thatML_p = 
     boost::dynamic_pointer_cast<MappedMemLocObject<Key, mostAccurate> >(thatML);  
   assert(thatML_p);
 
   // This object denotes full set of ML (full set of executions)
-  if(isFullML(pedge)) return thatML_p->isFullML(pedge);
+  //if(isFullML(pedge)) return thatML_p->isFullML(pedge);
+  if(isFull(pedge, comp, analysis)) return thatML_p->isFull(pedge, comp, analysis);
 
   // denotes empty set
-  if(isEmptyML(pedge)) return thatML_p->isEmptyML(pedge);
+  //if(isEmptyML(pedge)) return thatML_p->isEmptyML(pedge);
+  if(isEmpty(pedge, comp, analysis)) return thatML_p->isEmpty(pedge, comp, analysis);
 
   const map<Key, MemLocObjectPtr> thatMLMap = thatML_p->getMemLocsMap();
   typename map<Key, MemLocObjectPtr>::iterator it;
   for(it = memLocsMap.begin(); it != memLocsMap.end(); ++it) {
     // discharge query
     // break even if one of them returns false
-    if(equalSetMLWithKey(it->first, thatMLMap, pedge) == false) return false;
+    if(equalSetMLWithKey(it->first, thatMLMap, pedge, comp, analysis) == false) return false;
   }
 
   return true;
@@ -3983,11 +4748,12 @@ bool MappedMemLocObject<Key, mostAccurate>::equalSetML(MemLocObjectPtr thatML, P
 template<class Key, bool mostAccurate>
 bool MappedMemLocObject<Key, mostAccurate>::subSetMLWithKey(Key key,
                                                             const map<Key, MemLocObjectPtr>& thatMLMap, 
-                                                            PartEdgePtr pedge) {
+                                                            PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis) {
   typename map<Key, MemLocObjectPtr>::const_iterator s_it;
   s_it = thatMLMap.find(key);
   if(s_it == thatMLMap.end()) return true;
-  return memLocsMap[key]->subSetML(s_it->second, pedge);
+  //return memLocsMap[key]->subSetML(s_it->second, pedge);
+  return memLocsMap[key]->subSet(s_it->second, pedge, comp, analysis);
 }
 
 //! This object is a non-strict subset of the other if the set of memory locations denoted by this
@@ -3997,17 +4763,20 @@ bool MappedMemLocObject<Key, mostAccurate>::subSetMLWithKey(Key key,
 //! Simply discharge the queries to all keyed MemLoc objects
 //! If all the discharged queries come back true then this is a subset of that otherwise not.
 template<class Key, bool mostAccurate>
-bool MappedMemLocObject<Key, mostAccurate>::subSetML(MemLocObjectPtr thatML, PartEdgePtr pedge) {
+//bool MappedMemLocObject<Key, mostAccurate>::subSetML(MemLocObjectPtr thatML, PartEdgePtr pedge) {
+bool MappedMemLocObject<Key, mostAccurate>::subSet(MemLocObjectPtr thatML, PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis) {
   boost::shared_ptr<MappedMemLocObject<Key, mostAccurate> > thatML_p = 
     boost::dynamic_pointer_cast<MappedMemLocObject<Key, mostAccurate> >(thatML);  
   assert(thatML_p);
 
   // This object denotes full set of ML (full set of executions)
-  if(isFullML(pedge)) return thatML_p->isFullML(pedge);
+  //if(isFullML(pedge)) return thatML_p->isFullML(pedge);
+  if(isFull(pedge, comp, analysis)) return thatML_p->isFull(pedge, comp, analysis);
 
   // denotes empty set
   // thatML could be empty or non-empty eitherway this will be a non-strict subset of that.
-  if(isEmptyML(pedge)) return true;
+  //if(isEmpty(pedge)) return true;
+  if(isEmpty(pedge, comp, analysis)) return true;
 
   // If both objects have the same keys discharge
   // If this object has a key and that does not then 
@@ -4018,7 +4787,7 @@ bool MappedMemLocObject<Key, mostAccurate>::subSetML(MemLocObjectPtr thatML, Par
   for(it = memLocsMap.begin(); it != memLocsMap.end(); ++it) {
     // discharge query
     // break even if one of them returns false
-    if(subSetMLWithKey(it->first, thatMLMap, pedge) == false) return false;
+    if(subSetMLWithKey(it->first, thatMLMap, pedge, comp, analysis) == false) return false;
   }
 
   // If this object doesn't have the key and that object has the key then 
@@ -4037,9 +4806,15 @@ bool MappedMemLocObject<Key, mostAccurate>::subSetML(MemLocObjectPtr thatML, Par
 //! (mostAccurate=true) of executions
 //! The conservative answer is to assume that the object is live
 template<class Key, bool mostAccurate>
-bool MappedMemLocObject<Key, mostAccurate>::isLiveML(PartEdgePtr pedge) {
+//bool MappedMemLocObject<Key, mostAccurate>::isLiveML(PartEdgePtr pedge) {
+// General version of isLive that accounts for framework details before routing the call to the derived class' 
+// isLiveML check. Specifically, it routes the call through the composer to make sure the isLiveML call gets the 
+// right PartEdge
+bool MappedMemLocObject<Key, mostAccurate>::isLive(PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis)
+{
   // If this object is full return the conservative answer
-  if(isFullML(pedge)) return true;
+//  if(isFullML(pedge)) return true;
+  if(isFull(pedge, comp, analysis)) return true;
 
   // If it has one or more full objects added to it
   // and if the object has mostAccurate=false then return true (weakest answer)
@@ -4050,7 +4825,8 @@ bool MappedMemLocObject<Key, mostAccurate>::isLiveML(PartEdgePtr pedge) {
   // Under both cases the answer is based on how individual analysis respond to the query
   typename map<Key, MemLocObjectPtr>::iterator it = memLocsMap.begin();
   for( ; it != memLocsMap.end(); ++it) {
-    bool isLive = it->second->isLiveML(pedge);
+    //bool isLive = it->second->isLiveML(pedge);
+    bool isLive = it->second->isLive(pedge, comp, analysis);
     if(union_ && isLive==true) return true;
     else if(intersect_ && isLive==false) return false;
   }
@@ -4063,16 +4839,19 @@ bool MappedMemLocObject<Key, mostAccurate>::isLiveML(PartEdgePtr pedge) {
 
 //! meetUpdateML performs the join operation of abstractions of two mls
 template<class Key, bool mostAccurate>
-bool MappedMemLocObject<Key, mostAccurate>::meetUpdateML(MemLocObjectPtr that, PartEdgePtr pedge) {
+//bool MappedMemLocObject<Key, mostAccurate>::meetUpdateML(MemLocObjectPtr that, PartEdgePtr pedge) {
+bool MappedMemLocObject<Key, mostAccurate>::meetUpdate(MemLocObjectPtr that, PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis) {
   boost::shared_ptr<MappedMemLocObject<Key, mostAccurate> > thatML_p =
     boost::dynamic_pointer_cast<MappedMemLocObject<Key, mostAccurate> >(that);  
   assert(thatML_p);
 
   // if this object is already full
-  if(isFullML(pedge)) return false;
+//  if(isFullML(pedge)) return false;
+  if(isFull(pedge, comp, analysis)) return false;
 
   // If that object is full set this object to full
-  if(thatML_p->isFullML(pedge)) {
+//  if(thatML_p->isFullML(pedge)) {
+  if(thatML_p->isFull(pedge, comp, analysis)) {
     n_FullML++;
     setMLToFull();
     return true;
@@ -4089,7 +4868,8 @@ bool MappedMemLocObject<Key, mostAccurate>::meetUpdateML(MemLocObjectPtr that, P
     s_it = thatMLMap.find(it->first);
     // If two objects have the same key then discharge meetUpdate to the corresponding keyed ML objects
     if(s_it != thatMLMap.end()) {
-      modified = (it->second)->meetUpdateML(s_it->second, pedge) || modified;
+//      modified = (it->second)->meetUpdateML(s_it->second, pedge) || modified;
+      modified = (it->second)->meetUpdate(s_it->second, pedge, comp, analysis) || modified;
     }
 
     // Remove the current ML object (current iterator it) from the map if the mapepd object is full.
@@ -4098,7 +4878,8 @@ bool MappedMemLocObject<Key, mostAccurate>::meetUpdateML(MemLocObjectPtr that, P
     // in thatMLMap is full and the meetUpdate of the current ML with that is also full.
     // (2) meetUpdateML above of the two keyed objects resulted in this mapped object being full.
     // Under both cases remove the mapped ml from this map
-    if(s_it == thatMLMap.end() || (it->second)->isFullML(pedge)) {
+//    if(s_it == thatMLMap.end() || (it->second)->isFullML(pedge)) {
+    if(s_it == thatMLMap.end() || (it->second)->isFull(pedge, comp, analysis)) {
       // Current mapped ML has become full as a result of (1) or (2).
       // Remove the item from the map.
       // Note that post-increment which increments the iterator and returns the old value for deletion.
@@ -4125,15 +4906,38 @@ void MappedMemLocObject<Key, mostAccurate>::setMLToFull() {
 }
 
 template<class Key, bool mostAccurate>
-bool MappedMemLocObject<Key, mostAccurate>::isFullML(PartEdgePtr pedge) {
+//bool MappedMemLocObject<Key, mostAccurate>::isFullML(PartEdgePtr pedge) {
+bool MappedMemLocObject<Key, mostAccurate>::isFull(PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis) {
   if(n_FullML > 0 && memLocsMap.size() == 0) return true;
   return false;
 }
 
 template<class Key, bool mostAccurate>
-bool MappedMemLocObject<Key, mostAccurate>::isEmptyML(PartEdgePtr pedge) {
+//bool MappedMemLocObject<Key, mostAccurate>::isEmptyML(PartEdgePtr pedge) {
+bool MappedMemLocObject<Key, mostAccurate>::isEmpty(PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis) {
   if(n_FullML == 0 && memLocsMap.size() == 0) return true;
   return false;
+}
+
+// Returns true if this AbstractObject corresponds to a concrete value that is statically-known
+template<class Key, bool mostAccurate>
+bool MappedMemLocObject<Key, mostAccurate>::isConcrete() {
+  typename map<Key, MemLocObjectPtr>::iterator it;
+  for(it = memLocsMap.begin(); it != memLocsMap.end(); ++it)
+    if(!it->second->isConcrete()) return false;
+  return true;
+}
+
+// Returns the number of concrete values in this set
+template<class Key, bool mostAccurate>
+int MappedMemLocObject<Key, mostAccurate>::concreteSetSize() {
+  // This is an over-approximation of the set size that assumes that all the concrete sets of
+  // the sub-MemLocs are disjoint
+  int size=0;
+  typename map<Key, MemLocObjectPtr>::iterator it;
+  for(it = memLocsMap.begin(); it != memLocsMap.end(); ++it)
+    size += it->second->concreteSetSize();
+  return size;
 }
 
 template<class Key, bool mostAccurate>
@@ -4163,6 +4967,57 @@ string MappedMemLocObject<Key, mostAccurate>::str(string indent) const {
   return oss.str();
 }
 
+// Returns whether all instances of this class form a hierarchy. Every instance of the same
+// class created by the same analysis must return the same value from this method!
+template<class Key, bool mostAccurate>
+bool MappedMemLocObject<Key, mostAccurate>::isHierarchy() const {
+  // Combined MemLocs form hierarchy if:
+  // - All the sub-MemLocs form hierarchies of their own, AND
+  // - The combination is an intersection.
+  //   If the combination is a union then consider the following:
+  //            MLa     MLb
+  //   comb1 = {a,b}, {w, x}
+  //   comb2 = {a,b}, {y, z}
+  //   Note that MLs from analyses a and b are either identical sets or disjoint
+  //   However, comb1 U comb2 = {a, b, w, x, y, z}, for which this property does
+  //   not hold unless we work out a new hierarchy for MLb.
+  
+  // Unions are not hierarchical unless they're singletons
+  if(union_) {
+    if(memLocsMap.size()==1) return memLocsMap.begin()->second->isHierarchy();
+    else return false;
+  }
+  
+  typename map<Key, MemLocObjectPtr>::const_iterator it;
+  for(it = memLocsMap.begin(); it != memLocsMap.end(); ++it)
+    if(!it->second->isHierarchy()) return false;
+  return true;
+}
+
+// Returns a key that uniquely identifies this particular AbstractObject in the 
+// set hierarchy.
+template<class Key, bool mostAccurate>
+const AbstractObjectHierarchy::hierKeyPtr& MappedMemLocObject<Key, mostAccurate>::getHierKey() const {
+  // The intersection of multiple objects is just a filtering process from the full
+  // set of objects to the exact one, with each key in the hierarchy further filtering
+  // the set down. As such, a hierarchical key for the intersection of multiple objects
+  // is just the concatenation of the keys of all the individual objects.
+  if(!isHierKeyCached) {
+    ((MappedMemLocObject<Key, mostAccurate>*)this)->cachedHierKey = boost::make_shared<AOSHierKey>(((MappedMemLocObject<Key, mostAccurate>*)this)->shared_from_this());
+    
+    typename map<Key, MemLocObjectPtr>::const_iterator it;
+    for(it = memLocsMap.begin(); it != memLocsMap.end(); ++it) {
+      AbstractObjectHierarchyPtr hierIt = boost::dynamic_pointer_cast<AbstractObjectHierarchy>(it->second);
+      ROSE_ASSERT(hierIt);
+      
+      ((MappedMemLocObject<Key, mostAccurate>*)this)->cachedHierKey->add(hierIt->getHierKey()->begin(), hierIt->getHierKey()->end());
+    }
+    
+    ((MappedMemLocObject<Key, mostAccurate>*)this)->isHierKeyCached = true;
+  }
+  return cachedHierKey;
+}
+
 /* #############################
    # PartEdgeUnionMemLocObject #
    ############################# */
@@ -4175,73 +5030,101 @@ PartEdgeUnionMemLocObject::PartEdgeUnionMemLocObject(const PartEdgeUnionMemLocOb
   MemLocObject(thatML), unionML_p(thatML.copyML()) {
 }
 
-void PartEdgeUnionMemLocObject::add(MemLocObjectPtr ml_p, PartEdgePtr pedge) {
+void PartEdgeUnionMemLocObject::add(MemLocObjectPtr ml_p, PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis) {
   // If this is the very first object
   if(!unionML_p) unionML_p = ml_p->copyML();  
   // If Full return without adding
-  else if(isFullML(pedge)) return; 
+  //else if(isFullML(pedge)) return;
+  else if(isFull(pedge, comp, analysis)) return;
   // Else meetUpdate with the existing unionML_p
-  else unionML_p->meetUpdateML(ml_p, pedge);
+  //else unionML_p->meetUpdateML(ml_p, pedge);
+  else unionML_p->meetUpdate(ml_p, pedge, comp, analysis);
 }
 
-bool PartEdgeUnionMemLocObject::mayEqualML(MemLocObjectPtr that, PartEdgePtr pedge) {
+//bool PartEdgeUnionMemLocObject::mayEqualML(MemLocObjectPtr that, PartEdgePtr pedge) {
+bool PartEdgeUnionMemLocObject::mayEqual(MemLocObjectPtr that, PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis) {
   boost::shared_ptr<PartEdgeUnionMemLocObject> thatML_p = 
     boost::dynamic_pointer_cast<PartEdgeUnionMemLocObject>(that);
   assert(thatML_p);
 
   assert(unionML_p);
-  return unionML_p->mayEqualML(thatML_p->getUnionML(), pedge);
+  //return unionML_p->mayEqualML(thatML_p->getUnionML(), pedge);
+  return unionML_p->mayEqual(thatML_p->getUnionML(), pedge, comp, analysis);
 }
 
-bool PartEdgeUnionMemLocObject::mustEqualML(MemLocObjectPtr that, PartEdgePtr pedge) {
+//bool PartEdgeUnionMemLocObject::mustEqualML(MemLocObjectPtr that, PartEdgePtr pedge) {
+bool PartEdgeUnionMemLocObject::mustEqual(MemLocObjectPtr that, PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis) {
   boost::shared_ptr<PartEdgeUnionMemLocObject> thatML_p = 
     boost::dynamic_pointer_cast<PartEdgeUnionMemLocObject>(that);
   assert(thatML_p);
 
   assert(unionML_p);
-  return unionML_p->mustEqualML(thatML_p->getUnionML(), pedge);
+  //return unionML_p->mustEqualML(thatML_p->getUnionML(), pedge);
+  return unionML_p->mustEqual(thatML_p->getUnionML(), pedge, comp, analysis);
 }
 
-bool PartEdgeUnionMemLocObject::equalSetML(MemLocObjectPtr that, PartEdgePtr pedge) {
+//bool PartEdgeUnionMemLocObject::equalSetML(MemLocObjectPtr that, PartEdgePtr pedge) {
+bool PartEdgeUnionMemLocObject::equalSet(MemLocObjectPtr that, PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis) {
   boost::shared_ptr<PartEdgeUnionMemLocObject> thatML_p = 
     boost::dynamic_pointer_cast<PartEdgeUnionMemLocObject>(that);
   assert(thatML_p);
 
   assert(unionML_p);
-  return unionML_p->equalSetML(thatML_p->getUnionML(), pedge);
+  //return unionML_p->equalSetML(thatML_p->getUnionML(), pedge);
+  return unionML_p->equalSet(thatML_p->getUnionML(), pedge, comp, analysis);
 }
 
-bool PartEdgeUnionMemLocObject::subSetML(MemLocObjectPtr that, PartEdgePtr pedge) {
+//bool PartEdgeUnionMemLocObject::subSetML(MemLocObjectPtr that, PartEdgePtr pedge) {
+bool PartEdgeUnionMemLocObject::subSet(MemLocObjectPtr that, PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis) {
   boost::shared_ptr<PartEdgeUnionMemLocObject> thatML_p = 
     boost::dynamic_pointer_cast<PartEdgeUnionMemLocObject>(that);
   assert(thatML_p);
 
   assert(unionML_p);
-  return unionML_p->subSetML(thatML_p->getUnionML(), pedge);
+  //return unionML_p->subSetML(thatML_p->getUnionML(), pedge);
+  return unionML_p->subSet(thatML_p->getUnionML(), pedge, comp, analysis);
 }
 
-bool PartEdgeUnionMemLocObject::meetUpdateML(MemLocObjectPtr that, PartEdgePtr pedge) {
+//bool PartEdgeUnionMemLocObject::meetUpdateML(MemLocObjectPtr that, PartEdgePtr pedge) {
+bool PartEdgeUnionMemLocObject::meetUpdate(MemLocObjectPtr that, PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis) {
   boost::shared_ptr<PartEdgeUnionMemLocObject> thatML_p = 
     boost::dynamic_pointer_cast<PartEdgeUnionMemLocObject>(that);
   assert(thatML_p);
 
   assert(unionML_p);
-  return unionML_p->meetUpdateML(thatML_p->getUnionML(), pedge);
+  //return unionML_p->meetUpdateML(thatML_p->getUnionML(), pedge);
+  return unionML_p->meetUpdate(thatML_p->getUnionML(), pedge, comp, analysis);
 }
   
-bool PartEdgeUnionMemLocObject::isLiveML(PartEdgePtr pedge) {
+//bool PartEdgeUnionMemLocObject::isLiveML(PartEdgePtr pedge) {
+bool PartEdgeUnionMemLocObject::isLive(PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis) {
   assert(unionML_p);
-  return unionML_p->isLiveML(pedge);
+  //return unionML_p->isLiveML(pedge);
+  return unionML_p->isLive(pedge, comp, analysis);
 }
 
-bool PartEdgeUnionMemLocObject::isFullML(PartEdgePtr pedge) {
+//bool PartEdgeUnionMemLocObject::isFullML(PartEdgePtr pedge) {
+bool PartEdgeUnionMemLocObject::isFull(PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis) {
   assert(unionML_p);
-  return unionML_p->isFullML(pedge);
+  //return unionML_p->isFullML(pedge);
+  return unionML_p->isFull(pedge, comp, analysis);
 }
 
-bool PartEdgeUnionMemLocObject::isEmptyML(PartEdgePtr pedge) {
+//bool PartEdgeUnionMemLocObject::isEmptyML(PartEdgePtr pedge) {
+bool PartEdgeUnionMemLocObject::isEmpty(PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis) {
   assert(unionML_p);
-  return unionML_p->isEmptyML(pedge);
+  //return unionML_p->isEmptyML(pedge);
+  return unionML_p->isEmpty(pedge, comp, analysis);
+}
+
+// Returns true if this AbstractObject corresponds to a concrete value that is statically-known
+bool PartEdgeUnionMemLocObject::isConcrete() { 
+  return unionML_p->isConcrete();
+}
+
+// Returns the number of concrete values in this set
+int PartEdgeUnionMemLocObject::concreteSetSize() {
+  return unionML_p->concreteSetSize();
 }
 
 MemLocObjectPtr PartEdgeUnionMemLocObject::copyML() const {
@@ -4257,6 +5140,18 @@ string PartEdgeUnionMemLocObject::str(string indent) const {
   assert(unionML_p);
   oss << "[UnionML=" << unionML_p->str(indent) << "]";
   return oss.str();
+}
+
+// Returns whether all instances of this class form a hierarchy. Every instance of the same
+// class created by the same analysis must return the same value from this method!
+bool PartEdgeUnionMemLocObject::isHierarchy() const {
+  return unionML_p->isHierarchy();
+}
+
+// Returns a key that uniquely identifies this particular AbstractObject in the 
+// set hierarchy.
+const AbstractObjectHierarchy::hierKeyPtr& PartEdgeUnionMemLocObject::getHierKey() const {
+  return unionML_p->getHierKey();
 }
 
 /* #######################

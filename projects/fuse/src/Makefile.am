@@ -108,14 +108,15 @@ fuse_SOURCES = \
 	simpleAnalyses/taintAnalysis.C \
 	simpleAnalyses/virtualMethodAnalysis.C \
 	simpleAnalyses/defsAnalysis.C \
-        sparse/constantAnalysis.C \
+	state/nodeState.C \
+	compositionalTestAnalysis.C
+
+#        sparse/constantAnalysis.C \
 	sparse/heapDefsAndUsesTraversal.C \
 	sparse/heapSSA.C \
 	sparse/hssaMemObject.C \
 	sparse/pointerAnalysis.C \
-	sparse/valueNumbering.C \
-	state/nodeState.C \
-	compositionalTestAnalysis.C
+	sparse/valueNumbering.C
 
 # for .C files
 FUSE_C_TESTS = \

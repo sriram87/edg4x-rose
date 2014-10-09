@@ -266,6 +266,9 @@ namespace fuse {
     // Returns whether the given AbstractObject corresponds to the empty set
     bool isEmptyV (ValueObjectPtr     ao, PartEdgePtr pedge, ComposedAnalysis* analysis);
     bool isEmptyMR(MemRegionObjectPtr ao, PartEdgePtr pedge, ComposedAnalysis* analysis);
+
+    // Returns a ValueObject that denotes the size of this memory region
+    ValueObjectPtr getRegionSizeMR(MemRegionObjectPtr ao, PartEdgePtr pedge, ComposedAnalysis* analysis);
   
     // Return the anchor Parts of an application
     std::set<PartPtr> GetStartAStates(ComposedAnalysis* client);

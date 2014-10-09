@@ -98,6 +98,8 @@ class CPValueKind: public printable, public boost::enable_shared_from_this<CPVal
   
   // Returns true if this ValueObject corresponds to a concrete value that is statically-known
   virtual bool isConcrete()=0;
+  // Returns the number of concrete values in this set
+  virtual int concreteSetSize()=0;
   // Returns the type of the concrete value (if there is one)
   virtual SgType* getConcreteType()=0;
   // Returns the concrete value (if there is one) as an SgValueExp, which allows callers to use
@@ -228,6 +230,8 @@ class ParityValueObject : public FiniteLattice, public ValueObject {
 
   // Returns true if this ValueObject corresponds to a concrete value that is statically-known
   bool isConcrete();
+  // Returns the number of concrete values in this set
+  int concreteSetSize();
   // Returns the type of the concrete value (if there is one)
   SgType* getConcreteType();
   // Returns the concrete value (if there is one) as an SgValueExp, which allows callers to use

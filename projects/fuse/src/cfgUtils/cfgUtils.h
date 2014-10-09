@@ -3,7 +3,10 @@
 
 #include <set>
 #include <string>
+#include <list>
 #include "sight.h"
+#include "comp_shared_ptr.h"
+#include <iostream>
 
 namespace fuse
 {
@@ -47,6 +50,77 @@ namespace fuse
   // Returns a string representation of this CFG paths's key information
   std::string CFGPath2Str(CFGPath p);
 
+  // Base class for objects that can be compared using the == and < operators
+  class comparable;
+  typedef CompSharedPtr<comparable> comparablePtr;
+  class comparable {
+    public:
+    // Operations that derived classes must implement. Note that it is possible for 
+    // the argument of these operations to be not of the same type as the derived
+    // object implementing them. This happens only with special objects that can
+    // handle type incompatibilities and is thus not an error. As such, implementations
+    // should cast that to the type of the implementing object and allow any bad_cast
+    // exceptions to propagate to the calling methods.
+    // This == That
+    virtual bool equal(const comparable& that) const=0;
+    // This < That
+    virtual bool less(const comparable& that) const=0;
+    
+    // Implementations of the other comparison operations
+    bool operator==(const comparable& that) const;
+    bool operator<(const comparable& that) const;
+    bool operator!=(const comparable& that) const { return !(*this == that); }
+    bool operator<=(const comparable& that) const { return (*this == that)  || (*this < that); }
+    bool operator> (const comparable& that) const { return !(*this == that) && !(*this < that); }
+    bool operator>=(const comparable& that) const { return (*this == that)  || !(*this < that); }
+    
+    // Wrappers for comparing with CompSharedPtrs
+    bool operator==(const comparablePtr& that) const { return *this == *that.get(); }
+    bool operator< (const comparablePtr& that) const { return *this <  *that.get(); }
+    bool operator!=(const comparablePtr& that) const { return *this != *that.get(); }
+    bool operator<=(const comparablePtr& that) const { return *this <= *that.get(); }
+    bool operator> (const comparablePtr& that) const { return *this >  *that.get(); }
+    bool operator>=(const comparablePtr& that) const { return *this >= *that.get(); }
+    
+    // String method
+    virtual std::string str(std::string indent="") const { return "comparable"; }
+  }; // class comparable
+  
+  // Comparison operations on lists of comparable objects
+  bool operator==(const std::list<comparablePtr>& leftKey, const std::list<comparablePtr>& rightKey);
+  bool operator<(const std::list<comparablePtr>& leftKey, const std::list<comparablePtr>& rightKey);
+  
+  // Generic wrapper for comparing SgNode*'s that implements the comparable interface
+  class comparableSgNode : public comparable {
+    protected:
+    SgNode *n;
+    public:
+    comparableSgNode(SgNode* n): n(n) {}
+    // This == That
+    bool equal(const comparable& that_arg) const {
+      //try{
+        const comparableSgNode& that = dynamic_cast<const comparableSgNode&>(that_arg);
+        return n == that.n;
+      /*} catch (std::bad_cast bc) {
+        ROSE_ASSERT(0);
+      }*/
+    }
+
+    // This < That
+    bool less(const comparable& that_arg) const {
+      //try{
+        const comparableSgNode& that = dynamic_cast<const comparableSgNode&>(that_arg);
+        return n < that.n;
+      /*} catch (std::bad_cast bc) {
+        ROSE_ASSERT(0);
+      }*/
+    }
+    std::string str(std::string indent="") const { return SgNode2Str(n); }
+  };
+  typedef boost::shared_ptr<comparableSgNode> comparableSgNodePtr;
+
+  // Stringification of comparable lists
+  std::ostream& operator<<(std::ostream& s, const std::list<comparablePtr>& l); 
 } // namespace fuse
 
 #endif

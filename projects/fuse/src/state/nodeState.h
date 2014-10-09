@@ -186,10 +186,13 @@ class NodeState
   
   private:
   
-    // General lattice setter function
+  // General lattice setter function
   void setLattice_ex(LatticeMap& dfMap, Analysis* analysis, PartEdgePtr departEdge, 
                      std::vector<Lattice*>& lattices);
   
+  // Return whether the given analysis has state mapped at the given dfMap
+  bool analysisDataExists(const LatticeMap& dfMap, Analysis* analysis) const;
+
   // General lattice getter function
   Lattice* getLattice_ex(const LatticeMap& dfMap, 
                          Analysis* analysis, PartEdgePtr departEdge, int latticeName) const;

@@ -457,7 +457,10 @@ bool LiveDeadMemTransfer::isMemLocLive(SgExpression* sgn) {
   // MemLocObjectPtrPair p = composer->Expr2MemLoc(sgn, part->outEdgeToAny(), ldma);//ceml->Expr2Obj(expr);
   // return (p.expr ? liveLat->containsMay(p.expr) : false) ||
   //        (p.mem  ? liveLat->containsMay(p.mem)  : false);
+dbg << "LiveDeadMemTransfer::isMemLocLive("<<SgNode2Str(sgn)<<")"<<endl;
+dbg << "liveLat="<<liveLat->str()<<endl;
   MemLocObjectPtr p = composer->Expr2MemLoc(sgn, part->outEdgeToAny(), ldma);//ceml->Expr2Obj(expr);
+dbg << "p="<<p->str()<<endl;
   return (p ? liveLat->containsMay(p) : false);
 }
 

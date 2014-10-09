@@ -223,7 +223,7 @@ namespace fuse
       boost::shared_ptr<AbstractObjectSet> aos_p = boost::dynamic_pointer_cast<AbstractObjectSet>(aom_p->get(opML_p));
       assert(!aos_p->isEmptyLat());
       if(pointsToAnalysisDebugLevel() >= 2) dbg << "MLSet=" << aos_p->str() << endl;
-      ptML_p->add(aos_p, pedge);
+      ptML_p->add(aos_p, pedge, getComposer(), this);
       break;
     }
 
@@ -232,7 +232,7 @@ namespace fuse
     case V_SgInitializedName:
     default:
       MemLocObjectPtr ml_p = getComposer()->Expr2MemLoc(sgn, pedge, this);
-      ptML_p->add(ml_p, pedge);
+      ptML_p->add(ml_p, pedge, getComposer(), this);
       break;      
     };     
 
@@ -280,8 +280,8 @@ namespace fuse
     return index;
   }
   
-  void PTMemLocObject::add(MemLocObjectPtr ml_p, PartEdgePtr pedge) {
-    if(ml_p->isFullML(pedge)) {
+  void PTMemLocObject::add(MemLocObjectPtr ml_p, PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis) {
+    if(ml_p->isFull(pedge, comp, analysis)) {
       // Set the set to full
       aos_p->setToFull();
       return;
@@ -292,12 +292,12 @@ namespace fuse
     else aos_p->insert(ml_p);
   }
 
-  void PTMemLocObject::add(boost::shared_ptr<AbstractObjectSet> thataos_p, PartEdgePtr pedge) {
+  void PTMemLocObject::add(boost::shared_ptr<AbstractObjectSet> thataos_p, PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis) {
     // Addd elements of the set into this set
     AbstractObjectSet::const_iterator cIt = thataos_p->begin();    
     for( ; cIt != thataos_p->end(); ++cIt) {
       MemLocObjectPtr cItML_p = boost::dynamic_pointer_cast<MemLocObject>(*cIt);
-      add(cItML_p, pedge);
+      add(cItML_p, pedge, comp, analysis);
     }
   }
 
@@ -315,12 +315,12 @@ namespace fuse
 
   // If the two sets of PTMemLocObject contain overlapping MemLocObjects
   // then the two PTMemLocObjects mayEquals.
-  bool PTMemLocObject::mayEqualML(MemLocObjectPtr thatML_p, PartEdgePtr pedge) {
+  bool PTMemLocObject::mayEqual(MemLocObjectPtr thatML_p, PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis) {
     // scope reg(txt()<<"PTMemLocObject::mayEqualML", scope::medium, attrGE("pointsToAnalysisDebugLevel", 2));
     PTMemLocObjectPtr thatPTML_p = boost::dynamic_pointer_cast<PTMemLocObject>(thatML_p);
     assert(thatPTML_p);
 
-    if(isFullML(pedge) || thatPTML_p->isFullML(pedge)) return true;
+    if(isFull(pedge, comp, analysis) || thatPTML_p->isFull(pedge, comp, analysis)) return true;
 
     // if(pointsToAnalysisDebugLevel() >= 2) {
     //   dbg << "thisML=" << str() << endl;
@@ -340,11 +340,11 @@ namespace fuse
 
   // Two PTMemLocObjects are mustEquals if the sets are singleton and
   // the object in the sets mustEqual each other
-  bool PTMemLocObject::mustEqualML(MemLocObjectPtr thatML_p, PartEdgePtr pedge) {
+  bool PTMemLocObject::mustEqual(MemLocObjectPtr thatML_p, PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis) {
     PTMemLocObjectPtr thatPTML_p = boost::dynamic_pointer_cast<PTMemLocObject>(thatML_p);
     assert(thatPTML_p);
 
-    if(isFullML(pedge) || thatPTML_p->isFullML(pedge)) return false;
+    if(isFull(pedge, comp, analysis) || thatPTML_p->isFull(pedge, comp, analysis)) return false;
     
     const AbstractObjectSet& thatMLSet = thatPTML_p->getMLSet();
     
@@ -359,12 +359,12 @@ namespace fuse
     return aos_p->containsMust(thatAO_p);
   }
 
-  bool PTMemLocObject::equalSetML(MemLocObjectPtr thatML_p, PartEdgePtr pedge) {
+  bool PTMemLocObject::equalSet(MemLocObjectPtr thatML_p, PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis) {
     PTMemLocObjectPtr thatPTML_p = boost::dynamic_pointer_cast<PTMemLocObject>(thatML_p);
     assert(thatPTML_p);
 
     // If this full then thatML should also be full for the two to be equalSet
-    if(isFullML(pedge)) return thatML_p->isFullML(pedge);
+    if(isFull(pedge, comp, analysis)) return thatML_p->isFull(pedge, comp, analysis);
 
     const AbstractObjectSet& thatMLSet = thatPTML_p->getMLSet();
 
@@ -383,12 +383,12 @@ namespace fuse
     return true;
   }
 
-  bool PTMemLocObject::subSetML(MemLocObjectPtr thatML_p, PartEdgePtr pedge) {
+  bool PTMemLocObject::subSet(MemLocObjectPtr thatML_p, PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis) {
     PTMemLocObjectPtr thatPTML_p = boost::dynamic_pointer_cast<PTMemLocObject>(thatML_p);
     assert(thatPTML_p);
 
     // If this full then thatML should also be full for the two to be equalSet
-    if(isFullML(pedge)) return thatML_p->isFullML(pedge);
+    if(isFull(pedge, comp, analysis)) return thatML_p->isFull(pedge, comp, analysis);
 
     const AbstractObjectSet& thatMLSet = thatPTML_p->getMLSet();
     AbstractObjectSet::const_iterator cbegin, cend, cIt;
@@ -420,31 +420,31 @@ namespace fuse
     return true;
   }
 
-  bool PTMemLocObject::isLiveML(PartEdgePtr pedge) {
+  bool PTMemLocObject::isLive(PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis) {
     if(aos_p->size() == 0) return false;
     AbstractObjectSet::const_iterator cIt = aos_p->begin();
     for( ; cIt != aos_p->end(); ++cIt) {
       MemLocObjectPtr cML_p = boost::dynamic_pointer_cast<MemLocObject>(*cIt);
-      if(cML_p->isLiveML(pedge)) return true;
+      if(cML_p->isLive(pedge, comp, analysis)) return true;
     }
     return false;
   }
 
-  bool PTMemLocObject::meetUpdateML(MemLocObjectPtr thatML_p, PartEdgePtr pedge) {
+  bool PTMemLocObject::meetUpdate(MemLocObjectPtr thatML_p, PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis) {
     PTMemLocObjectPtr thatPTML_p = boost::dynamic_pointer_cast<PTMemLocObject>(thatML_p);
     assert(thatPTML_p);
 
-    if(isFullML(pedge)) return false;
+    if(isFull(pedge, comp, analysis)) return false;
     
     Lattice* thatMLSetLatPtr = thatPTML_p->getMLSetLatticePtr();
     return aos_p->meetUpdate(thatMLSetLatPtr);
   }
 
-  bool PTMemLocObject::isFullML(PartEdgePtr pedge) {
+  bool PTMemLocObject::isFull(PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis) {
     return aos_p->isFullLat();
   }
 
-  bool PTMemLocObject::isEmptyML(PartEdgePtr pedge) {
+  bool PTMemLocObject::isEmpty(PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis) {
     return aos_p->isEmptyLat();
   }
 

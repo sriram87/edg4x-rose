@@ -255,5 +255,70 @@ std::string CFGPath2Str(CFGPath p)
   return oss.str();
 }
 
+/**********************
+ ***** comparable *****
+ **********************/
+bool comparable::operator==(const comparable& that) const {
+  // First try applying the equal method of this
+  try{
+    return equal(that);
+  } catch (std::bad_cast bc) {
+    // The types of this and that are not compatible and this::equal cannot deal with
+    // this. Try calling the equal method of that.
+    try{
+      return that.equal(*this);
+    } catch (std::bad_cast bc) {
+      // Neither method could deal with the type incompatibility
+      ROSE_ASSERT(0);
+    }
+  }
+}
+
+bool comparable::operator<(const comparable& that) const {
+  // First try applying the less method of this
+  try{
+    return less(that);
+  } catch (std::bad_cast bc) {
+    // The types of this and that are not compatible and this::less cannot deal with
+    // this. Try calling the less method of that. Since we know that this!=that because
+    // they're not type compatible we can just negate the return of that.less(this)
+    try{
+      return !that.less(*this);
+    } catch (std::bad_cast bc) {
+      // Neither method could deal with the type incompatibility
+      ROSE_ASSERT(0);
+    }
+  }
+}
+
+// Comparison operations on lists of comparable objects
+bool operator==(const std::list<comparablePtr>& leftKey, const std::list<comparablePtr>& rightKey) {
+  std::list<comparablePtr>::const_iterator left=leftKey.begin(), right=rightKey.begin();
+  for(; left!=leftKey.end() && right!=rightKey.end(); left++, right++) {
+    if(*left != *right) return false;
+  }
+  return true;
+}
+
+bool operator<(const std::list<comparablePtr>& leftKey, const std::list<comparablePtr>& rightKey) {
+  std::list<comparablePtr>::const_iterator left=leftKey.begin(), right=rightKey.begin();
+  for(; left!=leftKey.end() && right!=rightKey.end(); left++, right++) {
+    // Less-than
+    if(*left < *right) return true;
+    // Greater-than (rephrased since the > implementation calls < redundantly)
+    if(*left != *right) return false;
+  }
+  // leftKey == rightKey
+  return false;
+}
+
+// Stringification of comparable lists
+std::ostream& operator<<(std::ostream& s, const std::list<comparablePtr>& l) {
+  for(list<comparablePtr>::const_iterator k=l.begin(); k!=l.end(); k++) {
+    if(k!=l.begin()) s << ", ";
+    s << (*k)->str();
+  }
+  return s;
+}
 } /* namespace fuse */
 

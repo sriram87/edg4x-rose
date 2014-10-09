@@ -48,16 +48,42 @@ class CPValueKind: public sight::printable, public boost::enable_shared_from_thi
   // The different kinds of CPValueObjects
   typedef enum {uninitialized, // The value has not been initialized (analyses may set this value to anything they want)
                 concrete,   // The exact value is known and can be described with an SgValueExp
-                //rank,     // The exact value is not known but we know their relative order
                 offsetList, // The value denotes the offset of some class/struct member from a pointer the member's 
                             // host object. Since the compiler can add arbitrary padding, such values are lists 
                             // of concrete values and members' ranks within their host objects.
                 
-          // !!! TODO
-          serverImpl, // Thin wrapper for a server-implemented ValueObject
+                // !!! TODO
+                serverImpl, // Thin wrapper for a server-implemented ValueObject
                 unknown     // The exact value is not known
      } valueKind;
   valueKind kind;
+
+  static std::string valueKind2Str(valueKind kind)
+  { return (kind==uninitialized?"uninitialized":(kind==concrete?"concrete":(kind==offsetList?"offsetList":(kind==serverImpl?"serverImpl":(kind==unknown?"unknown":"???"))))); }
+  
+  class comparableKind: public comparable {
+    public:
+    valueKind kind;
+    comparableKind(valueKind kind): kind(kind) {}
+    bool equal(const comparable& that_arg) const {
+      //try {
+        const comparableKind& that = dynamic_cast<const comparableKind&>(that_arg);
+        return kind == that.kind;
+      //} catch (std::bad_cast bc) {
+      //  ROSE_ASSERT(0);
+      //}
+    }
+    bool less(const comparable& that_arg) const {
+      //try{
+        const comparableKind& that = dynamic_cast<const comparableKind&>(that_arg);
+        return kind < that.kind;
+      //} catch (std::bad_cast bc) {
+      //  ROSE_ASSERT(0);
+      //}
+    }
+    std::string str(std::string indent="") const { return valueKind2Str(kind); }
+  }; // class comparableKind
+  typedef boost::shared_ptr<comparableKind> comparableKindPtr;
 
   CPValueKind(valueKind kind): kind(kind)
   {}
@@ -98,6 +124,8 @@ class CPValueKind: public sight::printable, public boost::enable_shared_from_thi
   
   // Returns true if this ValueObject corresponds to a concrete value that is statically-known
   virtual bool isConcrete()=0;
+  // Returns the number of concrete values in this set
+  virtual int concreteSetSize()=0;
   // Returns the type of the concrete value (if there is one)
   virtual SgType* getConcreteType()=0;
   // Returns the concrete value (if there is one) as an SgValueExp, which allows callers to use
@@ -111,9 +139,29 @@ class CPValueKind: public sight::printable, public boost::enable_shared_from_thi
   
   // Returns a copy of this CPConcreteKind
   virtual CPValueKindPtr copyV() const=0;
+  
+  // Appends to the given hierarchical key the additional information that uniquely 
+  // identifies this type's set
+  virtual void addHierSubKey(const AbstractObjectHierarchy::hierKeyPtr& key)=0;
 }; // CPValueKind
 
-class CPValueObject : public FiniteLattice, public ValueObject {
+// CPValueObject form a set hierarchy and thus implement the AbstractObjectHierarchy
+// interface. The hierarchy is:
+// empty key: unknown
+// non-empty:
+//   uninitalized: special value to denote the empty set
+//   concrete:
+//     SgValueExp
+//   offsetList:
+//     rankT
+//       long
+//     offsetT
+//       long
+// The keys the differentiate MemRegionObjects are:
+// std::list<comparableKind, comparableSgNode>
+
+
+class CPValueObject : public FiniteLattice, public ValueObject, public AbstractObjectHierarchy {
   //SgNode* n;
 
   // StxValueObjects are used to identify both raw values and the locations of class fields within 
@@ -143,10 +191,6 @@ class CPValueObject : public FiniteLattice, public ValueObject {
 
   // Do we need a default constructor?
   CPValueObject(PartEdgePtr pedge);
-  
-  // This constructor builds a constant value lattice.
-  //CPValueObject(SgValueExp* val, PartEdgePtr pedge);
-  
   CPValueObject(CPValueKindPtr kind, PartEdgePtr pedge);
   
   // Do we need th copy constructor?
@@ -228,11 +272,21 @@ class CPValueObject : public FiniteLattice, public ValueObject {
 
   // Returns true if this ValueObject corresponds to a concrete value that is statically-known
   bool isConcrete();
+  // Returns the number of concrete values in this set
+  int concreteSetSize();
   // Returns the type of the concrete value (if there is one)
   SgType* getConcreteType();
   // Returns the concrete value (if there is one) as an SgValueExp, which allows callers to use
   // the normal ROSE mechanisms to decode it
   set<boost::shared_ptr<SgValueExp> > getConcreteValue();
+  
+  // Returns whether all instances of this class form a hierarchy. Every instance of the same
+  // class created by the same analysis must return the same value from this method!
+  bool isHierarchy() const { return true; }
+  
+  // Returns a key that uniquely identifies this particular AbstractObject in the 
+  // set hierarchy.
+  const hierKeyPtr& getHierKey() const;
 }; // class CPValueObject
 
 class CPUninitializedKind : public CPValueKind {
@@ -265,6 +319,8 @@ class CPUninitializedKind : public CPValueKind {
   
   // Returns true if this ValueObject corresponds to a concrete value that is statically-known
   bool isConcrete();
+  // Returns the number of concrete values in this set
+  int concreteSetSize();
   // Returns the type of the concrete value (if there is one)
   SgType* getConcreteType();
   // Returns the concrete value (if there is one) as an SgValueExp, which allows callers to use
@@ -280,6 +336,13 @@ class CPUninitializedKind : public CPValueKind {
   CPValueKindPtr copyV() const { return boost::make_shared<CPUninitializedKind>(); }
   
   std::string str(std::string indent="") const;
+  
+  // Appends to the given hierarchical key the additional information that uniquely 
+  // identifies this type's set
+  void addHierSubKey(const AbstractObjectHierarchy::hierKeyPtr& key)
+  // Don't add anything else since the hier-level key already separates the empty
+  // set from all the other sets
+  { }
 }; // CPUninitializedKind
 
 class CPConcreteKind : public CPValueKind {
@@ -349,6 +412,14 @@ class CPConcreteKind : public CPValueKind {
   CPValueKindPtr op(SgUnaryOp* op);
   CPValueKindPtr op(SgBinaryOp* op, CPValueKindPtr that);
   
+  // Returns whether the two given SgValueExps denote the same numeric value. 
+  // If unknown, return unknownVal.
+  static bool equalVals(SgValueExp* val1, SgValueExp* val2, bool unknownVal);
+  
+  // Returns whether the SgValueExps denoted by val1 < the value denoted by val2.
+  // If unknown, return unknownVal.
+  static bool lessThanVals(SgValueExp* val1, SgValueExp* val2, bool unknownVal);
+  
   // Returns whether this and that CPValueKinds are may/must equal to each other
   bool mayEqualV(CPValueKindPtr that);
   bool mustEqualV(CPValueKindPtr that);
@@ -365,6 +436,8 @@ class CPConcreteKind : public CPValueKind {
   
   // Returns true if this ValueObject corresponds to a concrete value that is statically-known
   bool isConcrete();
+  // Returns the number of concrete values in this set
+  int concreteSetSize();
   // Returns the type of the concrete value (if there is one)
   SgType* getConcreteType();
   // Returns the concrete value (if there is one) as an SgValueExp, which allows callers to use
@@ -380,10 +453,42 @@ class CPConcreteKind : public CPValueKind {
   CPValueKindPtr copyV() const { return boost::make_shared<CPConcreteKind>(getVal()); }
   
   std::string str(std::string indent="") const;
+  
+  // Generic wrapper for comparing SgNode*'s that implements the comparable interface
+  class comparableSgValueExp : public comparable {
+    protected:
+    SgValueExp *val;
+    public:
+    comparableSgValueExp(SgValueExp* val): val(val) {}
+    bool equal(const comparable& that_arg) const {
+      //try{
+        const comparableSgValueExp& that = dynamic_cast<const comparableSgValueExp&>(that_arg);
+        return equalVals(val, that.val, val==that.val);
+      //} catch (std::bad_cast bc) {
+      //  ROSE_ASSERT(0);
+      //}
+    }
+    bool less(const comparable& that_arg) const {
+      //try{
+        const comparableSgValueExp& that = dynamic_cast<const comparableSgValueExp&>(that_arg);
+        return equalVals(val, that.val, val<that.val);
+      //} catch (std::bad_cast bc) {
+      //  ROSE_ASSERT(0);
+      //}
+    }
+    std::string str(std::string indent="") const { return SgNode2Str(val); }
+  };
+  typedef boost::shared_ptr<comparableSgNode> comparableSgNodePtr;
+  
+  // Appends to the given hierarchical key the additional information that uniquely 
+  // identifies this type's set
+  void addHierSubKey(const AbstractObjectHierarchy::hierKeyPtr& key)
+  { key->add(boost::make_shared<comparableSgValueExp>(exp.get())); }
+
 }; // CPConcreteKind
 
 class CPOffsetListKind : public CPValueKind {
-  class intWrap {
+  class intWrap: public comparable {
     public:
     typedef enum {rankT, offsetT} type;
     
@@ -393,6 +498,7 @@ class CPOffsetListKind : public CPValueKind {
     long long v;
     public:
     intWrap(long long v, type t): t(t), v(v){}
+    intWrap(const intWrap& that): t(that.t), v(that.v){}
     
     bool operator==(const intWrap& that) const { return t==that.t && v==that.v; }
     bool operator!=(const intWrap& that) const { return !(*this == that); }
@@ -403,7 +509,27 @@ class CPOffsetListKind : public CPValueKind {
     void set(unsigned long long v) { this->v = v; }
     
     type getType() const { return t; }
-  };
+    
+    bool equal(const comparable& that_arg) const {
+      //try {
+        const intWrap& that = dynamic_cast<const intWrap&>(that_arg);
+        return t == that.t && v == that.v;
+      //} catch (std::bad_cast bc) {
+      //  ROSE_ASSERT(0);
+      //}
+    }
+    bool less(const comparable& that_arg) const {
+      //try{
+        const intWrap& that = dynamic_cast<const intWrap&>(that_arg);
+        return (t  < that.t) || 
+               (t == that.t && v < that.v);
+      //} catch (std::bad_cast bc) {
+      //  ROSE_ASSERT(0);
+      //}
+    }
+    std::string str(std::string indent="") const { return sight::txt()<<"[type="<<(t==rankT?"rankT":(t==offsetT?"offsetT":"NULL"))<<", v="<<v<<"]"; }
+  }; // class intWrap
+  typedef boost::shared_ptr<intWrap> intWrapPtr;
   
   static SgTypeLongLong* type;
   
@@ -463,6 +589,8 @@ class CPOffsetListKind : public CPValueKind {
   
   // Returns true if this ValueObject corresponds to a concrete value that is statically-known
   bool isConcrete();
+  // Returns the number of concrete values in this set
+  int concreteSetSize();
   // Returns the type of the concrete value (if there is one)
   SgType* getConcreteType();
   // Returns the concrete value (if there is one) as an SgValueExp, which allows callers to use
@@ -478,6 +606,14 @@ class CPOffsetListKind : public CPValueKind {
   CPValueKindPtr copyV() const { return boost::make_shared<CPOffsetListKind>(offsetL); }
   
   std::string str(std::string indent="") const;
+  
+  // Appends to the given hierarchical key the additional information that uniquely 
+  // identifies this type's set
+  void addHierSubKey(const AbstractObjectHierarchy::hierKeyPtr& key) { 
+    // Add all the intWrap objects on the offset list to the key
+    for(std::list<intWrap>::iterator o=offsetL.begin(); o!=offsetL.end(); o++)
+      key->add(boost::make_shared<intWrap>(*o));
+  }
 }; // CPOffsetListKind
 
 class CPUnknownKind : public CPValueKind {
@@ -510,6 +646,8 @@ class CPUnknownKind : public CPValueKind {
   
   // Returns true if this ValueObject corresponds to a concrete value that is statically-known
   bool isConcrete();
+  // Returns the number of concrete values in this set
+  int concreteSetSize();
   // Returns the type of the concrete value (if there is one)
   SgType* getConcreteType();
   // Returns the concrete value (if there is one) as an SgValueExp, which allows callers to use
@@ -525,6 +663,12 @@ class CPUnknownKind : public CPValueKind {
   CPValueKindPtr copyV() const { return boost::make_shared<CPUnknownKind>(); }
   
   std::string str(std::string indent="") const;
+  
+  // Appends to the given hierarchical key the additional information that uniquely 
+  // identifies this type's set
+  void addHierSubKey(const AbstractObjectHierarchy::hierKeyPtr& key)
+  // Don't add anything else since the full set is denoted by the empty key
+  { }
 }; // CPUnknownKind
 
 class CPMemLocObject;

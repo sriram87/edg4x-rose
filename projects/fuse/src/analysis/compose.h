@@ -22,8 +22,6 @@
 // ------------------------------
 
 namespace fuse {
-//extern int composerDebugLevel;
-  
 /* Class for declaring the debug level used in various code modules. It ensures that at start-up time 
    (before main() runs) a dbglog attribute with a given name and value is created and it persists
    until the end of the analysis (exit of main()). */
@@ -186,7 +184,10 @@ class Composer
   //virtual bool isEmptyCL(CodeLocObjectPtr   cl,  PartEdgePtr pedge, ComposedAnalysis* analysis)=0;
   virtual bool isEmptyMR(MemRegionObjectPtr mr,  PartEdgePtr pedge, ComposedAnalysis* analysis)=0;
   //virtual bool isEmptyML(MemLocObjectPtr    ml,  PartEdgePtr pedge, ComposedAnalysis* analysis)=0;
-  
+
+  // Returns a ValueObject that denotes the size of this memory region
+  virtual ValueObjectPtr getRegionSizeMR(MemRegionObjectPtr mr, PartEdgePtr pedge, ComposedAnalysis* analysis)=0;
+
   // Return the anchor Parts of a given function
   virtual std::set<PartPtr> GetStartAStates(ComposedAnalysis* client)=0;
   // There may be multiple terminal points in the application (multiple calls to exit(), returns from main(), etc.)
@@ -557,6 +558,9 @@ class ChainComposer : public Composer, public UndirDataflow
   bool isEmptyMR(MemRegionObjectPtr ao, PartEdgePtr pedge, ComposedAnalysis* analysis);
   //bool isEmptyML(MemLocObjectPtr    ao, PartEdgePtr pedge, ComposedAnalysis* analysis);
   
+  // Returns a ValueObject that denotes the size of this memory region
+  ValueObjectPtr getRegionSizeMR(MemRegionObjectPtr mr, PartEdgePtr pedge, ComposedAnalysis* analysis);
+
   // Return the anchor Parts of an application
   std::set<PartPtr> GetStartAStates(ComposedAnalysis* client);
   std::set<PartPtr> GetEndAStates(ComposedAnalysis* client);
@@ -728,6 +732,9 @@ class LooseParallelComposer : public Composer, public UndirDataflow
   bool isEmptyMR(MemRegionObjectPtr mr,  PartEdgePtr pedge, ComposedAnalysis* analysis);
   //bool isEmptyML(MemLocObjectPtr    ml,  PartEdgePtr pedge, ComposedAnalysis* analysis);
   
+  // Returns a ValueObject that denotes the size of this memory region
+  ValueObjectPtr getRegionSizeMR(MemRegionObjectPtr mr, PartEdgePtr pedge, ComposedAnalysis* analysis);
+
   // Return the anchor Parts of a given function
   std::set<PartPtr> GetStartAStates(ComposedAnalysis* client);
   std::set<PartPtr> GetEndAStates(ComposedAnalysis* client);

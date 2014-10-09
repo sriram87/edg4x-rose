@@ -268,9 +268,9 @@ namespace fuse {
         if(tightComposerDebugLevel() >= 3) {
           dbg << dynamic_cast<ComposedAnalysis*>(getComposer())->str() << ":" << ao_p->str() << endl;
         }
-        cao_p->add(ao_p, query.pedge);
+        cao_p->add(ao_p, query.pedge, this, client);
       }
-      amao_p->add(dynamic_cast<ComposedAnalysis*>(getComposer()), cao_p, pedge);
+      amao_p->add(dynamic_cast<ComposedAnalysis*>(getComposer()), cao_p, pedge, this, client);
       return amao_p;
     }
 
@@ -295,9 +295,9 @@ namespace fuse {
             dbg << (*a)->str() << ":" << ao_p->str() << endl;
           }
 
-          cao_p->add(ao_p, query.pedge);
+          cao_p->add(ao_p, query.pedge, this, client);
         }        
-        amao_p->add(*a, cao_p, pedge);
+        amao_p->add(*a, cao_p, pedge, this, client);
       }
     }
 
@@ -313,10 +313,10 @@ namespace fuse {
         dbg << dynamic_cast<ComposedAnalysis*>(getComposer())->str() << ":" << ao_p->str() << endl;
       }
 
-      cao_p->add(ao_p, query.pedge);
+      cao_p->add(ao_p, query.pedge, this, client);
     }
 
-    amao_p->add(dynamic_cast<ComposedAnalysis*>(getComposer()), cao_p, pedge);
+    amao_p->add(dynamic_cast<ComposedAnalysis*>(getComposer()), cao_p, pedge, this, client);
 
     if(tightComposerDebugLevel() >= 3) {
       dbg << amao_p->str() << endl;
@@ -616,6 +616,11 @@ namespace fuse {
     return ao->isEmptyMR(pedge);
   }
   
+  // Returns a ValueObject that denotes the size of this memory region
+  ValueObjectPtr TightComposer::getRegionSizeMR(MemRegionObjectPtr ao, PartEdgePtr pedge, ComposedAnalysis* analysis) {
+    return ao->getRegionSizeMR(pedge);
+  }
+
   // query all analyses in the composition list with GetStartAStates
   // construct IntersectionPart and return the set of IntersectionParts
   // this would mean that the analyses are composed tightly and they are also
@@ -731,9 +736,9 @@ namespace fuse {
   dataflowPartEdgeIterator* TightComposer::getIterator() {
     direction dir = getDirection();
     if(dir == fw)
-      return new fw_dataflowPartEdgeIterator();
+      return new fw_dataflowPartEdgeIterator(selectIterOrderFromEnvironment());
     else if(dir == bw)
-      return new bw_dataflowPartEdgeIterator();
+      return new bw_dataflowPartEdgeIterator(selectIterOrderFromEnvironment());
     else assert(0);
   }
   

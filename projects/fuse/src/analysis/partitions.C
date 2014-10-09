@@ -910,7 +910,7 @@ std::list<PartEdgePtr> PartEdge::getOperandPartEdge(SgNode* anchor, SgNode* oper
   }
     
   std::list<PartEdgePtr> ccsOperandEdges;
-  bw_dataflowPartEdgeIterator it;
+  bw_dataflowPartEdgeIterator it(succ_front);
   it.add(makePtrFromThis(shared_from_this()));
   
   /* // There are scenarios where getOperandPartEdge() is called on edges that immediately precede
@@ -927,7 +927,8 @@ std::list<PartEdgePtr> PartEdge::getOperandPartEdge(SgNode* anchor, SgNode* oper
   scope regBE("Backward search", scope::medium, attrGE("partitionsDebugLevel", 2));
   
   // Walk backwards through the CCS edges, looking for the most recent CCS edge the parent of which is in list baseEdges
-  while(it!=bw_dataflowPartEdgeIterator::end()) {
+  //while(it!=bw_dataflowPartEdgeIterator::end()) {
+  while(!it.isEnd()) {
     scope reg("Predecessor", scope::low, attrGE("partitionsDebugLevel", 2));
     if(partitionsDebugLevel()>=2) {
         dbg << it.getPartEdge().get()->str()<<endl;

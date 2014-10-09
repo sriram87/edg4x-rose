@@ -399,7 +399,14 @@ std::ostream & ats2dot(std::ostream &o, std::string graphName, set<PartPtr>& sta
   // Maps contexts to the set of parts in each context
   Ctxt2PartsMap ctxt2parts(false, boost::make_shared<Ctxt2PartsMap_Generator_Base>(),
                                   boost::make_shared<Ctxt2PartsMap_Leaf_Generator_Base>());
-  for(fw_partEdgeIterator state(startParts); state!=fw_partEdgeIterator::end(); state++) {
+  /*fw_partEdgeIterator state(startParts);
+  cout << "state=("<<&state<<")="<<state.str() << endl;
+  const fw_partEdgeIterator& end = fw_partEdgeIterator::end();
+  cout << "end=("<<&end<<")=" << endl;
+  cout << "end=("<<&end<<")="<< end.str() << endl;
+  
+  for(fw_partEdgeIterator state(startParts); state!=fw_partEdgeIterator::end(); state++) {*/
+  for(fw_partEdgeIterator state(startParts); !state.isEnd(); state++) {
     PartPtr part = state.getPart();
     scope reg2(txt()<<"ats2dot: part="<<getPartUID(partInfo, part)<<"="<<part->str(), scope::medium, attrGE("saveDotAnalysisDebugLevel", 1));
     if(saveDotAnalysisDebugLevel()>=1) {
@@ -498,8 +505,10 @@ std::ostream & ats2dot_bw(std::ostream &o, std::string graphName, set<PartPtr>& 
   Ctxt2PartsMap ctxt2parts(false, boost::make_shared<Ctxt2PartsMap_Generator_Base>(),
                                   boost::make_shared<Ctxt2PartsMap_Leaf_Generator_Base>());
   
-  for(bw_partEdgeIterator state(endParts); state!=bw_partEdgeIterator::end(); state++) {
+  //for(bw_partEdgeIterator state(endParts); state!=bw_partEdgeIterator::end(); state++) {
+  for(bw_partEdgeIterator state(endParts); !state.isEnd(); state++) {
     PartPtr part = state.getPart();
+cout << "==== part="<<part->str()<<endl;
     scope reg(txt()<<"ats2dot: part="<<getPartUID(partInfo, part)<<"="<<part->str(), scope::medium, attrGE("saveDotAnalysisDebugLevel", 1));
     if(saveDotAnalysisDebugLevel()>=1) {
       dbg << "state="<<state.str()<<endl;

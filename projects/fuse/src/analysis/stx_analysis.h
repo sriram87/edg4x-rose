@@ -294,7 +294,14 @@ extern StxPartEdgePtr NULLStxPartEdge;
  ***** ABSTRACT OBJECTS *****
  ****************************/
 
-class StxValueObject : public ValueObject
+// StxValueObject form a set hierarchy and thus implement the AbstractObjectHierarchy
+// interface. The hierarchy is:
+// empty key: any value (val==NULL)
+// non-empty: specific value val!=NULL
+// The keys the differentiate StxValueObjects are:
+// std::list<comparableSgNode>
+
+class StxValueObject : public ValueObject, public AbstractObjectHierarchy
 {
   public:
   SgValueExp* val;
@@ -328,6 +335,8 @@ class StxValueObject : public ValueObject
 
   // Returns true if this ValueObject corresponds to a concrete value that is statically-known
   bool isConcrete();
+  // Returns the number of concrete values in this set
+  int concreteSetSize();
   // Returns the type of the concrete value (if there is one)
   SgType* getConcreteType();
   // Returns the concrete value (if there is one) as an SgValueExp, which allows callers to use
@@ -338,6 +347,14 @@ class StxValueObject : public ValueObject
     
   // Allocates a copy of this object and returns a pointer to it
   ValueObjectPtr copyV() const;
+  
+  // Returns whether all instances of this class form a hierarchy. Every instance of the same
+  // class created by the same analysis must return the same value from this method!
+  bool isHierarchy() const { return true; }
+  
+  // Returns a key that uniquely identifies this particular AbstractObject in the 
+  // set hierarchy.
+  const hierKeyPtr& getHierKey() const;
 };
 typedef boost::shared_ptr<StxValueObject> StxValueObjectPtr;
 
@@ -406,12 +423,38 @@ class StxMemRegionType: public sight::printable
                 all      // All memory, including heap, stack, global and expressions. Only used as a 
                          // result of merging an expression regions and storage/named regions.
                } regType;
-  
+               
   // Returns the type of this object: expr, named, storage or all
   virtual regType getType() const=0;
   
   // Returns the string representation of the given type
   static std::string MRType2Str(regType type);
+  
+  class comparableType: public comparable {
+    public:
+    regType type;
+    comparableType(regType type): type(type) {}
+    // This == That
+    bool equal(const comparable& that_arg) const {
+      //try {
+        const comparableType& that = dynamic_cast<const comparableType&>(that_arg);
+        return type == that.type;
+      /*} catch (std::bad_cast bc) {
+        ROSE_ASSERT(0);
+      }*/
+    }
+    // This < That
+    bool less(const comparable& that_arg) const {
+      //try{
+        const comparableType& that = dynamic_cast<const comparableType&>(that_arg);
+        return type < that.type;
+      /*} catch (std::bad_cast bc) {
+        ROSE_ASSERT(0);
+      }*/
+    }
+    std::string str(std::string indent="") const { return MRType2Str(type); }
+  }; // class typeWrapper
+  typedef boost::shared_ptr<comparableType> comparableTypePtr;
   
   // Returns a unique ID that differentiates this object from others within its type.
   // Storage and All objects must have a single ID, while others depend on the expression and symbol they
@@ -420,21 +463,41 @@ class StxMemRegionType: public sight::printable
   
   // Returns true if this object is live at the given part and false otherwise
   virtual bool isLiveMR(PartEdgePtr pedge)=0;
+
+  // Returns a ValueObject that denotes the size of this memory region
+  virtual ValueObjectPtr getRegionSizeMR(PartEdgePtr pedge)=0;
   
   // Returns true if this MemRegionObject denotes a finite set of concrete regions
   virtual bool isConcrete()=0;
+  // Returns the number of concrete values in this set
+  virtual int concreteSetSize()=0;
   // Returns the type of the concrete regions (if there is one)
   virtual SgType* getConcreteType()=0;
   // Returns the set of concrete memory regions as SgExpressions, which allows callers to use
   // the normal ROSE mechanisms to decode it
   virtual std::set<SgNode* > getConcrete()=0;
+
+  // Appends to the given hierarchical key the additional information that uniquely 
+  // identifies this type's set
+  virtual void addHierSubKey(const AbstractObjectHierarchy::hierKeyPtr& key)=0;
   
   StxMemRegionType() {};
 };
-
 typedef boost::shared_ptr<StxMemRegionType> StxMemRegionTypePtr;
 
-class StxMemRegionObject : public MemRegionObject
+// StxMemRegionObjects form a set hierarchy and thus implement the AbstractObjectHierarchy
+// interface. The hierarchy is:
+// empty key: all
+// non-empty:
+//   expr
+//     SgExpression*
+//   named
+//     SgInitializedName*
+//   storage
+// The keys the differentiate MemRegionObjects are:
+// std::list<comparableType, comparableSgNode>
+
+class StxMemRegionObject : public MemRegionObject, public AbstractObjectHierarchy
 {
   StxMemRegionTypePtr type;
   
@@ -443,7 +506,7 @@ class StxMemRegionObject : public MemRegionObject
   StxMemRegionObject(const StxMemRegionObject& that);
   
   // Returns the type of this object: expr, named, storage or all
-  StxMemRegionType::regType getType() { return type->getType(); }
+  StxMemRegionType::regType getType() const { return type->getType(); }
   
   // Returns whether this object may/must be equal to o within the given Part p
   // These methods are called by composers and should not be called by analyses.
@@ -469,8 +532,13 @@ class StxMemRegionObject : public MemRegionObject
   // Returns whether this AbstractObject denotes the empty set.
   bool isEmptyMR(PartEdgePtr pedge);
   
+  // Returns a ValueObject that denotes the size of this memory region
+  ValueObjectPtr getRegionSizeMR(PartEdgePtr pedge);
+
   // Returns true if this MemRegionObject denotes a finite set of concrete regions
   bool isConcrete() { return type->isConcrete(); }
+  // Returns the number of concrete values in this set
+  int concreteSetSize() { return type->concreteSetSize(); }
   // Returns the type of the concrete regions (if there is one)
   SgType* getConcreteType() { return type->getConcreteType(); }
   // Returns the set of concrete memory regions as SgExpressions, which allows callers to use
@@ -484,6 +552,14 @@ class StxMemRegionObject : public MemRegionObject
   MemRegionObjectPtr copyMR() const;
   
   std::string str(std::string indent="") const; // pretty print for the object
+
+  // Returns whether all instances of this class form a hierarchy. Every instance of the same
+  // class created by the same analysis must return the same value from this method!
+  bool isHierarchy() const { return true; }
+  
+  // Returns a key that uniquely identifies this particular AbstractObject in the 
+  // set hierarchy.
+  const hierKeyPtr& getHierKey() const;
 };
 typedef boost::shared_ptr<StxMemRegionObject> StxMemRegionObjectPtr;
         
@@ -515,13 +591,23 @@ class StxExprMemRegionType : public StxMemRegionType
   // Returns true if this object is live at the given part and false otherwise
   bool isLiveMR(PartEdgePtr pedge);
   
+  // Returns a ValueObject that denotes the size of this memory region
+  ValueObjectPtr getRegionSizeMR(PartEdgePtr pedge);
+
   // Returns true if this MemRegionObject denotes a finite set of concrete regions
   bool isConcrete() { return true; }
+  // Returns the number of concrete values in this set
+  int concreteSetSize() { return 1; }
   // Returns the type of the concrete regions (if there is one)
   SgType* getConcreteType() { return expr->get_type(); }
   // Returns the set of concrete memory regions as SgExpressions, which allows callers to use
   // the normal ROSE mechanisms to decode it
   std::set<SgNode* > getConcrete() { std::set<SgNode* > ret; ret.insert(expr); return ret; }
+  
+  // Appends to the given hierarchical key the additional information that uniquely 
+  // identifies this type's set
+  void addHierSubKey(const AbstractObjectHierarchy::hierKeyPtr& key)
+  { key->add(boost::make_shared<comparableSgNode>(expr)); }
   
   std::string str(std::string indent) const; // pretty print for the object
 };
@@ -556,13 +642,23 @@ class StxNamedMemRegionType : public StxMemRegionType
   // Returns true if this object is live at the given part and false otherwise
   bool isLiveMR(PartEdgePtr pedge);
   
+  // Returns a ValueObject that denotes the size of this memory region
+  ValueObjectPtr getRegionSizeMR(PartEdgePtr pedge);
+
   // Returns true if this MemRegionObject denotes a finite set of concrete regions
   bool isConcrete() { return symbol && isSgVariableSymbol(symbol); }
+  // Returns the number of concrete values in this set
+  int concreteSetSize() { return (isConcrete()? 1: -1); }
   // Returns the type of the concrete regions (if there is one)
   SgType* getConcreteType() { return (symbol? symbol->get_type(): NULL); }
   // Returns the set of concrete memory regions as SgExpressions, which allows callers to use
   // the normal ROSE mechanisms to decode it
   std::set<SgNode* > getConcrete() { std::set<SgNode* > ret; ret.insert(isSgVariableSymbol(symbol)); return ret; }
+  
+  // Appends to the given hierarchical key the additional information that uniquely 
+  // identifies this type's set
+  void addHierSubKey(const AbstractObjectHierarchy::hierKeyPtr& key)
+  { key->add(boost::make_shared<comparableSgNode>(iname)); }
   
   std::string str(std::string indent) const; // pretty print for the object
 };
@@ -594,13 +690,23 @@ class StxStorageMemRegionType : public StxMemRegionType
   // Returns true if this object is live at the given part and false otherwise
   bool isLiveMR(PartEdgePtr pedge) { return true; }
   
+  // Returns a ValueObject that denotes the size of this memory region
+  ValueObjectPtr getRegionSizeMR(PartEdgePtr pedge);
+
   // Returns true if this MemRegionObject denotes a finite set of concrete regions
   bool isConcrete() { return false; }
+  // Returns the number of concrete values in this set
+  int concreteSetSize() { return -1; }
   // Returns the type of the concrete regions (if there is one)
   SgType* getConcreteType() { return NULL; }
   // Returns the set of concrete memory regions as SgExpressions, which allows callers to use
   // the normal ROSE mechanisms to decode it
   std::set<SgNode* > getConcrete() { std::set<SgNode* > empty; return empty; }
+  
+  // Appends to the given hierarchical key the additional information that uniquely 
+  // identifies this type's set
+  // Nothing added since all instances of the storage type denote the same set
+  void addHierSubKey(const AbstractObjectHierarchy::hierKeyPtr& key) { }
   
   std::string str(std::string indent) const; // pretty print for the object
 };
@@ -629,13 +735,23 @@ class StxAllMemRegionType : public StxMemRegionType
   // Returns true if this object is live at the given part and false otherwise
   bool isLiveMR(PartEdgePtr pedge) { return true; }
   
+  // Returns a ValueObject that denotes the size of this memory region
+  ValueObjectPtr getRegionSizeMR(PartEdgePtr pedge);
+
   // Returns true if this MemRegionObject denotes a finite set of concrete regions
   bool isConcrete() { return false; }
+  // Returns the number of concrete values in this set
+  int concreteSetSize() { return -1; }
   // Returns the type of the concrete regions (if there is one)
   SgType* getConcreteType() { return NULL; }
   // Returns the set of concrete memory regions as SgExpressions, which allows callers to use
   // the normal ROSE mechanisms to decode it
   std::set<SgNode* > getConcrete() { std::set<SgNode* > empty; return empty; }
+  
+  // Appends to the given hierarchical key the additional information that uniquely 
+  // identifies this type's set
+  // Nothing added since all instances of the all type denote the same full set
+  void addHierSubKey(const AbstractObjectHierarchy::hierKeyPtr& key) { }
   
   std::string str(std::string indent) const; // pretty print for the object
 };
@@ -643,9 +759,13 @@ class StxAllMemRegionType : public StxMemRegionType
 /*********************
  ***** Utilities *****
  *********************/
+
 // Given a vector for base VirtualCFG edges, get the corresponding refined edges from
 // this attributes composer and add them to the given set of refined edges
 void collectRefinedEdges(Composer* composer, std::set<PartEdgePtr>& refined, const std::vector<CFGEdge>& base);
+
+// Returns the number of bytes an instance of the given SgType occupies
+StxValueObjectPtr getTypeSize(SgType* type);
 
 }; //namespace fuse
 

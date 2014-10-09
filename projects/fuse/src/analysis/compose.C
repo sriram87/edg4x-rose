@@ -15,7 +15,6 @@ using namespace sight;
 using namespace boost;
 namespace fuse
 {
-//DEBUG_LEVEL(composerDebugLevel, 0);
 #define composerDebugLevel 1
 
 //--------------------
@@ -381,9 +380,7 @@ RetType ChainComposer::callServerAnalysisFunc(
          ComposedAnalysis* client, 
          // Flag that indicates whether the operation's invocation should be logged in detail
          bool verbose) {
-  ostringstream label; if(verbose) label<<"ChainComposer::callServerAnalysisFunc() "<<opName<<" #doneAnalyses="<<doneAnalyses.size()<<" client="<<(client? client->str(): "NULL");
-//  scope reg(label.str(), scope::medium, attrGE("composerDebugLevel", (verbose? 1: composerDebugLevel()+1)));
-  SIGHT_VERB(scope reg(label.str(), scope::medium), (verbose? 1: composerDebugLevel+1), composerDebugLevel);
+  SIGHT_DECL(scope, (txt()<<"ChainComposer::callServerAnalysisFunc() "<<opName<<" #doneAnalyses="<<doneAnalyses.size()<<" client="<<(client? client->str(): "NULL"), scope::medium), verbose);
 //          attrGE("composerDebugLevel", 1));
   assert(doneAnalyses.size()>0);
   //assert(serverCache.find(client) != serverCache.end());
@@ -411,11 +408,12 @@ RetType ChainComposer::callServerAnalysisFunc(
       dbg << "&nbsp;&nbsp;&nbsp;&nbsp;"<<(*a)->str("")<<" : "<<(*a)<<endl;
   }*/
   
-  if(verbose>=1) {
+  
+  SIGHT_IF(verbose)
     dbg << "pedge="<<(pedge? pedge->str(): "NULL")<<endl;
     if(client) dbg << "client="<<client->str()<<", tightness="<<(checkTightness(client)==ComposedAnalysis::loose? "loose": "tight")<<endl;
     if(currentAnalysis) dbg << "currentAnalysis="<<currentAnalysis->str()<<", tightness="<<(checkTightness(currentAnalysis)==ComposedAnalysis::loose? "loose": "tight")<<endl;
-  }
+  SIGHT_FI()
   
   // If the current analysis is non-NULL and implements the desired operation tightly, call its implementation
   if(client && checkTightness(client)) {
@@ -429,7 +427,7 @@ RetType ChainComposer::callServerAnalysisFunc(
   assert((client==NULL          || queryInfo.find(client)         !=queryInfo.end()) &&
          (currentAnalysis==NULL || queryInfo.find(currentAnalysis)!=queryInfo.end()));
   CCQueryServers& info = queryInfo[client? client: currentAnalysis];
-  if(verbose) { dbg << "queryInfo="<<info.str()<<endl; }
+  SIGHT(dbg << "queryInfo="<<info.str()<<endl, verbose)
   
   ComposedAnalysis* server;
   int pedgeUnrollCnt;
@@ -443,7 +441,7 @@ RetType ChainComposer::callServerAnalysisFunc(
   }
   assert(server);
   
-  if(verbose) { dbg << "server="<<server->str()<<", pedgeUnrollCnt="<<pedgeUnrollCnt<<endl;  }
+  SIGHT(dbg << "server="<<server->str()<<", pedgeUnrollCnt="<<pedgeUnrollCnt<<endl, verbose)
   
   // Set pedge to the PartEdge of the ATS graph on which the server analysis ran
   for(int i=0; i<pedgeUnrollCnt; i++)
@@ -451,8 +449,9 @@ RetType ChainComposer::callServerAnalysisFunc(
   
   //endMeasure(opMeasure);
   //cout << "server="<<server->str()<<endl;
+  SIGHT(dbg << "pedge="<<pedge->str()<<endl, verbose);
   RetType v = callOp(pedge, server, type);
-  if(verbose) dbg << "Returning "<<ret2Str(v, "")<<endl;
+  SIGHT(dbg << "Returning "<<ret2Str(v, "")<<endl, verbose)
   return v;
 }
  
@@ -485,7 +484,7 @@ UnionRetPtrType ChainComposer::OperandExpr2Any
                       // Returns a string representation of the result of the operation
                       function<string (RetPtrType, string)> ret2Str)
 {
-  SIGHT_VERB(scope reg(txt()<<"ChainComposer::Operand"<<OpName, scope::medium), 2, composerDebugLevel)
+  SIGHT_VERB_DECL(scope, (txt()<<"ChainComposer::Operand"<<OpName, scope::medium), 2, composerDebugLevel)
   SIGHT_VERB(dbg << "n="<<SgNode2Str(n)<<endl << "operand("<<operand<<")="<<SgNode2Str(operand)<<endl<< "pedge="<<pedge->str()<<endl, 2, composerDebugLevel)
 /*  scope reg(txt()<<"ChainComposer::Operand"<<OpName, scope::medium, attrGE("composerDebugLevel", 2));
   if(composerDebugLevel()>=2) dbg << "n="<<SgNode2Str(n)<<endl << "operand("<<operand<<")="<<SgNode2Str(operand)<<endl << "pedge="<<pedge->str()<<endl;*/
@@ -517,7 +516,7 @@ UnionRetPtrType ChainComposer::OperandExpr2Any
   }
 
   //scope reg2("Returning", scope::low, attrGE("composerDebugLevel", 1));
-  SIGHT_VERB(scope reg2("Returning", scope::low), 2, composerDebugLevel)
+  SIGHT_VERB_DECL(scope, ("Returning", scope::low), 2, composerDebugLevel)
   if(opPartEdges.size()>0) {
     // Return the union of all the objects
     return unionOp(partObjects);
@@ -619,7 +618,7 @@ MemRegionObjectPtr ChainComposer::Expr2MemRegion_ex(SgNode* n, PartEdgePtr pedge
            function<ComposedAnalysis::implTightness (ComposedAnalysis*)>(bind( &ComposedAnalysis::Expr2MemRegionTightness, _1)),
            function<string (MemRegionObjectPtr, string)>(
                  CallGet2Arg<MemRegionObject, MemRegionObjectPtr>(function<string (MemRegionObject*, string)>(bind( &MemRegionObject::str, _1, _2)))),
-           pedge, client, false);
+           pedge, client, true);
 }
 MemRegionObjectPtr ChainComposer::Expr2MemRegion(SgNode* n, PartEdgePtr pedge, ComposedAnalysis* client) {
   // Call Expr2MemRegion_ex() and wrap the results with a UnionMemRegionObject
@@ -688,6 +687,11 @@ bool ChainComposer::mayEqualV (ValueObjectPtr val1, ValueObjectPtr  val2, PartEd
            pedge, client, false);
 }*/
 bool ChainComposer::mayEqualMR(MemRegionObjectPtr  mr1, MemRegionObjectPtr  mr2, PartEdgePtr pedge, ComposedAnalysis* client)  {
+  /*scope s("ChainComposer::mayEqualMR");
+  dbg << "mr1="<<(mr1?mr1->str():"NULL")<<endl;
+  dbg << "mr2="<<(mr2?mr2->str():"NULL")<<endl;
+  dbg << "pedge="<<pedge->str()<<endl;
+  dbg << "client="<<client->str()<<endl;*/
     return callServerAnalysisFunc<bool>("mayEqualMR",
            CallWithPE<bool>(
                function<bool (PartEdgePtr)>(bind( &MemRegionObject::mayEqualMR, mr1, mr2, _1))),
@@ -695,7 +699,7 @@ bool ChainComposer::mayEqualMR(MemRegionObjectPtr  mr1, MemRegionObjectPtr  mr2,
            Composer::memregion,
            function<ComposedAnalysis::implTightness (ComposedAnalysis*)>(bind( &ComposedAnalysis::Expr2MemRegionTightness, _1)),
            function<string (bool, string)>(&bool2Str),
-           pedge, client, false);
+           pedge, client, true);
 }
 /*bool ChainComposer::mayEqualML(MemLocObjectPtr  ml1, MemLocObjectPtr  ml2, PartEdgePtr pedge, ComposedAnalysis* client)  {
     return callServerAnalysisFunc<bool>("mayEqualML",
@@ -1021,6 +1025,19 @@ bool ChainComposer::isEmptyMR(MemRegionObjectPtr mr, PartEdgePtr pedge, Composed
            pedge, client, false);
 }*/
 
+// Returns a ValueObject that denotes the size of this memory region
+ValueObjectPtr ChainComposer::getRegionSizeMR(MemRegionObjectPtr mr, PartEdgePtr pedge, ComposedAnalysis* client)  {
+  return callServerAnalysisFunc<ValueObjectPtr>("getRegionSizeMR",
+           CallWithPE<ValueObjectPtr>(
+               function<ValueObjectPtr (PartEdgePtr)>(bind( &MemRegionObject::getRegionSizeMR, mr, _1))),
+           Composer::memregion,
+           function<ComposedAnalysis::implTightness (ComposedAnalysis*)>(bind( &ComposedAnalysis::Expr2MemRegionTightness, _1)),
+           function<string (ValueObjectPtr, string)>(
+                            CallGet2Arg<ValueObject, ValueObjectPtr>(function<string (ValueObject*, string)>(bind( &ValueObject::str, _1, _2)))),
+           pedge, client, false);
+}
+
+
 // ---------------------------
 // --- Calling Get*AStates ---
 // Return the anchor Parts of an application
@@ -1115,10 +1132,7 @@ void ChainComposer::runAnalysis()
     //trace opTimesT("OpTimes", contextAttrs, trace::showEnd, trace::boxplot);
     
     currentAnalysis = *a;
-    //ostringstream label; if(composerDebugLevel()>=1) label << "ChainComposer Running Analysis "<<i<<": "<<(*a)<<" : "<<(*a)->str("");
-    //scope reg(label.str(), scope::high, attrGE("composerDebugLevel", 1));
-    ostringstream label; SIGHT_VERB(label << "ChainComposer Running Analysis "<<i<<": "<<(*a)<<" : "<<(*a)->str(""), 1, composerDebugLevel)
-    SIGHT_VERB(scope reg(label.str(), scope::high), 1, composerDebugLevel);
+    SIGHT_VERB_DECL(scope, (txt()<<"ChainComposer Running Analysis "<<i<<": "<<(*a)<<" : "<<(*a)->str(""), scope::high), 1, composerDebugLevel);
     //scope s(txt()<<"Analysis "<<i<<": "<<currentAnalysis<<" : "<<currentAnalysis->str(""), scope::medium);
     //cout << "ChainComposer Analysis "<<i<<": "<<currentAnalysis<<" : "<<currentAnalysis->str("") << endl;
     
@@ -1185,7 +1199,7 @@ void ChainComposer::runAnalysis()
     trace opTimesT("OpTimes", contextAttrs, trace::showEnd, trace::boxplot);*/
     
     //scope s("---", scope::high, attrGE("composerDebugLevel", 1));
-    SIGHT_VERB(scope s("---", scope::high), 1, composerDebugLevel);
+    SIGHT_VERB_DECL(scope, ("---", scope::high), 1, composerDebugLevel);
     //UnstructuredPassInterDataflow inter_up(testAnalysis);
     /*ContextInsensitiveInterProceduralDataflow inter_up(testAnalysis, getCallGraph());
     inter_up.runAnalysis();*/
@@ -1517,6 +1531,11 @@ bool LooseParallelComposer::isEmptyV (ValueObjectPtr ao, PartEdgePtr pedge, Comp
 { return getComposer()->isEmptyCL(ao, pedge, this); }*/
 bool LooseParallelComposer::isEmptyMR(MemRegionObjectPtr ao, PartEdgePtr pedge, ComposedAnalysis* client)
 { return getComposer()->isEmptyMR(ao, pedge, this); }
+
+// Returns a ValueObject that denotes the size of this memory region
+ValueObjectPtr LooseParallelComposer::getRegionSizeMR(MemRegionObjectPtr ao, PartEdgePtr pedge, ComposedAnalysis* client)
+{ return getComposer()->getRegionSizeMR(ao, pedge, this); }
+
 /*bool LooseParallelComposer::isEmptyML(MemLocObjectPtr ao, PartEdgePtr pedge, ComposedAnalysis* client)
 { return getComposer()->isEmptyML(ao, pedge, this); }*/
 
@@ -1538,7 +1557,7 @@ void LooseParallelComposer::runAnalysis()
   int i=1;
   for(list<ComposedAnalysis*>::iterator a=allAnalyses.begin(); a!=allAnalyses.end(); a++, i++) {
     //scope reg(txt()<< "LooseParallelComposer Running Analysis "<<i<<": "<<(*a)->str(""), scope::high, attrGE("composerDebugLevel", 1));
-    SIGHT_VERB(scope reg(txt()<< "LooseParallelComposer Running Analysis "<<i<<": "<<(*a)->str(""), scope::high), 1, composerDebugLevel);
+    SIGHT_VERB_DECL(scope, (txt()<< "LooseParallelComposer Running Analysis "<<i<<": "<<(*a)->str(""), scope::high), 1, composerDebugLevel);
     
     (*a)->runAnalysis();
     
@@ -1574,7 +1593,7 @@ ValueObjectPtr   LooseParallelComposer::Expr2Val(SgNode* n, PartEdgePtr pedge)
   
   for(list<ComposedAnalysis*>::iterator a=allAnalyses.begin(); a!=allAnalyses.end(); a++) {
     //scope reg(txt()<<"Expr2Val  : " << (*a)->str(""), scope::medium, attrGE("composerDebugLevel", 1));
-    SIGHT_VERB(scope reg(txt()<<"Expr2Val  : " << (*a)->str(""), scope::medium), 1, composerDebugLevel)
+    SIGHT_VERB_DECL(scope, (txt()<<"Expr2Val  : " << (*a)->str(""), scope::medium), 1, composerDebugLevel)
     
     try {
       ValueObjectPtr val = (*a)->Expr2Val(n, getEdgeForAnalysis(pedge, *a));
@@ -1603,7 +1622,7 @@ CodeLocObjectPtr LooseParallelComposer::Expr2CodeLoc(SgNode* n, PartEdgePtr pedg
   
   for(list<ComposedAnalysis*>::iterator a=allAnalyses.begin(); a!=allAnalyses.end(); a++) {
     //scope reg(txt()<<"Expr2CodeLoc  : " << (*a)->str(""), scope::medium, attrGE("composerDebugLevel", 1));
-    SIGHT_VERB(scope reg(txt()<<"Expr2CodeLoc  : " << (*a)->str(""), scope::medium), 1, composerDebugLevel)
+    SIGHT_VERB_DECL(scope, (txt()<<"Expr2CodeLoc  : " << (*a)->str(""), scope::medium), 1, composerDebugLevel)
 
     try {
       CodeLocObjectPtr cl = (*a)->Expr2CodeLoc(n, getEdgeForAnalysis(pedge, *a));
@@ -1632,7 +1651,7 @@ MemRegionObjectPtr  LooseParallelComposer::Expr2MemRegion(SgNode* n, PartEdgePtr
   
   for(list<ComposedAnalysis*>::iterator a=allAnalyses.begin(); a!=allAnalyses.end(); a++) {
     //scope reg(txt()<<"Expr2MemRegion  : " << (*a)->str(""), scope::medium, attrGE("composerDebugLevel", 1));
-    SIGHT_VERB(scope reg(txt()<<"Expr2MemRegion  : " << (*a)->str(""), scope::medium), 1, composerDebugLevel)
+    SIGHT_VERB_DECL(scope, (txt()<<"Expr2MemRegion  : " << (*a)->str(""), scope::medium), 1, composerDebugLevel)
     
     try {
       MemRegionObjectPtr mr = (*a)->Expr2MemRegion(n, getEdgeForAnalysis(pedge, *a));
@@ -1660,7 +1679,7 @@ MemLocObjectPtr  LooseParallelComposer::Expr2MemLoc(SgNode* n, PartEdgePtr pedge
   
   for(list<ComposedAnalysis*>::iterator a=allAnalyses.begin(); a!=allAnalyses.end(); a++) {
     //scope reg(txt()<<"Expr2MemLoc  : " << (*a)->str(""), scope::medium, attrGE("composerDebugLevel", 1));
-    SIGHT_VERB(scope reg(txt()<<"Expr2MemLoc  : " << (*a)->str(""), scope::medium), 1, composerDebugLevel)
+    SIGHT_VERB_DECL(scope, (txt()<<"Expr2MemLoc  : " << (*a)->str(""), scope::medium), 1, composerDebugLevel)
     
     try {
       MemLocObjectPtr ml = (*a)->Expr2MemLoc(n, getEdgeForAnalysis(pedge, *a));
@@ -1854,7 +1873,7 @@ set<PartPtr> LooseParallelComposer::GetStartOrEndAStates_Spec(callStartOrEndASta
   if(subAnalysesImplementPartitions==True || subAnalysesImplementPartitions==Unknown) {
     for(list<ComposedAnalysis*>::iterator a=allAnalyses.begin(); a!=allAnalyses.end(); a++) {
       //scope reg(txt()<<funcName<<"  : " << (*a)->str(""), scope::medium, attrGE("composerDebugLevel", 1));
-      SIGHT_VERB(scope reg(txt()<<funcName<<"  : " << (*a)->str(""), scope::medium), 1, composerDebugLevel)
+      SIGHT_VERB_DECL(scope, (txt()<<funcName<<"  : " << (*a)->str(""), scope::medium), 1, composerDebugLevel)
 
       try {
         //set<PartPtr> curParts = (*a)->GetEndAStates();

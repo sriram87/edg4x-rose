@@ -4,8 +4,9 @@
 //#include <boost/lambda/lambda.hpp>
 //#include <boost/lambda/bind.hpp>
 #include "cfgUtils.h"
-#include "sight.h"
 #include "comp_shared_ptr.h"
+#include <boost/graph/adjacency_list.hpp>
+#include <boost/graph/topological_sort.hpp>
 
 namespace fuse {
 
@@ -93,7 +94,7 @@ class MLMapping
 // from MemLocObjects that are the keys of ml2ml to their corresponding values in ml2ml. The value MemLocObjects in 
 // ml2ml should be interpreted with respect to PartEdge newPEdge. It corresponds to the code region(s) to which we 
 // are remapping.
-class MLRemapper: public sight::printable
+class MLRemapper
 {
   // The edge for which the remapping is being performed
   PartEdgePtr pedge;
@@ -201,7 +202,7 @@ class PartContext;
 typedef CompSharedPtr<PartContext> PartContextPtr;
 extern PartContextPtr NULLPartContextPtr;
 
-class PartContext: public sight::printable//, public boost::enable_shared_from_this<PartContext>
+class PartContext//, public boost::enable_shared_from_this<PartContext>
 {
   // Comparison operations must be derived on contexts to make it possible to differentiate
   // them and create data structures from them. Note that we will only need to compare 
@@ -240,6 +241,8 @@ class PartContext: public sight::printable//, public boost::enable_shared_from_t
   bool operator>=(const PartContextPtr& that) const;
   bool operator<=(const PartContextPtr& that) const;
   bool operator> (const PartContextPtr& that) const;
+
+  virtual std::string str(std::string indent="") const=0;
 };
 
 // Combines the contexts of an individual Part and the contexts of its parent Parts
@@ -248,7 +251,7 @@ typedef CompSharedPtr<Context> ContextPtr;
 typedef CompSharedPtr<const Context> ConstContextPtr;
 extern ContextPtr NULLContextPtr;
 
-class Context//: public sight::printable
+class Context
 {
   public:
   /*ConstPartPtr part;
@@ -288,7 +291,7 @@ class Context//: public sight::printable
   //std::string str_rec(PartPtr part, std::string indent="");
 };
 
-class Part : public sight::printable, public boost::enable_shared_from_this<Part>
+class Part: public boost::enable_shared_from_this<Part>
 {
   protected:
   ComposedAnalysis* analysis;
@@ -296,6 +299,7 @@ class Part : public sight::printable, public boost::enable_shared_from_this<Part
   PartContextPtr pContext;
   
   public:
+  Part() {}
   Part(ComposedAnalysis* analysis, PartPtr parent, PartContextPtr pContext=NULLPartContextPtr);
   Part(const Part& that);
   
@@ -413,6 +417,8 @@ class Part : public sight::printable, public boost::enable_shared_from_this<Part
   // return the relevant CFGNode(s)
   bool mustOutgoingFuncCall(std::set<CFGNode>& ret);
   bool mayOutgoingFuncCall(std::set<CFGNode>& ret);
+  bool mustOutgoingFuncCall();
+  bool mayOutgoingFuncCall();
   
   // Returns whether this node denotes the portion of a function call to which control from the callee function
   // flows after it terminates.
@@ -421,6 +427,8 @@ class Part : public sight::printable, public boost::enable_shared_from_this<Part
   // return the relevant CFGNode(s)
   bool mustIncomingFuncCall(std::set<CFGNode>& ret);
   bool mayIncomingFuncCall(std::set<CFGNode>& ret);
+  bool mustIncomingFuncCall();
+  bool mayIncomingFuncCall();
   
   // Returns whether both this and that parts have the same context and their CFGNode lists consist
   // exclusively of matching pairs of outgoing and incoming function calls (for each outgoing call in one
@@ -460,10 +468,65 @@ class Part : public sight::printable, public boost::enable_shared_from_this<Part
   bool operator>=(const PartPtr& that) const;
   bool operator<=(const PartPtr& that) const;
   bool operator> (const PartPtr& that) const;
+
+  virtual std::string str(std::string indent="") const=0;
 };
 extern PartPtr NULLPart;
 
-class PartEdge : public sight::printable, public boost::enable_shared_from_this<PartEdge> {
+// Denotes the starting node of the application's execution
+class StartPart : public Part {
+  public:
+  std::set<PartPtr> parts;
+
+  StartPart(const std::set<PartPtr>& parts): parts(parts) {}
+
+  std::list<PartEdgePtr> outEdges();
+  std::list<PartEdgePtr> inEdges();
+  std::set<CFGNode> CFGNodes() const;
+  
+  // If this Part corresponds to a function call/return, returns the set of Parts that contain
+  // its corresponding return/call, respectively.
+  std::set<PartPtr> matchingCallParts() const;
+  
+  // Returns a PartEdgePtr, where the source is a wild-card part (NULLPart) and the target is this Part
+  PartEdgePtr inEdgeFromAny();
+  // Returns a PartEdgePtr, where the target is a wild-card part (NULLPart) and the source is this Part
+  PartEdgePtr outEdgeToAny();
+ 
+  bool equal(const PartPtr& that) const;
+  bool less(const PartPtr& that) const;
+
+  std::string str(std::string indent="") const;
+}; // class StartPart
+typedef CompSharedPtr<StartPart> StartPartPtr;// Denotes the starting node of the application's execution
+
+class EndPart : public Part {
+  public:
+  std::set<PartPtr> parts;
+
+  EndPart(const std::set<PartPtr>& parts): parts(parts) {}
+
+  std::list<PartEdgePtr> outEdges();
+  std::list<PartEdgePtr> inEdges();
+  std::set<CFGNode> CFGNodes() const;
+  
+  // If this Part corresponds to a function call/return, returns the set of Parts that contain
+  // its corresponding return/call, respectively.
+  std::set<PartPtr> matchingCallParts() const;
+  
+  // Returns a PartEdgePtr, where the source is a wild-card part (NULLPart) and the target is this Part
+  PartEdgePtr inEdgeFromAny();
+  // Returns a PartEdgePtr, where the target is a wild-card part (NULLPart) and the source is this Part
+  PartEdgePtr outEdgeToAny();
+ 
+  bool equal(const PartPtr& that) const;
+  bool less(const PartPtr& that) const;
+
+  std::string str(std::string indent="") const;
+}; // class EndPart
+typedef CompSharedPtr<EndPart> EndPartPtr;
+
+class PartEdge : public boost::enable_shared_from_this<PartEdge> {
   protected:
   ComposedAnalysis* analysis;
   PartEdgePtr parent;
@@ -471,6 +534,7 @@ class PartEdge : public sight::printable, public boost::enable_shared_from_this<
   MLRemapper remap;
   
   public:
+  PartEdge() {}
   PartEdge(ComposedAnalysis* analysis, PartEdgePtr parent);
   PartEdge(const PartEdge& that);
 
@@ -545,8 +609,34 @@ class PartEdge : public sight::printable, public boost::enable_shared_from_this<
   // Returns the remapping functor
   const MLRemapper& getRemap() const
   { return remap; }
+
+  virtual std::string str(std::string indent="") const=0;
 };
 extern PartEdgePtr NULLPartEdge;
+
+// Edges that connect StartPart and EndPart (implemented by Fuse) to other Parts (implemented by individual analyses).
+// The implementationof this class is a simple pair of Parts, making it a prototypical implementation of PartEdges.
+// The only reason why this class is dedicated to connecting terminal parts and is not used elsewhere is because
+// it is expected to fit into graphs that include PartEdges implemented by analyses and to achieve this, must be
+// directly comparable with these PartEdges. For terminal edges this comparison is well-defined (start->* edges
+// precede graph internal edges, which precede *->end edges), whereas for other edges it is not well-defined.
+class TerminalPartEdge: public PartEdge {
+  PartPtr src;
+  PartPtr tgt;
+  public:
+  TerminalPartEdge(PartPtr src, PartPtr tgt): src(src), tgt(tgt) {}
+  
+  PartPtr source() const;
+  PartPtr target() const;
+
+  std::map<CFGNode, boost::shared_ptr<SgValueExp> > getPredicateValue();
+  
+  bool equal(const PartEdgePtr& that) const;
+  bool less(const PartEdgePtr& that) const;
+  
+  std::string str(std::string indent="") const;
+}; // class TerminalPartEdge
+typedef CompSharedPtr<TerminalPartEdge> TerminalPartEdgePtr;
 
 class IntersectionPart;
 typedef CompSharedPtr<IntersectionPart> IntersectionPartPtr;
@@ -578,6 +668,8 @@ class IntersectionPartContext : public PartContext
   
   std::string str(std::string indent="") const;
 };
+class IntersectionPartContext;
+typedef CompSharedPtr<IntersectionPartContext> IntersectionPartContextPtr;
 
 // The intersection of multiple Parts. Maintains multiple Parts and responds to API calls with the most 
 //   accurate response that its constituent objects return.
@@ -750,12 +842,10 @@ class IntersectionPartEdge : public PartEdge
   Lattice* backwardRemapML(Lattice* lat, PartEdgePtr fromPEdge, ComposedAnalysis* client);
   
   std::string str(std::string indent="") const;
-};
+}; // class IntersectionPartEdge
 
 /**********************
  ****** Utilities *****
  **********************/
 
 }; // namespace fuse
-
-

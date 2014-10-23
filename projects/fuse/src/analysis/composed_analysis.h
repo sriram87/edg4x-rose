@@ -5,11 +5,13 @@
 #include "analysis.h"
 #include "lattice.h"
 #include "abstract_object.h"
+#include "ats.h"
 #include <boost/shared_ptr.hpp>
 #include <vector>
 #include <set>
 #include <map>
 #include <string>
+#include "sight.h"
 
 namespace fuse {
 
@@ -19,8 +21,19 @@ class NotImplementedException
 class ComposedAnalysis;
 typedef boost::shared_ptr<ComposedAnalysis> ComposedAnalysisPtr;
 
-class ComposedAnalysis : public virtual Dataflow, public sight::printable
+class ComposedAnalysis : public virtual Dataflow
 {
+  public:
+  // Indicates whether we should do the analysis using an SSA graph of the ATS this analysis runs on (true)
+  // or whether we should run on the raw dense ATS with no support info (false).
+  bool SSAAnalysis;
+  // The object that describes the ATS, from which we'll compute the SSA
+  ATSGraph* ats;
+  // The global lattices that describe the state of the entire application. These lattices same lattices
+  // will be attached to the NodeState of every part.
+  std::vector<Lattice*> ssaLats;
+  bool ssaLatsInitialized;
+  
   public:
   Composer* composer;
   
@@ -56,6 +69,14 @@ class ComposedAnalysis : public virtual Dataflow, public sight::printable
   virtual MemRegionObjectPtr  Expr2MemRegion(SgNode* n, PartEdgePtr pedge) { throw NotImplementedException(); }
   virtual MemLocObjectPtr  Expr2MemLoc      (SgNode* n, PartEdgePtr pedge) { throw NotImplementedException(); }
   
+  // Methods used by client analyses to get a MemLoc from the composer while also documenting
+  // whether the MemLoc corresponds to a definition or a use of the set of memory locations
+  // denoted by n.
+  MemLocObjectPtr Expr2MemLocDef(SgNode* n, PartEdgePtr pedge);
+  MemLocObjectPtr Expr2MemLocUse(SgNode* n, PartEdgePtr pedge);
+  MemLocObjectPtr OperandExpr2MemLocDef(SgNode* n, SgNode* operand, PartEdgePtr pedge);
+  MemLocObjectPtr OperandExpr2MemLocUse(SgNode* n, SgNode* operand, PartEdgePtr pedge);
+
   // Return true if the class implements Expr2* and false otherwise
   virtual bool implementsExpr2Val      () { return false; }
   virtual bool implementsExpr2CodeLoc  () { return false; }
@@ -199,15 +220,38 @@ class ComposedAnalysis : public virtual Dataflow, public sight::printable
   // analyzeFromDirectionStart - If true the function should be analyzed from its starting point from the analysis' 
   //    perspective (fw: entry point, bw: exit point)*/
   void runAnalysis();
+  void runAnalysisDense();
+  void runAnalysisSSA();
   
   // Execute the analysis transfer function, updating its dataflow info.
   // The final state of dfInfo will map a Lattice* object to each outgoing or incoming PartEdge.
   // Returns true if the Lattices in dfInfo are modified and false otherwise.
-  bool transferDFState(ComposedAnalysis* analysis, PartPtr part, CFGNode cn, SgNode* sgn, NodeState& state, std::map<PartEdgePtr, 
+  bool transferDFStateDense(ComposedAnalysis* analysis, PartPtr part, CFGNode cn, SgNode* sgn, NodeState& state, std::map<PartEdgePtr, 
+                       std::vector<Lattice*> >& dfInfo, const std::set<PartPtr>& ultimateParts);
+  bool transferDFStateSSA(ComposedAnalysis* analysis, PartPtr part, CFGNode cn, SgNode* sgn, NodeState& state, std::map<PartEdgePtr, 
                        std::vector<Lattice*> >& dfInfo, const std::set<PartPtr>& ultimateParts);
   
   // Propagates the Lattice* mapped to different PartEdges in dfInfo along these PartEdges
-  void propagateDF2Desc(ComposedAnalysis* analysis,
+  void propagateDF2DescDense(ComposedAnalysis* analysis,
+                        PartPtr part, 
+                        bool modified, 
+                        // Set of all the Parts that have already been visited by the analysis
+                        std::set<PartPtr>& visited,
+                        // Set of all the Parts that have been initialized
+                        std::set<PartPtr>& initialized,
+                        // The dataflow iterator that identifies the state of the iteration
+                        dataflowPartEdgeIterator* curNodeIt,
+                        std::map<PartEdgePtr, std::vector<Lattice*> >& dfInfo, 
+                        // anchor that denotes the current abstract state in the debug output
+                        anchor curPartAnchor,
+                        // graph widget that visualizes the flow of the worklist algorithm
+                        graph& worklistGraph,
+                        // Maps each Abstract State to the anchors of outgoing links that target it from the last visit to its predecessors
+                        std::map<PartPtr, std::set<anchor> >& toAnchors,
+                        // Maps each Abstract state to the anchors of the AStates that lead to it, as well as the AStates themselves
+                        std::map<PartPtr, std::set<std::pair<anchor, PartPtr> > >& fromAnchors);
+
+  void propagateDF2DescSSA(ComposedAnalysis* analysis,
                         PartPtr part, 
                         bool modified, 
                         // Set of all the Parts that have already been visited by the analysis
@@ -235,7 +279,8 @@ class ComposedAnalysis : public virtual Dataflow, public sight::printable
   // fill in the lattices above and below this part, as well as the facts, as needed. Since in many cases
   // the lattices above and below each node are the same, implementors can alternately implement the 
   // genInitLattice and genInitFact functions, which are called by the default implementation of initializeState.
-  virtual void initializeState(PartPtr part, NodeState& state);
+  virtual void initializeStateDense(PartPtr part, NodeState& state);
+  virtual void initializeStateSSA(PartPtr part, NodeState& state);
   
   // Initializes the state of analysis lattices at the given function, part and edge into our out of the part
   // by setting initLattices to refer to freshly-allocated Lattice objects.
@@ -248,17 +293,26 @@ class ComposedAnalysis : public virtual Dataflow, public sight::printable
 
   //! Generic transferPropgateAState that can be used by leaf analysis.
   //! Transfer functions and state propagation is determined by the ComposedAnalysis* passed to it.
-  void transferPropagateAState(ComposedAnalysis* analysis, PartPtr part, std::set<PartPtr>& visited, bool firstVisit, 
+  void transferPropagateAStateDense(ComposedAnalysis* analysis, PartPtr part, std::set<PartPtr>& visited, bool firstVisit, 
+                               std::set<PartPtr>& initialized, dataflowPartEdgeIterator* curNodeIt, anchor curPartAnchor, 
+                               graph& worklistGraph,std::map<PartPtr, std::set<anchor> >& toAnchors,
+                               std::map<PartPtr, std::set<std::pair<anchor, PartPtr> > >& fromAnchors);
+
+  void transferPropagateAStateSSA(ComposedAnalysis* analysis, PartPtr part, std::set<PartPtr>& visited, bool firstVisit, 
                                std::set<PartPtr>& initialized, dataflowPartEdgeIterator* curNodeIt, anchor curPartAnchor, 
                                graph& worklistGraph,std::map<PartPtr, std::set<anchor> >& toAnchors,
                                std::map<PartPtr, std::set<std::pair<anchor, PartPtr> > >& fromAnchors);
 
   //! TightComposer implents the following method by calling generic version of this function on each analysis.
   //! FWDataflow, BWDataflow which are dataflow anlayses implements this method by passing itself to the generic version.
-  virtual void transferPropagateAState(PartPtr part, std::set<PartPtr>& visited, bool firstVisit, 
+  virtual void transferPropagateAStateDense(PartPtr part, std::set<PartPtr>& visited, bool firstVisit,
                                        std::set<PartPtr>& initialized, dataflowPartEdgeIterator* curNodeIt, anchor curPartAnchor, 
                                        graph& worklistGraph,std::map<PartPtr, std::set<anchor> >& toAnchors,
                                        std::map<PartPtr, std::set<std::pair<anchor, PartPtr> > >& fromAnchors)=0;
+  virtual void transferPropagateAStateSSA(PartPtr part, std::set<PartPtr>& visited, bool firstVisit,
+                                         std::set<PartPtr>& initialized, dataflowPartEdgeIterator* curNodeIt, anchor curPartAnchor,
+                                         graph& worklistGraph,std::map<PartPtr, std::set<anchor> >& toAnchors,
+                                         std::map<PartPtr, std::set<std::pair<anchor, PartPtr> > >& fromAnchors)=0;
   
   // propagates the dataflow info from the current node's NodeState (curNodeState) to the next node's
   // NodeState (nextNodeState)
@@ -287,6 +341,8 @@ class ComposedAnalysis : public virtual Dataflow, public sight::printable
   virtual void remapML(PartEdgePtr fromPEdge, std::vector<Lattice*>& lat)=0;
   
   virtual direction getDirection() = 0;
+
+  virtual std::string str(std::string indent="") const { return "ComposedAnalysis"; }
 };
 
 /* Forward Dataflow Analysis */
@@ -298,7 +354,11 @@ class FWDataflow  : public ComposedAnalysis
   {}
 
   void initNodeState(PartPtr part);
-  void transferPropagateAState(PartPtr part, std::set<PartPtr>& visited, bool firstVisit, 
+  void transferPropagateAStateDense(PartPtr part, std::set<PartPtr>& visited, bool firstVisit,
+                               std::set<PartPtr>& initialized, dataflowPartEdgeIterator* curNodeIt, anchor curPartAnchor,
+                               graph& worklistGraph,std::map<PartPtr, std::set<anchor> >& toAnchors,
+                               std::map<PartPtr, std::set<std::pair<anchor, PartPtr> > >& fromAnchors);
+  void transferPropagateAStateSSA(PartPtr part, std::set<PartPtr>& visited, bool firstVisit,
                                std::set<PartPtr>& initialized, dataflowPartEdgeIterator* curNodeIt, anchor curPartAnchor, 
                                graph& worklistGraph,std::map<PartPtr, std::set<anchor> >& toAnchors,
                                std::map<PartPtr, std::set<std::pair<anchor, PartPtr> > >& fromAnchors);
@@ -331,7 +391,11 @@ class BWDataflow  : public ComposedAnalysis
   {}
 
   void initNodeState(PartPtr part);
-  void transferPropagateAState(PartPtr part, std::set<PartPtr>& visited, bool firstVisit, 
+  void transferPropagateAStateDense(PartPtr part, std::set<PartPtr>& visited, bool firstVisit,
+                                 std::set<PartPtr>& initialized, dataflowPartEdgeIterator* curNodeIt, anchor curPartAnchor,
+                                 graph& worklistGraph,std::map<PartPtr, std::set<anchor> >& toAnchors,
+                                 std::map<PartPtr, std::set<std::pair<anchor, PartPtr> > >& fromAnchors);
+  void transferPropagateAStateSSA(PartPtr part, std::set<PartPtr>& visited, bool firstVisit,
                                std::set<PartPtr>& initialized, dataflowPartEdgeIterator* curNodeIt, anchor curPartAnchor, 
                                graph& worklistGraph,std::map<PartPtr, std::set<anchor> >& toAnchors,
                                std::map<PartPtr, std::set<std::pair<anchor, PartPtr> > >& fromAnchors);
@@ -367,11 +431,15 @@ class UndirDataflow  : public ComposedAnalysis
 
   // relevant only for directional dataflow analysis
   void initNodeState(PartPtr part) { assert(0); }
-  void transferPropagateAState(PartPtr part, std::set<PartPtr>& visited, bool firstVisit, 
+  void transferPropagateAStateDense(PartPtr part, std::set<PartPtr>& visited, bool firstVisit,
                                std::set<PartPtr>& initialized, dataflowPartEdgeIterator* curNodeIt, anchor curPartAnchor, 
                                graph& worklistGraph,std::map<PartPtr, std::set<anchor> >& toAnchors,
                                std::map<PartPtr, std::set<std::pair<anchor, PartPtr> > >& fromAnchors) { assert(0); }
-  
+  void transferPropagateAStateSSA(PartPtr part, std::set<PartPtr>& visited, bool firstVisit,
+                                 std::set<PartPtr>& initialized, dataflowPartEdgeIterator* curNodeIt, anchor curPartAnchor,
+                                 graph& worklistGraph,std::map<PartPtr, std::set<anchor> >& toAnchors,
+                                 std::map<PartPtr, std::set<std::pair<anchor, PartPtr> > >& fromAnchors)  { assert(0); }
+
   //NodeState* initializeFunctionNodeState(const Function &func, NodeState *fState) { return NULL; }
   std::set<PartPtr> getInitialWorklist() { return std::set<PartPtr>(); }
   static std::map<PartEdgePtr, std::vector<Lattice*> > emptyMap;
@@ -460,7 +528,7 @@ class checkDataflowInfoPass : public FWDataflow
 };
 
 
-class InitDataflowState : public UnstructuredPassAnalysis
+/*class InitDataflowState : public UnstructuredPassAnalysis
 {
   ComposedAnalysis::direction dir;
   
@@ -469,7 +537,7 @@ class InitDataflowState : public UnstructuredPassAnalysis
   { }
 
   void visit(PartPtr p, NodeState& state);
-};
+};*/
 
 } // namespace fuse;
 #endif

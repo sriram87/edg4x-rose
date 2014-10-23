@@ -452,27 +452,33 @@ class GETopoOrderIteratorWorklist : public GEIteratorWorklist<GraphEdgePtr, Grap
   protected:
   // Map from each edge's unique topological index to its object. This makes it possible
   // to efficiently find the edge with the smallest index.
-  std::map<int, GraphEdgePtr> worklist;
+  //std::map<int, GraphEdgePtr> worklist;
+  std::map<int, std::set<GraphEdgePtr> > worklist;
   
-  // Maps each edge to its topological index to efficiently figure out where into the
+  // Maps each edge and node to its topological index to efficiently figure out where into the
   // worklist to place newly-observed edges.
   std::map<GraphEdgePtr, int> edge2Idx;
+  std::map<GraphNodePtr, int> node2Idx;
   
-  // The maximum topological index ever assigned to any edge
-  int maxTopoIdx;
+  // The maximum topological index ever assigned to any edge or node
+  int maxEdgeTopoIdx;
+  int maxNodeTopoIdx;
   public:
   
   GETopoOrderIteratorWorklist(graphEdgeIterator<GraphEdgePtr, GraphNodePtr>* parent) :
     GEIteratorWorklist<GraphEdgePtr, GraphNodePtr>(parent)
   {
-    maxTopoIdx=0;
+    maxEdgeTopoIdx=0;
+    maxNodeTopoIdx=0;
   }
   
   GETopoOrderIteratorWorklist(const GETopoOrderIteratorWorklist& that): 
       GEIteratorWorklist<GraphEdgePtr, GraphNodePtr>(that),
       worklist(that.worklist),
       edge2Idx(that.edge2Idx),
-      maxTopoIdx(that.maxTopoIdx) 
+      node2Idx(that.node2Idx),
+      maxEdgeTopoIdx(that.maxEdgeTopoIdx),
+      maxNodeTopoIdx(that.maxNodeTopoIdx)
   {}
   
   // Returns a freshly-allocated copy of the worklist
@@ -487,7 +493,7 @@ class GETopoOrderIteratorWorklist : public GEIteratorWorklist<GraphEdgePtr, Grap
         
   // Returns a topological index for the given edge, which may be freshly generated
   // or fetched from edge2Idx
-  int getEdgeTopoIdx(GraphEdgePtr edge);
+  //int getEdgeTopoIdx(GraphEdgePtr edge);
   
   // Add the given edge to the iterator's list of edges to follow
   void add(GraphEdgePtr next);

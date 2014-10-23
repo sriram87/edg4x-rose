@@ -245,8 +245,8 @@ void graphEdgeIterator<GraphEdgePtr, GraphNodePtr>::add_internal(GraphEdgePtr ne
 // Add the given PartEdge to the iterator's list of edges to follow
 template <class GraphEdgePtr, class GraphNodePtr>
 void graphEdgeIterator<GraphEdgePtr, GraphNodePtr>::add(GraphEdgePtr next) {
-//  cout << "graphEdgeIterator<GraphEdgePtr, GraphNodePtr>::add() next="<<next->str()<<endl;
-//  cout << "PartEdge2DirPart(next)="<<(PartEdge2DirPart(next)? PartEdge2DirPart(next)->str(): "NULL")<<endl;
+/*dbg << "graphEdgeIterator<GraphEdgePtr, GraphNodePtr>::add() next="<<next->str()<<endl;
+dbg << "PartEdge2DirPart(next)="<<(PartEdge2DirPart(next)? PartEdge2DirPart(next)->str(): "NULL")<<endl;*/
   // If the Part of the next PartEdge in the direction of iteration is not NULL, add it
   if(PartEdge2DirPart(next))
     add_internal(next);
@@ -926,8 +926,8 @@ template <class GraphEdgePtr, class GraphNodePtr>
 bool GEFrontBackIteratorWorklist<GraphEdgePtr, GraphNodePtr>::eq(const GEIteratorWorklist<GraphEdgePtr, GraphNodePtr>& that_arg) const {
   try {
     const GEFrontBackIteratorWorklist<GraphEdgePtr, GraphNodePtr>& that = dynamic_cast<const GEFrontBackIteratorWorklist<GraphEdgePtr, GraphNodePtr>&>(that_arg);
-    cout << "this("<<this<<")="; print(cout); cout <<endl;
-    cout << "that("<<&that<<")="<<endl; 
+/*    cout << "this("<<this<<")="; print(cout); cout <<endl;
+    cout << "that("<<&that<<")="<<endl;*/
     //that.print(cout); cout <<endl;
     // If these worklists operate in opposite directions, they're not equal
     if(placementLoc!=that.placementLoc) return false;
@@ -968,6 +968,14 @@ boost::shared_ptr<GEIteratorWorklist<GraphEdgePtr, GraphNodePtr> >
     GETopoOrderIteratorWorklist<GraphEdgePtr, GraphNodePtr>::copy() const
 { return boost::make_shared<GETopoOrderIteratorWorklist<GraphEdgePtr, GraphNodePtr> >(*this); }
 
+/*set<GraphNodePtr> getNodesWithNoIncoming(const map<GraphNodePtr, int>& inDegree) {
+  set<GraphNodePtr> ret;
+  for(map<GraphNodePtr, int>::const_iterator i=inDegree.begin(); i!=inDegree.end; ++i)
+    if(i->second==0)
+      ret.insert(i->first);
+  return ret;
+}*/
+
 // Initializes this worklist, assuming that it already contains all the edges from
 // which iteration starts.
 template <class GraphEdgePtr, class GraphNodePtr>
@@ -976,7 +984,7 @@ void GETopoOrderIteratorWorklist<GraphEdgePtr, GraphNodePtr>::initGivenStart(con
 //  cout << "initGivenStart()"<<endl;
   // The set of edges that are on the current frontier of edges that have not yet
   // been mapped to some index
-  set<GraphEdgePtr> frontier;
+/*  set<GraphEdgePtr> frontier;
 
   // Initialize the frontier with the starting edges
 //  for(typename map<int, GraphEdgePtr>::iterator i=worklist.begin(); i!=worklist.end(); i++) 
@@ -990,22 +998,110 @@ void GETopoOrderIteratorWorklist<GraphEdgePtr, GraphNodePtr>::initGivenStart(con
 
     // We must not yet have assigned an index to it so assign one now
     ROSE_ASSERT(edge2Idx.find(cur) == edge2Idx.end());
-//    cout << "assigning "<<maxTopoIdx<<" to "<<cur->str()<<endl;
-    edge2Idx[cur] = ++maxTopoIdx;
+//    cout << "assigning "<<maxEdgeTopoIdx<<" to "<<cur->str()<<endl;
+    edge2Idx[cur] = ++maxEdgeTopoIdx;
+    if(cur->source()) edge2Idx[cur->source()->outEdgeToAny()]  = ++maxEdgeTopoIdx;
+    if(cur->target()) edge2Idx[cur->target()->inEdgeFromAny()] = ++maxEdgeTopoIdx;
+
+    if(cur->source() && node2Idx.find(cur->source())==node2Idx.end())
+      node2Idx[cur->source()] = ++maxNodeTopoIdx;
+    if(cur->target() && node2Idx.find(cur->target())==node2Idx.end())
+      node2Idx[cur->target()] = ++maxNodeTopoIdx;
 
     // Push onto the frontier all outgoing edges of cur that have not yet been assigned
     // an index
     if(GEIteratorWorklist<GraphEdgePtr, GraphNodePtr>::parent->PartEdge2DirPart(cur)) {
       list<GraphEdgePtr> succE = GEIteratorWorklist<GraphEdgePtr, GraphNodePtr>::parent->Part2DirEdges(GEIteratorWorklist<GraphEdgePtr, GraphNodePtr>::parent->PartEdge2DirPart(cur));
-      //{ cout << "~~~succE"<<endl;
+      for(typename list<GraphEdgePtr>::iterator s=succE.begin(); s!=succE.end(); s++) {
+      //  cout << "    "<<s->str()<<endl;
+        if(edge2Idx.find(*s) == edge2Idx.end())
+          frontier.insert(*s);
+      }
+    }
+  }*/
+
+  // Traverse the graph to calculate the in-degree of all nodes
+  map<GraphNodePtr, int> inDegree;
+  {
+    set<GraphEdgePtr> frontier = startEdges;
+    set<GraphEdgePtr> visited;
+    while(frontier.size() != 0) {
+      // Grab a node from the frontier
+      GraphEdgePtr cur = *frontier.begin();
+      frontier.erase(frontier.begin());
+      visited.insert(cur);
+
+      if(inDegree.find(cur->target())==inDegree.end()) inDegree[cur->target()]=1;
+      else ++inDegree[cur->target()];
+
+      // Push onto the frontier all outgoing edges of cur that have not yet been assigned
+      // an index
+      if(GEIteratorWorklist<GraphEdgePtr, GraphNodePtr>::parent->PartEdge2DirPart(cur)) {
+        list<GraphEdgePtr> succE = GEIteratorWorklist<GraphEdgePtr, GraphNodePtr>::parent->Part2DirEdges(GEIteratorWorklist<GraphEdgePtr, GraphNodePtr>::parent->PartEdge2DirPart(cur));
         for(typename list<GraphEdgePtr>::iterator s=succE.begin(); s!=succE.end(); s++) {
-        //  cout << "    "<<s->str()<<endl;
-          if(edge2Idx.find(*s) == edge2Idx.end())
+          if(visited.find(*s) == visited.end())
             frontier.insert(*s);
         }
-      //}
+      }
     }
   }
+
+  {
+    set<GraphEdgePtr> frontier = startEdges;
+    set<GraphEdgePtr> visited;
+    set<GraphEdgePtr> history;
+
+    while(frontier.size() != 0) {
+      // Grab a node from the frontier
+      GraphEdgePtr cur = *frontier.begin();
+      //cout << "cur="<<cur->str()<<endl;
+      frontier.erase(frontier.begin());
+      visited.insert(cur);
+
+      // Decrement the in-degree of the edge's target node
+      --inDegree[cur->target()];
+      //cout << "    inDegree[cur->target()]="<<inDegree[cur->target()]<<endl;
+      if(inDegree[cur->target()]<=0) {
+        history.erase(cur);
+        inDegree.erase(cur->target());
+        edge2Idx[cur] = ++maxEdgeTopoIdx;
+        if(cur->source()) edge2Idx[cur->source()->outEdgeToAny()]  = ++maxEdgeTopoIdx;
+        if(cur->target()) edge2Idx[cur->target()->inEdgeFromAny()] = ++maxEdgeTopoIdx;
+
+        list<GraphEdgePtr> outE = cur->target()->outEdges();
+        for(typename list<GraphEdgePtr>::iterator e=outE.begin(); e!=outE.end(); ++e) {
+//          cout << "    successor (visited="<<(visited.find(*e) != visited.end())<<") = "<<(*e)->str()<<endl;
+          if(visited.find(*e) == visited.end())
+            frontier.insert(*e);
+        }
+      } else
+        history.insert(cur);
+
+      if(frontier.size()==0) {
+        if(history.size()>0) {
+          GraphEdgePtr h = *history.begin();
+//          cout << "    picking from history "<<h->str()<<endl;
+          /*list<GraphEdgePtr> outE = h->outEdges();
+          for(typename list<GraphEdgePtr>::iterator e=outE.begin(); e!=outE.end(); ++e) {
+            if(visited.find(*e) == visited.end())
+              frontier.insert(*e);
+          }*/
+          frontier.insert(h);
+          inDegree[h->target()]=1;
+
+          history.erase(history.begin());
+        }/* else if(inDegree.size()>0){
+          list<GraphEdgePtr> outE = cur->target()->outEdges();
+        }
+          for(typename list<GraphEdgePtr>::iterator e=outE.begin(); e!=outE.end(); ++e) {
+                    history.pop_front();
+        }*/
+      }
+    }
+  }
+  /*cout << "==================================================="<<endl;
+  cout << "==================================================="<<endl;
+  cout << "==================================================="<<endl;*/
 }
 
 // Returns the number of edges currently on the worklist
@@ -1013,7 +1109,7 @@ template <class GraphEdgePtr, class GraphNodePtr>
 int GETopoOrderIteratorWorklist<GraphEdgePtr, GraphNodePtr>::size() const
 { return worklist.size(); }
 
-// Returns a topological index for the given edge, which may be freshly generated
+/* // Returns a topological index for the given edge, which may be freshly generated
 // or fetched from edge2Idx
 template <class GraphEdgePtr, class GraphNodePtr>
 int GETopoOrderIteratorWorklist<GraphEdgePtr, GraphNodePtr>::getEdgeTopoIdx(GraphEdgePtr edge) {
@@ -1045,7 +1141,7 @@ int GETopoOrderIteratorWorklist<GraphEdgePtr, GraphNodePtr>::getEdgeTopoIdx(Grap
     // If this edge has no predecessors
     if(predE.size() == 0) {
       // Assign to it the maximum index ever observed
-      idx = ++maxTopoIdx;
+      idx = ++maxEdgeTopoIdx;
       cout << "No predecessors idx="<<idx<<endl;
     } else {
       // Compute the max of the predecessors' indexes. 
@@ -1062,8 +1158,8 @@ int GETopoOrderIteratorWorklist<GraphEdgePtr, GraphNodePtr>::getEdgeTopoIdx(Grap
       }
       idx++;
       
-      // Update maxTopoIdx to be the largest index ever assigned to an edge
-      maxTopoIdx = (idx > maxTopoIdx? idx: maxTopoIdx);
+      // Update maxEdgeTopoIdx to be the largest index ever assigned to an edge
+      maxEdgeTopoIdx = (idx > maxEdgeTopoIdx? idx: maxEdgeTopoIdx);
 
 //      // Unregister this edge from visited
 //      visited.erase(edge);
@@ -1076,35 +1172,65 @@ int GETopoOrderIteratorWorklist<GraphEdgePtr, GraphNodePtr>::getEdgeTopoIdx(Grap
     return it->second;
   }
 }
-
+*/
 // Add the given edge to the iterator's list of edges to follow
 template <class GraphEdgePtr, class GraphNodePtr>
 void GETopoOrderIteratorWorklist<GraphEdgePtr, GraphNodePtr>::add(GraphEdgePtr edge) {
 /*	cout << "###################################################"<<endl;
 	cout << "###################################################"<<endl;
-	cout << "###################################################"<<endl;
-	cout << "GETopoOrderIteratorWorklist<GraphEdgePtr, GraphNodePtr>::add("<<edge->str()<<")"<<endl;*/
+	cout << "###################################################"<<endl;*/
+	//dbg << "GETopoOrderIteratorWorklist<GraphEdgePtr, GraphNodePtr>::add("<<edge->str()<<")"<<endl;
   // Place the new edge into the worklist. Note that this ensures that no
   // edge can appear in the worklist more than once.
 //  worklist[getEdgeTopoIdx(edge)] = edge;
   typename map<GraphEdgePtr, int>::iterator i=edge2Idx.find(edge);
   //ROSE_ASSERT(i!=edge2Idx.end());
-  if(i!=edge2Idx.end()) worklist[i->second] = edge;
+//dbg << "(i!=edge2Idx.end())="<<(i!=edge2Idx.end())<<endl;
+  if(i!=edge2Idx.end()) worklist[i->second].insert(edge);
+  else {
+    cout << "ERROR: edge not found: "<<edge->str()<<endl;
+    cout << "edge2Idx:"<<endl;
+    for(typename map<GraphEdgePtr, int>::iterator e=edge2Idx.begin(); e!=edge2Idx.end(); ++e)
+      cout << "    "<<e->second<<": "<<e->first->str()<<endl;
+    ROSE_ASSERT(0);
+  }
+/*
+  typename map<GraphNodePtr, int>::iterator iSrc=node2Idx.find(edge->source());
+  if(iSrc!=node2Idx.end()) worklist[iSrc->second].insert(edge);
+  else {
+    typename map<GraphNodePtr, int>::iterator iTgt=node2Idx.find(edge->target());
+    if(iTgt!=node2Idx.end()) worklist[iTgt->second].insert(edge);
+    else
+      ROSE_ASSERT(0);
+  }*/
+/*    else if(worklist.size()==0) worklist[-1].insert(edge);
+  else {
+    // Pick an index for this edge that is smaller than any assigned index and smaller
+    // than any index currently on the worklist (which may currently have some edges 
+    // mapped to negative indexes).
+    int minIdx = worklist.begin()->first;
+    minIdx = (minIdx<0?minIdx-1: -1);
+    worklist[minIdx].insert(edge);
+  }*/
 }
 
 // Returns the next edge on the worklist but does not remove it from the worklist
 template <class GraphEdgePtr, class GraphNodePtr>
 GraphEdgePtr GETopoOrderIteratorWorklist<GraphEdgePtr, GraphNodePtr>::getNext() const {
   ROSE_ASSERT(worklist.size()>0);
-  return worklist.begin()->second;
+  ROSE_ASSERT(worklist.begin()->second.size()>0);
+  return *worklist.begin()->second.begin();
 }
 
 // Grabs the next edge form the worklist and returns it
 template <class GraphEdgePtr, class GraphNodePtr>
 GraphEdgePtr GETopoOrderIteratorWorklist<GraphEdgePtr, GraphNodePtr>::grabNext() {
   ROSE_ASSERT(worklist.size()>0);
-  GraphEdgePtr edge = worklist.begin()->second;
-  worklist.erase(worklist.begin());
+  ROSE_ASSERT(worklist.begin()->second.size()>0);
+  GraphEdgePtr edge = *worklist.begin()->second.begin();
+  worklist.begin()->second.erase(worklist.begin()->second.begin());
+  if(worklist.begin()->second.size()==0)
+    worklist.erase(worklist.begin());
   return edge;
 }
 
@@ -1118,12 +1244,16 @@ bool GETopoOrderIteratorWorklist<GraphEdgePtr, GraphNodePtr>::eq(const GEIterato
     // Two worklists are the same if they contain the same edges, regardless of their order
     // As such, transfer the values in both worklists into sets and compare the sets
     set<GraphEdgePtr> thisEdges;
-    for(typename map<int, GraphEdgePtr>::const_iterator e=worklist.begin(); e!=worklist.end(); e++)
-      thisEdges.insert(e->second);
+    for(typename map<int, set<GraphEdgePtr> >::const_iterator e=worklist.begin(); e!=worklist.end(); ++e) {
+      for(typename set<GraphEdgePtr>::const_iterator i=e->second.begin(); i!=e->second.end(); ++i)
+        thisEdges.insert(*i);
+    }
     
     set<GraphEdgePtr> thatEdges;
-    for(typename map<int, GraphEdgePtr>::const_iterator e=that.worklist.begin(); e!=that.worklist.end(); e++)
-      thatEdges.insert(e->second);
+    for(typename map<int, set<GraphEdgePtr> >::const_iterator e=that.worklist.begin(); e!=that.worklist.end(); ++e) {
+      for(typename set<GraphEdgePtr>::const_iterator i=e->second.begin(); i!=e->second.end(); ++i)
+        thatEdges.insert(*i);
+    }
     
     return thisEdges == thatEdges;
   } catch(bad_cast bc) {
@@ -1136,8 +1266,9 @@ bool GETopoOrderIteratorWorklist<GraphEdgePtr, GraphNodePtr>::eq(const GEIterato
 template <class GraphEdgePtr, class GraphNodePtr>
 void GETopoOrderIteratorWorklist<GraphEdgePtr, GraphNodePtr>::print(ostream& out) const {
   out << "GETopoOrderIteratorWorklist (#"<<size()<<")"<<endl;
-  for(typename map<int, GraphEdgePtr>::const_iterator e=worklist.begin(); e!=worklist.end(); e++) {
-    out << "    <idx="<<e->first<<", "<<e->second->str()<<">"<<endl;
+  for(typename map<int, set<GraphEdgePtr> >::const_iterator e=worklist.begin(); e!=worklist.end(); ++e) {
+    for(typename set<GraphEdgePtr>::const_iterator i=e->second.begin(); i!=e->second.end(); ++i)
+      out << "    <idx="<<e->first<<", "<<(*i)->str()<<">"<<endl;
   }
 }
 

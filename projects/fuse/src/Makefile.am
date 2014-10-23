@@ -10,8 +10,8 @@ INCLUDES = \
 	-I$(srcdir)/sight/widgets \
 	-I$(srcdir)/lattice \
 	-I$(srcdir)/simpleAnalyses \
-	-I$(srcdir)/state \
-        -I${srcdir}/sparse
+	-I$(srcdir)/state 
+#    -I${srcdir}/sparse
 
 include_HEADERS =\
 	analysis/abstract_object.h \
@@ -26,6 +26,7 @@ include_HEADERS =\
 	analysis/factor_trans_system.h \
 	analysis/graphIterator.h \
 	analysis/partitions.h \
+	analysis/ats.h \
 	analysis/stx_analysis.h \
 	analysis/tight_composer.h \
 	cfgUtils/CallGraphTraverse.h \
@@ -45,19 +46,20 @@ include_HEADERS =\
 	simpleAnalyses/taintAnalysis.h \
 	simpleAnalyses/virtualMethodAnalysis.h \
 	simpleAnalyses/defsAnalysis.h \
-	simpleAnalyses/VariableStateTransfer.h \
-	sparse/constantAnalysis.h \
-	sparse/heapDefsAndUsesTraversal.h \
-	sparse/heapReachingDef.h \
-	sparse/heapSSA.h \
-	sparse/LatticeArith.h \
-	sparse/LatticeArithInstance.h \
-	sparse/partitionGraph.h \
-	sparse/PGSSA.h \
-	sparse/pointerAnalysis.h \
-	sparse/SSAVariableStateTransfer.h \
-	sparse/valueNumbering.h \
-	state/nodeState.h
+	simpleAnalyses/VariableStateTransfer.h
+
+#	sparse/constantAnalysis.h \
+#	sparse/heapDefsAndUsesTraversal.h \
+#	sparse/heapReachingDef.h \
+#	sparse/heapSSA.h \
+#	sparse/LatticeArith.h \
+#	sparse/LatticeArithInstance.h \
+#	sparse/partitionGraph.h \
+#	sparse/PGSSA.h \
+#	sparse/pointerAnalysis.h \
+#	sparse/SSAVariableStateTransfer.h \
+#	sparse/valueNumbering.h \
+#	state/nodeState.h
 
 # TEST VARIABLES
 TESTS_DIR = $(top_srcdir)/projects/fuse/src/tests
@@ -90,6 +92,8 @@ fuse_SOURCES = \
 	analysis/factor_trans_system.C \
 	analysis/graphIterator.C \
 	analysis/partitions.C \
+	analysis/partitions_nosight.C \
+	analysis/ats.C \
 	analysis/stx_analysis.C \
 	analysis/tight_composer.C \
 	cfgUtils/CallGraphTraverse.C \
@@ -111,12 +115,12 @@ fuse_SOURCES = \
 	state/nodeState.C \
 	compositionalTestAnalysis.C
 
-#        sparse/constantAnalysis.C \
-	sparse/heapDefsAndUsesTraversal.C \
-	sparse/heapSSA.C \
-	sparse/hssaMemObject.C \
-	sparse/pointerAnalysis.C \
-	sparse/valueNumbering.C
+#	sparse/constantAnalysis.C \
+#	sparse/heapDefsAndUsesTraversal.C \
+#	sparse/heapSSA.C \
+#	sparse/hssaMemObject.C
+#	sparse/pointerAnalysis.C \
+#	sparse/valueNumbering.C
 
 # for .C files
 FUSE_C_TESTS = \
@@ -129,6 +133,7 @@ FUSE_C_TESTS = \
 	compositionalTestInput7.C \
 	compositionalTestInput8.C \
 	compositionalTestInput9.C \
+	compositionalTestInput10.C \
 	compositionalTestInput.jisheng.C \
 	cp_test1.C 
 

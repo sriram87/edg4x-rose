@@ -9,6 +9,8 @@ using namespace sight;
 namespace fuse
 {
 
+AbstractObject::~AbstractObject() {}
+
 // Functions that identify the type of AbstractObject this is. Should be over-ridden by derived
 // classes to save the cost of a dynamic cast.
 bool AbstractObject::isValueObject()     { return dynamic_cast<ValueObject*>    (this); }
@@ -119,6 +121,31 @@ AbstractObjectHierarchy::hierRel AbstractObjectHierarchy::hierCompare(AbstractOb
 // Stringification of hierKeys
 std::ostream& operator<<(std::ostream& s, AbstractObjectHierarchy::hierKeyPtr k)
 { s << k->getList(); return s; }
+
+bool AbstractObjectHierarchy::hierKey::equal(const comparable& that_arg) const {
+  const hierKey& that = dynamic_cast<const hierKey&>(that_arg);
+  if(keyList.size() != that.keyList.size()) return false;
+
+  list<comparablePtr>::const_iterator iThis=keyList.begin(), iThat=that.keyList.begin();
+  for(; iThis!=keyList.end(); ++iThis, ++iThat)
+    if(*iThis != *iThat) return false;
+
+  return true;
+}
+
+bool AbstractObjectHierarchy::hierKey::less(const comparable& that_arg) const {
+  const hierKey& that = dynamic_cast<const hierKey&>(that_arg);
+  if(keyList.size() != that.keyList.size()) return keyList.size() < that.keyList.size();
+
+  list<comparablePtr>::const_iterator iThis=keyList.begin(), iThat=that.keyList.begin();
+  for(; iThis!=keyList.end(); ++iThis, ++iThat) {
+    if(*iThis < *iThat) return true;
+    if(*iThis > *iThat) return false;
+  }
+
+  // this == that
+  return false;
+}
 
 /******************************************
  ***** AbstractObjectDisjointHierWrap *****
@@ -2785,7 +2812,7 @@ void CombinedMemRegionObject<defaultMayEq>::add(MemRegionObjectPtr memReg) {
 template <bool defaultMayEq>
 bool CombinedMemRegionObject<defaultMayEq>::mayEqualMR(MemRegionObjectPtr o, PartEdgePtr pedge)
 {
-  dbg << "Comparing " << this->str("    ") << "with " << o->str("    ") << endl;
+  //dbg << "Comparing " << this->str("    ") << "with " << o->str("    ") << endl;
 
   boost::shared_ptr<CombinedMemRegionObject<defaultMayEq> > that = boost::dynamic_pointer_cast<CombinedMemRegionObject<defaultMayEq> >(o);
   assert(that);
@@ -3796,17 +3823,10 @@ ValueObjectPtr     MemLocObject::getIndex() const  { /*cout << "MemLocObject::ge
 // derived class' may/mustEqual check. Specifically, it checks may/must equality with respect to ExprObj and routes
 // the call through the composer to make sure the may/mustEqual call gets the right PartEdge
 bool MemLocObject::mayEqual(MemLocObjectPtr that, PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis) {
-  // If this is a FuncResultMemLocObject and that is not or vice versa, they're not may-equal
-  if((dynamic_cast<FuncResultMemLocObject*>(this)==NULL) !=
-         (boost::dynamic_pointer_cast<FuncResultMemLocObject>(that)==NULL))
-    return false;
-  
-  scope s("MemLocObject::mayEqual");
+  /*scope s("MemLocObject::mayEqual");
   dbg << "this="<<str()<<endl;
-  dbg << "that="<<that->str()<<endl;
+  dbg << "that="<<that->str()<<endl;*/
   
-  //return mayEqualML(that, pedge);
-
   // Returns true only if both this region and this index denot the same set as that region and index, respectively
 
   // If this and that region overlap
@@ -3823,19 +3843,14 @@ bool MemLocObject::mayEqual(MemLocObjectPtr that, PartEdgePtr pedge, Composer* c
       else
         return getIndex()->mayEqual(that->getIndex(), pedge, comp, analysis);
     }
-  }
+  } else
+    return false;
 }
 
 // General version of mayEqual and mustEqual that accounts for framework details before routing the call to the 
 // derived class' may/mustEqual check. Specifically, it checks may/must equality with respect to ExprObj and routes
 // the call through the composer to make sure the may/mustEqual call gets the right PartEdge
 bool MemLocObject::mustEqual(MemLocObjectPtr that, PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis) {
-  // If this is a FuncResultMemLocObject and that is not or vice versa, they're not must-equal
-  if((dynamic_cast<FuncResultMemLocObject*>(this)==NULL) !=
-         (boost::dynamic_pointer_cast<FuncResultMemLocObject>(that)==NULL))
-    return false;
-  //return mustEqualML(that, pedge);
-
   // Returns true only if both this region and this index denot the same set as that region and index, respectively
 
   // If this region denotes the same set as that region in all executions
@@ -3853,12 +3868,20 @@ bool MemLocObject::mustEqual(MemLocObjectPtr that, PartEdgePtr pedge, Composer* 
       else
         return getIndex()->mustEqual(that->getIndex(), pedge, comp, analysis);
     }
-  }
+  } else
+    return false;
 }
 
 // Check whether that is a MemLocObject and if so, call the version of mayEqual specific to MemLocObjects
 bool MemLocObject::mayEqual(AbstractObjectPtr that, PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis)
 {
+  // If this is a FuncResultMemLocObject and that is not or vice versa, they're not may-equal
+  if((dynamic_cast<FuncResultMemLocObject*>(this)==NULL) !=
+     (boost::dynamic_pointer_cast<FuncResultMemLocObject>(that)==NULL))
+    return false;
+  // If that is a FullMemLocObject, it overlaps with this
+  if(boost::dynamic_pointer_cast<FullMemLocObject>(that)) return true;
+
   MemLocObjectPtr mo = boost::dynamic_pointer_cast<MemLocObject>(that);
   if(mo) return mayEqual(mo, pedge, comp, analysis);
   else   return false;
@@ -3867,7 +3890,12 @@ bool MemLocObject::mayEqual(AbstractObjectPtr that, PartEdgePtr pedge, Composer*
 // Check whether that is a MemLocObject and if so, call the version of mustEqual specific to MemLocObjects
 bool MemLocObject::mustEqual(AbstractObjectPtr that, PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis)
 {
-  //if(AbstractObject::mustEqualExpr(that, pedge)) return true;
+  // If this is a FuncResultMemLocObject and that is not or vice versa, they're not must-equal
+  if((dynamic_cast<FuncResultMemLocObject*>(this)==NULL) !=
+     (boost::dynamic_pointer_cast<FuncResultMemLocObject>(that)==NULL))
+    return false;
+  // If that is a FullMemLocObject, it is not must-equal to anything
+  if(boost::dynamic_pointer_cast<FullMemLocObject>(that)) return false;
   
   MemLocObjectPtr mo = boost::dynamic_pointer_cast<MemLocObject>(that);
   if(mo) return mustEqual(mo, pedge, comp, analysis);
@@ -3890,13 +3918,6 @@ bool MemLocObject::mustEqual(AbstractObjectPtr that, PartEdgePtr pedge, Composer
 
 // Returns whether the two abstract objects denote the same set of concrete objects
 bool MemLocObject::equalSet(MemLocObjectPtr that, PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis) {
-  // If this is a FuncResultMemLocObject and that is not or vice versa, the sets they denote are not equal
-  if((dynamic_cast<FuncResultMemLocObject*>(this)==NULL) !=
-         (boost::dynamic_pointer_cast<FuncResultMemLocObject>(that)==NULL))
-    return false;
-
-  //return equalSetML(that, pedge);
-
   // Returns true only if both this region and this index denot the same set as that region and index, respectively
 
   /*cout << "getRegion()="<<(region?region->str():"NULL")<<endl;
@@ -3923,19 +3944,13 @@ bool MemLocObject::equalSet(MemLocObjectPtr that, PartEdgePtr pedge, Composer* c
       else
         return getIndex()->equalSet(that->getIndex(), pedge, comp, analysis);
     }
-  }
+  } else
+    return false;
 }
 
 // Returns whether this abstract object denotes a non-strict subset (the sets may be equal) of the set denoted
 // by the given abstract object.
 bool MemLocObject::subSet(MemLocObjectPtr that, PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis) {
-  // If this is a FuncResultMemLocObject and that is not or vice versa, one is not a subset of the other
-  if((dynamic_cast<FuncResultMemLocObject*>(this)==NULL) !=
-         (boost::dynamic_pointer_cast<FuncResultMemLocObject>(that)==NULL))
-    return false;
-  
-  //return subSetML(that, pedge);
-
   // Returns true only if both this region and this index are a subset of that region and index, respectively
 
   // If this region is a subset of that region
@@ -3953,19 +3968,38 @@ bool MemLocObject::subSet(MemLocObjectPtr that, PartEdgePtr pedge, Composer* com
       else
         return getIndex()->subSet(that->getIndex(), pedge, comp, analysis);
     }
-  }
+  } else
+    return false;
 }
 
-bool MemLocObject::equalSet(AbstractObjectPtr o, PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis)
+bool MemLocObject::equalSet(AbstractObjectPtr that, PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis)
 { 
-  MemLocObjectPtr co = boost::dynamic_pointer_cast<MemLocObject>(o);
+  // If this is a FuncResultMemLocObject and that is not or vice versa, one is not a subset of the other
+  if((dynamic_cast<FuncResultMemLocObject*>(this)==NULL) !=
+     (boost::dynamic_pointer_cast<FuncResultMemLocObject>(that)==NULL))
+    return false;
+  // If this is a FullMemLocObject and that is not or vice versa, the Full set contains the non-Full set
+  if((dynamic_cast<FullMemLocObject*>(this)==NULL) !=
+     (boost::dynamic_pointer_cast<FullMemLocObject>(that)==NULL))
+    return boost::dynamic_pointer_cast<FullMemLocObject>(that)!=NULL;
+
+  MemLocObjectPtr co = boost::dynamic_pointer_cast<MemLocObject>(that);
   if(co) return equalSet(co, pedge, comp, analysis);
   else   return false;
 }
 
-bool MemLocObject::subSet(AbstractObjectPtr o, PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis)
+bool MemLocObject::subSet(AbstractObjectPtr that, PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis)
 { 
-  MemLocObjectPtr co = boost::dynamic_pointer_cast<MemLocObject>(o);
+  // If this is a FuncResultMemLocObject and that is not or vice versa, the sets they denote are not equal
+  if((dynamic_cast<FuncResultMemLocObject*>(this)==NULL) !=
+     (boost::dynamic_pointer_cast<FuncResultMemLocObject>(that)==NULL))
+    return false;
+  // If this is a FullMemLocObject and that is not or vice versa, the sets they denote are not equal
+  if((dynamic_cast<FullMemLocObject*>(this)==NULL) !=
+     (boost::dynamic_pointer_cast<FullMemLocObject>(that)==NULL))
+    return false;
+
+  MemLocObjectPtr co = boost::dynamic_pointer_cast<MemLocObject>(that);
   if(co) return subSet(co, pedge, comp, analysis);
   else   return false;
 }
@@ -3997,12 +4031,6 @@ bool MemLocObject::isLive(PartEdgePtr pedge, Composer* comp, ComposedAnalysis* a
 // meetUpdateML check. Specifically, it routes the call through the composer to make sure the meetUpdateML 
 // call gets the right PartEdge
 bool MemLocObject::meetUpdate(MemLocObjectPtr that, PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis) {
-  // If this is a FuncResultMemLocObject and that is not or vice versa, we'll need to make this object full
-  if((dynamic_cast<FuncResultMemLocObject*>(this)==NULL) !=
-         (boost::dynamic_pointer_cast<FuncResultMemLocObject>(that)==NULL))
-    assert(0);
-  
-  //return meetUpdateML(that, pedge);
   bool modified = false;
   modified = getRegion()->meetUpdate(that->getRegion(), pedge, comp, analysis) || modified;
   if(getIndex()!=NULLValueObject)
@@ -4011,6 +4039,15 @@ bool MemLocObject::meetUpdate(MemLocObjectPtr that, PartEdgePtr pedge, Composer*
 }
 
 bool MemLocObject::meetUpdate(AbstractObjectPtr that, PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis) {
+  // If this is a FuncResultMemLocObject and that is not or vice versa, we'll need to make this object full
+  if((dynamic_cast<FuncResultMemLocObject*>(this)==NULL) !=
+     (boost::dynamic_pointer_cast<FuncResultMemLocObject>(that)==NULL))
+    assert(0);
+  // If this is a FullMemLocObject and that is not or vice versa, we'll need to make this object full
+  if((dynamic_cast<FullMemLocObject*>(this)==NULL) !=
+     (boost::dynamic_pointer_cast<FullMemLocObject>(that)==NULL))
+    assert(0);
+
   MemLocObjectPtr ml = boost::dynamic_pointer_cast<MemLocObject>(that);
   assert(ml);
   return meetUpdate(ml, pedge, comp, analysis);
@@ -4235,11 +4272,8 @@ void CombinedMemLocObject<defaultMayEq>::add(MemLocObjectPtr memLoc) {
 
 // Returns whether this object may/must be equal to o within the given Part p
 template <bool defaultMayEq>
-//bool CombinedMemLocObject<defaultMayEq>::mayEqualML(MemLocObjectPtr o, PartEdgePtr pedge)
-bool CombinedMemLocObject<defaultMayEq>::mayEqual(AbstractObjectPtr o, PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis)
+bool CombinedMemLocObject<defaultMayEq>::mayEqual(MemLocObjectPtr o, PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis)
 {
-  scope s("CombinedMemLocObject<defaultMayEq>::mayEqual");
-  dbg << "Comparing " << this->str("    ") << "with " << o->str("    ") << endl;
   boost::shared_ptr<CombinedMemLocObject<defaultMayEq> > that = boost::dynamic_pointer_cast<CombinedMemLocObject<defaultMayEq> >(o);
   assert(that);
   
@@ -4262,8 +4296,7 @@ bool CombinedMemLocObject<defaultMayEq>::mayEqual(AbstractObjectPtr o, PartEdgeP
 }
 
 template <bool defaultMayEq>
-//bool CombinedMemLocObject<defaultMayEq>::mustEqualML(MemLocObjectPtr o, PartEdgePtr pedge)
-bool CombinedMemLocObject<defaultMayEq>::mustEqual(AbstractObjectPtr o, PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis)
+bool CombinedMemLocObject<defaultMayEq>::mustEqual(MemLocObjectPtr o, PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis)
 {
   boost::shared_ptr<CombinedMemLocObject<defaultMayEq> > that = boost::dynamic_pointer_cast<CombinedMemLocObject<defaultMayEq> >(o);
   assert(that);
@@ -4287,8 +4320,7 @@ bool CombinedMemLocObject<defaultMayEq>::mustEqual(AbstractObjectPtr o, PartEdge
 
 // Returns whether the two abstract objects denote the same set of concrete objects
 template <bool defaultMayEq>
-//bool CombinedMemLocObject<defaultMayEq>::equalSetML(MemLocObjectPtr o, PartEdgePtr pedge)
-bool CombinedMemLocObject<defaultMayEq>::equalSet(AbstractObjectPtr o, PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis)
+bool CombinedMemLocObject<defaultMayEq>::equalSet(MemLocObjectPtr o, PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis)
 {
   boost::shared_ptr<CombinedMemLocObject<defaultMayEq> > that = boost::dynamic_pointer_cast<CombinedMemLocObject<defaultMayEq> >(o);
   assert(that);
@@ -4307,8 +4339,7 @@ bool CombinedMemLocObject<defaultMayEq>::equalSet(AbstractObjectPtr o, PartEdgeP
 // Returns whether this abstract object denotes a non-strict subset (the sets may be equal) of the set denoted
 // by the given abstract object.
 template <bool defaultMayEq>
-//bool CombinedMemLocObject<defaultMayEq>::subSetML(MemLocObjectPtr o, PartEdgePtr pedge)
-bool CombinedMemLocObject<defaultMayEq>::subSet(AbstractObjectPtr o, PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis)
+bool CombinedMemLocObject<defaultMayEq>::subSet(MemLocObjectPtr o, PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis)
 {
   boost::shared_ptr<CombinedMemLocObject<defaultMayEq> > that = boost::dynamic_pointer_cast<CombinedMemLocObject<defaultMayEq> >(o);
   assert(that);
@@ -4329,7 +4360,6 @@ bool CombinedMemLocObject<defaultMayEq>::subSet(AbstractObjectPtr o, PartEdgePtr
 
 // Returns true if this object is live at the given part and false otherwise
 template <bool defaultMayEq>
-//bool CombinedMemLocObject<defaultMayEq>::isLiveML(PartEdgePtr pedge)
 // General version of isLive that accounts for framework details before routing the call to the derived class' 
 // isLiveML check. Specifically, it routes the call through the composer to make sure the isLiveML call gets the 
 // right PartEdge
@@ -4350,8 +4380,7 @@ bool CombinedMemLocObject<defaultMayEq>::isLive(PartEdgePtr pedge, Composer* com
 // Computes the meet of this and that and saves the result in this
 // returns true if this causes this to change and false otherwise
 template <bool defaultMayEq>
-//bool CombinedMemLocObject<defaultMayEq>::meetUpdateML(MemLocObjectPtr o, PartEdgePtr pedge)
-bool CombinedMemLocObject<defaultMayEq>::meetUpdate(AbstractObjectPtr o, PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis)
+bool CombinedMemLocObject<defaultMayEq>::meetUpdate(MemLocObjectPtr o, PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis)
 {
   boost::shared_ptr<CombinedMemLocObject<defaultMayEq> > that = boost::dynamic_pointer_cast<CombinedMemLocObject<defaultMayEq> >(o);
   assert(that);
@@ -4369,7 +4398,6 @@ bool CombinedMemLocObject<defaultMayEq>::meetUpdate(AbstractObjectPtr o, PartEdg
 
 // Returns whether this AbstractObject denotes the set of all possible execution prefixes.
 template <bool defaultMayEq>
-//bool CombinedMemLocObject<defaultMayEq>::isFullML(PartEdgePtr pedge)
 bool CombinedMemLocObject<defaultMayEq>::isFull(PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis)
 {
   // If this is a union type (defaultMayEq=true), an object is full if any of its components are full (weakest constraint)
@@ -4383,7 +4411,6 @@ bool CombinedMemLocObject<defaultMayEq>::isFull(PartEdgePtr pedge, Composer* com
 
 // Returns whether this AbstractObject denotes the empty set.
 template <bool defaultMayEq>
-//bool CombinedMemLocObject<defaultMayEq>::isEmptyML(PartEdgePtr pedge)
 bool CombinedMemLocObject<defaultMayEq>::isEmpty(PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis)
 {
   // If this is a union type (defaultMayEq=true), an object is not empty if any of its components are not empty (weakest constraint)

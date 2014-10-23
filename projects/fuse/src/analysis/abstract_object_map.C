@@ -14,15 +14,15 @@ using namespace boost;
 using namespace sight;
 
 namespace fuse {
+#define AOMDebugLevel 0
 
-#define AbstractObjectMapDebugLevel 0
 
 AbstractObjectMapKindPtr NULLAbstractObjectMapKind;
 
 /*****************************
  ***** AbstractObjectMap *****
  *****************************/
-AbstractObjectMap::AbstractObjectMap(const AbstractObjectMap& that) : 
+AbstractObjectMap::AbstractObjectMap(const AbstractObjectMap& that) :
                                    Lattice(that.latPEdge)/*,
                                    defaultLat  (that.defaultLat),
                                    mapState    (that.mapState),
@@ -56,7 +56,9 @@ AbstractObjectMap::AbstractObjectMap(const AbstractObjectMap& that, AbstractObje
 AbstractObjectMap::AbstractObjectMap(LatticePtr defaultLat_, PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis) :
   Lattice(pedge), defaultLat(defaultLat_), mapState(empty), comp(comp), analysis(analysis) { }
 
-AbstractObjectMap::~AbstractObjectMap() {}
+AbstractObjectMap::~AbstractObjectMap() {
+  //cout << "AbstractObjectMap::~AbstractObjectMap()"<<endl;
+}
 
 // Initializes the AOM implementation that will be used inside this AbstractObjectMap. 
 // The choice of implementation will be based on the semantics that are implemented
@@ -97,13 +99,14 @@ bool AbstractObjectMap::remove(AbstractObjectPtr key) {
 LatticePtr AbstractObjectMap::get(AbstractObjectPtr key) {
   // If this map corresponds to all possible mappings, the only mapping that exists for any object is the full lattice
   if(mapState==full) { 
-    LatticePtr fullLat(defaultLat->copy());
+    //LatticePtr emptyLat(defaultLat->copy());
+    LatticePtr fullLat = defaultLat->copySharedPtr();
     fullLat->setToFull();
     return fullLat;
   }
   // If this map corresponds to the empty set of mappings, the only mapping that exists for any object is the empty lattice
   else if(mapState==empty) { 
-    LatticePtr emptyLat(defaultLat->copy());
+    LatticePtr emptyLat = defaultLat->copySharedPtr();
     emptyLat->setToEmpty();
     return emptyLat;
   } else {
@@ -165,8 +168,8 @@ bool AbstractObjectMap::isEmptyLat() {
 }
 
 std::string AbstractObjectMap::str(std::string indent) const {
-  if(mapState == full)  return txt()<<"[AbstractObjectMap: FULL, pedge = "<<latPEdge->str()<<"]";
-  else if(mapState == empty) return txt()<<"[AbstractObjectMap: EMPTY, pedge = "<<latPEdge->str()<<"]";
+  if(mapState == full)  return txt()<<"[AbstractObjectMap: FULL, pedge = "<<(latPEdge? latPEdge->str(): "NULL")<<"]";
+  else if(mapState == empty) return txt()<<"[AbstractObjectMap: EMPTY, pedge = "<<(latPEdge? latPEdge->str(): "NULL")<<"]";
   else {
     ROSE_ASSERT(implementation);
     return implementation->str(indent);
@@ -253,14 +256,81 @@ bool AbstractObjectMap::replaceML(Lattice* newL) {
     return false;
 }
 
+// Propagate information from a set of defs to a single use
+bool AbstractObjectMap::propagateDefs2Use(MemLocObjectPtr use, const std::set<MemLocObjectPtr>& defs) {
+  SIGHT_VERB_DECL(scope, ("AbstractObjectMap::propagateDefs2Use()", scope::medium), 1, AOMDebugLevel)
+  if(mapState==between) {
+    ROSE_ASSERT(implementation);
+    SIGHT_VERB(dbg << "use="<<use->str()<<", #defs="<<defs.size()<<endl, 1, AOMDebugLevel)
+    LatticePtr unionLat;
+    for(std::set<MemLocObjectPtr>::const_iterator d=defs.begin(); d!=defs.end(); ++d) {
+      SIGHT_VERB(dbg << "unionLat="<<unionLat<<", def="<<(*d)->str()<<endl, 1, AOMDebugLevel)
+      // If unionLat has not been assigned a Lattice, assign it to be a copy of the Lattice mapped to the current def.
+      // unionLat is unmodified if nothing is mapped to the current def
+      if(!unionLat) {
+//        LatticePtr tmp = get(*d);
+        unionLat = get(*d);
+/*        cout << "unionLat="<<(unionLat? unionLat->str(): "NULL")<<endl;
+        cout << "unionLat->copy="<<(unionLat? unionLat->copy()->str(): "NULL")<<endl;
+        cout << "unionLat="<<(unionLat? unionLat->str(): "NULL")<<endl;*/
+        //dbg << "unionLat->copySharedPtr="<<(unionLat? unionLat->copySharedPtr()->str(): "NULL")<<endl;
+        //if(unionLat) unionLat = boost::shared_ptr<Lattice>(unionLat->copy());
+//        Lattice* tmp = unionLat->copy();
+//        cout << "tmp="<<(tmp? tmp->str(): "NULL")<<endl;
+        //if(tmp) unionLat = boost::shared_ptr<Lattice>(tmp);
+
+      // If unionLat already contains the union of all the Lattices mapped to the preceding defs,
+      // union into it the Lattice mapped to the current def
+      } else {
+        if(LatticePtr defLat = get(*d))
+          unionLat->meetUpdate(defLat.get());
+      }
+    }
+    SIGHT_VERB(dbg << "unionLat="<<(unionLat?unionLat->str():"NULL")<<endl, 1, AOMDebugLevel)
+
+    // If we have Lattice information at some of the defs, assign it to the use
+    if(unionLat) return insert(use, unionLat);
+    else         return false;
+  // If this is a full or empty map, nothing is changed
+  } else
+    return false;
+}
+
+// Propagate information from a single defs to a set of uses
+bool AbstractObjectMap::propagateDef2Uses(const std::set<MemLocObjectPtr>& uses, MemLocObjectPtr def) {
+  SIGHT_VERB_DECL(scope, ("AbstractObjectMap::propagateDef2Uses()", scope::medium), 1, AOMDebugLevel)
+  if(mapState==between) {
+    /*scope s("AbstractObjectMap::propagateDef2Uses");
+    dbg << "latPEdge="<<latPEdge<<", #uses="<<uses.size()<<", def="<<def->str()<<endl;*/
+    SIGHT_VERB(dbg << "#uses="<<uses.size()<<", def="<<def->str()<<endl, 1, AOMDebugLevel)
+
+    ROSE_ASSERT(implementation);
+
+    bool modified=false;
+    // If there is a lattice mapped to def
+    if(LatticePtr defLat = get(def)) {
+      SIGHT_VERB(dbg << "defLat="<<defLat->str()<<endl, 1, AOMDebugLevel)
+      // Assign it to all the uses
+      for(std::set<MemLocObjectPtr>::const_iterator u=uses.begin(); u!=uses.end(); ++u) {
+        SIGHT_VERB(dbg << "use="<<(*u)->str()<<endl, 1, AOMDebugLevel)
+        modified = insert(*u, defLat) || modified;
+      }
+      //dbg << "modified="<<modified<<endl;
+    }
+    return modified;
+  // If this is a full or empty map, nothing is changed
+  } else
+    return false;
+}
+
 // computes the meet of this and that and saves the result in this
 // returns true if this causes this to change and false otherwise
 bool AbstractObjectMap::meetUpdate(Lattice* thatL) {
-  SIGHT_VERB_DECL(scope, ("AbstractObjectMap::meetUpdate()", scope::medium), 2, AbstractObjectMapDebugLevel)
+  SIGHT_VERB_DECL(scope, ("AbstractObjectMap::meetUpdate()", scope::medium), 2, AOMDebugLevel)
   AbstractObjectMap* that = dynamic_cast<AbstractObjectMap*>(thatL);
   ROSE_ASSERT(that);
 
-  SIGHT_VERB(dbg << "mapState="<<state2Str(mapState)<<", that->mapState="<<state2Str(that->mapState)<<endl, 2, AbstractObjectMapDebugLevel)
+  SIGHT_VERB(dbg << "mapState="<<state2Str(mapState)<<", that->mapState="<<state2Str(that->mapState)<<endl, 2, AOMDebugLevel)
   
   // Full sets cannot be expanded via union operations
   if(mapState==full) return false;
@@ -285,7 +355,7 @@ bool AbstractObjectMap::meetUpdate(Lattice* thatL) {
     else if(that->mapState==empty) return false;
     else {
       ROSE_ASSERT(that->implementation);
-      SIGHT_VERB(dbg << "Calling implementation->meetUpdate()"<<endl, 2, AbstractObjectMapDebugLevel)
+      SIGHT_VERB(dbg << "Calling implementation->meetUpdate()"<<endl, 2, AOMDebugLevel)
       return implementation->meetUpdate(that->implementation);
     }
   }
@@ -324,15 +394,15 @@ bool AbstractObjectMap::operator==(Lattice* thatL) {
 // Return true if this causes the map to change and false otherwise.
 // It is assumed that the given Lattice is now owned by the AbstractObjectMap and can be modified and deleted by it.
 bool GenericAOM::insert(AbstractObjectPtr o, LatticePtr lattice) {
-  SIGHT_VERB_DECL(scope, ("GenericAOM::insert()", scope::medium), 1, AbstractObjectMapDebugLevel)
-  SIGHT_VERB_IF(1, AbstractObjectMapDebugLevel)
-    dbg << "&nbsp;&nbsp;&nbsp;&nbsp;o="<<o->strp(parent->latPEdge, "")<<" lattice="<<lattice->str("&nbsp;&nbsp;&nbsp;&nbsp;")<<endl;
-    dbg << "&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;"<<str("&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;")<<endl;
+  SIGHT_VERB_DECL(scope, ("GenericAOM::insert()", scope::medium), 1, AOMDebugLevel)
+  SIGHT_VERB_IF(1, AOMDebugLevel)
+    dbg << "    o="<<(parent->latPEdge? o->strp(parent->latPEdge, ""): "NULL")<<" lattice="<<lattice->str("    ")<<endl;
+    dbg << "        "<<str("        ")<<endl;
   SIGHT_VERB_FI()
   
   // Do not insert mappings for dead keys
   if(!o->isLive(parent->latPEdge, parent->comp, parent->analysis)) { 
-    SIGHT_VERB(dbg << "<b>GenericAOM::insert() WARNING: attempt to insert dead mapping "<<o->strp(parent->latPEdge)<<" =&gt; "<<lattice->str()<<"<\b>"<<endl, 1, AbstractObjectMapDebugLevel)
+    SIGHT_VERB(dbg << "<b>GenericAOM::insert() WARNING: attempt to insert dead mapping "<<o->strp(parent->latPEdge)<<" =&gt; "<<lattice->str()<<"<\b>"<<endl, 1, AOMDebugLevel)
     return false;
   }
   
@@ -350,7 +420,7 @@ bool GenericAOM::insert(AbstractObjectPtr o, LatticePtr lattice) {
   int i=0;
   for(it = items.begin(); it != items.end(); i++) {
     AbstractObjectPtr keyElement = it->first;
-    SIGHT_VERB(dbg << "&nbsp;&nbsp;&nbsp;&nbsp;keyElement="<<keyElement->str("            ")<<" mustEqual(o, keyElement, parent->latPEdge)="<<o->mustEqual(keyElement, parent->latPEdge, parent->comp, parent->analysis)<<" insertDone="<<insertDone<<" mustEqualSeen="<<mustEqualSeen<<endl, 2, AbstractObjectMapDebugLevel)
+    SIGHT_VERB(dbg << "    keyElement="<<keyElement->str("            ")<<" mustEqual(o, keyElement, parent->latPEdge)="<<o->mustEqual(keyElement, parent->latPEdge, parent->comp, parent->analysis)<<" insertDone="<<insertDone<<" mustEqualSeen="<<mustEqualSeen<<endl, 2, AOMDebugLevel)
 
     // If we're done inserting, don't do it again
     if(insertDone) {
@@ -374,23 +444,23 @@ bool GenericAOM::insert(AbstractObjectPtr o, LatticePtr lattice) {
   
     // If the o-frontier contains an object that must-equal to 
     if(o->mustEqual(keyElement, parent->latPEdge, parent->comp, parent->analysis)) {
-      SIGHT_VERB(dbg << "&nbsp;&nbsp;&nbsp;&nbsp;keyElement="<<keyElement->str("            ")<<" mustEqual(o, keyElement, parent->latPEdge)="<<o->mustEqual(keyElement, parent->latPEdge, parent->comp, parent->analysis)<<" insertDone="<<insertDone<<" mustEqualSeen="<<mustEqualSeen<<endl, 1, AbstractObjectMapDebugLevel)
-      SIGHT_VERB_IF(1, AbstractObjectMapDebugLevel)
-        dbg << "&nbsp;&nbsp;&nbsp;&nbsp;Must Equal"<<endl;
-        dbg << "&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;lattice="<<lattice->str("&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;")<<endl;
-        dbg << "&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;it="<<it->second->str("&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;")<<endl;
+      SIGHT_VERB(dbg << "    keyElement="<<keyElement->str("            ")<<" mustEqual(o, keyElement, parent->latPEdge)="<<o->mustEqual(keyElement, parent->latPEdge, parent->comp, parent->analysis)<<" insertDone="<<insertDone<<" mustEqualSeen="<<mustEqualSeen<<endl, 1, AOMDebugLevel)
+      SIGHT_VERB_IF(1, AOMDebugLevel)
+        dbg << "    Must Equal"<<endl;
+        dbg << "        lattice="<<lattice->str("        ")<<endl;
+        dbg << "        it="<<it->second->str("        ")<<endl;
       SIGHT_VERB_FI()
 
       // If the old and new mappings of o are different,  we remove the old mapping and add a new one 
       if(!it->second->equiv(lattice))
       {
-        SIGHT_VERB(dbg << "&nbsp;&nbsp;&nbsp;&nbsp;keyElement="<<keyElement->str("            ")<<" mustEqual(o, keyElement, parent->latPEdge)="<<o->mustEqual(keyElement, parent->latPEdge, parent->comp, parent->analysis)<<" insertDone="<<insertDone<<" mustEqualSeen="<<mustEqualSeen<<endl, 1, AbstractObjectMapDebugLevel)
-        SIGHT_VERB(dbg << "&nbsp;&nbsp;&nbsp;&nbsp;Removing i="<<i<<", inserting "<<o->strp(parent->latPEdge, "        ")<<"=&gt;"<<lattice->str("        ")<<endl, 1, AbstractObjectMapDebugLevel)
+        SIGHT_VERB(dbg << "    keyElement="<<keyElement->str("            ")<<" mustEqual(o, keyElement, parent->latPEdge)="<<o->mustEqual(keyElement, parent->latPEdge, parent->comp, parent->analysis)<<" insertDone="<<insertDone<<" mustEqualSeen="<<mustEqualSeen<<endl, 1, AOMDebugLevel)
+        SIGHT_VERB(dbg << "    Removing i="<<i<<", inserting "<<o->strp(parent->latPEdge, "        ")<<"=&gt;"<<lattice->str("        ")<<endl, 1, AOMDebugLevel)
         items.erase(it++);
         items.push_front(MapElement(o, lattice));
         retVal = true;
       } else {
-        //dbg << "&nbsp;&nbsp;&nbsp;&nbsp;No Change"<<endl;
+        //dbg << "    No Change"<<endl;
         it++;
         // Otherwise, they're identical and thus there is no need to modify the map
         retVal = false;
@@ -432,7 +502,7 @@ bool GenericAOM::insert(AbstractObjectPtr o, LatticePtr lattice) {
   // Step 2: if the map is larger than some fixed bound, merge some key->value mappings together
   // !!! TODO !!!
   
-  SIGHT_VERB_IF(1, AbstractObjectMapDebugLevel)
+  SIGHT_VERB_IF(1, AOMDebugLevel)
     indent ind();
     dbg << "retVal="<<retVal<<" insertDone="<<insertDone<<" mustEqualSeen="<<mustEqualSeen<<endl;
     dbg << str()<<endl;
@@ -457,10 +527,10 @@ bool GenericAOM::remove(AbstractObjectPtr abstractObjectPtr) {
 
 // Get all x-frontier for a given abstract memory object                                                            
 LatticePtr GenericAOM::get(AbstractObjectPtr abstractObjectPtr) {
-  SIGHT_VERB_DECL(scope, ("GenericAOM::get()", scope::medium), 1, AbstractObjectMapDebugLevel)
-  SIGHT_VERB_IF(1, AbstractObjectMapDebugLevel)
-    dbg << "&nbsp;&nbsp;&nbsp;&nbsp;o="<<abstractObjectPtr->strp(parent->latPEdge, "&nbsp;&nbsp;&nbsp;&nbsp;")<<endl;
-    dbg << "&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;"<<str("&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;")<<endl;
+  SIGHT_VERB_DECL(scope, ("GenericAOM::get()", scope::medium), 1, AOMDebugLevel)
+  SIGHT_VERB_IF(1, AOMDebugLevel)
+    dbg << "    o="<<abstractObjectPtr->strp(parent->latPEdge, "    ")<<endl;
+    dbg << "        "<<str("        ")<<endl;
   SIGHT_VERB_FI()
 
   LatticePtr ret;
@@ -468,7 +538,7 @@ LatticePtr GenericAOM::get(AbstractObjectPtr abstractObjectPtr) {
        it != items.end(); it++) {
     AbstractObjectPtr keyElement = it->first;
     bool eq = abstractObjectPtr->mayEqual(keyElement, parent->latPEdge, parent->comp, parent->analysis);
-    if(AbstractObjectMapDebugLevel>=2 || (AbstractObjectMapDebugLevel>=1 && eq)) dbg << "&nbsp;&nbsp;&nbsp;&nbsp;keyElement(equal="<<eq<<")="<<keyElement->str("&nbsp;&nbsp;&nbsp;&nbsp;")<<endl;
+    if(AOMDebugLevel>=2 || (AOMDebugLevel>=1 && eq)) dbg << "    keyElement(equal="<<eq<<")="<<keyElement->str("    ")<<endl;
     if(eq) {
       // If this is the first matching Lattice, copy this Lattice to ret
       if(!ret) ret = boost::shared_ptr<Lattice>(it->second->copy());
@@ -478,15 +548,15 @@ LatticePtr GenericAOM::get(AbstractObjectPtr abstractObjectPtr) {
       // If the current key must-equals the given object, its assignment must have overwritten any prior assignment
       // to this object, meaning that prior assignments can be ignored
       if(abstractObjectPtr->mustEqual(keyElement, parent->latPEdge, parent->comp, parent->analysis)) {
-        SIGHT_VERB(dbg << "&nbsp;&nbsp;&nbsp;&nbsp;Stopping search since mustEqual, ret="<<ret->str("&nbsp;&nbsp;&nbsp;&nbsp;")<<endl, 1, AbstractObjectMapDebugLevel)
+        SIGHT_VERB(dbg << "    Stopping search since mustEqual, ret="<<ret->str("    ")<<endl, 1, AOMDebugLevel)
         break;
       }
       
-      SIGHT_VERB(dbg << "&nbsp;&nbsp;&nbsp;&nbsp;ret="<<ret->str("&nbsp;&nbsp;&nbsp;&nbsp;")<<endl, 1, AbstractObjectMapDebugLevel)
+      SIGHT_VERB(dbg << "    ret="<<ret->str("    ")<<endl, 1, AOMDebugLevel)
     }
   }
   
-  SIGHT_VERB(dbg << "ret="<<(ret ? ret->str("&nbsp;&nbsp;&nbsp;&nbsp;"): "NULL")<<endl, 1, AbstractObjectMapDebugLevel)
+  SIGHT_VERB(dbg << "ret="<<(ret ? ret->str("    "): "NULL")<<endl, 1, AOMDebugLevel)
   if(ret) return ret;
   // If there is no match for abstractObjectPtr, return a copy of the default lattice
   return LatticePtr(parent->defaultLat->copy());
@@ -516,15 +586,18 @@ bool GenericAOM::isFullLat()
   return false;
 }
 
+/*set<AbstractObjectPtr> cacheAO;*/
+set<LatticePtr> cache;
+
 // Returns whether this lattice denotes the empty set.
 bool GenericAOM::isEmptyLat()
 {
-  SIGHT_VERB(scope s("GenericAOM::isEmpty()", scope::medium), 2, AbstractObjectMapDebugLevel)
-  SIGHT_VERB(dbg << "this="<<str()<<endl, 2, AbstractObjectMapDebugLevel)
+  SIGHT_VERB_DECL(scope, ("GenericAOM::isEmpty()", scope::medium), 2, AOMDebugLevel)
+  SIGHT_VERB(dbg << "this="<<str()<<endl, 2, AOMDebugLevel)
   
   // Check if all items are empty
   for(std::list<MapElement>::iterator i=items.begin(); i!=items.end();) {
-    SIGHT_VERB_IF(2, AbstractObjectMapDebugLevel)
+    SIGHT_VERB_IF(2, AOMDebugLevel)
       indent ind;
       dbg << "i->first="<<i->first->str()<<endl;
       dbg << "i->second="<<i->second->str()<<endl;
@@ -534,11 +607,19 @@ bool GenericAOM::isEmptyLat()
        !(i->second)->isEmptyLat()) return false;
     
     // If this item mapping is empty, remove it from the items list
+    SIGHT_VERB(dbg << "Deleting Empty mapping", 2, AOMDebugLevel)
+
+    //cache.insert(i->second);
+    //cacheAO.insert(i->first);
+//dbg << "#i->second="<<i->second.use_count()<<endl;
+//dbg << "#defaultLat="<<parent->defaultLat.use_count()<<endl;
     items.erase(i++);
+//    ++i;
   }
   // If all are empty, return true
   assert(items.size()==0);
   return true;
+//  return items.size()>0;
 }
 
 std::string GenericAOM::str(std::string indent) const {
@@ -555,10 +636,10 @@ std::string GenericAOM::strp(PartEdgePtr pedge, std::string indent) const
   for(list<MapElement>::const_iterator it = items.begin();
        it != items.end(); it++) {
     //printf("\n%s%p =&gt; %p\n", indent.c_str(), it->first.get(), it->second.get()); fflush(stdout);
-    oss << "<tr><td>";
-    oss << it->first->strp(pedge, indent+"&nbsp;&nbsp;&nbsp;&nbsp;")<<" =&gt; ";
-    oss << "</td><td>";
-    oss << it->second->str(indent+"&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;");
+    oss << "<tr><td>#"<<it->first.use_count()<<"   ";
+    oss << it->first->strp(pedge, indent+"    ");
+    oss << "</td><td>#"<<it->second.use_count()<<"   ";
+    oss << it->second->str(indent+"        ");
     oss << "</td></tr>";
   }
   oss << "</table>"<<endl;
@@ -601,9 +682,9 @@ AbstractObjectMapKindPtr GenericAOM::remapML(const std::set<MLMapping>& ml2ml, P
   // Do nothing on empty maps or those where the keys are not MemLocObjects
   if(items.size()==0 || !(items.begin()->first->isMemLocObject())) { return copy(); }
   
-  SIGHT_VERB_DECL(scope, ("GenericAOM::remapML", scope::medium), 1, AbstractObjectMapDebugLevel)
+  SIGHT_VERB_DECL(scope, ("GenericAOM::remapML", scope::medium), 1, AOMDebugLevel)
   
-  SIGHT_VERB_IF(1, AbstractObjectMapDebugLevel)
+  SIGHT_VERB_IF(1, AOMDebugLevel)
     // If either the key or the value of this mapping is dead within its respective part, we skip it.
     // Print notices of this skipping once
     for(std::set<MLMapping>::const_iterator m=ml2ml.begin(); m!=ml2ml.end(); m++) {
@@ -611,8 +692,8 @@ AbstractObjectMapKindPtr GenericAOM::remapML(const std::set<MLMapping>& ml2ml, P
       // If either the key or the value of this mapping is dead within its respective part, skip it
       if(!m->from->isLive(fromPEdge, parent->comp, parent->analysis) || (m->to && !m->to->isLive(parent->latPEdge, parent->comp, parent->analysis)))
         dbg << "<b>GenericAOM::remapML() WARNING: Skipping dead ml2ml mapping "<<m->from->strp(fromPEdge)<<"(live="<<m->from->isLive(fromPEdge, parent->comp, parent->analysis)<<") =&gt; "<<(m->to ? m->to->strp(parent->latPEdge) : "NULL")<<"(live="<<(m->to ? m->to->isLive(parent->latPEdge, parent->comp, parent->analysis) : -1)<<")"<<endl
-                 << "&nbsp;&nbsp;&nbsp;&nbsp;fromPEdge=["<<fromPEdge->str()<<"]"<<endl
-                 << "&nbsp;&nbsp;&nbsp;&nbsp;parent->latPEdge=["<<parent->latPEdge->str()<<"]</b>"<<endl;
+                 << "    fromPEdge=["<<fromPEdge->str()<<"]"<<endl
+                 << "    parent->latPEdge=["<<(parent->latPEdge? parent->latPEdge->str(): "NULL")<<"]</b>"<<endl;
     }
   
   {
@@ -635,7 +716,7 @@ AbstractObjectMapKindPtr GenericAOM::remapML(const std::set<MLMapping>& ml2ml, P
   for(std::set<MLMapping>::const_iterator m=ml2ml.begin(); m!=ml2ml.end(); m++)
     ml2mlAdded.push_back(false);
   
-  SIGHT_VERB(dbg << "newM="<<newM->str()<<endl, 2, AbstractObjectMapDebugLevel)
+  SIGHT_VERB(dbg << "newM="<<newM->str()<<endl, 2, AOMDebugLevel)
   
   // Iterate over all the mappings <key, val> n ml2ml and for each mapping consider 
   // each item in newM. If the key mustEquals to some item newM, that item is replaced 
@@ -643,20 +724,20 @@ AbstractObjectMapKindPtr GenericAOM::remapML(const std::set<MLMapping>& ml2ml, P
   // the list. If the key does not appear in newM at all, val is placed at the front of 
   // the list.
   for(std::list<MapElement>::iterator i=newM->items.begin(); i!=newM->items.end(); ) {
-    SIGHT_VERB_DECL(indent, (), 1, AbstractObjectMapDebugLevel)
-    SIGHT_VERB(dbg << "i="<<i->first->str()<<endl, 1, AbstractObjectMapDebugLevel)
+    SIGHT_VERB_DECL(indent, (), 1, AOMDebugLevel)
+    SIGHT_VERB(dbg << "i="<<i->first->str()<<endl, 1, AOMDebugLevel)
   
     int mIdx=0;
     std::set<MLMapping>::const_iterator m=ml2ml.begin();
     for(; m!=ml2ml.end(); m++, mIdx++) {
       if(!m->from) continue;
       
-      SIGHT_VERB_DECL(indent, (), 1, AbstractObjectMapDebugLevel)
-      SIGHT_VERB(dbg << mIdx << ": m-&gt;key="<<m->from->strp(fromPEdge)<<endl, 1, AbstractObjectMapDebugLevel)
+      SIGHT_VERB_DECL(indent, (), 1, AOMDebugLevel)
+      SIGHT_VERB(dbg << mIdx << ": m-&gt;key="<<m->from->strp(fromPEdge)<<endl, 1, AOMDebugLevel)
       
-      SIGHT_VERB_DECL(indent, (), 1, AbstractObjectMapDebugLevel)
+      SIGHT_VERB_DECL(indent, (), 1, AOMDebugLevel)
       // If the current item in newM may- or must-equals a key in ml2ml, record this and update newM
-      SIGHT_VERB_IF(1, AbstractObjectMapDebugLevel)
+      SIGHT_VERB_IF(1, AOMDebugLevel)
         dbg << "i-&gt;first mustEqual m-&gt;from = "<<i->first->mustEqual(m->from, fromPEdge, parent->comp, parent->analysis)<<endl;
         dbg << "i-&gt;first mayEqual m-&gt;from = "<<i->first->mayEqual(m->from, fromPEdge, parent->comp, parent->analysis)<<endl;
       SIGHT_VERB_FI()
@@ -670,13 +751,13 @@ AbstractObjectMapKindPtr GenericAOM::remapML(const std::set<MLMapping>& ml2ml, P
           //scope reg("Deleting items that are must-equal to value", scope::medium));
           std::list<MapElement>::iterator iNext = i; iNext++;
           for(std::list<MapElement>::iterator j=iNext; j!=newM->items.end(); ) {
-            SIGHT_VERB_IF(2, AbstractObjectMapDebugLevel)
+            SIGHT_VERB_IF(2, AOMDebugLevel)
               dbg << "j="<<j->first<<" => "<<j->second<<endl;
               dbg << mIdx << ": m-&gt;value="<<m->to->strp(fromPEdge)<<endl;
               dbg << "j-&gt;first mustEqual m-&gt;to = "<<j->first->mustEqual(m->to, fromPEdge, parent->comp, parent->analysis)<<endl;
             SIGHT_VERB_FI() 
             if(j->first->mustEqual(m->to, fromPEdge, parent->comp, parent->analysis)) {
-              SIGHT_VERB(dbg << "Erasing j="<<j->first->str()<<" => "<<j->second->str()<<endl, 2, AbstractObjectMapDebugLevel)
+              SIGHT_VERB(dbg << "Erasing j="<<j->first->str()<<" => "<<j->second->str()<<endl, 2, AOMDebugLevel)
               j = newM->items.erase(j);
               //break;
             } else
@@ -692,7 +773,7 @@ AbstractObjectMapKindPtr GenericAOM::remapML(const std::set<MLMapping>& ml2ml, P
         ml2mlAdded[mIdx]=true;
       } else if(i->first->mayEqual(m->from, fromPEdge, parent->comp, parent->analysis)) {
         // Insert the value in the current ml2ml mapping immediately before the current item
-        SIGHT_VERB(dbg << "Inserting before i: "<<m->to->str()<<" => "<<i->second->str()<<endl, 1, AbstractObjectMapDebugLevel)
+        SIGHT_VERB(dbg << "Inserting before i: "<<m->to->str()<<" => "<<i->second->str()<<endl, 1, AOMDebugLevel)
         newM->items.insert(i, make_pair(boost::static_pointer_cast<AbstractObject>(m->to), i->second));
         ml2mlAdded[mIdx]=true;
       }
@@ -745,7 +826,7 @@ bool GenericAOM::replaceML(AbstractObjectMapKindPtr newL)
 // The part of this object is to be used for AbstractObject parent->comparisons.
 bool GenericAOM::meetUpdate(AbstractObjectMapKindPtr thatL)
 {
-  SIGHT_VERB_DECL(scope, ("GenericAOM::meetUpdate()", scope::medium), 2, AbstractObjectMapDebugLevel);
+  SIGHT_VERB_DECL(scope, ("GenericAOM::meetUpdate()", scope::medium), 2, AOMDebugLevel);
 
   // Both incorporateVars() and meetUpdate currently call merge. This is clearly not
   // right but we'll postpone fixing it until we have the right algorithm for merges
@@ -754,8 +835,8 @@ bool GenericAOM::meetUpdate(AbstractObjectMapKindPtr thatL)
     boost::shared_ptr<GenericAOM> that = boost::dynamic_pointer_cast<GenericAOM>(thatL);
     assert(that);
     
-    SIGHT_VERB_IF(2, AbstractObjectMapDebugLevel)
-      dbg << "parent->latPEdge="<<parent->latPEdge->str()<<endl;
+    SIGHT_VERB_IF(2, AOMDebugLevel)
+      dbg << "parent->latPEdge="<<(parent->latPEdge? parent->latPEdge->str(): "NULL")<<endl;
       { scope thisreg("this", scope::medium);
       dbg << str()<<endl; }
       { scope thisreg("that", scope::medium);
@@ -810,7 +891,7 @@ bool GenericAOM::meetUpdate(AbstractObjectMapKindPtr thatL)
     for(list<MapElement>::iterator itThat=that->items.begin(); itThat!=that->items.end(); itThat++)
       thatMustEq.push_back(false);
 
-    SIGHT_VERB_IF(2, AbstractObjectMapDebugLevel)
+    SIGHT_VERB_IF(2, AOMDebugLevel)
       scope thisreg("that->items", scope::medium);
       for(list<MapElement>::iterator itThat=that->items.begin(); itThat!=that->items.end(); itThat++)
       dbg << "that: "<<itThat->first->str()<<" ==&gt; "<<itThat->second->str()<<endl;
@@ -820,16 +901,16 @@ bool GenericAOM::meetUpdate(AbstractObjectMapKindPtr thatL)
     // and for these pairs merge the lattices from that->items to this->items.
     for(list<MapElement>::iterator itThis=items.begin(); 
        itThis!=items.end(); itThis++) {
-      SIGHT_VERB(scope thisreg("itThis", scope::medium), 2, AbstractObjectMapDebugLevel)
-      SIGHT_VERB(dbg << "this: "<<itThis->first->str()<<" ==&gt; "<<itThis->second->str()<<endl, 2, AbstractObjectMapDebugLevel)
+      SIGHT_VERB(scope thisreg("itThis", scope::medium), 2, AOMDebugLevel)
+      SIGHT_VERB(dbg << "this: "<<itThis->first->str()<<" ==&gt; "<<itThis->second->str()<<endl, 2, AOMDebugLevel)
       
       int i=0;
       list<bool>::iterator thatMEIt=thatMustEq.begin();
       for(list<MapElement>::iterator itThat=that->items.begin(); 
          itThat!=that->items.end(); itThat++, i++, thatMEIt++) {
       
-        SIGHT_VERB(scope thisreg("itThat", scope::medium), 2, AbstractObjectMapDebugLevel)
-        SIGHT_VERB(dbg << "that: "<<itThat->first->str()<<" ==&gt; "<<itThat->second->str()<<endl, 2, AbstractObjectMapDebugLevel)
+        SIGHT_VERB(scope thisreg("itThat", scope::medium), 2, AOMDebugLevel)
+        SIGHT_VERB(dbg << "that: "<<itThat->first->str()<<" ==&gt; "<<itThat->second->str()<<endl, 2, AOMDebugLevel)
         
         // If we've found a pair of keys in this and that that are mustEqual or denote the same set
         //if(mustEqual(itThis->first, itThat->first, parent->latPEdge, parent->comp, parent->analysis)) {
@@ -838,7 +919,7 @@ bool GenericAOM::meetUpdate(AbstractObjectMapKindPtr thatL)
           thisMustEq2thatMustEq.push_back(make_pair(itThis, make_pair(itThat, i)));
           *thatMEIt = true;
           
-          SIGHT_VERB(scope meetreg(txt()<<"Meeting", scope::medium), 2, AbstractObjectMapDebugLevel)
+          SIGHT_VERB(scope meetreg(txt()<<"Meeting", scope::medium), 2, AOMDebugLevel)
           
           // Update the lattice at *itThis to incorporate information at *itThat
           {
@@ -847,10 +928,10 @@ bool GenericAOM::meetUpdate(AbstractObjectMapKindPtr thatL)
             // As such, instead of updating lattices in-place (this would update the same lattice
             // in other maps) we first copy them and update into the copy.
             itThis->second = LatticePtr(itThis->second->copy());
-            SIGHT_VERB(scope meetreg(txt()<<"Meeting "<<itThis->first->str(), scope::medium), 2, AbstractObjectMapDebugLevel)
-            SIGHT_VERB(scope befreg("before", scope::low); dbg << itThis->second->str()<<endl, 2, AbstractObjectMapDebugLevel)
+            SIGHT_VERB(scope meetreg(txt()<<"Meeting "<<itThis->first->str(), scope::medium), 2, AOMDebugLevel)
+            SIGHT_VERB(scope befreg("before", scope::low); dbg << itThis->second->str()<<endl, 2, AOMDebugLevel)
             modified = itThis->second->meetUpdate(itThat->second) || modified;
-            SIGHT_VERB_IF(2, AbstractObjectMapDebugLevel)
+            SIGHT_VERB_IF(2, AOMDebugLevel)
             { scope aftreg("after", scope::low); dbg << itThis->second->str()<<endl; }
             dbg << "modified="<<modified<<endl;
             SIGHT_VERB_FI()
@@ -858,7 +939,7 @@ bool GenericAOM::meetUpdate(AbstractObjectMapKindPtr thatL)
         }
       }
     }
-    SIGHT_VERB_IF(2, AbstractObjectMapDebugLevel)
+    SIGHT_VERB_IF(2, AOMDebugLevel)
       scope eqreg("thisMustEq2thatMustEq", scope::medium);
       for(list<pair<list<MapElement>::iterator, pair<list<MapElement>::iterator, int> > >::iterator it=thisMustEq2thatMustEq.begin();
           it!=thisMustEq2thatMustEq.end(); it++) {
@@ -866,7 +947,7 @@ bool GenericAOM::meetUpdate(AbstractObjectMapKindPtr thatL)
       }
     SIGHT_VERB_FI()
     
-    { SIGHT_VERB(scope insreg("inserting that->this", scope::medium), 2, AbstractObjectMapDebugLevel);
+    { SIGHT_VERB(scope insreg("inserting that->this", scope::medium), 2, AOMDebugLevel);
     
     // Copy over the mappings of all the elements in that->items that were not mustEqual
     // to any elements in this->items. Although any order will work for these elements,
@@ -876,8 +957,8 @@ bool GenericAOM::meetUpdate(AbstractObjectMapKindPtr thatL)
     list<bool>::iterator thatMEIt=thatMustEq.begin();
     for(list<pair<list<MapElement>::iterator, pair<list<MapElement>::iterator, int> > >::iterator meIt=thisMustEq2thatMustEq.begin();
        meIt!=thisMustEq2thatMustEq.end(); meIt++) {
-      SIGHT_VERB(scope mapreg(txt()<<"mustEqual mapping "<<meIt->second.second<<": "<<(meIt->first)->first->str(), scope::medium), 2, AbstractObjectMapDebugLevel)
-      SIGHT_VERB_IF(2, AbstractObjectMapDebugLevel)
+      SIGHT_VERB(scope mapreg(txt()<<"mustEqual mapping "<<meIt->second.second<<": "<<(meIt->first)->first->str(), scope::medium), 2, AOMDebugLevel)
+      SIGHT_VERB_IF(2, AOMDebugLevel)
         dbg << "this: "<<meIt->first->first->str() << " =&gt; " << meIt->first->second->str() <<endl;
         dbg << "that: "<<(meIt->second).first->first->str() << " =&gt; " << (meIt->second).first->second->str() << endl;
         dbg << "thatIdx="<<thatIdx<<endl;
@@ -891,31 +972,31 @@ bool GenericAOM::meetUpdate(AbstractObjectMapKindPtr thatL)
           // Copy over the current element from that->items if it doesn't have a mustEqual 
           // partner in this->items (i.e. its already been handled)
           if(!(*thatMEIt)) {
-            SIGHT_VERB(dbg << "Inserting at meIt->first="<<(meIt->first)->first->str()<<" mapping "<<thatIt->first->str()<<" ==&gt; "<<thatIt->second->str()<<endl, 2, AbstractObjectMapDebugLevel)
+            SIGHT_VERB(dbg << "Inserting at meIt->first="<<(meIt->first)->first->str()<<" mapping "<<thatIt->first->str()<<" ==&gt; "<<thatIt->second->str()<<endl, 2, AOMDebugLevel)
             // NOTE: we do not currently update the part field in the lattice thatIt->second
             //       to refer to this->parent->latPEdge. Perhaps we should make a copy of it and update it.
             items.insert(meIt->first, *thatIt);
             modified = true;
           } else 
-            SIGHT_VERB(dbg << "mustEqual partner exists in this"<<endl, 2, AbstractObjectMapDebugLevel)
+            SIGHT_VERB(dbg << "mustEqual partner exists in this"<<endl, 2, AOMDebugLevel)
         }
         // Advance thatIt and thatIdx once more to account for the partner in that->items 
         // of the current entry in this->items
         thatIt++;
         thatIdx++;
       }
-      //if(AbstractObjectMapDebugLevel()>=2) dbg << "modified="<<modified<<endl;
+      //if(AOMDebugLevel()>=2) dbg << "modified="<<modified<<endl;
     }
     
     // Add all the elements from that->items that remain
     for(; thatIt!=that->items.end(); thatIt++) {
-      SIGHT_VERB(dbg << "Pushing end "<<thatIt->first->str()<<" ==&gt; "<<thatIt->second->str()<<endl, 2, AbstractObjectMapDebugLevel)
+      SIGHT_VERB(dbg << "Pushing end "<<thatIt->first->str()<<" ==&gt; "<<thatIt->second->str()<<endl, 2, AOMDebugLevel)
       // NOTE: we do not currently update the part field in the lattice thatIt->second
       //       to refer to this->parent->latPEdge. Perhaps we should make a copy of it and update it.
       items.push_back(*thatIt);
       modified = true;
     }
-    //dbg << "&nbsp;&nbsp;&nbsp;&nbsp;items.size()="<<items.size()<<"\n";
+    //dbg << "    items.size()="<<items.size()<<"\n";
    }
     
     // parent->compress all the elements from that are now mustEqual to each other in this->parent->latPEdge.
@@ -937,7 +1018,7 @@ bool GenericAOM::meetUpdate(AbstractObjectMapKindPtr thatL)
   } catch (bad_cast & bc) { 
     assert(false);
   }
-  SIGHT_VERB(dbg << "Final modified="<<modified<<endl, 2, AbstractObjectMapDebugLevel)
+  SIGHT_VERB(dbg << "Final modified="<<modified<<endl, 2, AOMDebugLevel)
   return modified;
 }
 
@@ -946,21 +1027,21 @@ bool GenericAOM::meetUpdate(AbstractObjectMapKindPtr thatL)
 bool GenericAOM::compressMustEq()
 {
   /*dbg << "parent->compressMustEq()"<<endl;
-  dbg << "&nbsp;&nbsp;&nbsp;&nbsp;"<<str("&nbsp;&nbsp;&nbsp;&nbsp;")<<endl;*/
+  dbg << "    "<<str("    ")<<endl;*/
   
   bool modified = false;
   int xIdx=0;
   for(list<MapElement>::iterator x = items.begin(); x != items.end(); x++, xIdx++) {
-    //dbg << "&nbsp;&nbsp;&nbsp;&nbsp;"<<xIdx<<" : x="<<x->first->str("")<<endl;
+    //dbg << "    "<<xIdx<<" : x="<<x->first->str("")<<endl;
     // y starts from the element that follows x
     list<MapElement>::iterator y = x;
     y++;
     int yIdx = xIdx+1;
     for(; y != items.end(); yIdx++) {
-      //dbg << "&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;"<<yIdx<<" : y="<<y->first->str("")<<endl;
+      //dbg << "        "<<yIdx<<" : y="<<y->first->str("")<<endl;
       // If x and y are equal, merge their lattices and remove the later one
       if(x->first->mustEqual(y->first, parent->latPEdge, parent->comp, parent->analysis)) {
-        //dbg << "&nbsp;&nbsp;&nbsp;&nbsp;MERGING and REMOVING"<<endl;
+        //dbg << "    MERGING and REMOVING"<<endl;
         // First copy the lattice since it may change. We don't deep-copy lattices when we copy
         // AbstractObjectMaps, so multiple maps may contain references to the same lattice.
         // As such, instead of updating lattices in-place (this would update the same lattice
@@ -972,7 +1053,7 @@ bool GenericAOM::compressMustEq()
         y++;
         items.erase(tmp);
         
-        //dbg << "&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;map="<<str("&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;")<<endl;
+        //dbg << "        map="<<str("            ")<<endl;
         
         modified = true;
       } else
@@ -987,17 +1068,17 @@ bool GenericAOM::compressMustEq()
 // Return true if this causes the object to change and false otherwise.
 bool GenericAOM::compressDead()
 {
-  SIGHT_VERB_DECL(scope, ("compressDead", scope::low), 2, AbstractObjectMapDebugLevel)        
+  SIGHT_VERB_DECL(scope, ("compressDead", scope::low), 2, AOMDebugLevel)
   bool modified = false;
   for(list<MapElement>::iterator i = items.begin(); i != items.end(); ) {
-    SIGHT_VERB(dbg << "i: "<<i->first.get()->str()<<" ==&gt"<<endl<<"          "<<i->second.get()->str()<<endl, 2, AbstractObjectMapDebugLevel)
+    SIGHT_VERB(dbg << "i: "<<i->first.get()->str()<<" ==&gt"<<endl<<"          "<<i->second.get()->str()<<endl, 2, AOMDebugLevel)
     
     // Remove mappings with dead keys
     if(!(i->first->isLive(parent->latPEdge, parent->comp, parent->analysis))) {
       list<MapElement>::iterator nextI = i;
       nextI++;
       
-      SIGHT_VERB(dbg << "Erasing "<<i->first.get()->str()<<endl, 2, AbstractObjectMapDebugLevel)
+      SIGHT_VERB(dbg << "Erasing "<<i->first.get()->str()<<endl, 2, AOMDebugLevel)
       items.erase(i);
       modified = true;
       
@@ -1056,26 +1137,41 @@ HierarchicalAOM::Node::Node(comparablePtr myKey, std::list<comparablePtr>::const
 }
 
 HierarchicalAOM::Node::Node(const NodePtr& that, PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis) {
-  SIGHT_VERB_DECL(scope, ("HierarchicalAOM::Node::Node()", scope::medium), 2, AbstractObjectMapDebugLevel)
-  SIGHT_VERB(dbg << "that="; that->print(dbg); dbg<<endl, 2, AbstractObjectMapDebugLevel)
-  SIGHT_VERB(dbg << "that->key="<<(that->key? that->key->str(): "NULL")<<", that->fullKey="<<(that->fullKey? string(txt()<<that->fullKey): "NULL")<<endl, 2, AbstractObjectMapDebugLevel)
+  init((Node*)that.get(), pedge, comp, analysis);
+}
+
+HierarchicalAOM::Node::Node(Node* that, PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis) {
+  init(that, pedge, comp, analysis);
+}
+
+// This copy constructor variant is called inside the copy constructor. The "that" parameter
+// does not have a const qualification because we need to modify the source Node object.
+// This change is functionally transparent to users of this object.
+void HierarchicalAOM::Node::init(Node* that, PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis) {
+  SIGHT_VERB_DECL(scope, ("HierarchicalAOM::Node::Node()", scope::medium), 2, AOMDebugLevel)
+  SIGHT_VERB(dbg << "that="; that->print(dbg); dbg<<endl, 2, AOMDebugLevel)
+  SIGHT_VERB(dbg << "that->key="<<(that->key? that->key->str(): "NULL")<<", that->fullKey="<<(that->fullKey? string(txt()<<that->fullKey): "NULL")<<endl, 2, AOMDebugLevel)
   
   // Copy over that node's obj and val
   isObjSingleton = that->isObjSingleton;
   key = that->key;
   fullKey = that->fullKey;
   val = that->val;
-  // This val is original if that one is. 
-  // If that val is a copy, we set this one to be original so that we know 
-  //    to not modify it without first making a private copy.
+
+  // As a result of this copy, both instances of Node refer to the same instance of Lattice.
+  // Thus, if either of them modifies this Lattice object the other will be (erroneously)
+  // affected. To make sure that both objects are safe from each other, we set originalVal
+  // to true in both, which will force them to make a copy of the Lattice object before
+  // they modify it.
+  that->originalVal = true;
   originalVal = true;
   
   // Copy subsets, recursively invoking this constructor on this node's children
-  for(map<comparablePtr, NodePtr>::const_iterator sub=that->subsets.begin(); sub!=that->subsets.end(); sub++) {
-    SIGHT_VERB(dbg << "sub="<<sub->second<<endl, 2, AbstractObjectMapDebugLevel)
+  for(map<comparablePtr, NodePtr>::iterator sub=that->subsets.begin(); sub!=that->subsets.end(); sub++) {
+    SIGHT_VERB(dbg << "sub="<<sub->second<<endl, 2, AOMDebugLevel)
     if(sub->second->fullKey) {
-      SIGHT_VERB(dbg << "sub->second->fullKey="<<string(txt()<<sub->second->fullKey)<<endl, 2, AbstractObjectMapDebugLevel)
-      SIGHT_VERB(dbg << "live="<<sub->second->fullKey->isLive(pedge, comp, analysis)<<endl, 2, AbstractObjectMapDebugLevel)
+      SIGHT_VERB(dbg << "sub->second->fullKey="<<string(txt()<<sub->second->fullKey)<<endl, 2, AOMDebugLevel)
+      SIGHT_VERB(dbg << "live="<<sub->second->fullKey->isLive(pedge, comp, analysis)<<endl, 2, AOMDebugLevel)
     }
     // Only create sub-keys for live keys
     if(!sub->second->fullKey || sub->second->fullKey->isLive(pedge, comp, analysis)) {
@@ -1124,7 +1220,7 @@ bool HierarchicalAOM::Node::setSubTreeToFull() {
 
 // Removes the given child node from the given parent node
 void HierarchicalAOM::Node::remove(NodePtr child) {
-  SIGHT_VERB(dbg << "child->key="<<child->key->str()<<endl, 1, AbstractObjectMapDebugLevel)
+  SIGHT_VERB(dbg << "child->key="<<child->key->str()<<endl, 1, AOMDebugLevel)
   ROSE_ASSERT(subsets.erase(child->key)==1);
 }
 
@@ -1184,7 +1280,7 @@ bool HierarchicalAOM::Node::isEmptyVal() const {
 std::ostream& operator<<(std::ostream& s, const HierarchicalAOM::NodePtr& node) {
   s << "<div style=\"border-style:solid; border-color:#888888; border-width=1px\">";
   s << "Node: "<</*key="<<(node->key?node->key->str():"NULL")<<", */" isObjSingleton="<<node->isObjSingleton<<endl;
-  s << "    val="<<(node->val?node->val->str():"NULL");
+  s << "    val("<<node->val<<"| originalVal="<<node->originalVal<<")="<<(node->val?node->val->str():"NULL");
   //s << "  <table border=1>";
   for(map<comparablePtr, HierarchicalAOM::NodePtr>::const_iterator sub=node->subsets.begin(); sub!=node->subsets.end(); sub++) {
     s << "  <table border=0>";
@@ -1200,13 +1296,13 @@ std::ostream& operator<<(std::ostream& s, const HierarchicalAOM::NodePtr& node) 
   return s;
 }
 
-HierarchicalAOM::HierarchicalAOM(const HierarchicalAOM& that, AbstractObjectMap* parent) : 
+HierarchicalAOM::HierarchicalAOM(const HierarchicalAOM& that, AbstractObjectMap* parent) :
 			   AbstractObjectMapKind(parent),
                            tree    (that.tree),
 			   isFinite(that.isFinite)
 { tree = boost::make_shared<Node>(that.tree, parent->latPEdge, parent->comp, parent->analysis); }
 
-HierarchicalAOM::HierarchicalAOM(const HierarchicalAOM& that) : 
+HierarchicalAOM::HierarchicalAOM(const HierarchicalAOM& that) :
 			   AbstractObjectMapKind(that.parent),
 			   tree    (that.tree),
 			   isFinite(that.isFinite)
@@ -1215,6 +1311,10 @@ HierarchicalAOM::HierarchicalAOM(const HierarchicalAOM& that) :
 HierarchicalAOM::HierarchicalAOM(AbstractObjectMap* parent) : AbstractObjectMapKind(parent), isFinite(true)
 { tree = boost::make_shared<Node>(); }
 
+HierarchicalAOM::~HierarchicalAOM() {
+//cout << "HierarchicalAOM::~HierarchicalAOM()"<<endl;
+}
+
 // Add a new memory object --> lattice pair to the frontier.
 // Return true if this causes the map to change and false otherwise.
 // It is assumed that the given Lattice is now owned by the AbstractObjectMap and can be modified and deleted by it.
@@ -1222,19 +1322,19 @@ bool HierarchicalAOM::insert(AbstractObjectPtr obj_arg, LatticePtr val, bool ori
   AbstractObjectHierarchyPtr obj = boost::dynamic_pointer_cast<AbstractObjectHierarchy>(obj_arg);
   ROSE_ASSERT(obj);
 
-  SIGHT_VERB_DECL(scope, ("HierarchicalAOM::insert()", scope::medium), 1, AbstractObjectMapDebugLevel)
-  SIGHT_VERB_IF(1, AbstractObjectMapDebugLevel)
+  SIGHT_VERB_DECL(scope, ("HierarchicalAOM::insert()", scope::medium), 1, AOMDebugLevel)
+  SIGHT_VERB_IF(1, AOMDebugLevel)
     indent ind;
     dbg << "obj(live="<<obj_arg->isLive(parent->latPEdge, parent->comp, parent->analysis)<<")="<<obj_arg->strp(parent->latPEdge, "")<<endl;
     dbg << "    key="<<obj->getHierKey()<<endl;
-    dbg << "lattice(empty="<<val->isEmptyLat()<<")="<<val->str("&nbsp;&nbsp;&nbsp;&nbsp;")<<endl;
+    dbg << "lattice(empty="<<val->isEmptyLat()<<")="<<val->str("    ")<<endl;
     indent ind2;
     dbg << str()<<endl;
   SIGHT_VERB_FI()
   
   // Do not insert mappings for dead keys
   if(!obj_arg->isLive(parent->latPEdge, parent->comp, parent->analysis)) { 
-    SIGHT_VERB(dbg << "<b>GenericAOM::insert() WARNING: attempt to insert dead mapping "<<obj_arg->strp(parent->latPEdge)<<" =&gt; "<<val->str()<<"<\b>"<<endl, 1, AbstractObjectMapDebugLevel)
+    SIGHT_VERB(dbg << "<b>HierarchicalAOM::insert() WARNING: attempt to insert dead mapping "<<obj_arg->strp(parent->latPEdge)<<" =&gt; "<<val->str()<<"<\b>"<<endl, 1, AOMDebugLevel)
     return false;
   }
   
@@ -1243,7 +1343,9 @@ bool HierarchicalAOM::insert(AbstractObjectPtr obj_arg, LatticePtr val, bool ori
   // Don't add empty values since that wouldn't have any information content
   if(val->isEmptyLat()) return false;
   
-  return insert(tree, obj->getHierKey()->begin(), obj->getHierKey()->end(), obj->getHierKey(), obj_arg, val, originalVal);
+  bool modified = insert(tree, obj->getHierKey()->begin(), obj->getHierKey()->end(), obj->getHierKey(), obj_arg, val, originalVal);
+  SIGHT_VERB(dbg << "modified="<<modified<<endl, 1, AOMDebugLevel);
+  return modified;
 }
 
 // Recursive body of insert
@@ -1251,19 +1353,29 @@ bool HierarchicalAOM::insert(NodePtr subTree,
              std::list<comparablePtr>::const_iterator subKey, std::list<comparablePtr>::const_iterator keyEnd,
              AbstractObjectHierarchy::hierKeyPtr fullKey, AbstractObjectPtr obj, LatticePtr val, bool originalVal)
 {
-  SIGHT_VERB_DECL(scope, ("HierarchicalAOM::insert()", scope::medium), 1, AbstractObjectMapDebugLevel)
-  SIGHT_VERB(dbg << "subKey="<<(subKey!=keyEnd? (*subKey)->str(): "END")<<", end of key="<<(subKey==keyEnd)<<", tree root="<<(subTree==tree)<<endl, 1, AbstractObjectMapDebugLevel)
-  SIGHT_VERB(dbg << "subTree="<<subTree<<endl,  1, AbstractObjectMapDebugLevel)
+  bool modified = false;
+  SIGHT_VERB_DECL(scope, ("HierarchicalAOM::insert()", scope::medium), 1, AOMDebugLevel)
+  SIGHT_VERB(dbg << "subKey="<<(subKey!=keyEnd? (*subKey)->str(): "END")<<", end of key="<<(subKey==keyEnd)<<", tree root="<<(subTree==tree)<<endl, 1, AOMDebugLevel)
+  SIGHT_VERB(dbg << "subTree="<<subTree<<endl,  1, AOMDebugLevel)
   // If this is the last sub-key in the key
   if(subKey==keyEnd) {
     // If this is the root node of the tree, the key must have been empty/the object 
     // must have been the full set. In this case we place val into the Node without 
     // placing obj.
     if(subTree == tree) {
-      subTree->fullKey = fullKey;
-      subTree->val = val;
-      subTree->originalVal = originalVal;
-      return true;
+      if(subTree->fullKey != fullKey) {
+        subTree->fullKey = fullKey;
+        modified = true;
+      }
+
+      if(!subTree->val->equiv(val)) {
+        subTree->val = val;
+        subTree->originalVal = originalVal;
+        modified = true;
+      }
+
+      SIGHT_VERB(dbg << "root: modified="<<modified<<endl, 1, AOMDebugLevel)
+      return modified;
       // Note: we should return true only if the set was modified but lattices have no equalSet method
     } else {
       // If obj is equal to the current obj in the node in all possible executions, replace the original
@@ -1271,10 +1383,16 @@ bool HierarchicalAOM::insert(NodePtr subTree,
       ROSE_ASSERT(subTree->isObjSingleton == Node::isSingleton(obj));
       if(subTree->isObjSingleton) {
         ROSE_ASSERT(subTree->fullKey);
-        subTree->val = val;
+        if(!subTree->val->equiv(val)) {
+          subTree->val = val;
+          subTree->originalVal = originalVal;
+          modified = true;
+        }
         // If an object is must-equal, it must be a singleton set and thus, cannot have any subsets
         ROSE_ASSERT(subTree->subsets.size()==0);
-        return true;
+
+        SIGHT_VERB(dbg << "singleton: modified="<<modified<<endl, 1, AOMDebugLevel)
+        return modified;
       } else {
         // The old and new objects denote the same set but in different executions the actual concrete 
         // objects they denote may be different, so union the original and new lattices
@@ -1285,7 +1403,9 @@ bool HierarchicalAOM::insert(NodePtr subTree,
           subTree->val = subTree->val->copySharedPtr();
           subTree->originalVal = false;
         }
-        return subTree->val->meetUpdate(val);
+        modified = subTree->val->meetUpdate(val);
+        SIGHT_VERB(dbg << "overlap: modified="<<modified<<endl, 1, AOMDebugLevel)
+        return modified;
       }
     }
   // If this is not the last sub-key, place it deeper in the tree
@@ -1294,11 +1414,14 @@ bool HierarchicalAOM::insert(NodePtr subTree,
     map<comparablePtr, NodePtr>::iterator skIt = subTree->subsets.find(*subKey);
     std::list<comparablePtr>::const_iterator next = subKey; ++next;
     if(skIt != subTree->subsets.end()) {
-      return insert(skIt->second, next, keyEnd, fullKey, obj, val, originalVal);
+      modified = insert(skIt->second, next, keyEnd, fullKey, obj, val, originalVal);
+      SIGHT_VERB(dbg << "recursive: modified="<<modified<<endl, 1, AOMDebugLevel)
+      return modified;
     // If it does not exist in the current tree node, add a sub-tree for it, which
     // will contain nodes for each sub-key between subKey and keyEnd
     } else {
       subTree->subsets[*subKey] = boost::make_shared<Node>(*subKey, next, keyEnd, fullKey, obj, val);
+      SIGHT_VERB(dbg << "new key: modified=1"<<endl, 1, AOMDebugLevel)
       return true;
     }
   }
@@ -1336,11 +1459,11 @@ LatticePtr HierarchicalAOM::getVal(NodePtr subTree) {
 
 // Get all x-frontier for a given abstract memory object
 LatticePtr HierarchicalAOM::get(AbstractObjectPtr obj_arg) {
-  SIGHT_VERB_DECL(scope, ("HierarchicalAOM::get()", scope::medium), 1, AbstractObjectMapDebugLevel)
+  SIGHT_VERB_DECL(scope, ("HierarchicalAOM::get()", scope::medium), 1, AOMDebugLevel)
+  SIGHT_VERB(dbg << "obj="<<obj_arg->str()<<endl, 1, AOMDebugLevel)
   AbstractObjectHierarchyPtr obj = boost::dynamic_pointer_cast<AbstractObjectHierarchy>(obj_arg);
   ROSE_ASSERT(obj);
-  SIGHT_VERB(dbg << "obj="<<obj_arg->str()<<endl, 1, AbstractObjectMapDebugLevel)
-  SIGHT_VERB(dbg << "key="<<obj->getHierKey()<<endl, 1, AbstractObjectMapDebugLevel)
+  SIGHT_VERB(dbg << "key="<<obj->getHierKey()<<endl, 1, AOMDebugLevel)
 
   list<comparablePtr>::const_iterator curKey = obj->getHierKey()->begin(),
                                       keyEnd = obj->getHierKey()->end();
@@ -1354,16 +1477,17 @@ LatticePtr HierarchicalAOM::get(AbstractObjectPtr obj_arg) {
   NodePtr subTree = tree;
           
   // The lattice object we'll return
-  LatticePtr resLat(parent->defaultLat->copy());
+  //LatticePtr resLat(parent->defaultLat->copy());
+  LatticePtr resLat = parent->defaultLat->copySharedPtr();
   resLat->setToEmpty();
-  
+
   do {
-    SIGHT_VERB(dbg << "curKey="<<curKey->str()<<", found="<<(subTree->subsets.find(*curKey)!=subTree->subsets.end())<<endl, 1, AbstractObjectMapDebugLevel)
-    SIGHT_VERB(dbg << "subTree="<<subTree<<endl, 2, AbstractObjectMapDebugLevel)
+    SIGHT_VERB(dbg << "curKey="<<curKey->str()<<", found="<<(subTree->subsets.find(*curKey)!=subTree->subsets.end())<<endl, 1, AOMDebugLevel)
+    SIGHT_VERB(dbg << "subTree="<<subTree<<endl, 2, AOMDebugLevel)
             
     // Union the current node's lattice object into resLat
     resLat->meetUpdate(getVal(subTree));
-    SIGHT_VERB(dbg << "resLat="<<resLat->str()<<endl, 2, AbstractObjectMapDebugLevel)
+    SIGHT_VERB(dbg << "resLat="<<resLat->str()<<endl, 2, AOMDebugLevel)
             
     map<comparablePtr, NodePtr>::iterator sub = subTree->subsets.find(*curKey);
     // If the current sub-key exists in subsets
@@ -1382,7 +1506,7 @@ LatticePtr HierarchicalAOM::get(AbstractObjectPtr obj_arg) {
   // We've now reached the end of the key but there may be more information deeper
   // in the tree about subsets of obj. Union their values into resLat.
   subTree->meetUpdate(resLat);
-  SIGHT_VERB(dbg << "after sub-tree meet resLat="<<resLat->str()<<endl, 2, AbstractObjectMapDebugLevel)
+  SIGHT_VERB(dbg << "after sub-tree meet resLat="<<resLat->str()<<endl, 2, AOMDebugLevel)
   
   return resLat;
 }
@@ -1394,7 +1518,7 @@ LatticePtr HierarchicalAOM::get(AbstractObjectPtr obj_arg) {
 //     of the key (false).
 std::pair<std::pair<HierarchicalAOM::NodePtr, HierarchicalAOM::NodePtr>, bool> 
                             HierarchicalAOM::find(AbstractObjectHierarchyPtr obj) {
-  SIGHT_VERB_DECL(scope, ("HierarchicalAOM::find()", scope::medium), 2, AbstractObjectMapDebugLevel)
+  SIGHT_VERB_DECL(scope, ("HierarchicalAOM::find()", scope::medium), 2, AOMDebugLevel)
   list<comparablePtr>::const_iterator curKey = obj->getHierKey()->begin(),
                                       keyEnd = obj->getHierKey()->end();
 
@@ -1407,9 +1531,9 @@ std::pair<std::pair<HierarchicalAOM::NodePtr, HierarchicalAOM::NodePtr>, bool>
   NodePtr subTree = tree;
   
   do {
-    SIGHT_VERB(dbg << "curKey="<<curKey->str()<<endl, 2, AbstractObjectMapDebugLevel)
-    SIGHT_VERB(dbg << "found="<<(subTree->subsets.find(*curKey)!=subTree->subsets.end())<<endl, 2, AbstractObjectMapDebugLevel)
-    SIGHT_VERB(dbg << "subTree="<<subTree<<endl, 2, AbstractObjectMapDebugLevel)
+    SIGHT_VERB(dbg << "curKey="<<curKey->str()<<endl, 2, AOMDebugLevel)
+    SIGHT_VERB(dbg << "found="<<(subTree->subsets.find(*curKey)!=subTree->subsets.end())<<endl, 2, AOMDebugLevel)
+    SIGHT_VERB(dbg << "subTree="<<subTree<<endl, 2, AOMDebugLevel)
     map<comparablePtr, NodePtr>::iterator sub = subTree->subsets.find(*curKey);
     // If the current sub-key exists in subsets
     if(sub!=subTree->subsets.end()) {
@@ -1487,7 +1611,7 @@ bool HierarchicalAOM::isEmptyLat() {
 
 std::string HierarchicalAOM::str(std::string indent) const {
   ostringstream s;
-  s << "pedge = "<<parent->latPEdge->str()<<endl;
+  s << "pedge = "<<(parent->latPEdge? parent->latPEdge->str(): "NULL")<<endl;
   s << tree;
   return s.str();
 }
@@ -1509,7 +1633,7 @@ AbstractObjectMapKindPtr HierarchicalAOM::copy() const
 void HierarchicalAOM::copy(AbstractObjectMapKindPtr thatL) {
   HierarchicalAOMPtr that = boost::dynamic_pointer_cast <HierarchicalAOM> (thatL);
   ROSE_ASSERT(that);
-  tree = that->tree;
+  tree = boost::make_shared<Node>(that->tree, parent->latPEdge, parent->comp, parent->analysis);
   isFinite = that->isFinite;
 }
 
@@ -1527,22 +1651,22 @@ void HierarchicalAOM::copy(AbstractObjectMapKindPtr thatL) {
 //    by getPartEdge().
 // remapML must return a freshly-allocated object.
 AbstractObjectMapKindPtr HierarchicalAOM::remapML(const std::set<MLMapping>& ml2ml, PartEdgePtr fromPEdge) {
-  SIGHT_VERB_DECL(scope, ("HierarchicalAOM::remapML()", scope::high), 1, AbstractObjectMapDebugLevel)
+  SIGHT_VERB_DECL(scope, ("HierarchicalAOM::remapML()", scope::high), 1, AOMDebugLevel)
   HierarchicalAOMPtr newAOM = boost::dynamic_pointer_cast<HierarchicalAOM>(copy());
   for(set<MLMapping>::const_iterator m=ml2ml.begin(); m!=ml2ml.end(); m++) {
     AbstractObjectHierarchyPtr fromHier = boost::dynamic_pointer_cast<AbstractObjectHierarchy>(m->from);
     ROSE_ASSERT(fromHier);
-    SIGHT_VERB(dbg << "from="<<m->from->str()<<endl, 1, AbstractObjectMapDebugLevel)
-    SIGHT_VERB(dbg << "from key="<<fromHier->getHierKey()<<endl, 1, AbstractObjectMapDebugLevel)
-    SIGHT_VERB(dbg << "to="<<(m->to?m->to->str():"NULL")<<endl, 1, AbstractObjectMapDebugLevel)
+    SIGHT_VERB(dbg << "from="<<m->from->str()<<endl, 1, AOMDebugLevel)
+    SIGHT_VERB(dbg << "from key="<<fromHier->getHierKey()<<endl, 1, AOMDebugLevel)
+    SIGHT_VERB(dbg << "to="<<(m->to?m->to->str():"NULL")<<endl, 1, AOMDebugLevel)
   
     pair<pair<NodePtr, NodePtr>, bool> f = newAOM->find(fromHier);
     NodePtr foundN = f.first.first;
     NodePtr parentN = f.first.second;
     bool fullKeyFound = f.second;
-    if(parentN) { SIGHT_VERB(dbg << "parentN="<<parentN<<endl, 1, AbstractObjectMapDebugLevel) }
-    if(foundN)  { SIGHT_VERB(dbg << "foundN="<<foundN<<endl, 1, AbstractObjectMapDebugLevel) }
-    SIGHT_VERB(dbg << "fullKeyFound="<<fullKeyFound<<endl, 1, AbstractObjectMapDebugLevel)
+    if(parentN) { SIGHT_VERB(dbg << "parentN="<<parentN<<endl, 1, AOMDebugLevel) }
+    if(foundN)  { SIGHT_VERB(dbg << "foundN="<<foundN<<endl, 1, AOMDebugLevel) }
+    SIGHT_VERB(dbg << "fullKeyFound="<<fullKeyFound<<endl, 1, AOMDebugLevel)
 
     // If m->from mustEqual f->first, remove that node and insert under m->to
     if(fullKeyFound && foundN->isObjSingleton) {
@@ -1587,26 +1711,26 @@ AbstractObjectMapKindPtr HierarchicalAOM::remapML(const std::set<MLMapping>& ml2
 //    maintained in this lattice about them.
 // Returns true if the Lattice state is modified and false otherwise.
 bool HierarchicalAOM::replaceML(AbstractObjectMapKindPtr that_arg) {
-  SIGHT_VERB_DECL(scope, ("HierarchicalAOM::replaceML()", scope::high), 1, AbstractObjectMapDebugLevel)
+  SIGHT_VERB_DECL(scope, ("HierarchicalAOM::replaceML()", scope::high), 1, AOMDebugLevel)
   HierarchicalAOMPtr that = boost::dynamic_pointer_cast <HierarchicalAOM> (that_arg);
   bool modified = false;
   modified = (isFinite != (isFinite || that->isFinite)) || modified;
   isFinite = isFinite || that->isFinite;
-  SIGHT_VERB(dbg<<"this="<<str()<<endl, 1, AbstractObjectMapDebugLevel)
-  SIGHT_VERB(dbg<<"that="<<that_arg->str()<<endl, 1, AbstractObjectMapDebugLevel)
+  SIGHT_VERB(dbg<<"this="<<str()<<endl, 1, AOMDebugLevel)
+  SIGHT_VERB(dbg<<"that="<<that_arg->str()<<endl, 1, AOMDebugLevel)
   
   return replaceML(tree, that->tree) || modified;
 }
 
 // Recursive body of replaceML
 bool HierarchicalAOM::replaceML(NodePtr thisST, NodePtr thatST) {
-  SIGHT_VERB_DECL(scope, ("HierarchicalAOM::replaceML()", scope::medium), 1, AbstractObjectMapDebugLevel)
+  SIGHT_VERB_DECL(scope, ("HierarchicalAOM::replaceML()", scope::medium), 1, AOMDebugLevel)
   bool modified = false;
   
   ROSE_ASSERT(thisST->isObjSingleton == thatST->isObjSingleton);
   
-  SIGHT_VERB(dbg<<"thisST->val="<<(thisST->val? thisST->val->str(): "NULL")<<endl, 1, AbstractObjectMapDebugLevel)
-  SIGHT_VERB(dbg<<"thatST->val="<<(thatST->val? thatST->val->str(): "NULL")<<endl, 1, AbstractObjectMapDebugLevel)
+  SIGHT_VERB(dbg<<"thisST->val="<<(thisST->val? thisST->val->str(): "NULL")<<endl, 1, AOMDebugLevel)
+  SIGHT_VERB(dbg<<"thatST->val="<<(thatST->val? thatST->val->str(): "NULL")<<endl, 1, AOMDebugLevel)
   
   // We currently don't check if val was modified since equalSet doesn't exist for Lattices
   modified = true;
@@ -1615,7 +1739,7 @@ bool HierarchicalAOM::replaceML(NodePtr thisST, NodePtr thatST) {
   
   // Iterate over the subsets of thatST, copying from their sub-trees into this
   for(map<comparablePtr, NodePtr>::iterator thatSub=thatST->subsets.begin(); thatSub!=thatST->subsets.end(); thatSub++) {
-    SIGHT_VERB(dbg<<"thatSub key="<<thatSub->first->str()<<", found="<<(thisST->subsets.find(thatSub->first)!=thisST->subsets.end())<<endl, 1, AbstractObjectMapDebugLevel)
+    SIGHT_VERB(dbg<<"thatSub key="<<thatSub->first->str()<<", found="<<(thisST->subsets.find(thatSub->first)!=thisST->subsets.end())<<endl, 1, AOMDebugLevel)
     
     // If the current sub-tree of that exists in this
     map<comparablePtr, NodePtr>::iterator thisSub=thisST->subsets.find(thatSub->first);
@@ -1643,7 +1767,7 @@ bool HierarchicalAOM::replaceML(NodePtr thisST, NodePtr thatST) {
 // computes the meet of this and that and saves the result in this
 // returns true if this causes this to change and false otherwise
 bool HierarchicalAOM::meetUpdate(AbstractObjectMapKindPtr that_arg) {
-  SIGHT_VERB_DECL(scope, ("HierarchicalAOM::meetUpdate()", scope::high), 1, AbstractObjectMapDebugLevel)
+  SIGHT_VERB_DECL(scope, ("HierarchicalAOM::meetUpdate()", scope::high), 1, AOMDebugLevel)
   HierarchicalAOMPtr that = boost::dynamic_pointer_cast <HierarchicalAOM> (that_arg);
   
   bool modified = false;
@@ -1660,8 +1784,8 @@ bool HierarchicalAOM::meetUpdate(NodePtr thisST, NodePtr thatST) {
   ROSE_ASSERT(thisST->isObjSingleton == thatST->isObjSingleton);
   
   // Meet the values at this and that node
-  SIGHT_VERB(dbg<<"thisST->val="<<(thisST->val? thisST->val->str(): "NULL")<<endl, 1, AbstractObjectMapDebugLevel)
-  SIGHT_VERB(dbg<<"thatST->val="<<(thatST->val? thatST->val->str(): "NULL")<<endl, 1, AbstractObjectMapDebugLevel)
+  SIGHT_VERB(dbg<<"thisST->val="<<(thisST->val? thisST->val->str(): "NULL")<<endl, 1, AOMDebugLevel)
+  SIGHT_VERB(dbg<<"thatST->val="<<(thatST->val? thatST->val->str(): "NULL")<<endl, 1, AOMDebugLevel)
   // If they're both non-NULL, call meetUpdate
   if(thisST->val && thatST->val) {
     // If val is an original copy from the user, copy it before modifying it
@@ -1676,19 +1800,19 @@ bool HierarchicalAOM::meetUpdate(NodePtr thisST, NodePtr thatST) {
     thisST->originalVal = true;
     modified = !thisST->val->isEmptyLat() || modified;
   }
-  SIGHT_VERB(dbg<<"merged thisST->val="<<(thisST->val? thisST->val->str(): "NULL")<<endl, 1, AbstractObjectMapDebugLevel)
-  SIGHT_VERB_DECL(indent, (), 1, AbstractObjectMapDebugLevel)
+  SIGHT_VERB(dbg<<"merged thisST->val="<<(thisST->val? thisST->val->str(): "NULL")<<endl, 1, AOMDebugLevel)
+  SIGHT_VERB_DECL(indent, (), 1, AOMDebugLevel)
   // Otherwise, this doesn't change
   
   // Iterate over the subsets of thatST, unioning their sub-trees into this
   for(map<comparablePtr, NodePtr>::iterator thatSub=thatST->subsets.begin(); thatSub!=thatST->subsets.end(); thatSub++) {
-    SIGHT_VERB(dbg<<"thatSub key="<<thatSub->first->str()<<", found="<<(thisST->subsets.find(thatSub->first)!=thisST->subsets.end())<<", live="<<thatSub->second->isLive(parent->latPEdge, parent->comp, parent->analysis)<<endl, 1, AbstractObjectMapDebugLevel)
+    SIGHT_VERB(dbg<<"thatSub key="<<thatSub->first->str()<<", found="<<(thisST->subsets.find(thatSub->first)!=thisST->subsets.end())<<", live="<<thatSub->second->isLive(parent->latPEdge, parent->comp, parent->analysis)<<endl, 1, AOMDebugLevel)
     // If the current sub-tree of that exists in this
     map<comparablePtr, NodePtr>::iterator thisSub=thisST->subsets.find(thatSub->first);
     if(thisSub!=thisST->subsets.end()) {
       // Meet both sub-trees
       modified = meetUpdate(thisSub->second, thatSub->second) || modified;
-      SIGHT_VERB(dbg<<"merged thisSub="<<thisSub->second<<endl, 1, AbstractObjectMapDebugLevel)
+      SIGHT_VERB(dbg<<"merged thisSub="<<thisSub->second<<endl, 1, AOMDebugLevel)
     // If it doesn't, copy the sub-tree from that into this
     } else {
       //thisST->subsets[thatSub->first] = boost::make_shared<Node>(thatSub->second);
@@ -1697,7 +1821,7 @@ bool HierarchicalAOM::meetUpdate(NodePtr thisST, NodePtr thatST) {
         // If the copied sub-tree didn't end up being empty (due to the keys being out of scope), add it
         if(!newNode->isEmptyVal()) {
           thisST->subsets[thatSub->first] = newNode;
-          SIGHT_VERB_IF(2, AbstractObjectMapDebugLevel)
+          SIGHT_VERB_IF(1, AOMDebugLevel)
             dbg << "original node "<<thatSub->second<<endl;
             dbg << "new node "<<newNode<<endl;
           SIGHT_VERB_FI()

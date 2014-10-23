@@ -1,7 +1,7 @@
 #ifndef ABSTRACT_OBJECT_H
 #define ABSTRACT_OBJECT_H
 
-#include "sight.h"
+//#include "sight.h"
 #include "partitions.h"
 #include "CallGraphTraverse.h"
 #include "analysis.h"
@@ -98,7 +98,7 @@ class MemRegionObject;
 // they're not compound, they perform the above logic, converting PartEdges and calling opZZ() methods.
 // Compound objects thus have no need for opZZ() methods.
 
-class AbstractObject : public sight::printable, public boost::enable_shared_from_this<AbstractObject>
+class AbstractObject : public boost::enable_shared_from_this<AbstractObject>
 {
   SgNode* base;
   
@@ -109,6 +109,8 @@ class AbstractObject : public sight::printable, public boost::enable_shared_from
   AbstractObject(SgNode* base) : base(base) {}
   AbstractObject(const AbstractObject& that) : base(that.base) {}
   
+  virtual ~AbstractObject();
+
   SgNode* getBase() const { return base; }
 
   // Analyses that are being composed inside a given composer provide a pointer to themselves
@@ -213,6 +215,8 @@ class AbstractObject : public sight::printable, public boost::enable_shared_from
   virtual bool isDisjoint() const { return false; }
   // AbstractObjects that form a hierarchy must inherit from the AbstractObjectDisjoint class
   
+  virtual std::string str(std::string indent="") const=0;
+
   // Variant of the str method that can produce information specific to the current Part.
   // Useful since AbstractObjects can change from one Part to another.
   virtual std::string strp(PartEdgePtr pedge, std::string indent="")
@@ -236,13 +240,14 @@ class AbstractObjectHierarchy {
   // another key.
   class hierKey;
   typedef boost::shared_ptr<hierKey> hierKeyPtr;
-  class hierKey {
+  class hierKey : public comparable {
     std::list<comparablePtr> keyList;
     
     public:
     hierKey() {}
     hierKey(const std::list<comparablePtr>& keyList): keyList(keyList) {}
     hierKey(comparablePtr subKey) { keyList.push_back(subKey); }
+    hierKey(hierKeyPtr that) { keyList = that->keyList; }
     
     std::list<comparablePtr>::const_iterator begin() { return keyList.begin(); }
     std::list<comparablePtr>::const_iterator end()   { return keyList.end(); }
@@ -251,6 +256,9 @@ class AbstractObjectHierarchy {
     { keyList.insert(keyList.end(), beginIt, endIt); }
     const std::list<comparablePtr>& getList() { return keyList; }
     
+    bool equal(const comparable& that) const;
+    bool less(const comparable& that) const;
+
     // Returns whether the set denoted by key is live at the given PartEdge
     virtual bool isLive(PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis)=0;
   };
@@ -1897,17 +1905,17 @@ class CombinedMemLocObject : public virtual MemLocObject
   // Returns whether this object may/must be equal to o within the given Part p
   //bool mayEqualML(MemLocObjectPtr o, PartEdgePtr pedge);
   //bool mustEqualML(MemLocObjectPtr o, PartEdgePtr pedge);
-  bool mayEqual(AbstractObjectPtr that, PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis);
-  bool mustEqual(AbstractObjectPtr that, PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis);
+  bool mayEqual(MemLocObjectPtr that, PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis);
+  bool mustEqual(MemLocObjectPtr that, PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis);
   
   // Returns whether the two abstract objects denote the same set of concrete objects
   //bool equalSetML(MemLocObjectPtr o, PartEdgePtr pedge);
-  bool equalSet(AbstractObjectPtr that, PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis);
+  bool equalSet(MemLocObjectPtr that, PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis);
   
   // Returns whether this abstract object denotes a non-strict subset (the sets may be equal) of the set denoted
   // by the given abstract object.
   //bool subSetML(MemLocObjectPtr o, PartEdgePtr pedge);
-  bool subSet(AbstractObjectPtr that, PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis);
+  bool subSet(MemLocObjectPtr that, PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis);
   
   // Allocates a copy of this object and returns a pointer to it
   MemLocObjectPtr copyML() const;
@@ -1922,7 +1930,7 @@ class CombinedMemLocObject : public virtual MemLocObject
   // Computes the meet of this and that and saves the result in this
   // returns true if this causes this to change and false otherwise
   //bool meetUpdateML(MemLocObjectPtr that, PartEdgePtr pedge);
-  bool meetUpdate(AbstractObjectPtr that, PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis);
+  bool meetUpdate(MemLocObjectPtr that, PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis);
   
   // Returns whether this AbstractObject denotes the set of all possible execution prefixes.
   //bool isFullML(PartEdgePtr pedge);

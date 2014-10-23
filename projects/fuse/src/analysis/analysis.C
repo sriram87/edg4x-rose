@@ -35,7 +35,7 @@ using namespace std;
 
 namespace fuse {
 
-#define analysisDebugLevel 1
+#define analysisDebugLevel 0
 
 // Initializes Fuse
 void FuseInit(int argc, char **argv) {
@@ -90,76 +90,19 @@ void UnstructuredPassAnalysis::runAnalysis()
 
 /*************************
  *** InitDataflowState ***
- *************************/
+ ************************* /
 
 void InitDataflowState::visit(PartPtr p, NodeState& state)
 {
-  /*ostringstream label; label << "InitDataflowState::visit() p="<<p->str()<<", analysis="<<analysis<<"="<<analysis->str()<<" state="<<&state<<endl;
-  scope reg(label.str(), scope::medium, attrGE("analysisDebugLevel", 1));*/
+  / *ostringstream label; label << "InitDataflowState::visit() p="<<p->str()<<", analysis="<<analysis<<"="<<analysis->str()<<" state="<<&state<<endl;
+  scope reg(label.str(), scope::medium, attrGE("analysisDebugLevel", 1));* /
   
   // generate a new initial state for this node
   analysis->initializeState(p, state);
-}
+}*/
 
 /************************
  *** ComposedAnalysis ***
  ************************/
-
-// Propagates the dataflow info from the current node's NodeState (curNodeState) to the next node's 
-//     NodeState (nextNodeState).
-// Returns true if the next node's meet state is modified and false otherwise.
-bool ComposedAnalysis::propagateStateToNextNode(
-                map<PartEdgePtr, vector<Lattice*> >& curNodeState, PartPtr curNode, 
-                map<PartEdgePtr, vector<Lattice*> >& nextNodeState, PartPtr nextNode)
-{
-  SIGHT_VERB_DECL(scope, ("propagateStateToNextNode", scope::medium), 1, analysisDebugLevel)
-  bool modified = false;
-  
-  // curNodeState should have a single mapping to the NULLPartEdge
-  PartEdgePtr curNodeWildCardPartEdge = getDirection()==fw? curNode->inEdgeFromAny() : curNode->outEdgeToAny();
-  assert(curNodeState.begin()->first == curNodeWildCardPartEdge);
-  
-  vector<Lattice*>::const_iterator itC, itN;
-  SIGHT_VERB_IF(1, analysisDebugLevel)
-    dbg << endl << "Propagating to Next Node: "<<nextNode->str()<<endl;
-    dbg << "Cur Node Lattice "<<endl;
-    { indent ind; dbg<<NodeState::str(curNodeState); }
-    
-    dbg << "Next Node Lattice "<<endl;
-    { indent ind; dbg<<NodeState::str(nextNodeState); }
-  SIGHT_VERB_FI()
-
-  // Update forward info above nextNode from the forward info below curNode.
-  
-  // Compute the meet of the dataflow information along the curNode->nextNode edge with the 
-  // next node's current state one Lattice at a time and save the result above the next node.
-  
-  // If nextNodeState is non-empty, we union curNodeState into it
-  SIGHT_VERB(dbg << " #nextNodeState="<<nextNodeState.size()<<endl, 1, analysisDebugLevel)
-  if(nextNodeState.size()>0)
-    modified = NodeState::unionLatticeMaps(nextNodeState, curNodeState) || modified;
-  // Otherwise, we copy curNodeState[NULLPartEdge] over it
-  else {
-    PartEdgePtr nextNodeWildCardPartEdge = getDirection() == fw? nextNode->inEdgeFromAny() : nextNode->outEdgeToAny();
-    NodeState::copyLatticesOW(nextNodeState, nextNodeWildCardPartEdge, curNodeState, curNodeWildCardPartEdge);
-    modified = true;
-  }
-
-  //dbg << "Result:"<<endl;  
-  //{ indent ind(attrGE("analysisDebugLevel", 1)); dbg<<NodeState::str(nextNodeState); }
-
-  SIGHT_VERB_IF(1, analysisDebugLevel)
-    indent ind;
-    if(modified) {
-      dbg << "Next node's in-data modified. Adding..."<<endl;
-      dbg << "Propagated: Lattice "<<endl;
-      { indent ind; dbg<<NodeState::str(nextNodeState); }
-    }
-    else
-      dbg << "  No modification on this node"<<endl;
-  SIGHT_VERB_FI()
-
-  return modified;
-}
 
 } // namespace fuse;

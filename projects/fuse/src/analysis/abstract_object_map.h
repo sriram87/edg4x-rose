@@ -104,7 +104,7 @@ namespace fuse {
     //    maintained in this lattice about them.
     // Returns true if the Lattice state is modified and false otherwise.
     virtual bool replaceML(AbstractObjectMapKindPtr newL)=0;
-    
+
     // computes the meet of this and that and saves the result in this
     // returns true if this causes this to change and false otherwise
     virtual bool meetUpdate(AbstractObjectMapKindPtr that)=0;
@@ -215,6 +215,12 @@ namespace fuse {
     // Returns true if the Lattice state is modified and false otherwise.
     bool replaceML(Lattice* newL);
     
+    // Propagate information from a set of defs to a single use. Return true if this causes the Lattice to change.
+    bool propagateDefs2Use(MemLocObjectPtr use, const std::set<MemLocObjectPtr>& defs);
+
+    // Propagate information from a single defs to a set of uses. Return true if this causes the Lattice to change.
+    bool propagateDef2Uses(const std::set<MemLocObjectPtr>& uses, MemLocObjectPtr def);
+
     // computes the meet of this and that and saves the result in this
     // returns true if this causes this to change and false otherwise
     bool meetUpdate(Lattice* that);
@@ -413,7 +419,14 @@ namespace fuse {
       // and places obj and val at the leaf of this sub-tree
       Node(comparablePtr myKey, std::list<comparablePtr>::const_iterator subKey, std::list<comparablePtr>::const_iterator keyEnd, 
            AbstractObjectHierarchy::hierKeyPtr fullKey, AbstractObjectPtr obj, LatticePtr val);
+
       Node(const NodePtr& that, PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis);
+
+      // This copy constructor variant is called inside the copy constructor. The "that" parameter
+      // does not have a const qualification because we need to modify the source Node object.
+      // This change is functionally transparent to users of this object.
+      Node(Node* that, PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis);
+      void init(Node* that, PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis);
 
       protected:
       // Returns whether the set denoted by thet given object is a singleton
@@ -459,6 +472,7 @@ namespace fuse {
     HierarchicalAOM(const HierarchicalAOM& that, AbstractObjectMap* parent);
     HierarchicalAOM(const HierarchicalAOM& that);
     HierarchicalAOM(AbstractObjectMap* parent);
+    ~HierarchicalAOM();
 
     public:
     // Add a new memory object --> lattice pair to the frontier.

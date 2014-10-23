@@ -34,7 +34,8 @@ class VariableStateTransfer : public DFTransferVisitor
   LatticePtr getLattice(SgExpression *sgn) {
     assert(sgn);
     // MemLocObjectPtrPair p = composer->Expr2MemLoc(sgn, part->inEdgeFromAny(), analysis);
-    MemLocObjectPtr p = composer->Expr2MemLoc(sgn, part->inEdgeFromAny(), analysis);
+    //MemLocObjectPtr p = composer->Expr2MemLoc(sgn, part->inEdgeFromAny(), analysis);
+    MemLocObjectPtr p = analysis->Expr2MemLocUse(sgn, part->inEdgeFromAny());
     SIGHT_VERB(dbg << "VariableStateTransfer::getLattice() p="<<p->str("&nbsp;&nbsp;&nbsp;&nbsp;")<<endl, 1, dLevel)
     
     return getLattice(AbstractObjectPtr(p));
@@ -57,7 +58,8 @@ class VariableStateTransfer : public DFTransferVisitor
     SIGHT_VERB_FI()
     
     assert(sgn);
-    MemLocObjectPtr p = composer->OperandExpr2MemLoc(sgn, operand, part->inEdgeFromAny(), analysis);
+    //MemLocObjectPtr p = composer->OperandExpr2MemLoc(sgn, operand, part->inEdgeFromAny(), analysis);
+    MemLocObjectPtr p = analysis->OperandExpr2MemLocUse(sgn, operand, part->inEdgeFromAny());
     SIGHT_VERB(dbg << "p="<<(p? p->str("&nbsp;&nbsp;&nbsp;&nbsp;"): "NULL")<<endl, 1, dLevel)
     return getLattice(p);
     
@@ -96,7 +98,8 @@ class VariableStateTransfer : public DFTransferVisitor
   void setLattice(SgNode *sgn, LatticePtr lat) {
     assert(sgn);
     // MemLocObjectPtrPair p = composer->Expr2MemLoc(sgn, part->inEdgeFromAny(), analysis);
-    MemLocObjectPtr p = composer->Expr2MemLoc(sgn, part->inEdgeFromAny(), analysis);
+    //MemLocObjectPtr p = composer->Expr2MemLoc(sgn, part->inEdgeFromAny(), analysis);
+    MemLocObjectPtr p = analysis->Expr2MemLocDef(sgn, part->inEdgeFromAny());
     SIGHT_VERB_IF(1, dLevel)
       scope s("setLattice()");
       dbg << "edge="<<part->inEdgeFromAny()->str()<<endl;
@@ -112,14 +115,14 @@ class VariableStateTransfer : public DFTransferVisitor
   void setLatticeOperand(SgNode *sgn, SgExpression* operand, LatticePtr lat) {
     assert(sgn);
     // MemLocObjectPtrPair p = composer->OperandExpr2MemLoc(sgn, operand, part->inEdgeFromAny(), analysis);
-    MemLocObjectPtr p = composer->OperandExpr2MemLoc(sgn, operand, part->inEdgeFromAny(), analysis);
+    //MemLocObjectPtr p = composer->OperandExpr2MemLoc(sgn, operand, part->inEdgeFromAny(), analysis);
+    MemLocObjectPtr p = analysis->OperandExpr2MemLocDef(sgn, operand, part->inEdgeFromAny());
     SIGHT_VERB_IF(1, dLevel)
           scope s(sight::txt()<<"setLatticeOperand("<<SgNode2Str(operand)<<")");
           dbg << "edge="<<part->inEdgeFromAny()->str()<<endl;
           dbg << "p="<<p->strp(part->inEdgeFromAny(), "&nbsp;&nbsp;&nbsp;&nbsp;")<<endl;
           dbg << "lat="<<lat->str()<<endl;
         SIGHT_VERB_FI()
-
     
     setLattice(p, lat);
   }
@@ -197,7 +200,10 @@ public:
     assert(dfInfo.size()==1);
 //    assert(dfInfo[NULLPartEdge].size()==2);
     //#SA: Incoming dfInfo is associated with inEdgeFromAny/outEdgeToAny
-    PartEdgePtr wildCardPartEdge = ((ComposedAnalysis*)analysis)->getDirection()==ComposedAnalysis::fw? part->inEdgeFromAny() : part->outEdgeToAny();
+    PartEdgePtr wildCardPartEdge;
+    if(((ComposedAnalysis*)analysis)->SSAAnalysis) wildCardPartEdge = NULLPartEdge;
+    else wildCardPartEdge = ((ComposedAnalysis*)analysis)->getDirection()==ComposedAnalysis::fw? part->inEdgeFromAny() : part->outEdgeToAny();
+
     assert(dfInfo[wildCardPartEdge][0]);
     Lattice *l = dfInfo[wildCardPartEdge][0];
     prodLat = (dynamic_cast<AbstractObjectMap*>(l));
@@ -236,7 +242,9 @@ public:
       //dbg << "resLat=";  { indent ind; dbg << resLat->str("") <<"\n"; }
     SIGHT_VERB_FI()
 
-    setLattice(sgn, asgnLat); modified = true;
+    setLattice(sgn, asgnLat);
+
+    modified = true;
   }
 
   // XXX: Right now, we take the meet of all of the elements of the
@@ -334,7 +342,8 @@ public:
     // Copy data from the memory location identified by the array index expression to the
     // expression object of the SgPntrArrRefExp.
     // MemLocObjectPtrPair p = composer->Expr2MemLoc(sgn, part->inEdgeFromAny(), analysis);
-    MemLocObjectPtr p = composer->Expr2MemLoc(sgn, part->inEdgeFromAny(), analysis);
+    //MemLocObjectPtr p = composer->Expr2MemLoc(sgn, part->inEdgeFromAny(), analysis);
+    MemLocObjectPtr p = analysis->Expr2MemLocUse(sgn, part->inEdgeFromAny());
     LatticePtr dataLat;
     // If this is a top-level array access expression
     // if(isSgPntrArrRefExp (sgn) && 

@@ -101,9 +101,7 @@ ClassInheritanceTree& ClassInheritanceTree::operator=(const ClassInheritanceTree
 void ClassInheritanceTree::copyFrom(const ClassInheritanceTree& that) {
   state = that.state;
   inclusive = that.inclusive;
-  /*
-  bases = that.bases;
-  leaves = that.leaves;*/
+
   list<pair<NodePtr, NodePtr> > worklist;
   for(list<NodePtr>::const_iterator l=that.leaves.begin(); l!=that.leaves.end(); l++) {
     NodePtr newLeaf = makePtr<Node>((*l)->def);

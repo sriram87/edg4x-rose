@@ -3,7 +3,7 @@
 #include "sight_verbosity.h"
 
 using namespace std;
-using namespace std;
+using namespace sight;
 
 namespace fuse {
 
@@ -57,7 +57,7 @@ DeadPathElimPartPtr DeadPathElimPart::get_shared_this()
 
 list<PartEdgePtr> DeadPathElimPart::outEdges()
 {
-  SIGHT_VERB_DECL(scope, ("DeadPathElimPart::outEdges()"), 2, deadPathElimAnalysisDebugLevel)
+  SIGHT_VERB_DECL(scope, (txt()<<"DeadPathElimPart::outEdges("<<this<<": "<<str()<<")"), 2, deadPathElimAnalysisDebugLevel)
   SIGHT_VERB(dbg<<"cacheInitialized_outEdges="<<cacheInitialized_outEdges<<endl, 2, deadPathElimAnalysisDebugLevel)
 
   if(!cacheInitialized_outEdges) {
@@ -722,13 +722,13 @@ bool DeadPathElimTransfer::finish() {
 
 // General function for SgNodes with 2 outgoing edges, where the first edge must/may be taken when some value (provided)
 // is definitely true and the second edge must/may taken when this value is false.
-// trueBranchMayMust - set to may/must if the true branch is taken when the value may/must be true
-// falseBranchMayMust - set to may/must if the false branch is taken when the value may/must be false
+// trueBranchMayMust - set to may/must if the true branch is taken only if the value may/must be true
+// falseBranchMayMust - set to may/must if the false branch is taken only if the value may/must be false
 void DeadPathElimTransfer::visit2OutNode(SgNode* sgn, ValueObjectPtr val, maymust trueBranchMayMust, maymust falseBranchMayMust) {
   SIGHT_VERB_DECL(scope, ("visit2OutNode", scope::medium), 1, deadPathElimAnalysisDebugLevel);
   // If the conditional has a concrete value, replace the NULL-keyed dfInfo with two copies of the lattice for each
   // successor, one of which is live and the other dead
-  SIGHT_VERB(dbg << "val="<<val->str()<<", val->isConcrete()="<<val->isConcrete()<<endl, 1, deadPathElimAnalysisDebugLevel)
+  SIGHT_VERB(dbg << "val="<<val->str()<<", val->isConcrete()="<<val->isConcrete()<<", trueBranchMayMust="<<(trueBranchMayMust==may?"may":"must")<<", falseBranchMayMust="<<(falseBranchMayMust==may?"may":"must")<<endl, 1, deadPathElimAnalysisDebugLevel)
   if(val->isConcrete()) {
     set<boost::shared_ptr<SgValueExp> > concreteVals = val->getConcreteValue();
     SIGHT_VERB(dbg << "#concreteVals="<<concreteVals.size()<<endl, 1, deadPathElimAnalysisDebugLevel)
@@ -782,7 +782,7 @@ void DeadPathElimTransfer::visit2OutNode(SgNode* sgn, ValueObjectPtr val, maymus
         if(ValueObject::SgValue2Bool(pv[cn])) {
           // Set the level of the true edge to live/dead if the outcome of this conditional is true/false 
           // and the incoming edge was live
-          if(IfPredValue==true && trueBranchMayMust==must) 
+          if(IfPredValue==true || (IfPredValue==false && trueBranchMayMust==may))
             dpeEdge->level = (dfLevel==live? live: dfLevel);
           else
             dpeEdge->level = (dfLevel==live? dead: dfLevel);
@@ -795,7 +795,7 @@ void DeadPathElimTransfer::visit2OutNode(SgNode* sgn, ValueObjectPtr val, maymus
         } else {
           // Set the level of the true edge to live/dead if the outcome of this conditional is true/false 
           // and the incoming edge was live
-          if(IfPredValue==false && falseBranchMayMust==must)
+          if(IfPredValue==false || (IfPredValue==true && falseBranchMayMust==may))
             dpeEdge->level = (dfLevel==live? live: dfLevel);
           else
             dpeEdge->level = (dfLevel==live? dead: dfLevel);
@@ -842,7 +842,7 @@ void DeadPathElimTransfer::visit(SgIfStmt *sgn)
 
 void DeadPathElimTransfer::visit(SgAndOp *op)
 {
-  SIGHT_VERB(dbg << "DeadPathElimTransfer::visit(SgAndOp), op="<<SgNode2Str(op)<<endl, 1, deadPathElimAnalysisDebugLevel)
+  SIGHT_VERB(dbg << "DeadPathElimTransfer::visit(SgAndOp), cn="<<CFGNode2Str(cn)<<endl, 1, deadPathElimAnalysisDebugLevel)
   // If this is the portion of the short-circuit operation after the first argument was evaluated but before
   // the second argument
   if(cn.getIndex()==1) {
@@ -855,7 +855,7 @@ void DeadPathElimTransfer::visit(SgAndOp *op)
 
 void DeadPathElimTransfer::visit(SgOrOp *op)
 {
-  SIGHT_VERB(dbg << "DeadPathElimTransfer::visit(SgOrOp), op="<<SgNode2Str(op)<<endl, 1, deadPathElimAnalysisDebugLevel)
+  SIGHT_VERB(dbg << "DeadPathElimTransfer::visit(SgOrOp), cn="<<CFGNode2Str(cn)<<endl, 1, deadPathElimAnalysisDebugLevel)
   // If this is the portion of the short-circuit operation after the first argument was evaluated but before
   // the second argument
   if(cn.getIndex()==1) {

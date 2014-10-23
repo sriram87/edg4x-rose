@@ -15,6 +15,8 @@ using namespace SageInterface;
 
 #include <cwchar>
 
+#define constantPropagationAnalysisDebugLevel 0
+
 // Define type conversions for lambda operators that are not supported by Boost::Lambda
 namespace boost { 
 namespace lambda {
@@ -405,7 +407,6 @@ struct plain_return_type_2<arithmetic_action<Act>, long double, wchar_t> {
 }
 
 namespace fuse {
-#define constantPropagationAnalysisDebugLevel 0
 
 // ************************
 // **** CPValueObject *****
@@ -430,7 +431,7 @@ CPValueObject::CPValueObject(CPValueKindPtr kind, PartEdgePtr pedge) :
 CPValueObject::CPValueObject(const CPValueObject & that) : 
   Lattice(that.latPEdge), FiniteLattice(that.latPEdge), ValueObject(that), AbstractObjectHierarchy(that)
 {
-  this->kind = that.kind;
+  this->kind = that.kind->copyV();
 }
 
 CPValueKindPtr CPValueObject::getKind() const {
@@ -2326,22 +2327,33 @@ bool CPConcreteKind::subSetV(CPValueKindPtr that) {
 // Computes the meet of this and that and returns the resulting kind
 pair<bool, CPValueKindPtr> CPConcreteKind::meetUpdateV(CPValueKindPtr that)
 {
+  //scope s("CPConcreteKind::meetUpdateV");
   // Concrete MEET Uninitialized => Concrete
-  if(that->getKind() == CPValueKind::uninitialized) 
+  if(that->getKind() == CPValueKind::uninitialized) {
+    //dbg << "that=>uninitialized"<<endl;
     return make_pair(true, copyV());
+  }
   
   // Concrete MEET Unknown => Unknown
   // Concrete MEET Offset  => Unknown
   if(that->getKind() == CPValueKind::offsetList ||
-     that->getKind() == CPValueKind::unknown)
+     that->getKind() == CPValueKind::unknown) {
+    //dbg << "that=>offsetlist or unknown"<<endl;
     return make_pair(true, boost::make_shared<CPUnknownKind>());
+  }
   
   // That is definitely concrete
   
   // If this and that denote the same concrete value
-  if(mustEqualV(that)) return make_pair(false, copyV());
+  if(mustEqualV(that)) {
+    //dbg << "must equal, not modified"<<endl;
+    return make_pair(false, copyV());
+  }
   // If the concrete values differ
-  else                 return make_pair(true, boost::make_shared<CPUnknownKind>());
+  else {
+    //dbg << "different, modified"<<endl;
+    return make_pair(true, boost::make_shared<CPUnknownKind>());
+  }
 }
 
 // Returns true if this ValueObject corresponds to a concrete value that is statically-known
@@ -3280,9 +3292,9 @@ bool CPMemLocObject::meetUpdate(Lattice* that_arg)
 // The part of this object is to be used for AbstractObject comparisons.
 bool CPMemLocObject::meetUpdate(CPMemLocObject* that, PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis)
 {
-  scope S("CPMemLocObject::meetUpdate");
+/*  scope S("CPMemLocObject::meetUpdate");
   dbg << "this="<<str()<<endl;
-  dbg << "that="<<that->str()<<endl;
+  dbg << "that="<<that->str()<<endl;*/
   // The regions must be identical
   //assert(getRegion()->equalSet(that->getRegion(), pedge, comp, analysis));
   
@@ -3434,7 +3446,8 @@ void ConstantPropagationAnalysisTransfer::visit(SgDotExp *dot) {
     } else assert(0);
   } else assert(0);*/
   
-  MemLocObjectPtr ml = composer->OperandExpr2MemLoc(dot, dot->get_lhs_operand(), part->inEdgeFromAny(), analysis);
+  //MemLocObjectPtr ml = composer->OperandExpr2MemLoc(dot, dot->get_lhs_operand(), part->inEdgeFromAny(), analysis);
+  MemLocObjectPtr ml = analysis->OperandExpr2MemLocUse(dot, dot->get_lhs_operand(), part->inEdgeFromAny());
   UnionMemLocObjectPtr mlUnion = boost::dynamic_pointer_cast<UnionMemLocObject>(ml);
   assert(mlUnion);
   const std::list<MemLocObjectPtr>& mlVals = mlUnion->getMemLocs();
@@ -3487,7 +3500,8 @@ void ConstantPropagationAnalysisTransfer::visit(SgPntrArrRefExp *paRef) {
       assert(core);
     } else assert(0);
   } else assert(0);*/
-  MemLocObjectPtr ml = composer->OperandExpr2MemLoc(paRef, paRef->get_lhs_operand(), part->inEdgeFromAny(), analysis);
+  //MemLocObjectPtr ml = composer->OperandExpr2MemLoc(paRef, paRef->get_lhs_operand(), part->inEdgeFromAny(), analysis);
+  MemLocObjectPtr ml = analysis->OperandExpr2MemLocUse(paRef, paRef->get_lhs_operand(), part->inEdgeFromAny());
   SIGHT_VERB(dbg << "ml="<<(ml? ml->str(): "NULL")<<endl, 1, constantPropagationAnalysisDebugLevel)
   UnionMemLocObjectPtr mlUnion = boost::dynamic_pointer_cast<UnionMemLocObject>(ml);
   assert(mlUnion);
@@ -3530,10 +3544,11 @@ void ConstantPropagationAnalysisTransfer::visit(SgBinaryOp *sgn) {
   CPValueObjectPtr resLat = arg1Lat->op(sgn, arg2Lat);
 
 //prodLat->setToEmpty();
- 
+ //dbg << "after op modified="<<modified<<endl;
   setLattice(sgn, resLat);
   if(isSgCompoundAssignOp(sgn))
     setLatticeOperand(sgn, sgn->get_lhs_operand(), boost::dynamic_pointer_cast<CPValueObject>(resLat->copyV()));
+  //dbg << "after setLattice modified="<<modified<<endl;
 }
 
 // Unary ops that update the operand
@@ -3740,20 +3755,24 @@ ValueObjectPtr ConstantPropagationAnalysis::Expr2Val(SgNode* n, PartEdgePtr pedg
 {
   SIGHT_VERB_DECL(scope, (txt()<<"ConstantPropagationAnalysis::Expr2Val(n="<<SgNode2Str(n)<<", pedge="<<pedge->str()<<")", scope::medium), 1, constantPropagationAnalysisDebugLevel)
   
-  MemLocObjectPtr ml = getComposer()->Expr2MemLoc(n, pedge, this);
+  //MemLocObjectPtr ml = getComposer()->Expr2MemLoc(n, pedge, this);
+  MemLocObjectPtr ml = Expr2MemLocUse(n, pedge);
   SIGHT_VERB(dbg << "ml="<<(ml? ml->str(): "NULL")<<endl, 1, constantPropagationAnalysisDebugLevel)
   
   // If pedge doesn't have wildcards
   if(pedge->source() && pedge->target()) {
     // Get the NodeState at the source of this edge
-    NodeState* state = NodeState::getNodeState(this, pedge->source());
+    NodeState* state = NodeState::getNodeState(this, (SSAAnalysis? NULLPart: pedge->source()));
     SIGHT_VERB(dbg << "state="<<state->str(this)<<endl, 1, constantPropagationAnalysisDebugLevel)
     
     // Get the value map at the current edge
-    AbstractObjectMap* cpMap = dynamic_cast<AbstractObjectMap*>(state->getLatticeBelow(this, pedge, 0));
+    AbstractObjectMap* cpMap =
+              SSAAnalysis? dynamic_cast<AbstractObjectMap*>(state->getLatticeAbove(this, NULLPartEdge, 0)) :
+                           dynamic_cast<AbstractObjectMap*>(state->getLatticeBelow(this, pedge,        0));
     if(cpMap == NULL) {
-      Lattice* l = state->getLatticeBelow(this, pedge, 0);
-      dbg << "l="<<l->str()<<endl;
+      Lattice* l = SSAAnalysis? state->getLatticeBelow(this, NULLPartEdge, 0) :
+                                state->getLatticeBelow(this, pedge,        0);
+      SIGHT_VERB(dbg << "l="<<l->str()<<endl, 1, constantPropagationAnalysisDebugLevel)
     }
     assert(cpMap);
     

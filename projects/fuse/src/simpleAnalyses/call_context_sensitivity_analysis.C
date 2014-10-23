@@ -8,7 +8,7 @@ using namespace sight;
 namespace fuse
 {
 
-#define callContextSensitivityDebugLevel 1
+#define callContextSensitivityDebugLevel 0
 
 /* ###########################
    ##### CallPartContext #####

@@ -192,6 +192,9 @@ class Composer
   virtual std::set<PartPtr> GetStartAStates(ComposedAnalysis* client)=0;
   // There may be multiple terminal points in the application (multiple calls to exit(), returns from main(), etc.)
   virtual std::set<PartPtr> GetEndAStates(ComposedAnalysis* client)=0;
+
+  // Return an ATSGraph object that describes the overall structure of the transition system
+  virtual ATSGraph* GetATSGraph(ComposedAnalysis* client)=0;
  
   // Returns all the edges implemented by the entire composer that refine the given
   // base PartEdge
@@ -231,7 +234,7 @@ typedef boost::shared_ptr<Composer> ComposerPtr;
 // decide what function the () operator actually calls and what the arguments actually are
 // but by abstracting these details away we can get a general algorithm for the ChainComposer to 
 // choose the analysis that implements a given function.
-/*class FuncCallerArgs : public sight::printable
+/*class FuncCallerArgs
 { 
   // Dummy virtual methods to allow dynamic casting on classes derived from FuncCallerArgs
   virtual void dummy() {}
@@ -251,7 +254,7 @@ class FuncCaller
 
 // Records the info required to forward queries of each type. We maintain one instance of this class
 // for each analysis
-class CCQueryServers : public sight::printable
+class CCQueryServers
 {
   public:
   // Records the last analysis in the composition chain that can answer queries of a given type
@@ -362,15 +365,13 @@ class ChainComposer : public Composer, public UndirDataflow
   // If true, the debug output of testAnalysis is emitted.
   bool verboseTest;
   
-  /*std::map<std::pair<SgNode*, ComposedAnalysis*>, CodeLocObjectPtr>   Expr2CodeLocCache;
-  std::map<std::pair<SgNode*, ComposedAnalysis*>, ValueObjectPtr>     Expr2ValCache;
-  std::map<std::pair<SgNode*, ComposedAnalysis*>, MemLocObjectPtr>    Expr2MemLocCache;
-  std::map<std::pair<SgNode*, ComposedAnalysis*>, MemRegionObjectPtr> Expr2MemRegionCache;*/
-  
   // Maps each completed analysis to the CCQueryServers object that records which analyses it 
   // should query to answer all types of queries
   std::map<ComposedAnalysis*, CCQueryServers> queryInfo;
   
+  // Maps each analysis that implements the ATS to the ATSGraph that has been generated for it, if any
+  std::map<ComposedAnalysis*, ATSGraph*> ATSGraphCache;
+
   public:
   ChainComposer(const std::list<ComposedAnalysis*>& analyses, 
                 ComposedAnalysis* testAnalysis, bool verboseTest, 
@@ -565,6 +566,9 @@ class ChainComposer : public Composer, public UndirDataflow
   std::set<PartPtr> GetStartAStates(ComposedAnalysis* client);
   std::set<PartPtr> GetEndAStates(ComposedAnalysis* client);
 
+  // Return an ATSGraph object that describes the overall structure of the transition system
+  ATSGraph* GetATSGraph(ComposedAnalysis* client);
+
   // Returns all the edges implemented by the entire composer that refine the given
   // base PartEdge
   const std::set<PartEdgePtr>& getRefinedPartEdges(PartEdgePtr base) const;
@@ -739,6 +743,9 @@ class LooseParallelComposer : public Composer, public UndirDataflow
   std::set<PartPtr> GetStartAStates(ComposedAnalysis* client);
   std::set<PartPtr> GetEndAStates(ComposedAnalysis* client);
   
+  // Return an ATSGraph object that describes the overall structure of the transition system
+  ATSGraph* GetATSGraph(ComposedAnalysis* client);
+
   // Common functionality for GetStartAStates_Spec() and GetEndAStates_Spec()
   
   // Functors that call either GetStartStates or GetEndStates in GetStartOrEndStates_Spec

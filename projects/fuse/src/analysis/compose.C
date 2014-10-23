@@ -1,5 +1,6 @@
 #include "sage3basic.h"
 #include "compose.h"
+#include "ats.h"
 #include "const_prop_analysis.h"
 #include <boost/enable_shared_from_this.hpp>
 //#include "printAnalysisStates.h"
@@ -15,7 +16,7 @@ using namespace sight;
 using namespace boost;
 namespace fuse
 {
-#define composerDebugLevel 1
+#define composerDebugLevel 0
 
 //--------------------
 //----- Composer -----
@@ -618,7 +619,7 @@ MemRegionObjectPtr ChainComposer::Expr2MemRegion_ex(SgNode* n, PartEdgePtr pedge
            function<ComposedAnalysis::implTightness (ComposedAnalysis*)>(bind( &ComposedAnalysis::Expr2MemRegionTightness, _1)),
            function<string (MemRegionObjectPtr, string)>(
                  CallGet2Arg<MemRegionObject, MemRegionObjectPtr>(function<string (MemRegionObject*, string)>(bind( &MemRegionObject::str, _1, _2)))),
-           pedge, client, true);
+           pedge, client, false);
 }
 MemRegionObjectPtr ChainComposer::Expr2MemRegion(SgNode* n, PartEdgePtr pedge, ComposedAnalysis* client) {
   // Call Expr2MemRegion_ex() and wrap the results with a UnionMemRegionObject
@@ -699,7 +700,7 @@ bool ChainComposer::mayEqualMR(MemRegionObjectPtr  mr1, MemRegionObjectPtr  mr2,
            Composer::memregion,
            function<ComposedAnalysis::implTightness (ComposedAnalysis*)>(bind( &ComposedAnalysis::Expr2MemRegionTightness, _1)),
            function<string (bool, string)>(&bool2Str),
-           pedge, client, true);
+           pedge, client, false);
 }
 /*bool ChainComposer::mayEqualML(MemLocObjectPtr  ml1, MemLocObjectPtr  ml2, PartEdgePtr pedge, ComposedAnalysis* client)  {
     return callServerAnalysisFunc<bool>("mayEqualML",
@@ -1074,6 +1075,18 @@ set<PartPtr> ChainComposer::GetEndAStates(ComposedAnalysis* client) {
            NULLPartEdge, client, false);
 }
 
+// Return an ATSGraph object that describes the overall structure of the transition system
+ATSGraph* ChainComposer::GetATSGraph(ComposedAnalysis* client) {
+  // Find the the analysis that most recently implemented the ATS
+  ROSE_ASSERT(queryInfo[client].lastATSGraphAnalysis);
+
+  // Create an ATS for it if one has not already been created
+  if(ATSGraphCache.find(queryInfo[client].lastATSGraphAnalysis) == ATSGraphCache.end())
+    ATSGraphCache[queryInfo[client].lastATSGraphAnalysis] = new ATSGraph(this, client);
+
+  return ATSGraphCache[queryInfo[client].lastATSGraphAnalysis];
+}
+
 // Returns all the edges implemented by the entire composer that refine the given
 // base PartEdge
 const set<PartEdgePtr>& ChainComposer::getRefinedPartEdges(PartEdgePtr base) const {
@@ -1119,12 +1132,29 @@ const set<PartEdgePtr>& ChainComposer::getRefinedPartEdges(PartEdgePtr base) con
 // ChainComposer invokes the runAnalysis methods of all its constituent analyses in sequence
 void ChainComposer::runAnalysis()
 {
-  /*int j=1;
+/*  int j=1;
+  cout << "allAnalyses:"<<endl;
   for(list<ComposedAnalysis*>::iterator a=allAnalyses.begin(); a!=allAnalyses.end(); a++, j++) {
+    cout << "ChainComposer Analysis "<<j<<": "<<(*a)<<" : "<<(*a)->str("") << endl;
+    cout.flush();
+  }
+  j=1;
+  cout << "doneAnalyses:"<<endl;
+  for(list<ComposedAnalysis*>::iterator a=doneAnalyses.begin(); a!=doneAnalyses.end(); a++, j++) {
     cout << "ChainComposer Analysis "<<j<<": "<<(*a)<<" : "<<(*a)->str("") << endl;
     cout.flush();
   }*/
   
+  // Create query information for just the done analyses so that we can answer queries
+  // made before the first analysis starts
+  if(doneAnalyses.size()==1) {
+    currentAnalysis = NULL;
+    queryInfo[currentAnalysis] = CCQueryServers(doneAnalyses.back());
+  }
+
+  /*ATSGraph* ats = GetATSGraph(NULL);
+  ats->buildSSA();*/
+
   int i=1;
   for(list<ComposedAnalysis*>::iterator a=allAnalyses.begin(); a!=allAnalyses.end(); a++, i++) {
     //list<string> contextAttrs;
@@ -1150,6 +1180,8 @@ void ChainComposer::runAnalysis()
       ats2dot(fName.str(), "ATS", startStates, endStates);
       SIGHT_VERB_FI()
 //      ats2dot_bw(fName.str()+".BW", "ATS", startStates, endStates);
+
+      cout << "Analysis "<<currentAnalysis->str()<<endl;
     }
     
     struct timeval start, end;
@@ -1173,6 +1205,10 @@ void ChainComposer::runAnalysis()
     
     // Record that we've completed the given analysis
     doneAnalyses.push_back(*a);
+
+    /*ATSGraph* ats = GetATSGraph(NULL);
+    ats->buildSSA();*/
+
     currentAnalysis = NULL;
   }
   
@@ -1544,6 +1580,10 @@ set<PartPtr> LooseParallelComposer::GetStartAStates(ComposedAnalysis* client)
 { return getComposer()->GetStartAStates(this); }
 set<PartPtr> LooseParallelComposer::GetEndAStates(ComposedAnalysis* client)
 { return getComposer()->GetEndAStates(this); }
+
+// Return an ATSGraph object that describes the overall structure of the transition system
+ATSGraph* LooseParallelComposer::GetATSGraph(ComposedAnalysis* client)
+{ ROSE_ASSERT(0); }
 
 // -----------------------------------------
 // ----- Methods from ComposedAnalysis -----

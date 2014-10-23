@@ -410,7 +410,7 @@ typedef boost::shared_ptr<StxCodeLocObject> StxCodeLocObjectPtr;*/
 //
 
 // Root class for the three variants of StxMemRegionObjects
-class StxMemRegionType: public sight::printable
+class StxMemRegionType
 {
   public:
   
@@ -482,6 +482,8 @@ class StxMemRegionType: public sight::printable
   virtual void addHierSubKey(const AbstractObjectHierarchy::hierKeyPtr& key)=0;
   
   StxMemRegionType() {};
+  
+  virtual std::string str(std::string indent="") const=0;
 };
 typedef boost::shared_ptr<StxMemRegionType> StxMemRegionTypePtr;
 

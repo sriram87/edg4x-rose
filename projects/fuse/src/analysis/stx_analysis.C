@@ -591,7 +591,6 @@ map<StxPartEdgePtr, bool> makeClosureDF(const vector<CFGEdge>& orig, // raw in o
 {
   SIGHT_VERB_DECL(scope, ("makeClosureDF", scope::medium), 3, stxAnalysisDebugLevel)
   SIGHT_VERB_DECL(indent, (), 3, stxAnalysisDebugLevel)
-  indent ind;
   set<CFGPath> allPaths;
   for(vector<CFGEdge>::const_iterator e=orig.begin(); e!=orig.end(); e++) {
     SIGHT_VERB(dbg << "edge "<<CFGNode2Str(e->source())<<" ==&gt; "<<CFGNode2Str(e->target())<<endl, 3, stxAnalysisDebugLevel)
@@ -631,7 +630,7 @@ map<StxPartEdgePtr, bool> makeClosureDF(const vector<CFGEdge>& orig, // raw in o
 
 map<StxPartEdgePtr, bool> StxPart::getOutEdges()
 {
-//  scope sRet(txt()<<"StxPart::getOutEdges() ret="<<CFGNode2Str(n), scope::medium, attrGE("stxAnalysisDebugLevel", 2));
+//  SIGHT_VERB_DECL(scope, (txt()<<"StxPart::getOutEdges() ret="<<CFGNode2Str(n), scope::medium), stxAnalysisDebugLevel, 2)
   map<StxPartEdgePtr, bool> vStx;
   SgFunctionCallExp* call;
   
@@ -1847,11 +1846,11 @@ StxNamedMemRegionTypePtr StxNamedMemRegionType::getInstance(SgNode* n) {
 // Return whether there exists a CFGNode within this part that is inside the function in which the anchor symbol
 // is defined.
 bool matchAnchorPart(SgScopeStatement* scopeStmt, const CFGNode& n) {
-  scope s("matchAnchorPart");
-  dbg << "n="<<CFGNode2Str(n)<<endl;
+  //scope s("matchAnchorPart");
+  //dbg << "n="<<CFGNode2Str(n)<<endl;
   SgScopeStatement* part_scope = SageInterface::getScope(n.getNode());
-  dbg << "part_scope="<<SgNode2Str(part_scope)<<endl;
-  dbg << "equal="<<(scopeStmt == part_scope)<<", isAncestor="<<SageInterface::isAncestor(scopeStmt, part_scope)<<endl;
+  /*dbg << "part_scope="<<SgNode2Str(part_scope)<<endl;
+  dbg << "equal="<<(scopeStmt == part_scope)<<", isAncestor="<<SageInterface::isAncestor(scopeStmt, part_scope)<<endl;*/
   assert(part_scope);
   if(scopeStmt == part_scope)
     return true;
@@ -1870,9 +1869,9 @@ bool StxNamedMemRegionType::isLiveMR(PartEdgePtr pedge) {
     else if(isSgFunctionSymbol(symbol))
       scope = isSgFunctionSymbol(symbol)->get_declaration()->get_scope();*/
     scopeStmt = iname->get_scope();
-    scope s("StxNamedMemRegionType::isLiveMR");
+    /*scope s("StxNamedMemRegionType::isLiveMR");
     dbg << "iname="<<SgNode2Str(iname)<<endl;
-    dbg << "scopeStmt="<<SgNode2Str(scopeStmt)<<endl;
+    dbg << "scopeStmt="<<SgNode2Str(scopeStmt)<<endl;*/
 
     assert(scopeStmt);
 

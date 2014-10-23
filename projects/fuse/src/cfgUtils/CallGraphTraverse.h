@@ -28,6 +28,8 @@ class Function
 
   Function(SgFunctionCallExp* funcCall);
   
+  Function(SgFunctionParameterList* params);
+
   public:
   void init(SgFunctionDeclaration* sample);
 

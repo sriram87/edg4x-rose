@@ -7,6 +7,7 @@
 #include <boost/enable_shared_from_this.hpp>
 #include "sight.h"
 #include "stx_analysis.h"
+#include "ats.h"
 #include <algorithm>
 
 using namespace std;
@@ -658,8 +659,8 @@ namespace fuse {
   }
 
   // call the generic version of this function on each analysis
-  void TightComposer::transferPropagateAState(PartPtr part, set<PartPtr>& visited, bool firstVisit, set<PartPtr>& initialized,
-                                              dataflowPartEdgeIterator* curNodeIt, anchor curPartAnchor, graph& worklistGraph,
+  void TightComposer::transferPropagateAStateDense(PartPtr part, set<PartPtr>& visited, bool firstVisit, set<PartPtr>& initialized,
+                                              dataflowPartEdgeIterator* curNodeIt, anchor curPartAnchor, sight::structure::graph& worklistGraph,
                                               map<PartPtr, set<anchor> >& toAnchors,
                                               map<PartPtr, set<pair<anchor, PartPtr> > >& fromAnchors) {
     list<ComposedAnalysis*>::iterator a = allAnalyses.begin();
@@ -667,7 +668,21 @@ namespace fuse {
       scope reg(txt() << "TightComposer::transferPropagateAState",
                 scope::medium, attrGE("tightComposerDebugLevel", 2));
       dbg << "ComposedAnalysis=" << (*a)->str() << endl;
-      ComposedAnalysis::transferPropagateAState(*a, part, visited, firstVisit, initialized, curNodeIt, curPartAnchor, 
+      ComposedAnalysis::transferPropagateAStateDense(*a, part, visited, firstVisit, initialized, curNodeIt, curPartAnchor,
+                                                worklistGraph, toAnchors, fromAnchors);
+    }
+  }
+
+  void TightComposer::transferPropagateAStateSSA(PartPtr part, set<PartPtr>& visited, bool firstVisit, set<PartPtr>& initialized,
+                                              dataflowPartEdgeIterator* curNodeIt, anchor curPartAnchor, sight::structure::graph& worklistGraph,
+                                              map<PartPtr, set<anchor> >& toAnchors,
+                                              map<PartPtr, set<pair<anchor, PartPtr> > >& fromAnchors) {
+    list<ComposedAnalysis*>::iterator a = allAnalyses.begin();
+    for( ; a != allAnalyses.end(); ++a) {
+      scope reg(txt() << "TightComposer::transferPropagateAState",
+                scope::medium, attrGE("tightComposerDebugLevel", 2));
+      dbg << "ComposedAnalysis=" << (*a)->str() << endl;
+      ComposedAnalysis::transferPropagateAStateSSA(*a, part, visited, firstVisit, initialized, curNodeIt, curPartAnchor,
                                                 worklistGraph, toAnchors, fromAnchors);
     }
   }
@@ -825,6 +840,10 @@ namespace fuse {
   std::set<PartPtr> TightComposer::GetEndAStates_Spec() {
     return getComposer()->GetEndAStates(this);
   }
+
+  // Return an ATSGraph object that describes the overall structure of the transition system
+  ATSGraph* TightComposer::GetATSGraph(ComposedAnalysis* client)
+  { ROSE_ASSERT(0); }
 
   std::string TightComposer::str(std::string indent) const {
     return txt() << "TightComposer";

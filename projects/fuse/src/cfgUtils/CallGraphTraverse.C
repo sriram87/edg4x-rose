@@ -11,8 +11,6 @@ using namespace SageInterface;
 #include <set>
 using namespace std;
 
-using namespace sight;
-
 namespace fuse {
 // Points to the object that stores the entire class hierarchy of all types
 ClassHierarchyWrapper* classHierarchy=NULL;
@@ -106,6 +104,10 @@ Function::Function(SgFunctionCallExp* funcCall)
   // Otherwise, set the function to NULL
   else
     init(NULL);
+}
+
+Function::Function(SgFunctionParameterList* params) {
+  init(SageInterface::getEnclosingFunctionDeclaration(params));
 }
 
 class NoSymbolExistsAttribute : public AstAttribute {

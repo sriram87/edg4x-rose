@@ -14,7 +14,7 @@ namespace fuse {
    ***************/
 
   //! Key value used to identify any query.
-  class Expr2AnyKey : public sight::printable {
+  class Expr2AnyKey {
   public:
     SgNode* sgn;
     PartEdgePtr pedge;
@@ -274,6 +274,9 @@ namespace fuse {
     std::set<PartPtr> GetStartAStates(ComposedAnalysis* client);
     std::set<PartPtr> GetEndAStates(ComposedAnalysis* client);
 
+    // Return an ATSGraph object that describes the overall structure of the transition system
+    ATSGraph* GetATSGraph(ComposedAnalysis* client);
+
     // Returns all the edges implemented by the entire composer that refine the given
     // base PartEdge
     // NOTE: Once we change ChainComposer to derive from ComposedAnalysis, we can modify
@@ -287,10 +290,14 @@ namespace fuse {
     void initNodeState(PartPtr part);
     bool transfer(PartPtr part, CFGNode cn, NodeState& state, 
                   std::map<PartEdgePtr, std::vector<Lattice*> >& dfInfo);
-    void transferPropagateAState(PartPtr part, std::set<PartPtr>& visited, bool firstVisit, 
-                                 std::set<PartPtr>& initialized, dataflowPartEdgeIterator* curNodeIt, anchor curPartAnchor, 
-                                 graph& worklistGraph,std::map<PartPtr, std::set<anchor> >& toAnchors,
-                                 std::map<PartPtr, std::set<std::pair<anchor, PartPtr> > >& fromAnchors);
+    void transferPropagateAStateDense(PartPtr part, std::set<PartPtr>& visited, bool firstVisit,
+                                     std::set<PartPtr>& initialized, dataflowPartEdgeIterator* curNodeIt, anchor curPartAnchor,
+                                     sight::structure::graph& worklistGraph,std::map<PartPtr, std::set<anchor> >& toAnchors,
+                                     std::map<PartPtr, std::set<std::pair<anchor, PartPtr> > >& fromAnchors);
+    void transferPropagateAStateSSA(PartPtr part, std::set<PartPtr>& visited, bool firstVisit,
+                                     std::set<PartPtr>& initialized, dataflowPartEdgeIterator* curNodeIt, anchor curPartAnchor,
+                                     sight::structure::graph& worklistGraph,std::map<PartPtr, std::set<anchor> >& toAnchors,
+                                     std::map<PartPtr, std::set<std::pair<anchor, PartPtr> > >& fromAnchors);
   std::set<PartPtr> getInitialWorklist();
     std::map<PartEdgePtr, std::vector<Lattice*> >& getLatticeAnte(NodeState *state);
     std::map<PartEdgePtr, std::vector<Lattice*> >& getLatticePost(NodeState *state);

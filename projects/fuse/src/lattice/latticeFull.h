@@ -30,6 +30,8 @@ class BoolAndLattice : public FiniteLattice
   BoolAndLattice(bool state, PartEdgePtr pedge) : Lattice(pedge), FiniteLattice(pedge)
   { this->state = state; }
   
+  virtual ~BoolAndLattice();
+
   // initializes this Lattice to its default state
   void initialize()
   { state = -1; }
@@ -40,6 +42,12 @@ class BoolAndLattice : public FiniteLattice
   // overwrites the state of this Lattice with that of that Lattice
   void copy(Lattice* that);
   
+  // Propagate information from a set of defs to a single use. Return true if this causes the Lattice to change.
+  bool propagateDefs2Use(MemLocObjectPtr use, const std::set<MemLocObjectPtr>& defs) { return false; }
+
+  // Propagate information from a single defs to a set of uses. Return true if this causes the Lattice to change.
+  bool propagateDef2Uses(const std::set<MemLocObjectPtr>& uses, MemLocObjectPtr def) { return false; }
+
   // computes the meet of this and that and saves the result in this
   // returns true if this causes this to change and false otherwise
   bool meetUpdate(Lattice* that);
@@ -117,6 +125,12 @@ class IntMaxLattice : public InfiniteLattice
   // overwrites the state of this Lattice with that of that Lattice
   void copy(Lattice* that);
   
+  // Propagate information from a set of defs to a single use. Return true if this causes the Lattice to change.
+  bool propagateDefs2Use(MemLocObjectPtr use, const std::set<MemLocObjectPtr>& defs) { return false; }
+
+  // Propagate information from a single defs to a set of uses. Return true if this causes the Lattice to change.
+  bool propagateDef2Uses(const std::set<MemLocObjectPtr>& uses, MemLocObjectPtr def) { return false; }
+
   // computes the meet of this and that and saves the result in this
   // returns true if this causes this to change and false otherwise
   bool meetUpdate(Lattice* that);

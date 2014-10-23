@@ -9,6 +9,8 @@
 #include "printAnalysisStates.h"
 #include "pointsToAnalysis.h"
 #include "virtualMethodAnalysis.h"
+//#include "constantAnalysis.h"
+//#include "valueNumbering.h"
 #include "defsAnalysis.h"
 #include "analysis_tester.h"
 #include <vector>
@@ -26,10 +28,16 @@ using namespace fuse;
 using namespace boost::xpressive;
 using namespace SageBuilder;
 using namespace SageInterface;
+//using namespace scc_private;
 
 // Regex expressions for the composition command, defined globally so that they can be used inside main 
 // (where they're initialized) as well as inside output_nested_results()
-sregex composer, lcComposer, lpComposer, tComposer, analysis, cpAnalysis, ldAnalysis, ccsAnalysis, dpAnalysis, ptAnalysis, vmAnalysis, analysisList, compSpec;
+sregex composer, lcComposer, lpComposer, tComposer,
+       analysis, cpAnalysis, ldAnalysis, ccsAnalysis, dpAnalysis, ptAnalysis,
+                 vmAnalysis, spcpAnalysis, spvnAnalysis,
+                 ssacpAnalysis, ssaldAnalysis, ssaccsAnalysis, ssadpAnalysis, ssaptAnalysis,
+                 ssavmAnalysis, ssaspcpAnalysis, ssaspvnAnalysis,
+       analysisList, compSpec;
 
 // Displays nested results to std::cout with indenting
 struct output_nested_results
@@ -66,11 +74,13 @@ struct output_nested_results
     if(regex_match(match, subWhat, analysis)) {
 //      cout << "analysis match="<<match<<", smatch="<<subWhat<<endl;
       // Create the selected analysis and add it to the parent's sub-analysis list
-           if(regex_match(match, subWhat, cpAnalysis))  {  /*dbg << "CP"<<endl;*/ parentSubAnalyses.push_back(new ConstantPropagationAnalysis()); }
-      else if(regex_match(match, subWhat, ldAnalysis))  { parentSubAnalyses.push_back(new LiveDeadMemAnalysis()); }
-//      else if(regex_match(match, subWhat, oaAnalysis))  { parentSubAnalyses.push_back(new OrthogonalArrayAnalysis()); }//ComposedAnalysis* ca = new OrthogonalArrayAnalysis(); cout << "OrthogonalArrayAnalysis="<<ca->str()<<endl; parentSubAnalyses.push_back(ca); }
-      else if(regex_match(match, subWhat, dpAnalysis))  { parentSubAnalyses.push_back(new DeadPathElimAnalysis(true)); }
-      else if(regex_match(match, subWhat, ccsAnalysis)) { 
+           if(regex_match(match, subWhat, cpAnalysis))   {  /*dbg << "CP"<<endl;*/ parentSubAnalyses.push_back(new ConstantPropagationAnalysis()); }
+      else if(regex_match(match, subWhat, ssacpAnalysis))   {  /*dbg << "CP"<<endl;*/ parentSubAnalyses.push_back(new ConstantPropagationAnalysis()); }
+      else if(regex_match(match, subWhat, ldAnalysis))   { parentSubAnalyses.push_back(new LiveDeadMemAnalysis()); }
+      else if(regex_match(match, subWhat, ssaldAnalysis))   { parentSubAnalyses.push_back(new LiveDeadMemAnalysis()); }
+      else if(regex_match(match, subWhat, dpAnalysis))   { parentSubAnalyses.push_back(new DeadPathElimAnalysis(true)); }
+      else if(regex_match(match, subWhat, ssadpAnalysis))   { parentSubAnalyses.push_back(new DeadPathElimAnalysis(true)); }
+      else if(regex_match(match, subWhat, ccsAnalysis))  {
         parentSubAnalyses.push_back(new CallContextSensitivityAnalysis(1, CallContextSensitivityAnalysis::callSite, /*trackBase2RefinedPartEdgeMapping*/ true));
         
 /*        list<ComposedAnalysis*> mySubAnalyses;
@@ -81,8 +91,15 @@ struct output_nested_results
             subWhat.nested_results().end(),
             ons);*/
       }
-      else if(regex_match(match, subWhat, ptAnalysis))  { parentSubAnalyses.push_back(new PointsToAnalysis()); }
-      else if(regex_match(match, subWhat, vmAnalysis))  { parentSubAnalyses.push_back(new VirtualMethodAnalysis(true)); }
+      else if(regex_match(match, subWhat, ssaccsAnalysis))  { parentSubAnalyses.push_back(new CallContextSensitivityAnalysis(1, CallContextSensitivityAnalysis::callSite, /*trackBase2RefinedPartEdgeMapping*/ true)); }
+      else if(regex_match(match, subWhat, ptAnalysis))   { parentSubAnalyses.push_back(new PointsToAnalysis()); }
+      else if(regex_match(match, subWhat, ssaptAnalysis))   { parentSubAnalyses.push_back(new PointsToAnalysis()); }
+      else if(regex_match(match, subWhat, vmAnalysis))   { parentSubAnalyses.push_back(new VirtualMethodAnalysis(true)); }
+      else if(regex_match(match, subWhat, ssavmAnalysis))   { parentSubAnalyses.push_back(new VirtualMethodAnalysis(true)); }
+
+      //else if(regex_match(match, subWhat, spcpAnalysis)) { parentSubAnalyses.push_back(new SparseConstantAnalysis()); }
+      //else if(regex_match(match, subWhat, spvnAnalysis)) { parentSubAnalyses.push_back(new SparseValueNumbering()); }
+
     // Otherwise, if this is a composer, create the analyses in its sub-analysis list and then create the composer
     } else if(regex_match(match, subWhat, lcComposer)) {
       //std::fill_n( std::ostream_iterator<char_type>( std::cout ), tabs_ * 4, space_ch ); cout << "LOOSE SEQUENTIAL\n"<<endl;
@@ -400,6 +417,7 @@ void printAttributes(Labeler* labeler, VariableIdMapping* vim, string attributeN
 int main(int argc, char** argv)
 {
   FuseInit(argc, argv);
+  modularApp fuseMA("Fuse", namedMeasures("time", new timeMeasure()));
   
   printf("========== S T A R T ==========\n");
   
@@ -407,7 +425,15 @@ int main(int argc, char** argv)
   // Strip the dataflow analysis options
   
   // Run the front end
+  struct timeval start, end;
+  gettimeofday(&start, NULL);
+
   SgProject* project = frontend(argc, argv);
+
+  gettimeofday(&end, NULL);
+  cout << "  Front End Elapsed="<<((end.tv_sec*1000000+end.tv_usec) -
+                                               (start.tv_sec*1000000+start.tv_usec))/1000000.0<<"s"<<endl;
+
   //generatePDF(*project);
 
 #if 0
@@ -452,14 +478,29 @@ int main(int argc, char** argv)
   composer = by_ref(lcComposer) | by_ref(lpComposer) | by_ref(tComposer);
   //composer = as_xpr(icase("loosechain")) | icase("lc") | icase("loosepar") | icase("lp");
   
-  cpAnalysis  = as_xpr(icase("constantpropagationanalysis")) | icase("constantpropagation") | icase("cp");
-  ldAnalysis  = as_xpr(icase("livedeadmemanalysis"))         | icase("livedead")            | icase("ld");
-  ccsAnalysis = as_xpr(icase("callctxsensanalysis"))         | icase("callctxsens")         | icase("ccs");
-  dpAnalysis  = as_xpr(icase("deadpathelimanalysis"))        | icase("deadpath")            | icase("dp");
-  ptAnalysis  = as_xpr(icase("pointstoanalysis"))            | icase("pointsto")            | icase("pt");
-  vmAnalysis  = as_xpr(icase("virtualmethodanalysis"))       | icase("virtualmem")          | icase("vm");
-  analysis = by_ref(cpAnalysis) | by_ref(ldAnalysis) | by_ref(ccsAnalysis) | 
-             by_ref(dpAnalysis) | by_ref(ptAnalysis) | by_ref(vmAnalysis);
+  cpAnalysis   = as_xpr(icase("constantpropagationanalysis"))       | icase("constprop")   | icase("cp");
+  ldAnalysis   = as_xpr(icase("livedeadmemanalysis"))               | icase("livedead")    | icase("ld");
+  ccsAnalysis  = as_xpr(icase("callctxsensanalysis"))               | icase("callctxsens") | icase("ccs");
+  dpAnalysis   = as_xpr(icase("deadpathelimanalysis"))              | icase("deadpath")    | icase("dp");
+  ptAnalysis   = as_xpr(icase("pointstoanalysis"))                  | icase("pointsto")    | icase("pt");
+  vmAnalysis   = as_xpr(icase("virtualmethodanalysis"))             | icase("virtualmem")  | icase("vm");
+  spcpAnalysis = as_xpr(icase("sparseconstantpropagationanalysis")) | icase("spconstprop") | icase("spcp");
+  spvnAnalysis = as_xpr(icase("sparsevaluenumberinganalysis"))      | icase("spvalnum")    | icase("spvn");
+  ssacpAnalysis   = as_xpr(icase("SSA:constantpropagationanalysis"))       | icase("SSA:constprop")   | icase("SSA:cp");
+  ssaldAnalysis   = as_xpr(icase("SSA:livedeadmemanalysis"))               | icase("SSA:livedead")    | icase("SSA:ld");
+  ssaccsAnalysis  = as_xpr(icase("SSA:callctxsensanalysis"))               | icase("SSA:callctxsens") | icase("SSA:ccs");
+  ssadpAnalysis   = as_xpr(icase("SSA:deadpathelimanalysis"))              | icase("SSA:deadpath")    | icase("SSA:dp");
+  ssaptAnalysis   = as_xpr(icase("SSA:pointstoanalysis"))                  | icase("SSA:pointsto")    | icase("SSA:pt");
+  ssavmAnalysis   = as_xpr(icase("SSA:virtualmethodanalysis"))             | icase("SSA:virtualmem")  | icase("SSA:vm");
+  ssaspcpAnalysis = as_xpr(icase("SSA:sparseconstantpropagationanalysis")) | icase("SSA:spconstprop") | icase("SSA:spcp");
+  ssaspvnAnalysis = as_xpr(icase("SSA:sparsevaluenumberinganalysis"))      | icase("SSA:spvalnum")    | icase("SSA:spvn");
+
+  analysis = by_ref(cpAnalysis)   | by_ref(ldAnalysis) | by_ref(ccsAnalysis) |
+             by_ref(dpAnalysis)   | by_ref(ptAnalysis) | by_ref(vmAnalysis)  |
+             by_ref(spcpAnalysis) | by_ref(spvnAnalysis) |
+             by_ref(ssacpAnalysis)   | by_ref(ssaldAnalysis) | by_ref(ssaccsAnalysis) |
+             by_ref(ssadpAnalysis)   | by_ref(ssaptAnalysis) | by_ref(ssavmAnalysis)  |
+             by_ref(ssaspcpAnalysis) | by_ref(ssaspvnAnalysis);
   analysisList = '(' >> *_s >> (by_ref(analysis) | by_ref(compSpec)) >> *_s >> (!('(' >> *_s >>  +_w   >> *_s >> ')') ) >>
         *(*_s >> "," >> *_s >> (by_ref(analysis) | by_ref(compSpec)) >> *_s >> (!('(' >> *_s >>  +_w   >> *_s >> ')') ) ) >> *_s >> ')';
   compSpec = *_s >> by_ref(composer) >> *_s >> analysisList >> *_s;

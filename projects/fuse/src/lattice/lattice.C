@@ -14,6 +14,9 @@ namespace fuse {
  ********** Lattice **********
  *****************************/
   
+Lattice::~Lattice()
+{  }
+
 // Sets the PartEdge that this Lattice's information corresponds to. 
 // Returns true if this causes the edge to change and false otherwise
 bool Lattice::setPartEdge(PartEdgePtr latPEdge) { 
@@ -32,6 +35,10 @@ PartEdgePtr Lattice::getPartEdge() const
 /********************************************
  ************** BoolAndLattice **************
  ********************************************/
+
+BoolAndLattice::~BoolAndLattice()
+{}
+
 
 // returns a copy of this lattice
 Lattice* BoolAndLattice::copy() const

@@ -11,13 +11,16 @@
 namespace fuse {
 class Lattice;
 typedef boost::shared_ptr<Lattice> LatticePtr;
-class Lattice : public sight::printable
+class Lattice
 {
   public:
   PartEdgePtr latPEdge;
   //Lattice() {}
   Lattice(PartEdgePtr latPEdge) : latPEdge(latPEdge) {}
   
+  // This virtual destructor is required to ensure boost::shared_ptrs identify types of Lattices correctly
+  virtual ~Lattice();
+
   public:
   // Sets the PartEdge that this Lattice's information corresponds to. 
   // Returns true if this causes the edge to change and false otherwise
@@ -60,6 +63,12 @@ class Lattice : public sight::printable
   }
   bool replaceML(LatticePtr newL) { return replaceML(newL.get()); }
   
+  // Propagate information from a set of defs to a single use. Return true if this causes the Lattice to change.
+  virtual bool propagateDefs2Use(MemLocObjectPtr use, const std::set<MemLocObjectPtr>& defs) { std::cerr << "ERROR: function propagateDefs2Use should be implemented for this Lattice! "<<str()<<std::endl; ROSE_ASSERT(0); }
+
+  // Propagate information from a single defs to a set of uses. Return true if this causes the Lattice to change.
+  virtual bool propagateDef2Uses(const std::set<MemLocObjectPtr>& uses, MemLocObjectPtr def) { std::cerr << "ERROR: function propagateDef2Uses should be implemented for this Lattice! "<<str()<<std::endl; ROSE_ASSERT(0); }
+
   // Computes the meet of this and that and saves the result in this
   // returns true if this causes this to change and false otherwise
   // The part of this object is to be used for AbstractObject comparisons.
@@ -107,7 +116,7 @@ class Lattice : public sight::printable
     delete thatCopy;
     return true;
   }
-  bool equiv(LatticePtr that) { return implies(that.get()); }
+  bool equiv(LatticePtr that) { return equiv(that.get()); }
   
   // Computes the meet of this and that and returns the result
   virtual bool finiteLattice()=0;
@@ -151,6 +160,8 @@ class Lattice : public sight::printable
   // If indent!="", every line of this string must be prefixed by indent
   // The last character of the returned string should not be '\n', even if it is a multi-line string.
   //virtual string str(string indent="") /*const*/=0;
+
+  virtual std::string str(std::string indent="") const=0;
 };
 
 class FiniteLattice : public virtual Lattice

@@ -4,7 +4,7 @@
 #include <set>
 #include <string>
 #include <list>
-#include "sight.h"
+//#include "sight.h"
 #include "comp_shared_ptr.h"
 #include <iostream>
 

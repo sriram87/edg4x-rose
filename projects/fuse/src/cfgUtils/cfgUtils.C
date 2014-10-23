@@ -11,6 +11,7 @@
 #include <iostream>
 #include <boost/make_shared.hpp>
 
+#include "sight.h"
 using namespace std;
 using namespace sight;
 

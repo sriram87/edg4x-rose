@@ -10,6 +10,10 @@
 // using namespace hssa_private;
 using namespace std;
 
+#include "sight.h"
+#include "sight_verbosity.h"
+using namespace sight;
+
 template <class LatticeType>
 class SSAVariableStateTransfer : public DFTransferVisitor { 
  protected:
@@ -26,11 +30,19 @@ class SSAVariableStateTransfer : public DFTransferVisitor {
  
   LatticeType *getLattice(const SgExpression *sgn) { 
     // std::cout << "getting lattice " << sgn->class_name() << std::endl;
+    SIGHT_VERB_DECL(scope, (txt()<<"getLattice("<<SgNode2Str(sgn)<<")"), 1, debugLevel)
+
     // TODO: return sgn ? getLattice(SgExpr2Var(sgn)) : NULL;
-    return latticeMap.find(sgn) != latticeMap.end() ? latticeMap[sgn] : NULL;
+    if(latticeMap.find(sgn) != latticeMap.end()) {
+      return latticeMap[sgn];
+    } else {
+      return NULL;
+    }
   };
 
   LatticeType *getLattice__(const SgExpression *sgn) {
+    SIGHT_VERB_DECL(scope, (txt()<<"getLattice__("<<SgNode2Str(sgn)<<")"), 1, debugLevel)
+
     // TODO: return sgn ? getLattice(SgExpr2Var(sgn)) : NULL;       
     if (tmpLatticeMap.find(sgn) != tmpLatticeMap.end())
       return tmpLatticeMap[sgn];
@@ -45,6 +57,9 @@ class SSAVariableStateTransfer : public DFTransferVisitor {
   };*/
 
   void setLattice(const SgExpression *sgn, LatticeType * lattice) {
+    SIGHT_VERB_DECL(scope, (txt()<<"setLattice("<<SgNode2Str(sgn)<<")"), 1, debugLevel)
+    SIGHT_VERB(dbg << "lattice="<<lattice->str()<<endl, 1, debugLevel)
+
     if (latticeMap.find(sgn) != latticeMap.end() && lattice == NULL)
       latticeMap.erase(sgn);
 
@@ -52,17 +67,25 @@ class SSAVariableStateTransfer : public DFTransferVisitor {
   };
 
   void setLattice__(const SgExpression* sgn, LatticeType * lattice) {
+    SIGHT_VERB_DECL(scope, (txt()<<"setLattice__("<<SgNode2Str(sgn)<<")"), 1, debugLevel)
+    SIGHT_VERB(dbg << "lattice="<<lattice->str()<<endl, 1, debugLevel)
+
     if (tmpLatticeMap.find(sgn) != tmpLatticeMap.end() && lattice == NULL)
       tmpLatticeMap.erase(sgn);
     
     tmpLatticeMap[sgn] = lattice;
   };
 
-  bool getLattices(const SgBinaryOp *sgn, LatticeType* &arg1Lat, LatticeType* &arg2Lat, 
-		   LatticeType* &resLat) {
+  bool getLattices(const SgBinaryOp *sgn, LatticeType* &arg1Lat, LatticeType* &arg2Lat, LatticeType* &resLat) {
+    SIGHT_VERB_DECL(scope, (txt()<<"getLattice("<<SgNode2Str(sgn)<<")"), 1, debugLevel)
+
     arg1Lat = getLattice(sgn->get_lhs_operand());
     arg2Lat = getLattice(sgn->get_rhs_operand());
     resLat = getLattice(sgn);
+
+    SIGHT_VERB(dbg << "arg1Lat="<<arg1Lat->str()<<endl, 1, debugLevel)
+    SIGHT_VERB(dbg << "arg2Lat="<<arg2Lat->str()<<endl, 1, debugLevel)
+    SIGHT_VERB(dbg << "resLat="<<resLat->str()<<endl, 1, debugLevel)
 
     if (isSgCompoundAssignOp(sgn)) {
       if (resLat==NULL && arg1Lat != NULL)
@@ -73,8 +96,13 @@ class SSAVariableStateTransfer : public DFTransferVisitor {
   };
 
   bool getLattices(const SgUnaryOp *sgn,  LatticeType* &arg1Lat, LatticeType* &arg2Lat, LatticeType* &resLat) {
+    SIGHT_VERB_DECL(scope, (txt()<<"getLattice("<<SgNode2Str(sgn)<<")"), 1, debugLevel)
+
     arg1Lat = getLattice(sgn->get_operand());
     resLat = getLattice(sgn);
+
+    SIGHT_VERB(dbg << "arg1Lat="<<arg1Lat->str()<<endl, 1, debugLevel)
+    SIGHT_VERB(dbg << "resLat="<<resLat->str()<<endl, 1, debugLevel)
 
     // Unary Update    
     if(isSgMinusMinusOp(sgn) || isSgPlusPlusOp(sgn)) {
@@ -100,6 +128,8 @@ class SSAVariableStateTransfer : public DFTransferVisitor {
   }
 
   void visit(SgAssignOp *sgn) {
+    SIGHT_VERB_DECL(scope, (txt()<<"visit(SgAssignOp)"), 1, debugLevel)
+
     SgExpression * lhsOperand = sgn->get_lhs_operand();
     SgExpression * rhsOperand = sgn->get_rhs_operand();
     LatticeArith * lhsLattice = getLattice(lhsOperand);
@@ -126,6 +156,7 @@ class SSAVariableStateTransfer : public DFTransferVisitor {
   };
 
   void visit(SgAssignInitializer *sgn) {
+    SIGHT_VERB_DECL(scope, (txt()<<"visit(SgAssignInitializer)"), 1, debugLevel)
     LatticeType* asgnLat = getLattice(sgn->get_operand());
     // LatticeType* resLat = getLattice(sgn);
 
@@ -139,23 +170,27 @@ class SSAVariableStateTransfer : public DFTransferVisitor {
   };
 
   void visit(SgAggregateInitializer *sgn) {
+    SIGHT_VERB_DECL(scope, (txt()<<"visit(SgAggregateInitializer)"), 1, debugLevel)
     LatticeType *res = getLattice(sgn);
     SgExpressionPtrList &inits = sgn->get_initializers()->get_expressions();
     if (inits.size() > 0) {
       res->copy(getLattice(inits[0]));
       modified = true;
       for (int i = 1; i < inits.size(); ++i)
-	res->meetUpdate(getLattice(inits[i]));
+        res->meetUpdate(getLattice(inits[i]));
     }
   };
 
   void visit(SgConstructorInitializer *sgn) {
+    SIGHT_VERB_DECL(scope, (txt()<<"visit(SgConstructorInitializer)"), 1, debugLevel)
   };
 
   void visit(SgDesignatedInitializer *sgn) {
+    SIGHT_VERB_DECL(scope, (txt()<<"visit(SgDesignatedInitializer)"), 1, debugLevel)
   };
 
   void visit(SgInitializedName *initName) {
+    SIGHT_VERB_DECL(scope, (txt()<<"visit(SgInitializedName)"), 1, debugLevel)
     // LatticeType* varLat = getLattice(initName);
     // if(varLat) {
     if (initName->get_initializer() == NULL)
@@ -172,6 +207,7 @@ class SSAVariableStateTransfer : public DFTransferVisitor {
   };
 
   void visit(SgBinaryOp *sgn) {
+    SIGHT_VERB_DECL(scope, (txt()<<"visit(SgBinaryOp)"), 1, debugLevel)
     LatticeType *lhs, *rhs, *res;
     getLattices(sgn, lhs, rhs, res);
     if (res) {
@@ -182,6 +218,7 @@ class SSAVariableStateTransfer : public DFTransferVisitor {
   };
 
   void visit(SgCompoundAssignOp *sgn) {
+    SIGHT_VERB_DECL(scope, (txt()<<"visit(SgCompoundAssignOp)"), 1, debugLevel)
     LatticeType *lhs, *rhs, *res;
     getLattices(sgn, lhs, rhs, res);
     if (lhs)
@@ -194,6 +231,7 @@ class SSAVariableStateTransfer : public DFTransferVisitor {
   };
 
   void visit(SgCommaOpExp *sgn) {
+    SIGHT_VERB_DECL(scope, (txt()<<"visit(SgCommaOpExp)"), 1, debugLevel)
     LatticeType *lhsLat, *rhsLat, *resLat;
     getLattices(sgn, lhsLat, rhsLat, resLat);
 
@@ -204,6 +242,7 @@ class SSAVariableStateTransfer : public DFTransferVisitor {
   };
 
   void visit(SgConditionalExp *sgn) {
+    SIGHT_VERB_DECL(scope, (txt()<<"visit(SgConditionalExp)"), 1, debugLevel)
     LatticeType *condLat = getLattice(sgn->get_conditional_exp()),
       *trueLat = getLattice(sgn->get_true_exp()),
       *falseLat = getLattice(sgn->get_false_exp()),
@@ -223,6 +262,7 @@ class SSAVariableStateTransfer : public DFTransferVisitor {
   };
 
   void visit(SgBitComplementOp *sgn) {
+    SIGHT_VERB_DECL(scope, (txt()<<"visit(SgBitComplementOp)"), 1, debugLevel)
     LatticeType *res = getLattice(sgn);
     if (res) {
       res->copy(getLattice(sgn->get_operand()));

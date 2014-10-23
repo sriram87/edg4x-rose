@@ -35,18 +35,9 @@ namespace hssa_private
 
   class HeapSSA;
 
-  class SSAScalar;
-  typedef boost::shared_ptr<SSAScalar> SSAScalarPtr;
-  class SSAFunctionMemLoc;
-  typedef boost::shared_ptr<SSAFunctionMemLoc> SSAFunctionMemLocPtr;
-  class SSALabeledAggregate;
-  typedef boost::shared_ptr<SSALabeledAggregate> SSALabeledAggregatePtr;
-  class SSAArray;
-  typedef boost::shared_ptr<SSAArray> SSAArrayPtr;
-  class SSAPointer;
-  typedef boost::shared_ptr<SSAPointer> SSAPointerPtr;
-  class SSADefault;
-  typedef boost::shared_ptr<SSADefault> SSADefaultPtr;
+  class SSAMemLoc;
+  //typedef boost::shared_ptr<SSAMemLoc> SSAMemLocPtr;
+  typedef CompSharedPtr<SSAMemLoc> SSAMemLocPtr;
 
   class SSAMemLoc : public virtual MemLocObject {
   protected:
@@ -58,284 +49,152 @@ namespace hssa_private
     PartPtr part;
 
   public:
-  SSAMemLoc(HeapSSA* ssaInstance) : ssa(ssaInstance), expr(NULL), MemLocObject(NULL) {
+  SSAMemLoc(HeapSSA* ssaInstance) : MemLocObject(NULL), ssa(ssaInstance), expr(NULL) {
     // ROSE_ASSERT(false && "Must initialize MemLoc");
   };
-  SSAMemLoc(HeapSSA* ssaInstance, SgExpression* expr_) : ssa(ssaInstance), expr(expr_), 
-    MemLocObject(NULL) {
+  SSAMemLoc(HeapSSA* ssaInstance, SgExpression* expr_) : MemLocObject(NULL), ssa(ssaInstance), expr(expr_) {
     // ROSE_ASSERT(false && "Must initialize MemLoc");
   };
-  SSAMemLoc(SSAMemLoc* ssaMemLoc) : ssa(ssaMemLoc->ssa), expr(ssaMemLoc->expr), 
-    MemLocObject(ssaMemLoc->expr) {
+  SSAMemLoc(SSAMemLoc* ssaMemLoc) : MemLocObject(ssaMemLoc->expr), ssa(ssaMemLoc->ssa), expr(ssaMemLoc->expr) {
     // ROSE_ASSERT(false && "Must initialize MemLoc");
   };
-  SSAMemLoc(HeapSSA* ssaInstance, SgExpression* expr_, MemLocObjectPtr memLoc_, PartPtr part_) : ssa(ssaInstance), 
-    expr(expr_), memLoc(memLoc_), part(part_), MemLocObject(expr_) {};
+  SSAMemLoc(HeapSSA* ssaInstance, SgExpression* expr_, MemLocObjectPtr memLoc_, PartPtr part_) :
+    MemLocObject(expr_), ssa(ssaInstance), expr(expr_), memLoc(memLoc_), part(part_) {};
 
-  SSAMemLoc(SgNode* sgn) : MemLocObject(sgn), expr(NULL), ssa(NULL) {
+  SSAMemLoc(SgNode* sgn) : MemLocObject(sgn), ssa(NULL), expr(NULL) {
     // ROSE_ASSERT(false && "Must initialize MemLoc");
   };
 
   SSAMemLoc(MemLocObjectPtr memLoc_, PartPtr part_, SgExpression* labelNode, HeapSSA* ssaInstance) 
-    : expr(labelNode), ssa(ssaInstance), memLoc(memLoc_), part(part_), MemLocObject(labelNode) {};
+    : MemLocObject(labelNode), ssa(ssaInstance), expr(labelNode), memLoc(memLoc_), part(part_) {};
 
-    bool mayEqualML(MemLocObjectPtr o, PartPtr p); //  const;
-    bool mustEqualML(MemLocObjectPtr o, PartPtr p); //  const;
-    
-    SgExpression* getVarExpr() const { return expr; };
-    void setVarExpr(SgExpression* expr_) { expr = expr_; };
-    
-    MemLocObjectPtr getLabelMemLoc() { return memLoc; };
 
-    PartPtr getPart() { return part; };
+  SgExpression* getVarExpr() const { return expr; };
+  void setVarExpr(SgExpression* expr_) { expr = expr_; };
 
-    HeapSSA* getSSAInstance() { return ssa; };
+  MemLocObjectPtr getLabelMemLoc() { return memLoc; };
 
-    bool mayEqual(MemLocObjectPtr o, PartPtr p) { return mayEqualML(o, p); };
-    bool mustEqual(MemLocObjectPtr o, PartPtr p) { return mustEqualML(o, p); };
+  PartPtr getPart() { return part; };
 
-    virtual bool mayEqualML(MemLocObjectPtr o) const;
-    virtual bool mustEqualML(MemLocObjectPtr o) const;
+  HeapSSA* getSSAInstance() { return ssa; };
 
-    virtual bool mayEqual(MemLocObjectPtr o) const { mayEqualML(o); };
-    virtual bool mustEqual(MemLocObjectPtr o) const { mayEqualML(o); };
-        
-    virtual bool mayEqualML(MemLocObjectPtr o, PartEdgePtr pedge) { return mayEqualML(o); };
-    virtual bool mustEqualML(MemLocObjectPtr o, PartEdgePtr pedge) { return mustEqualML(o); };
+  /*
+  bool mayEqualML(MemLocObjectPtr o, PartPtr p); //  const;
+  bool mustEqualML(MemLocObjectPtr o, PartPtr p); //  const;
 
-    std::string str(std::string indent="") const { 
-      std::string str = "SSA Mem Loc: " + memLoc->str();
-      return str;
-    };
-    std::string str(std::string indent="") {
-      std::string str ="SSA Mem Loc: "+ memLoc->str();
-      return str;
-    };
+  bool mayEqual(MemLocObjectPtr o, PartPtr p) { return mayEqualML(o, p); };
+  bool mustEqual(MemLocObjectPtr o, PartPtr p) { return mustEqualML(o, p); };
 
-    /*virtual ScalarPtr isScalar() {
-      return boost::dynamic_pointer_cast<Scalar>(copyML());
-    }
+  virtual bool mayEqualML(MemLocObjectPtr o) const;
+  virtual bool mustEqualML(MemLocObjectPtr o) const;
 
-    virtual FunctionMemLocPtr isFunctionMemLoc() {
-      return boost::dynamic_pointer_cast<FunctionMemLoc>(copyML());
-    }
+  virtual bool mayEqual(MemLocObjectPtr o) const { return mayEqualML(o); };
+  virtual bool mustEqual(MemLocObjectPtr o) const { return mayEqualML(o); };
 
-    virtual LabeledAggregatePtr isLabeledAggregate() {
-      return boost::dynamic_pointer_cast<LabeledAggregate>(copyML());
-    }
+  virtual bool mayEqualML(MemLocObjectPtr o, PartEdgePtr pedge) { return mayEqualML(o); };
+  virtual bool mustEqualML(MemLocObjectPtr o, PartEdgePtr pedge) { return mustEqualML(o); };*/
 
-    virtual ArrayPtr isArray() {
-      return boost::dynamic_pointer_cast<Array>(copyML());
-    }
+  bool operator==(const SSAMemLocPtr & o) const;
+  bool operator!=(const SSAMemLocPtr & o) const;
+  bool operator< (const SSAMemLocPtr & o) const;
+  bool operator<=(const SSAMemLocPtr & o) const;
+  bool operator> (const SSAMemLocPtr & o) const;
+  bool operator>=(const SSAMemLocPtr & o) const;
 
-    virtual PointerPtr isPointer() {
-      return boost::dynamic_pointer_cast<Pointer>(copyML());
-      }*/
+  bool mayEqual(MemLocObjectPtr that, PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis);
+  bool mustEqual(MemLocObjectPtr that, PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis);
 
-    // TODO:
-    virtual bool equalSet(AbstractObjectPtr objPtr, PartEdgePtr partEdgePtr) {
-      return false;
-    }
+  bool mayEqual(SSAMemLocPtr that);
+  bool mustEqual(SSAMemLocPtr that);
 
-    virtual bool isFull(PartEdgePtr partEdgePtr) {
-      return false;
-    }
+  // Returns whether the two abstract objects denote the same set of concrete objects
+  bool equalSet(MemLocObjectPtr o, PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis);
 
-    virtual bool isEmpty(PartEdgePtr partEdgePtr) {
-      return false;
-    }
+  // Returns whether this abstract object denotes a non-strict subset (the sets may be equal) of the set denoted
+  // by the given abstract object.
+  bool subSet(MemLocObjectPtr o, PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis);
 
-    virtual bool isLiveML(PartEdgePtr partEdgePtr) {
-      return false;
-    }
-    
-    virtual bool meetUpdateML(MemLocObjectPtr objPtr, PartEdgePtr partEdgePtr) {
-      return false;
-    }
+  // General version of isLive that accounts for framework details before routing the call to the derived class'
+  // isLiveML check. Specifically, it routes the call through the composer to make sure the isLiveML call gets the
+  // right PartEdge
+  bool isLive(PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis);
 
+  // General version of meetUpdate that accounts for framework details before routing the call to the derived class'
+  // meetUpdateML check. Specifically, it routes the call through the composer to make sure the meetUpdateML
+  // call gets the right PartEdge
+  bool meetUpdate(MemLocObjectPtr that, PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis);
+
+  // General versions of isFull() and isEmpty that account for framework details before routing the call to the
+  // derived class' isFull() and isEmpty()  check. Specifically, it routes the call through the composer to make
+  // sure the isFullML() and isEmptyML() call gets the right PartEdge.
+  // These functions are just aliases for the real implementations in AbstractObject
+  bool isFull(PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis=NULL);
+  bool isEmpty(PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis=NULL);
+
+  // Returns true if this AbstractObject corresponds to a concrete value that is statically-known
+  bool isConcrete();
+  // Returns the number of concrete values in this set
+  int concreteSetSize();
+
+  std::string str(std::string indent="") const {
+    return sight::txt()<<"[SSA Mem Loc expr="<<SgNode2Str(expr)<<", memLoc=" + memLoc->str()<<"]";
+  };
+
+  std::string str(std::string indent="") {
+    return sight::txt()<<"[SSA Mem Loc expr="<<SgNode2Str(expr)<<", memLoc=" + memLoc->str()<<"]";
+  };
+
+  std::string strp(PartEdgePtr pedge, std::string indent="") const {
+    return sight::txt()<<"[SSA Mem Loc expr="<<SgNode2Str(expr)<<", memLoc=" + memLoc->str()<<"]";
+  };
+
+  // TODO:
+/*  virtual bool equalSet(AbstractObjectPtr objPtr, PartEdgePtr partEdgePtr) {
+    return false;
+  }
+
+  virtual bool isFull(PartEdgePtr partEdgePtr) {
+    return false;
+  }
+
+  virtual bool isEmpty(PartEdgePtr partEdgePtr) {
+    return false;
+  }
+
+  virtual bool isLiveML(PartEdgePtr partEdgePtr) {
+    return false;
+  }
+
+  virtual bool meetUpdateML(MemLocObjectPtr objPtr, PartEdgePtr partEdgePtr) {
+    return false;
+  }
+*/
   protected:
     SgNode* getDefNode(SgExpression* expr) const;
   
     /// Internal comparision, i.e. if the two given expressions are same or not
     static bool isSameSig(SgExpression* exprL, SgExpression* exprR);
-  };
-
-  typedef boost::shared_ptr<SSAMemLoc> SSAMemLocPtr;
-
-  /*class SSAScalar : virtual public SSAMemLoc,  virtual public Scalar {
-  public:
-    SSAScalar(HeapSSA* ssaInstance, SgExpression* expr_)
-      : SSAMemLoc(ssaInstance, expr_), MemLocObject(expr_) {
-      ROSE_ASSERT(false && "Scalar must initialize MemLoc");
-    };
-      SSAScalar(HeapSSA* ssaInstance, SgExpression* expr_, MemLocObjectPtr memLoc, PartPtr part)
-	: SSAMemLoc(ssaInstance, expr_, memLoc, part), MemLocObject(expr_) {};
-
-    SSAScalar(SgNode* sgn)
-      : SSAMemLoc(sgn), MemLocObject(sgn) {
-      ROSE_ASSERT(false && "Scalar must initialize MemLoc");
-    };
-
-    virtual bool mayEqual(MemLocObjectPtr o) const; 
-    virtual bool mustEqual(MemLocObjectPtr o) const; 
-  
-    bool isLive(PartEdgePtr pedge) const { return true; };
-
-    virtual bool subSet(AbstractObjectPtr objPtr, PartEdgePtr pedge) {
-      ROSE_ASSERT(false && "Not supported!");
-    };
-
-    MemLocObjectPtr copyML() const {
-      return boost::make_shared<SSAScalar>(ssa, expr, memLoc, part);
-    };
-  };
-
-  class SSAFunctionMemLoc : virtual public SSAMemLoc, virtual public FunctionMemLoc {
-  public:
-    SSAFunctionMemLoc(HeapSSA* ssaInstance, SgFunctionSymbol* funcSymb_)
-      : SSAMemLoc(ssaInstance, NULL), funcSymb(funcSymb_), MemLocObject(NULL) {
-      ROSE_ASSERT(false && "Function must initialize MemLoc");
-    };
-    SSAFunctionMemLoc(HeapSSA* ssaInstance, SgFunctionSymbol* funcSymb_, MemLocObjectPtr memLoc, PartPtr part)
-      : SSAMemLoc(ssaInstance, NULL, memLoc, part), funcSymb(funcSymb_), MemLocObject(NULL) {};
-
-    SSAFunctionMemLoc(SgNode* sgn)
-      : SSAMemLoc(sgn), MemLocObject(sgn) {
-      ROSE_ASSERT(false && "Function must initialize MemLoc");
-    };
-
-    virtual bool mayEqual(MemLocObjectPtr o) const { mayEqual(o); };
-    virtual bool mustEqual(MemLocObjectPtr o) const { mustEqual(o); };
-
-    bool isLive(PartEdgePtr pedge) const { return true; };
-
-    virtual bool subSet(AbstractObjectPtr objPtr, PartEdgePtr pedge) {
-      ROSE_ASSERT(false && "Not supported!");
-    };
-
-    MemLocObjectPtr copyML() const {
-      return boost::make_shared<SSAFunctionMemLoc>(ssa, funcSymb, memLoc, part);
-    };
-
-  protected:
-    SgFunctionSymbol* funcSymb;
-
-  public:
-    SgFunctionSymbol* getFuncSymb() { return funcSymb; };
-  };
-
-  class SSALabeledAggregate : virtual public SSAMemLoc, virtual public LabeledAggregate {
-  public:
-    SSALabeledAggregate(HeapSSA* ssaInstance, SgExpression* expr_)
-      : SSAMemLoc(ssaInstance, expr_), MemLocObject(expr_) {
-      ROSE_ASSERT(false && "Labeled aggregate must initialize MemLoc");
-    };
-    SSALabeledAggregate(HeapSSA* ssaInstance, SgExpression* expr_, MemLocObjectPtr memLoc, PartPtr part)
-      : SSAMemLoc(ssaInstance, expr_, memLoc, part), MemLocObject(expr_) {};
-
-    SSALabeledAggregate(SgNode* sgn)
-        : SSAMemLoc(sgn), MemLocObject(sgn) {
-      ROSE_ASSERT(false && "Labeled aggregate must initialize MemLoc");
-    };
-
-    virtual bool mayEqual(MemLocObjectPtr o) const { mayEqual(o); };
-    virtual bool mustEqual(MemLocObjectPtr o) const { mustEqual(o); };
-
-    bool isLive(PartEdgePtr pedge) const { return true; };
-
-    virtual bool subSet(AbstractObjectPtr objPtr, PartEdgePtr pedge) {
-      ROSE_ASSERT(false && "Not supported!");
-    };
-
-    MemLocObjectPtr copyML() const {
-      return boost::make_shared<SSALabeledAggregate>(ssa, expr, memLoc, part);
-    };
-  };
-
-  class SSAArray : virtual public SSAMemLoc, virtual public Array {
-  public:
-    SSAArray(HeapSSA* ssaInstance, SgExpression* expr_)
-      : SSAMemLoc(ssaInstance, expr_), MemLocObject(expr_) {
-      ROSE_ASSERT(false && "Array must initialize MemLoc");
-    };
-    SSAArray(IndexVectorPtr iv_, HeapSSA* ssaInstance, SgExpression* expr_)
-      : SSAMemLoc(ssaInstance, expr_), MemLocObject(expr_), iv(iv_) {
-      ROSE_ASSERT(false && "Array must initialize MemLoc");
-    };
-    SSAArray(HeapSSA* ssaInstance, SgExpression* expr_, MemLocObjectPtr memLoc, PartPtr part)
-      : SSAMemLoc(ssaInstance, expr_, memLoc, part), MemLocObject(expr_) {};
-
-    SSAArray(SgNode* sgn)
-      : SSAMemLoc(sgn), MemLocObject(sgn) {
-      ROSE_ASSERT(false && "Array must initialize MemLoc");
-    };
-
-    virtual bool mayEqual(MemLocObjectPtr o) const; 
-    virtual bool mustEqual(MemLocObjectPtr o) const; 
-
-    bool isLive(PartEdgePtr pedge) const { return true; };
-
-    virtual bool subSet(AbstractObjectPtr objPtr, PartEdgePtr pedge) {
-      ROSE_ASSERT(false && "Not supported!");
-    };
-
-    IndexVectorPtr getIndexVector() { return iv; };
-
-    MemLocObjectPtr copyML() const {
-      return boost::make_shared<SSAArray>(ssa, expr, memLoc, part);
-    };
-
-  protected:
-    IndexVectorPtr iv;
-  };
-
-  class SSAPointer : virtual public SSAMemLoc, virtual public Pointer {
-  public:
-    SSAPointer(HeapSSA* ssaInstance, SgExpression* expr_) 
-      : SSAMemLoc(ssaInstance, expr_), MemLocObject(expr_) {
-      ROSE_ASSERT(false && "Pointer must initialize MemLoc");
-    };
-    SSAPointer(HeapSSA* ssaInstance, SgExpression* expr_, MemLocObjectPtr memLoc, PartPtr part)
-      : SSAMemLoc(ssaInstance, expr_, memLoc, part), MemLocObject(expr_) {};
-      
-    SSAPointer(SgNode* sgn)
-      : SSAMemLoc(sgn), MemLocObject(sgn) {
-      ROSE_ASSERT(false && "Pointer must initialize MemLoc");
-    };
-
-    virtual bool mayEqual(MemLocObjectPtr o) const; 
-    virtual bool mustEqual(MemLocObjectPtr o) const;
-
-    bool isLive(PartEdgePtr pedge) const { return true; };
-
-    virtual bool subSet(AbstractObjectPtr objPtr, PartEdgePtr pedge) {
-      ROSE_ASSERT(false && "Not supported!");
-    };
-
-    MemLocObjectPtr copyML() const { 
-      return boost::make_shared<SSAPointer>(ssa, expr, memLoc, part);
-    };
-    };*/
+  }; // class SSAMemLoc
 
   class SSADefault : virtual public SSAMemLoc {
   protected:
     SgInitializedName* initName;
 
   public:
-    SSADefault(HeapSSA* ssaInstance, SgExpression* expr) : SSAMemLoc(ssaInstance, expr), 
-      MemLocObject(expr), initName(NULL) {
+    SSADefault(HeapSSA* ssaInstance, SgExpression* expr) :
+      MemLocObject(expr), SSAMemLoc(ssaInstance, expr),initName(NULL) {
       ROSE_ASSERT(false && "Default must initialize MemLoc");
     };
       // SSADefault(HeapSSA* ssaInstance, SgExpression* expr, MemLocObjectPtr memLoc, PartPtr part) 
       //  : SSAMemLoc(ssaInstance, expr, memLoc, part), MemLocObject(expr), initName(NULL) {};
     SSADefault(HeapSSA* ssaInstance, SgNode* expr, MemLocObjectPtr memLoc, PartPtr part)
-      : SSAMemLoc(ssaInstance, NULL, memLoc, part), MemLocObject(expr) {
+      : MemLocObject(expr), SSAMemLoc(ssaInstance, isSgExpression(expr), memLoc, part) {
       expr = isSgExpression(expr);
       initName = isSgInitializedName(expr);
     };
 
-    virtual bool mayEqual(MemLocObjectPtr o) const { mayEqual(o); };
-    virtual bool mustEqual(MemLocObjectPtr o) const { mustEqual(o); };
+    virtual bool mayEqual(MemLocObjectPtr o) const { return mayEqual(o); };
+    virtual bool mustEqual(MemLocObjectPtr o) const { return mustEqual(o); };
     
     bool isLive(PartEdgePtr pedge) const { return true; };
 
@@ -371,13 +230,13 @@ namespace hssa_private
 
     void build(SgProject* proj, bool interprocedural, bool treatPointersAsStructures);
     void build(bool interprocedural, bool treatPointersAsStructures);
-    bool mustBeSame(SSAMemLocPtr memLoc1,SSAMemLocPtr memLoc2);
+    /*bool mustBeSame(SSAMemLocPtr memLoc1,SSAMemLocPtr memLoc2);
     bool mustBeSame(SSAMemLoc* memLoc1, SSAMemLoc* memLoc2);
     bool mustBeSame(SSAMemLoc* memLoc1, SSAMemLoc* memLoc2, bool& mayBeSame);
     bool mayBeSame(SSAMemLocPtr memLoc1, SSAMemLocPtr memLoc2);
     bool mayBeSame(SSAMemLoc* memLoc1, SSAMemLoc* memLoc2);
     bool mayBeDifferent(SSAMemLocPtr memLoc1, SSAMemLocPtr memLoc);
-    bool mayBeDifferent(SSAMemLoc* memLoc1, SSAMemLoc* memLoc2);
+    bool mayBeDifferent(SSAMemLoc* memLoc1, SSAMemLoc* memLoc2);*/
     
   protected:
     void clearTables();
@@ -471,5 +330,7 @@ namespace hssa_private
     
     static HeapReachingDefPtr emptyHeapReachingDefPtr;
     static SSAMemLocPtr emptySSAMemLocPtr;
+    public:
+    std::string str() const;
   };
 };

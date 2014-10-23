@@ -706,20 +706,20 @@ void HeapSSA::updateIncomingPropagatedDefs(FilteredCfgNode cfgNode)
       //Here we don't propagate defs for variables that went out of scope    
       //(built-in vars are body-scoped but we inserted the def at the SgFunctionDefinition node, so we make an exception)              
       if (!isVarInScope(var, astNode) && !isBuiltinVar(var))
-	continue;
+	      continue;
       
       //If this is the first time this def has propagated to this node, just copy it over   
       if (incomingDefTable.count(var) == 0) {
-	incomingDefTable[var] = previousDef;
+	      incomingDefTable[var] = previousDef;
  
 	// Process the heap variable and dphi function  
 	if (hv_isHeapVar(var)) {
 	  SgInitializedName* prevSgn = isSgInitializedName(previousDef->getDefinitionNode());
 	  if (prevSgn != NULL) {
-	    SgType* nodeType = prevSgn->get_type();
+	    //????? SgType* nodeType = prevSgn->get_type();
 	  }
 	  // Get the prev node's dphi 
-          ReachingDefPtr prevDPhi = previousDef;
+    ReachingDefPtr prevDPhi = previousDef;
 	  if (!prevDPhi->isPhiFunction() 
 	      && hv_hasDPhi(previousDef->getDefinitionNode())) {
 	    prevDPhi = hv_getDPhi(previousDef->getDefinitionNode());
@@ -796,127 +796,127 @@ void HeapSSA::buildUseTable(const vector<FilteredCfgNode>& cfgNodes) {
   }
 }
 
-/**
- * Check if the two given abstract memory objects must be same or not, now we support two types 
- * of object set: ScalarExprObj and ScalarNamedObj
- */
-bool HeapSSA::mustBeSame(SSAMemLocPtr memLoc1, SSAMemLocPtr memLoc2) {
-  return memLoc1->mustEqual(memLoc2);
-}
-
-bool HeapSSA::mustBeSame(SSAMemLoc* memLoc1, SSAMemLoc* memLoc2) {
-  // This function should expire
-  /*ScalarExprObj* seObj1 = dynamic_cast<ScalarExprObj* >(objSet1);
-  ScalarExprObj* seObj2 = dynamic_cast<ScalarExprObj* >(objSet2);
-  
-  if (seObj1 != NULL && seObj2 != NULL)
-    return mustBeSame(seObj1, seObj2);
-  else if (seObj1 != NULL || seObj2 != NULL)
-    return false;
-  
-  ScalarNamedObj* snObj1 = dynamic_cast<ScalarNamedObj* >(objSet1);
-  ScalarNamedObj* snObj2 = dynamic_cast<ScalarNamedObj* >(objSet2);
-  if (snObj1 != NULL && snObj2 != NULL) {
-    return mustBeSame(snObj1, snObj2);
-  }
-  */
-  ROSE_ASSERT(false);
-
-  return false;
-}
-
-bool HeapSSA::mustBeSame(SSAMemLoc* memLoc1, SSAMemLoc* memLoc2, bool& mayBeSame) {
-  // This function should expire
-  /*ScalarExprObj* seObj1 = dynamic_cast<ScalarExprObj* >(objSet1);
-  ScalarExprObj* seObj2 = dynamic_cast<ScalarExprObj* >(objSet2);
-
-  if (seObj1 != NULL && seObj2 != NULL)
-    return mustBeSame(seObj1, seObj2, mayBeSame);
-  else if (seObj1 != NULL || seObj2 != NULL)
-    return false;
-
-  ScalarNamedObj* snObj1 = dynamic_cast<ScalarNamedObj* >(objSet1);
-  ScalarNamedObj* snObj2 = dynamic_cast<ScalarNamedObj* >(objSet2);
-  if (snObj1 != NULL && snObj2 != NULL) {
-    return mustBeSame(snObj1, snObj2);
-  }
-  */
-  ROSE_ASSERT(false);
-
-  return false;
-}
-
-/**  
- * Check if the two given abstract memory objects may be same or not, now we support two types
- * of object set: ScalarExprObj and ScalarNamedOb
- */
-bool HeapSSA::mayBeSame(SSAMemLocPtr memLoc1, SSAMemLocPtr memLoc2) {
-  return mustBeSame(memLoc1, memLoc2);
-}
-
-bool HeapSSA::mayBeSame(SSAMemLoc* memLoc1, SSAMemLoc* memLoc2) {
-  return mustBeSame(memLoc1, memLoc2);
-}
-
-/**           
- * Check if the two given abstract memory objects may be different or not, now we support 
- * two types of object set: ScalarExprObj and ScalarNamedObj
- */
-bool HeapSSA::mayBeDifferent(SSAMemLocPtr memLoc1, SSAMemLocPtr memLoc2) {
-  return !mustBeSame(memLoc1, memLoc2);
-}
-
-bool HeapSSA::mayBeDifferent(SSAMemLoc* memLoc1, SSAMemLoc* memLoc2) {
-  return !mustBeSame(memLoc1, memLoc2);
-}
-
-/**
- * Check if two dot expressions point to same heap address
- */
-bool HeapSSA::mustBeSame(SgDotExp* dotExp1, SgDotExp* dotExp2) {
-  SgNode* lhs1 = dotExp1->get_lhs_operand();
-  SgNode* lhs2 = dotExp2->get_lhs_operand();
-  if (hasSameReachingDef(lhs1, lhs2)) {
-    SgNode* rhs1 = dotExp1->get_rhs_operand();
-    SgNode* rhs2 = dotExp2->get_rhs_operand();
-
-    SgVarRefExp* varRef1 = isSgVarRefExp(rhs1);
-    SgVarRefExp* varRef2 = isSgVarRefExp(rhs2);
-    if (varRef1 != NULL && varRef2 != NULL)
-      return varRef1->get_symbol() == varRef2->get_symbol();
-    
-    bool res = hasSameReachingDef(rhs1, rhs2);
-    return res;
-  }
-  
-  return false;
-}
-
-/**
- * Check if two arrow expression point to same heap address 
- */
-bool HeapSSA::mustBeSame(SgArrowExp* arrowExp1, SgArrowExp* arrowExp2) {
-  SgNode* lhs1 = arrowExp1->get_lhs_operand();
-  SgNode* lhs2 = arrowExp2->get_lhs_operand();
-  if (hasSameReachingDef(lhs1, lhs2)) {
-    SgNode* rhs1 = arrowExp1->get_rhs_operand();
-    SgNode* rhs2 = arrowExp2->get_rhs_operand();
-    return hasSameReachingDef(rhs1, rhs2);
-  }
-
-  return false;
-}
-
-/**
- * Check if two pointer de-reference have same pointer value
- */
-bool HeapSSA::mustBeSame(SgPointerDerefExp* pdrExp1, SgPointerDerefExp* pdrExp2) {
-  return hasSameReachingDef(pdrExp1->get_operand(), pdrExp2->get_operand());
-}
-
-bool HeapSSA::mustBeSame(SgDotExp* dotExp, SgPointerDerefExp* pdrExp) {
-  return false;
-}
+///**
+// * Check if the two given abstract memory objects must be same or not, now we support two types
+// * of object set: ScalarExprObj and ScalarNamedObj
+// */
+//bool HeapSSA::mustBeSame(SSAMemLocPtr memLoc1, SSAMemLocPtr memLoc2) {
+//  return memLoc1->mustEqual(memLoc2);
+//}
+//
+//bool HeapSSA::mustBeSame(SSAMemLoc* memLoc1, SSAMemLoc* memLoc2) {
+//  // This function should expire
+//  /*ScalarExprObj* seObj1 = dynamic_cast<ScalarExprObj* >(objSet1);
+//  ScalarExprObj* seObj2 = dynamic_cast<ScalarExprObj* >(objSet2);
+//
+//  if (seObj1 != NULL && seObj2 != NULL)
+//    return mustBeSame(seObj1, seObj2);
+//  else if (seObj1 != NULL || seObj2 != NULL)
+//    return false;
+//
+//  ScalarNamedObj* snObj1 = dynamic_cast<ScalarNamedObj* >(objSet1);
+//  ScalarNamedObj* snObj2 = dynamic_cast<ScalarNamedObj* >(objSet2);
+//  if (snObj1 != NULL && snObj2 != NULL) {
+//    return mustBeSame(snObj1, snObj2);
+//  }
+//  */
+//  ROSE_ASSERT(false);
+//
+//  return false;
+//}
+//
+//bool HeapSSA::mustBeSame(SSAMemLoc* memLoc1, SSAMemLoc* memLoc2, bool& mayBeSame) {
+//  // This function should expire
+//  /*ScalarExprObj* seObj1 = dynamic_cast<ScalarExprObj* >(objSet1);
+//  ScalarExprObj* seObj2 = dynamic_cast<ScalarExprObj* >(objSet2);
+//
+//  if (seObj1 != NULL && seObj2 != NULL)
+//    return mustBeSame(seObj1, seObj2, mayBeSame);
+//  else if (seObj1 != NULL || seObj2 != NULL)
+//    return false;
+//
+//  ScalarNamedObj* snObj1 = dynamic_cast<ScalarNamedObj* >(objSet1);
+//  ScalarNamedObj* snObj2 = dynamic_cast<ScalarNamedObj* >(objSet2);
+//  if (snObj1 != NULL && snObj2 != NULL) {
+//    return mustBeSame(snObj1, snObj2);
+//  }
+//  */
+//  ROSE_ASSERT(false);
+//
+//  return false;
+//}
+//
+///**
+// * Check if the two given abstract memory objects may be same or not, now we support two types
+// * of object set: ScalarExprObj and ScalarNamedOb
+// */
+//bool HeapSSA::mayBeSame(SSAMemLocPtr memLoc1, SSAMemLocPtr memLoc2) {
+//  return mustBeSame(memLoc1, memLoc2);
+//}
+//
+//bool HeapSSA::mayBeSame(SSAMemLoc* memLoc1, SSAMemLoc* memLoc2) {
+//  return mustBeSame(memLoc1, memLoc2);
+//}
+//
+///**
+// * Check if the two given abstract memory objects may be different or not, now we support
+// * two types of object set: ScalarExprObj and ScalarNamedObj
+// */
+//bool HeapSSA::mayBeDifferent(SSAMemLocPtr memLoc1, SSAMemLocPtr memLoc2) {
+//  return !mustBeSame(memLoc1, memLoc2);
+//}
+//
+//bool HeapSSA::mayBeDifferent(SSAMemLoc* memLoc1, SSAMemLoc* memLoc2) {
+//  return !mustBeSame(memLoc1, memLoc2);
+//}
+//
+///**
+// * Check if two dot expressions point to same heap address
+// */
+//bool HeapSSA::mustBeSame(SgDotExp* dotExp1, SgDotExp* dotExp2) {
+//  SgNode* lhs1 = dotExp1->get_lhs_operand();
+//  SgNode* lhs2 = dotExp2->get_lhs_operand();
+//  if (hasSameReachingDef(lhs1, lhs2)) {
+//    SgNode* rhs1 = dotExp1->get_rhs_operand();
+//    SgNode* rhs2 = dotExp2->get_rhs_operand();
+//
+//    SgVarRefExp* varRef1 = isSgVarRefExp(rhs1);
+//    SgVarRefExp* varRef2 = isSgVarRefExp(rhs2);
+//    if (varRef1 != NULL && varRef2 != NULL)
+//      return varRef1->get_symbol() == varRef2->get_symbol();
+//
+//    bool res = hasSameReachingDef(rhs1, rhs2);
+//    return res;
+//  }
+//
+//  return false;
+//}
+//
+///**
+// * Check if two arrow expression point to same heap address
+// */
+//bool HeapSSA::mustBeSame(SgArrowExp* arrowExp1, SgArrowExp* arrowExp2) {
+//  SgNode* lhs1 = arrowExp1->get_lhs_operand();
+//  SgNode* lhs2 = arrowExp2->get_lhs_operand();
+//  if (hasSameReachingDef(lhs1, lhs2)) {
+//    SgNode* rhs1 = arrowExp1->get_rhs_operand();
+//    SgNode* rhs2 = arrowExp2->get_rhs_operand();
+//    return hasSameReachingDef(rhs1, rhs2);
+//  }
+//
+//  return false;
+//}
+//
+///**
+// * Check if two pointer de-reference have same pointer value
+// */
+//bool HeapSSA::mustBeSame(SgPointerDerefExp* pdrExp1, SgPointerDerefExp* pdrExp2) {
+//  return hasSameReachingDef(pdrExp1->get_operand(), pdrExp2->get_operand());
+//}
+//
+//bool HeapSSA::mustBeSame(SgDotExp* dotExp, SgPointerDerefExp* pdrExp) {
+//  return false;
+//}
 
 /**
  * Check if the two given SgNodes have same reaching def object, i.e. same variable
@@ -1145,3 +1145,44 @@ void HeapSSA::hv_addAlias(SgNode* sgn, AliasSetPtr another) {
   AliasSet* aliasSet = another->copy();
   hv_aliasTable[sgn] = AliasSetPtr(aliasSet);
   }*/
+
+std::string HeapSSA::str() const {
+  ostringstream s;
+  s << "[HeapSSA:"<<endl;
+  s << "<u>hv_amoTable</u>"<<endl;
+  s << "<table>";
+  for(map<SgNode*, SSAMemLocPtr>::const_iterator i=hv_amoTable.begin(); i!=hv_amoTable.end(); i++) {
+    s << "<tr><td>"<<SgNode2Str(i->first)<<"</td><td>"<<i->second->str()<<"</td></tr>";
+  }
+  s << "</table>"<<endl;
+
+  s << "<u>hv_localUses</u>"<<endl;
+  s << "<table>";
+  for(boost::unordered_map<SgNode*, std::set<SgNode* > >::const_iterator i=hv_localUses.begin(); i!=hv_localUses.end(); i++) {
+    s << "<tr><td>"<<SgNode2Str(i->first)<<"</td><td>";
+    for(set<SgNode* >::const_iterator j=i->second.begin(); j!=i->second.end(); j++)
+      s << SgNode2Str(*j)<<endl;
+    s << "</td>";
+  }
+  s << "</table>"<<endl;
+
+  s << "<u>hv_localDefs</u>"<<endl;
+  s << "<table>";
+  for(boost::unordered_map<SgNode*, std::set<SgNode* > >::const_iterator i=hv_localDefs.begin(); i!=hv_localDefs.end(); i++) {
+    s << "<tr><td>"<<SgNode2Str(i->first)<<"</td><td>";
+    for(set<SgNode* >::const_iterator j=i->second.begin(); j!=i->second.end(); j++)
+      s << SgNode2Str(*j)<<endl;
+    s << "</td>";
+  }
+  s << "</table>"<<endl;
+
+  s << "<u>hv_localDefs</u>"<<endl;
+  s << "<table>";
+  for(map<SgNode*, ReachingDef::ReachingDefPtr>::const_iterator i=hv_reachingDefTable.begin(); i!=hv_reachingDefTable.end(); i++) {
+    s << "<tr><td>"<<SgNode2Str(i->first)<<"</td><td>"<<CFGNode2Str(i->second->getDefinitionNode())<<"</td></tr>";
+  }
+  s << "</table>"<<endl;
+
+  s << "]";
+  return s.str();
+}

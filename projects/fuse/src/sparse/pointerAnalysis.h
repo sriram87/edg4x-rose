@@ -42,11 +42,11 @@ namespace scc_private
 
   class SPTMemLoc : virtual public SSAMemLoc {
   public:
-    SPTMemLoc(HeapSSA* ssaInstance, SgExpression* expr, MemLocObjectPtr memLoc, PartPtr part) 
-      : SSAMemLoc(ssaInstance, expr, memLoc, part), MemLocObject(expr), analysis(NULL) {};
+    /*SPTMemLoc(HeapSSA* ssaInstance, SgExpression* expr, MemLocObjectPtr memLoc, PartPtr part)
+      : MemLocObject(expr), SSAMemLoc(ssaInstance, expr, memLoc, part), analysis(NULL) {};*/
     SPTMemLoc(HeapSSA* ssaInstance, SgExpression* expr, MemLocObjectPtr memLoc, PartPtr part, 
 	      SparsePointToAnalysis* analysis_)
-      : SSAMemLoc(ssaInstance, expr, memLoc, part), MemLocObject(expr), analysis(analysis_) {};
+      : MemLocObject(expr), SSAMemLoc(ssaInstance, expr, memLoc, part), analysis(analysis_) {};
     SPTMemLoc(SSAMemLocPtr memLoc_, SparsePointToAnalysis* analysis_);
 
     // pretty print for the object                     
@@ -163,8 +163,8 @@ namespace scc_private
   /// Sparse PointTo Analysis
   class SparsePointToAnalysis : virtual public PGSSAAnalysis {
   public:
-    SparsePointToAnalysis() : ComposedAnalysis(/*trackBase2RefinedPartEdgeMapping*/ false), hasVisitor(false) {};
-    SparsePointToAnalysis(SparsePointToAnalysis* oldAnalysis) : ComposedAnalysis(/*trackBase2RefinedPartEdgeMapping*/ false), hasVisitor(false) {};
+    SparsePointToAnalysis() : PGSSAAnalysis(/*trackBase2RefinedPartEdgeMapping*/ false), hasVisitor(false) {};
+    SparsePointToAnalysis(SparsePointToAnalysis* oldAnalysis) : PGSSAAnalysis(/*trackBase2RefinedPartEdgeMapping*/ false), hasVisitor(false) {};
 
     void genInitLattice(const Function& func, PartPtr part, PartEdgePtr pedge,
                         std::vector<Lattice*>& initLattices);
@@ -210,7 +210,7 @@ namespace scc_private
     /// Get iterator
     dataflowPartEdgeIterator* getIterator() {
       set<PartPtr> terminalStates = getComposer()->GetEndAStates(this);
-      return new fw_dataflowPartEdgeIterator();
+      return new fw_dataflowPartEdgeIterator(selectIterOrderFromEnvironment());
     }
 
     /// Transfer function

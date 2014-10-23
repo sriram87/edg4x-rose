@@ -3,6 +3,8 @@
 #include "sageInterface.h"
 #include "stx_analysis.h"
     
+#define sparsePTDebugLevel 0
+
 /**
  * This is an implementation of Ondrej Lothak'11 pointer analysis
  * 
@@ -45,8 +47,9 @@ std::string getVarName_(SgNode* sgn) {
 
 /// Sparse PointTo memory location
 SPTMemLoc::SPTMemLoc(SSAMemLocPtr memLoc_, SparsePointToAnalysis* analysis_) 
-: SSAMemLoc(memLoc_->getSSAInstance(), memLoc_->getVarExpr(), memLoc_->getLabelMemLoc(), memLoc_->getPart()), 
-MemLocObject(memLoc_->getVarExpr()) {
+: MemLocObject(memLoc_->getVarExpr()),
+  SSAMemLoc(memLoc_->getSSAInstance(), memLoc_->getVarExpr(), memLoc_->getLabelMemLoc(), memLoc_->getPart())
+ {
   analysis = analysis_;
 }
 
@@ -59,11 +62,13 @@ bool SPTMemLoc::mayEqualML(MemLocObjectPtr o, PartEdgePtr pedge) {
     SSAMemLocPtr ssaMemLoc = boost::dynamic_pointer_cast<SSAMemLoc>(o);
     if (!ssaMemLoc)
       // Delegate to label memory location that got from predecessor
-      return this->memLoc->mayEqualML(o, pedge);
+      //return this->memLoc->mayEqualML(o, pedge);
+      return this->memLoc->mayEqual(o, pedge, analysis->getComposer(), analysis);
     else {
       // Delegate to label memory location that got from predecessor
       // PartPtr currPart = ((PGSSA* )ssa)->getPart(expr);
-      return this->memLoc->mayEqualML(ssaMemLoc->getLabelMemLoc(), pedge); // currPart->inEdgeFromAny());
+      //return this->memLoc->mayEqualML(ssaMemLoc->getLabelMemLoc(), pedge); // currPart->inEdgeFromAny());
+      return this->memLoc->mayEqual(ssaMemLoc->getLabelMemLoc(), pedge, analysis->getComposer(), analysis);
     }
   } else 
     return analysis->mayAlias(expr, memLoc);
@@ -77,11 +82,13 @@ bool SPTMemLoc::mustEqualML(MemLocObjectPtr o, PartEdgePtr pedge) {
     SSAMemLocPtr ssaMemLoc = boost::dynamic_pointer_cast<SSAMemLoc>(o);
     if (!ssaMemLoc) 
       // Delegate to label memory location that got from predecessor
-      return this->memLoc->mustEqualML(o, pedge);
+      //return this->memLoc->mustEqualML(o, pedge);
+      return this->memLoc->mustEqual(o, pedge, analysis->getComposer(), analysis);
     else {
       // Delegate to label memory location that got from predecessor
       // PartPtr currPart = ((PGSSA* )ssa)->getPart(expr);
-      return this->memLoc->mustEqualML(ssaMemLoc->getLabelMemLoc(), pedge); // currPart->inEdgeFromAny());
+      //return this->memLoc->mustEqualML(ssaMemLoc->getLabelMemLoc(), pedge); // currPart->inEdgeFromAny());
+      return this->memLoc->mustEqual(ssaMemLoc->getLabelMemLoc(), pedge, analysis->getComposer(), analysis);
     }
   } else 
     return analysis->mustAlias(expr, memLoc);
@@ -93,14 +100,16 @@ bool SPTMemLoc::mayEqualML(MemLocObjectPtr o) const {
   PartPtr currPart = ((PGSSA* )ssa)->getPart(expr);
   if (!ssaMemLoc)
     // Delegate to label memory location that got from predecessor
-    return this->memLoc->mayEqualML(o, currPart->inEdgeFromAny());
+    //return this->memLoc->mayEqualML(o, currPart->inEdgeFromAny());
+    return this->memLoc->mayEqual(o, currPart->inEdgeFromAny(), analysis->getComposer(), analysis);
   else {
     // Compare the signature
     if (isSameSig(this->expr, ssaMemLoc->getVarExpr()))
       return true;
 
     // Delegate to label memory location that got from predecessor
-    return this->memLoc->mayEqualML(ssaMemLoc->getLabelMemLoc(), currPart->inEdgeFromAny());
+    //return this->memLoc->mayEqualML(ssaMemLoc->getLabelMemLoc(), currPart->inEdgeFromAny());
+    return this->memLoc->mayEqual(ssaMemLoc->getLabelMemLoc(), currPart->inEdgeFromAny(), analysis->getComposer(), analysis);
   }
 }
 
@@ -110,19 +119,21 @@ bool SPTMemLoc::mustEqualML(MemLocObjectPtr o) const {
   PartPtr currPart = ((PGSSA* )ssa)->getPart(expr);
   if (!ssaMemLoc)
     // Delegate to label memory location that got from predecessor
-    return this->memLoc->mustEqualML(o, currPart->inEdgeFromAny());
+    //return this->memLoc->mustEqualML(o, currPart->inEdgeFromAny());
+    return this->memLoc->mustEqual(o, currPart->inEdgeFromAny(), analysis->getComposer(), analysis);
   else {
     // Compare the signature
     if (isSameSig(this->expr, ssaMemLoc->getVarExpr()))
       return true;
 
     // Delegate to label memory location that got from predecessor
-    return this->memLoc->mustEqualML(ssaMemLoc->getLabelMemLoc(), currPart->inEdgeFromAny());
+    //return this->memLoc->mustEqualML(ssaMemLoc->getLabelMemLoc(), currPart->inEdgeFromAny());
+    return this->memLoc->mustEqual(ssaMemLoc->getLabelMemLoc(), currPart->inEdgeFromAny(), analysis->getComposer(), analysis);
   }
 }
 
 /// Sparse PointTo Lattice
-SPTLattice::SPTLattice(PartEdgePtr pedge) : FiniteLattice(pedge), Lattice(pedge), full(false) {
+SPTLattice::SPTLattice(PartEdgePtr pedge) : Lattice(pedge), FiniteLattice(pedge), full(false) {
   this->pedge = pedge;
 }
 
@@ -136,11 +147,19 @@ Lattice* SPTLattice::copy() const {
 bool SPTLattice::meetUpdate(Lattice* lattice) {
   SPTLattice* ptLattice = dynamic_cast<SPTLattice* >(lattice);
   ROSE_ASSERT(ptLattice);
+  unsigned int initialSize=ptSet.size();
   ptSet.insert(ptLattice->ptSet.begin(), ptLattice->ptSet.end());
+
+  // Return whether ptSet has changed
+  return (ptSet.size() != initialSize);
 }
 
 bool SPTLattice::meetUpdate(SPTLatticePtr lattice) {
+  unsigned int initialSize=ptSet.size();
   ptSet.insert(lattice->ptSet.begin(), lattice->ptSet.end());
+
+  // Return whether ptSet has changed
+  return (ptSet.size() != initialSize);
 }
 
 bool SPTLattice::operator==(Lattice* lattice) {
@@ -197,7 +216,7 @@ SparsePointToAnalysisTransfer::SparsePointToAnalysisTransfer(// const Function& 
 							     Composer* composer, 
 							     SparsePointToAnalysis* analysis_)
   : PGSSAValueTransferVisitor<SPTLattice>(part, cn, state, dfInfo, analysis_->getPGSSA(), 
-					  composer), analysis(analysis_), modified(false) {}
+					  composer, sparsePTDebugLevel), analysis(analysis_), modified(false) {}
 
 void SparsePointToAnalysisTransfer::visit(SgVarRefExp* sgn) {
   // std::cout << "before visit: " << sgn->class_name() << std::endl;
@@ -340,8 +359,9 @@ SPTLatticePtr SparsePointToAnalysisTransfer::getPhiLattice(SgNode* sgn) {
 /// Sparse PointTo Analysis
 void SparsePointToAnalysis::genInitLattice(const Function& func, PartPtr part, PartEdgePtr pedge, 
                                            std::vector<Lattice* >& initLattice) {
-  PGSSAObjectMap* l = new PGSSAObjectMap(boost::make_shared<SPTLattice>(pedge), pedge, getComposer(), this);
-  initLattice.push_back(l);
+/*  PGSSAObjectMap* l = new PGSSAObjectMap(boost::make_shared<SPTLattice>(pedge), pedge, getComposer(), this);
+  initLattice.push_back(l);*/
+  ROSE_ASSERT(0);
 }
 
 boost::shared_ptr<PGSSAIntraProcTransferVisitor>
@@ -474,8 +494,8 @@ MemLocObjectPtr SparsePointToAnalysis::Expr2MemLoc(SgNode* sgn, PartEdgePtr pedg
 void SparsePointToAnalysis::dumpPTG() {
   std::cout << "---------------------------" << std::endl;
   std::cout << "dump PTG" << std::endl;
-  SgFunctionDefinition* funcDef;
-  PGSSAObjectMap* objMap;
+  //SgFunctionDefinition* funcDef;
+  //PGSSAObjectMap* objMap;
   // foreach(tie(funcDef, objMap), funcObjMap) {
   // }
   std::cout << "---------------------------" << std::endl;

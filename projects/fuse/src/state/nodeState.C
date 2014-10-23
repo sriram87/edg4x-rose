@@ -200,16 +200,16 @@ Lattice* NodeState::getLatticeAbove(Analysis* analysis, PartEdgePtr departEdge, 
   SIGHT_VERB_FI()
 
   // We must get either a concrete edge or inEdgeFromAny
-  assert(departEdge && departEdge->target());
+  //assert(departEdge && departEdge->target());
 
   // If the analysis has data mapped abode this part
   if(analysisDataExists(dfInfoAbove, analysis)) {
     Lattice* retLattice;
     
-    // given concrete edge or inEdgeFromAny verify that the state queried upon (this) 
+    /* // given concrete edge or inEdgeFromAny verify that the state queried upon (this)
     // and the state associated with the edge are same
     // otherwise the given departEdge is invalid for this state
-    assert(this==getNodeState(dynamic_cast<ComposedAnalysis*>(analysis), departEdge->target()));
+    assert(this==getNodeState(dynamic_cast<ComposedAnalysis*>(analysis), departEdge->target()));*/
   
     // departEdge is either inEdgeFromAny or concrete here
     retLattice = getLattice_ex(dfInfoAbove, analysis, departEdge, latticeName);
@@ -236,15 +236,15 @@ Lattice* NodeState::getLatticeBelow(Analysis* analysis, PartEdgePtr departEdge, 
   SIGHT_VERB_FI()
 
   // We must get a concrete edge or outEdgeToAny
-  assert(departEdge && departEdge->source());
+  //assert(departEdge && departEdge->source());
 
   // If the analysis has data mapped abode this part
   if(analysisDataExists(dfInfoBelow, analysis)) {
     Lattice* retLattice;
-    // given concrete edge or outEdgeToAny verify that the state queried upon (this) 
+    /* // given concrete edge or outEdgeToAny verify that the state queried upon (this)
     // and the state associated with the edge are same
     // otherwise the given departEdge is invalid for this state
-    assert(this==getNodeState(dynamic_cast<ComposedAnalysis*>(analysis), departEdge->source()));
+    assert(this==getNodeState(dynamic_cast<ComposedAnalysis*>(analysis), departEdge->source()));*/
 
     // departEdge is either outEdgeToAny or concrete here
     retLattice = getLattice_ex(dfInfoBelow, analysis, departEdge, latticeName);

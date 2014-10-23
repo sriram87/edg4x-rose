@@ -23,6 +23,10 @@
 
 #include <vector>
 
+#include "sight.h"
+#include "sight_verbosity.h"
+using namespace sight;
+
 namespace hssa_private {
   using namespace boost;
   using namespace std;
@@ -71,44 +75,44 @@ namespace hssa_private {
     /// Create the attribute with no refs. 
     PGChildUses() : currentVar(NULL), currentOp(NULL) {};
       
-      PGChildUses(SgNode* useNode, SgVarRefExp* var) {
-	uses.push_back(useNode);
-	currentVar = var;
-	currentOp = NULL;
-      }
+    PGChildUses(SgNode* useNode, SgVarRefExp* var) {
+      uses.push_back(useNode);
+      currentVar = var;
+      currentOp = NULL;
+    }
 
-      /// Create the attribute with the def and list of uses
-      /// @param useTree The vector of uses to add, or an empty vector.
-      PGChildUses(const std::vector<SgNode*>& useTree, SgVarRefExp* var = NULL) {
-	if (useTree.size() > 0)
-	  uses.assign(useTree.begin(), useTree.end());
-	currentVar = var;
-      }
+    /// Create the attribute with the def and list of uses
+    /// @param useTree The vector of uses to add, or an empty vector.
+    PGChildUses(const std::vector<SgNode*>& useTree, SgVarRefExp* var = NULL) {
+      if (useTree.size() > 0)
+        uses.assign(useTree.begin(), useTree.end());
+      currentVar = var;
+    }
 
-      PGChildUses(const std::vector<SgNode*>& useTree, SgNode* op, bool isHeap) {
-	if (useTree.size() > 0)
-          uses.assign(useTree.begin(), useTree.end());
-        if (isHeap && op != NULL)
-	  currentOp = op;
-	currentVar = NULL;
-      }
+    PGChildUses(const std::vector<SgNode*>& useTree, SgNode* op, bool isHeap) {
+      if (useTree.size() > 0)
+        uses.assign(useTree.begin(), useTree.end());
+      if (isHeap && op != NULL)
+        currentOp = op;
+      currentVar = NULL;
+    }
 
-      /// Get the uses for this node and below
-      /// @return A constant reference to the use list
-      std::vector<SgNode*>& getUses() { return uses; };
+    /// Get the uses for this node and below
+    /// @return A constant reference to the use list
+    std::vector<SgNode*>& getUses() { return uses; };
 
-      /// Set the uses for this node and below.
-      /// @param newUses A constant reference to the uses to copy to this node.
-      void setUses(const std::vector<SgNode*>& newUses) {
-	uses.assign(newUses.begin(), newUses.end());
-      };
+    /// Set the uses for this node and below.
+    /// @param newUses A constant reference to the uses to copy to this node.
+    void setUses(const std::vector<SgNode*>& newUses) {
+      uses.assign(newUses.begin(), newUses.end());
+    };
 
-      SgVarRefExp* getCurrentVar() const { return currentVar; };
+    SgVarRefExp* getCurrentVar() const { return currentVar; };
 
-      SgNode* getCurrentOp() const { return currentOp; };
+    SgNode* getCurrentOp() const { return currentOp; };
 
-      bool isVar() { return currentVar != NULL; };
-      bool isHeap() { return currentOp != NULL; };
+    bool isVar() { return currentVar != NULL; };
+    bool isHeap() { return currentOp != NULL; };
   };
 
   class PGDefsAndUsesTraversal : public AstBottomUpProcessing<PGChildUses> {
@@ -129,8 +133,8 @@ namespace hssa_private {
       treatPointersAsStructs(treatPointersAsStructs) {};
       
       PGDefsAndUsesTraversal(PGSSA* ssa, PartPtr part, CFGNode cfgNode_, bool treatPointersAsStructs = true) 
-	: pgssa(ssa), currPart(part), cfgNode(cfgNode_), 
-	treatPointersAsStructs(treatPointersAsStructs) {};
+  : pgssa(ssa), currPart(part), cfgNode(cfgNode_),
+  treatPointersAsStructs(treatPointersAsStructs) {};
 
       /** Called to evaluate the synthesized attribute on every node.
        *
@@ -143,7 +147,7 @@ namespace hssa_private {
       virtual PGChildUses evaluateSynthesizedAttribute(SgNode* node, SynthesizedAttributesList attrs);
 
       static void collectDefsAndUses(PGSSA* pgssa, PartPtr startN, const std::set<PartPtr>& endNs, 
-				     PartSet& visitedParts);
+             PartSet& visitedParts);
 
   protected:
 
@@ -172,11 +176,11 @@ namespace hssa_private {
 
   public:
     PGReachingDef(PartPtr defPart_, SgNode* defNode_, Type type)
-      : defPart(defPart_), defNode(defNode_), defType(type), id(-1) {};
+      : defType(type), defPart(defPart_), defNode(defNode_), id(-1) {};
     PGReachingDef(PartPtr defPart_, SgNode* defNode_, int id_)
-      : defPart(defPart_), defNode(defNode_), defType(PI), id(id_) {};
+      : defType(PI), defPart(defPart_), defNode(defNode_), id(id_) {};
     PGReachingDef(PartPtr defPart_, SgNode* defNode_, Type type, PGReachingDefPtr prevDef)
-      : defPart(defPart_), defNode(defNode_), defType(type), id(-1), prevDef_(prevDef) {};
+      : defType(type), defPart(defPart_), defNode(defNode_), id(-1), prevDef_(prevDef) {};
     ~PGReachingDef() {}
 
     bool isPhiFunction() const { return defType == PHI; };
@@ -241,335 +245,336 @@ namespace hssa_private {
 
   class PGSSA : public HeapSSA {
   public:
-    PGSSA() : HeapSSA(NULL), needPiNode(false), hasDeref(false), hasAddrTaken(false), hasArrOrFieldAcc(false), 
-      analysis(NULL), heapVarName(NULL), hasUniqueNames(false) {};
-    PGSSA(SgProject* proj, const Function& func, PGSSAAnalysis* analysis_) : HeapSSA(proj), needPiNode(false), 
-      hasDeref(false), hasAddrTaken(false), hasArrOrFieldAcc(false), analysis(analysis_), heapVarName(NULL), hasUniqueNames(false) {
+    PGSSA() : HeapSSA(NULL), analysis(NULL), needPiNode(false), heapVarName(NULL),
+      hasDeref(false), hasAddrTaken(false), hasArrOrFieldAcc(false), hasUniqueNames(false) {};
+    PGSSA(SgProject* proj, const Function& func, PGSSAAnalysis* analysis_) : HeapSSA(proj), analysis(analysis_), needPiNode(false),
+        heapVarName(NULL), hasDeref(false), hasAddrTaken(false), hasArrOrFieldAcc(false), hasUniqueNames(false) {
       setFunction(func);
     };
     PGSSA(SgProject* proj, const Function& func, PGSSAAnalysis* analysis_, bool needPiNode_) : HeapSSA(proj), 
-      needPiNode(needPiNode_), hasDeref(false), hasAddrTaken(false), hasArrOrFieldAcc(false), analysis(analysis_),
-      heapVarName(NULL), hasUniqueNames(false) {
+      analysis(analysis_), needPiNode(needPiNode_), heapVarName(NULL),
+      hasDeref(false), hasAddrTaken(false), hasArrOrFieldAcc(false), hasUniqueNames(false)
+    {
       setFunction(func);
     };
 
-      ~PGSSA() {};
-      
-      // ChainComposer* composer;
-      PGSSAAnalysis* getAnalysis() { return analysis; };
-      void setAnalysis(PGSSAAnalysis* analysis_) { analysis = analysis_; };
+    ~PGSSA() {};
 
-      /// Build partition graph based SSA form
-      bool build(SgProject* proj, bool interprocedural, bool treatPointersAsStructures);
+    // ChainComposer* composer;
+    PGSSAAnalysis* getAnalysis() { return analysis; };
+    void setAnalysis(PGSSAAnalysis* analysis_) { analysis = analysis_; };
 
-      /// Build partition graph based SSA form
-      bool build(const std::set<PartPtr>& startNodes, 
-		 const std::set<PartPtr>& endNodes);
+    /// Build partition graph based SSA form
+    bool build(SgProject* proj, bool interprocedural, bool treatPointersAsStructures);
 
-      bool build(const std::set<PartPtr>& startNodes, 
-		 const std::set<PartPtr>& endNodes, bool needPiNode_);
+    /// Build partition graph based SSA form
+    bool build(const std::set<PartPtr>& startNodes,
+    const std::set<PartPtr>& endNodes);
 
-      /// Test functions
-      void postDominator(SgProject* proj);
-      void createDominator(const Function& function, const std::set<PartPtr>& startNs, 
-			   const std::set<PartPtr>& endNs);
-      
-      /// Register the SgNode to Part
-      void registerNode(PartPtr part, SgNode* sgn) {
-	node2Part[sgn] = part;
-      };
+    bool build(const std::set<PartPtr>& startNodes,
+    const std::set<PartPtr>& endNodes, bool needPiNode_);
 
-      /// Register MemLocObject with SgNode and part
-      void registerMemLocObj(SgNode* sgn, PartPtr part, CFGNode cfgNode);
-      
-      /// Reregister the memory location
-      bool reRegisterMemLocObj(SgNode* sgn, SSAMemLocPtr oldMemLoc, SSAMemLocPtr memLoc);
+    /// Test functions
+    void postDominator(SgProject* proj);
+    void createDominator(const Function& function, const std::set<PartPtr>& startNs,
+                         const std::set<PartPtr>& endNs);
 
-      /// Get current heap variable that is corresponding to current function
-      const StaticSingleAssignment::VarName& getHeapVarName(SgNode* sgn);
-      
-      /// Get part based local uses table
-      PartLocalDefUseTable& getPartLocalUsesTable() {
-	return partLocalUsesTable;
-      };
+    /// Register the SgNode to Part
+    void registerNode(PartPtr part, SgNode* sgn) {
+      node2Part[sgn] = part;
+    };
 
-      /// Get part based original definition table
-      PartLocalDefUseTable& getPartOriginalDefTable() {
-	return partOriginalDefTable;
-      };
+    /// Register MemLocObject with SgNode and part
+    void registerMemLocObj(SgNode* sgn, PartPtr part, CFGNode cfgNode);
 
-      /// Get part based heap uses table
-      PartLocalDefUseTable_& getPartHeapUsesTable() {
-	return partHeapLocalUses;
-      };
+    /// Reregister the memory location
+    bool reRegisterMemLocObj(SgNode* sgn, SSAMemLocPtr oldMemLoc, SSAMemLocPtr memLoc);
 
-      /// Set current function to PGSSA 
-      void setFunction(const Function& func) {
-	currFunc = func.get_declaration()->get_definition();
-      };
+    /// Get current heap variable that is corresponding to current function
+    const StaticSingleAssignment::VarName& getHeapVarName(SgNode* sgn);
 
-      /// Check if the given SgNode contains definition
-      bool hasDef(SgNode* node);
+    /// Get part based local uses table
+    PartLocalDefUseTable& getPartLocalUsesTable() {
+      return partLocalUsesTable;
+    };
 
-      /// Check if the given variable is a heap variable
-      bool isHeapVar(const VarName& var) {
-	ROSE_ASSERT(heapVarName);
-	return var == heapVarName->getKey();
-      };
+    /// Get part based original definition table
+    PartLocalDefUseTable& getPartOriginalDefTable() {
+      return partOriginalDefTable;
+    };
 
-      /// Check if the part has dphi function
-      bool hasDPhi(PartPtr part);
+    /// Get part based heap uses table
+    PartLocalDefUseTable_& getPartHeapUsesTable() {
+      return partHeapLocalUses;
+    };
 
-      /// Check if the <part, SgNode> has dphi function 
-      bool hasDPhi(PartPtr part, SgNode* sgn);
+    /// Set current function to PGSSA
+    void setFunction(const Function& func) {
+      currFunc = func.get_declaration()->get_definition();
+    };
 
-      /// Get <part, SgNode>'s dphi function
-      PGReachingDefPtr getDPhi(PartPtr part, SgNode * sgn);
+    /// Check if the given SgNode contains definition
+    bool hasDef(SgNode* node);
 
-      /// Check if the part contains heap uses
-      bool hasHeapUse(PartPtr part, SgNode* sgn);
+    /// Check if the given variable is a heap variable
+    bool isHeapVar(const VarName& var) {
+      ROSE_ASSERT(heapVarName);
+      return var == heapVarName->getKey();
+    };
 
-      /// Set given node's all use SgNode with the input reaching def which is a dphi       
-      bool updateHeapUseReachingDef(PartPtr part, SgNode* sgn, PGReachingDefPtr reachignDef);
+    /// Check if the part has dphi function
+    bool hasDPhi(PartPtr part);
 
-      /// Add heap def/use to corresponding tables
-      void addHeapDefAndUse(SgExpression* sgn, bool isDef);
+    /// Check if the <part, SgNode> has dphi function
+    bool hasDPhi(PartPtr part, SgNode* sgn);
 
-      /// Create dphi function for <part, CFGNode> --> sgn
-      void addDPhi(PartPtr part, CFGNode cfgNode, SgNode* sgn);
+    /// Get <part, SgNode>'s dphi function
+    PGReachingDefPtr getDPhi(PartPtr part, SgNode * sgn);
 
-      /// Generate unique name for the SgNodes
-      static bool generateUniqueName(SgProject* project, bool treatPointersAsStructures);
+    /// Check if the part contains heap uses
+    bool hasHeapUse(PartPtr part, SgNode* sgn);
 
-      /// Get the reaching def for the given part and SgNode
-      PGReachingDefPtr getReachingDef(PartPtr part, SgNode* sgn);
+    /// Set given node's all use SgNode with the input reaching def which is a dphi
+    bool updateHeapUseReachingDef(PartPtr part, SgNode* sgn, PGReachingDefPtr reachignDef);
 
-      /// Get the reaching defs for the given part and SgNode, all phi function's incoming edges are collected
-      void getReachingDefs(SgNode* sgn, set<PGReachingDefPtr>& reachingDefs);
-      
-      void getReachingDefs(PartPtr part, SgNode* sgn, set<PGReachingDefPtr>& reachingDefs);
+    /// Add heap def/use to corresponding tables
+    void addHeapDefAndUse(SgExpression* sgn, bool isDef);
 
-      /// Get the set of reaching defs for the given expression at the given part
-      void getReachingDefsAtPart(PartPtr part, SgExpression* expr, set<PGReachingDefPtr>& reachingDefs);
+    /// Create dphi function for <part, CFGNode> --> sgn
+    void addDPhi(PartPtr part, CFGNode cfgNode, SgNode* sgn);
 
-      /// Get the reaching def for the given part, CFGNode and MemLocObject
-      PGReachingDefPtr getReachingDef(PartPtr part, SSAMemLocPtr memLoc);
+    /// Generate unique name for the SgNodes
+    static bool generateUniqueName(SgProject* project, bool treatPointersAsStructures);
 
-      const map<PartPtr, SgNode* >& getReachingDef(PartPtr part, CFGNode cfgNode, 
-						   SSAMemLocPtr memLoc);
+    /// Get the reaching def for the given part and SgNode
+    PGReachingDefPtr getReachingDef(PartPtr part, SgNode* sgn);
 
-      /// Get the given SgNode's MemLoc
-      SSAMemLocPtr getMemLocObject(SgNode* sgn);
+    /// Get the reaching defs for the given part and SgNode, all phi function's incoming edges are collected
+    void getReachingDefs(SgNode* sgn, set<PGReachingDefPtr>& reachingDefs);
 
-      /// Update the memory location for the given SgNode
-      void updateMemLocObject(SgNode* sgn, SSAMemLocPtr memLoc);
+    void getReachingDefs(PartPtr part, SgNode* sgn, set<PGReachingDefPtr>& reachingDefs);
 
-      /// Get the given expression's may MemLocObject, this can be reaching def for either scalar 
-      /// or heap reaching def
-      void getDefMemLocs(SgExpression* expr, PartPtr part, SSAMemLocSet& memLocs, bool mustDef = false);
+    /// Get the set of reaching defs for the given expression at the given part
+    void getReachingDefsAtPart(PartPtr part, SgExpression* expr, set<PGReachingDefPtr>& reachingDefs);
 
-      /// Collect the heap reaching defs (SSAMemLoc based) for the given SSAMemLoc, til mustEqual 
-      void collectHeapRDs(PGReachingDefPtr heapRD, SSAMemLocPtr memLoc, SSAMemLocSet& memLocs, 
-			  ReachingDefSet& visited, bool mustDef = false);
+    /// Get the reaching def for the given part, CFGNode and MemLocObject
+    PGReachingDefPtr getReachingDef(PartPtr part, SSAMemLocPtr memLoc);
 
-      /// Get one of dphi node from the given part, here we just pick up the 1st one, since using the single 
-      /// heap variable
-      PGReachingDefPtr getAnyDPhi(PartPtr part);
+    const map<PartPtr, SgNode* >& getReachingDef(PartPtr part, CFGNode cfgNode,
+           SSAMemLocPtr memLoc);
 
-      /// Get the given SgNode's partition graph node
-      PartPtr getPart(SgNode* sgn) {
-	if (node2Part.count(sgn) > 0)
-	  return node2Part[sgn];
-	else
-	  return EmptyPart;
-      };
+    /// Get the given SgNode's MemLoc
+    SSAMemLocPtr getMemLocObject(SgNode* sgn);
 
-      PIDefTable& getPIDefTable() {
-	return piDefTable;
-      };
+    /// Update the memory location for the given SgNode
+    void updateMemLocObject(SgNode* sgn, SSAMemLocPtr memLoc);
 
-      /// Check the conditional statements, e.g. SgIfStatement, SgSwitchStatement, to insert the PI function
-      void handleCondStmt(SgStatement* condStmt);
+    /// Get the given expression's may MemLocObject, this can be reaching def for either scalar
+    /// or heap reaching def
+    void getDefMemLocs(SgExpression* expr, PartPtr part, SSAMemLocSet& memLocs, bool mustDef = false);
 
-      /// Add the PI reaching defs for the given conditional statement
-      void addPiReachingDefs(SgStatement* stmt, SgStatement* trueStmt, SgStatement* falseStmt, 
-			     SgExpression* condExpr, int trueId, int falseId);
+    /// Collect the heap reaching defs (SSAMemLoc based) for the given SSAMemLoc, til mustEqual
+    void collectHeapRDs(PGReachingDefPtr heapRD, SSAMemLocPtr memLoc, SSAMemLocSet& memLocs,
+     ReachingDefSet& visited, bool mustDef = false);
 
-      SgNode* getNode(PartPtr part, SSAMemLocPtr memLoc) {
-	if (memLoc2Node.find(memLoc) != memLoc2Node.end())
-	  return memLoc2Node[memLoc];
-	else
-	  return NULL;
-      }
+    /// Get one of dphi node from the given part, here we just pick up the 1st one, since using the single
+    /// heap variable
+    PGReachingDefPtr getAnyDPhi(PartPtr part);
 
-      /// Collect the Scalar SSA uses based on part
-      void collectScalarUseParts(PartPtr part, set<PartPtr>& partSet);
-      /// Collect the Heap SSA uses based on part
-      void collectHeapUseParts(PartPtr part, set<PartPtr>& partSet);
+    /// Get the given SgNode's partition graph node
+    PartPtr getPart(SgNode* sgn) {
+      if (node2Part.count(sgn) > 0)
+        return node2Part[sgn];
+      else
+        return EmptyPart;
+    };
 
-      /// Collect the SSA uses based on part
-      void collectUseParts(PartPtr part, SgNode* sgn, set<PartPtr>& partSet);
+    PIDefTable& getPIDefTable() {
+      return piDefTable;
+    };
 
-      /// Check if the PGSSA has pointer dereference
-      bool hasPointerDeref() { return hasDeref; };
+    /// Check the conditional statements, e.g. SgIfStatement, SgSwitchStatement, to insert the PI function
+    void handleCondStmt(SgStatement* condStmt);
 
-      /// Set the pointer dereference flag
-      void setPointerDeref(bool flag) { hasDeref = flag; };
+    /// Add the PI reaching defs for the given conditional statement
+    void addPiReachingDefs(SgStatement* stmt, SgStatement* trueStmt, SgStatement* falseStmt,
+        SgExpression* condExpr, int trueId, int falseId);
 
-      /// Check if the PGSSA has address taken
-      bool hasAddressTaken() { return hasAddrTaken; };
+    SgNode* getNode(PartPtr part, SSAMemLocPtr memLoc) {
+      if (memLoc2Node.find(memLoc) != memLoc2Node.end())
+        return memLoc2Node[memLoc];
+      else
+        return NULL;
+    }
 
-      /// Set the address taken flag
-      void setAddressTaken(bool flag) { hasAddrTaken = flag; };
+    /// Collect the Scalar SSA uses based on part
+    void collectScalarUseParts(PartPtr part, set<PartPtr>& partSet);
+    /// Collect the Heap SSA uses based on part
+    void collectHeapUseParts(PartPtr part, set<PartPtr>& partSet);
 
-      /// Check if the PGSSA has array access or class/struct field access
-      bool hasArrayAcc() { return hasArrOrFieldAcc; };
+    /// Collect the SSA uses based on part
+    void collectUseParts(PartPtr part, SgNode* sgn, set<PartPtr>& partSet);
 
-      /// Set the array access or class/struct field access
-      void setArrayAcc(bool flag) { hasArrOrFieldAcc = true; };
+    /// Check if the PGSSA has pointer dereference
+    bool hasPointerDeref() { return hasDeref; };
 
-  protected:
-      /// Clean the internal tables
-      void clearTables();
+    /// Set the pointer dereference flag
+    void setPointerDeref(bool flag) { hasDeref = flag; };
 
-      /// Insert the def for the external variables
-      void insertDefsForExternalVariables(SgFunctionDeclaration* function);
-      
-      /// Create the dummy def for the heap variable at the start node of partition graph
-      void getDummyDefForHeapVar(PartLocalDefUseTable& partOrigDefTable, 
-				 const std::set<PartPtr>& startNodes);
-				 // SgFunctionDeclaration* function);
+    /// Check if the PGSSA has address taken
+    bool hasAddressTaken() { return hasAddrTaken; };
 
-      /// Create PGReachingDef objects for each scalar local def and insert them in the local def table.
-      void populateLocalDefsTable();
-      void populateLocalDefsTable(SgFunctionDeclaration* function);
+    /// Set the address taken flag
+    void setAddressTaken(bool flag) { hasAddrTaken = flag; };
 
-      /// Renumber all definitions for variables
-      void renumberAllDefinitions(// SgFunctionDefinition* func, 
-				  const std::set<PartPtr>& startNodes, 
-				  const std::set<PartPtr>& endNodes);
-      
-      /// Once all the local definitions have been inserted in the ssaLocalDefsTable and phi functions have been 
-      /// inserted in the reaching defs table, propagate reaching definitions along the partition graph
-      void runDefUseDataFlow(// SgFunctionDefinition* func, 
-			     const std::set<PartPtr>& startNodes, 
-			     const std::set<PartPtr>& endNodes);
-      
-      /// Performs the data-flow update for one individual node, populating the reachingDefsTable for that node.
-      /// @returns true if the OUT defs from the node changed, false if they stayed the same.
-      bool propagateDefs(PartPtr part);
+    /// Check if the PGSSA has array access or class/struct field access
+    bool hasArrayAcc() { return hasArrOrFieldAcc; };
 
-      /// Take all the outgoing defs from previous nodes and merge them as the incoming defs
-      /// of the current node.
-      void updateIncomingPropagatedDefs(PartPtr part);
-      
-      /// Insert phi functions at join points
-      void insertPhiFunctions(// SgFunctionDefinition* func, 
-			      const std::set<PartPtr>& startNode, 
-			      const std::set<PartPtr>& endNodes);
-      
-      void buildSSAUseTable(const std::set<PartPtr>& endNodes);
-
-      /// Check if the given expression is in the given SgNode
-      bool isNodeInNode(SgNode* expr, SgNode* sgn);
-
-      /// Get the real definition for the given variable and Pi function
-      PGReachingDefPtr getOrigDefForPi(PGReachingDefPtr piDef, const StaticSingleAssignment::VarName& var);
-
-      /// Check if the PGSSA support PI node
-      bool needPiNodeSupport() { return needPiNode; };
+    /// Set the array access or class/struct field access
+    void setArrayAcc(bool flag) { hasArrOrFieldAcc = true; };
 
   protected:
-      /// Current analysis that PGSSA is constructed for
-      PGSSAAnalysis* analysis;
+    /// Clean the internal tables
+    void clearTables();
 
-      /// Does current PGSSA support PI function
-      bool needPiNode;
+    /// Insert the def for the external variables
+    void insertDefsForExternalVariables(SgFunctionDeclaration* function);
 
-      /// The VarName data structure for constructing heap variable
-      VarUniqueName* heapVarName;
+    /// Create the dummy def for the heap variable at the start node of partition graph
+    void getDummyDefForHeapVar(PartLocalDefUseTable& partOrigDefTable,
+     const std::set<PartPtr>& startNodes);
+     // SgFunctionDeclaration* function);
 
-      /// The function that the PGSSA constructed on
-      SgFunctionDefinition* currFunc;
-      
-      /// The part based local uses table
-      PartLocalDefUseTable partLocalUsesTable;
+    /// Create PGReachingDef objects for each scalar local def and insert them in the local def table.
+    void populateLocalDefsTable();
+    void populateLocalDefsTable(SgFunctionDeclaration* function);
 
-      /// The part based original local definition table
-      PartLocalDefUseTable partOriginalDefTable;
-      
-      /// The part based heap variable local uses
-      PartLocalDefUseTable_ partHeapLocalUses;
+    /// Renumber all definitions for variables
+    void renumberAllDefinitions(// SgFunctionDefinition* func,
+      const std::set<PartPtr>& startNodes,
+      const std::set<PartPtr>& endNodes);
 
-      /// The local definition table used for propagating definitions
-      boost::unordered_map<PartPtr, NodePGReachingDefTable> pgssaLocalDefTable;
+    /// Once all the local definitions have been inserted in the ssaLocalDefsTable and phi functions have been
+    /// inserted in the reaching defs table, propagate reaching definitions along the partition graph
+    void runDefUseDataFlow(// SgFunctionDefinition* func,
+        const std::set<PartPtr>& startNodes,
+        const std::set<PartPtr>& endNodes);
 
-      /// PartPtr --> SgNode --> PGReachingDefPtr
-      PartReachingDefTable_ partDPhiTable;
+    /// Performs the data-flow update for one individual node, populating the reachingDefsTable for that node.
+    /// @returns true if the OUT defs from the node changed, false if they stayed the same.
+    bool propagateDefs(PartPtr part);
 
-      /// PartPtr --> SgNode --> VarName --> PGReachignDefPtr
-      PartReachingDefTable partInReachingDefTable;
-      PartReachingDefTable partOutReachingDefTable;
+    /// Take all the outgoing defs from previous nodes and merge them as the incoming defs
+    /// of the current node.
+    void updateIncomingPropagatedDefs(PartPtr part);
 
-      /// PartPtr --> {PartPtr}
-      PartUseTable partUseTable;
-      /// PartPtr --> {PartPtr} for heap operations
-      PartUseTable heapPartUseTable;
+    /// Insert phi functions at join points
+    void insertPhiFunctions(// SgFunctionDefinition* func,
+         const std::set<PartPtr>& startNode,
+         const std::set<PartPtr>& endNodes);
 
-      /// SgNode --> Part
-      Node2Part node2Part;
+    void buildSSAUseTable(const std::set<PartPtr>& endNodes);
 
-      /// SgNode --> PI part
-      Node2Part node2PI;
-      
-      /// SgNode --> set<var> this is for PI functions 
-      PIDefTable piDefTable;
+    /// Check if the given expression is in the given SgNode
+    bool isNodeInNode(SgNode* expr, SgNode* sgn);
 
-      /// SgNode --> SSAMemLocPtr
-      Node2MemLoc node2MemLoc;
+    /// Get the real definition for the given variable and Pi function
+    PGReachingDefPtr getOrigDefForPi(PGReachingDefPtr piDef, const StaticSingleAssignment::VarName& var);
 
-      /// SSAMemLocPtr --> SgNode
-      SSAMemLoc2Node memLoc2Node;
+    /// Check if the PGSSA support PI node
+    bool needPiNodeSupport() { return needPiNode; };
 
-      /// SSAMemLocPtr --> PartPtr
-      SSAMemLoc2Part memLoc2Part;
+  protected:
+    /// Current analysis that PGSSA is constructed for
+    PGSSAAnalysis* analysis;
 
-      /// SSAMemLocPtr --> CFGNode
-      SSAMemLoc2CFGNode memLoc2CFGNode;
+    /// Does current PGSSA support PI function
+    bool needPiNode;
+
+    /// The VarName data structure for constructing heap variable
+    VarUniqueName* heapVarName;
+
+    /// The function that the PGSSA constructed on
+    SgFunctionDefinition* currFunc;
+
+    /// The part based local uses table
+    PartLocalDefUseTable partLocalUsesTable;
+
+    /// The part based original local definition table
+    PartLocalDefUseTable partOriginalDefTable;
+
+    /// The part based heap variable local uses
+    PartLocalDefUseTable_ partHeapLocalUses;
+
+    /// The local definition table used for propagating definitions
+    boost::unordered_map<PartPtr, NodePGReachingDefTable> pgssaLocalDefTable;
+
+    /// PartPtr --> SgNode --> PGReachingDefPtr
+    PartReachingDefTable_ partDPhiTable;
+
+    /// PartPtr --> SgNode --> VarName --> PGReachignDefPtr
+    PartReachingDefTable partInReachingDefTable;
+    PartReachingDefTable partOutReachingDefTable;
+
+    /// PartPtr --> {PartPtr}
+    PartUseTable partUseTable;
+    /// PartPtr --> {PartPtr} for heap operations
+    PartUseTable heapPartUseTable;
+
+    /// SgNode --> Part
+    Node2Part node2Part;
+
+    /// SgNode --> PI part
+    Node2Part node2PI;
+
+    /// SgNode --> set<var> this is for PI functions
+    PIDefTable piDefTable;
+
+    /// SgNode --> SSAMemLocPtr
+    Node2MemLoc node2MemLoc;
+
+    /// SSAMemLocPtr --> SgNode
+    SSAMemLoc2Node memLoc2Node;
+
+    /// SSAMemLocPtr --> PartPtr
+    SSAMemLoc2Part memLoc2Part;
+
+    /// SSAMemLocPtr --> CFGNode
+    SSAMemLoc2CFGNode memLoc2CFGNode;
+
+    /// The function has pointer dereference
+    bool hasDeref;
+
+    /// The function has address taken
+    bool hasAddrTaken;
     
-      /// The function has pointer dereference
-      bool hasDeref;
-     
-      /// The function has address taken
-      bool hasAddrTaken;
-      
-      /// The function has array access or struct/class field access
-      bool hasArrOrFieldAcc;
+    /// The function has array access or struct/class field access
+    bool hasArrOrFieldAcc;
 
-      /// The unique names has been generated or not
-      bool hasUniqueNames;
+    /// The unique names has been generated or not
+    bool hasUniqueNames;
 
   public:
-      /// The empty Reaching Def
-      static PGReachingDefPtr EmptyReachingDef;
+    /// The empty Reaching Def
+    static PGReachingDefPtr EmptyReachingDef;
 
-      /// The empty SSA memory location object pointer
-      static SSAMemLocPtr EmptySSAMemLoc;
+    /// The empty SSA memory location object pointer
+    static SSAMemLocPtr EmptySSAMemLoc;
 
-      /// The empty part pointer
-      static PartPtr EmptyPart;
+    /// The empty part pointer
+    static PartPtr EmptyPart;
 
-      /// The empty value object pointer
-      static ValueObjectPtr EmptyValueObject;
+    /// The empty value object pointer
+    static ValueObjectPtr EmptyValueObject;
 
-      /// The empty lattice object pointer
-      static LatticePtr EmptyLattice;
-      
-      /// Create PGSSA memory location object
-      static SSAMemLocPtr createSSAMemLoc(SgNode* expr, PartPtr part, PGSSA* pgssa);
+    /// The empty lattice object pointer
+    static LatticePtr EmptyLattice;
+
+    /// Create PGSSA memory location object
+    static SSAMemLocPtr createSSAMemLoc(SgNode* expr, PartPtr part, PGSSA* pgssa);
   };
 
-  class PGSSAObjectMap : public AbstractObjectMap {
+  class PGSSAObjectMap/* : public AbstractObjectMap*/ {
   protected:
     map<SSAMemLocPtr, LatticePtr> internalTable;
 
@@ -578,11 +583,11 @@ namespace hssa_private {
   public:
     PGSSAObjectMap(const AbstractObjectMap& that);
     PGSSAObjectMap(LatticePtr defaultLat_, PartEdgePtr pedge, Composer* comp,
-		   ComposedAnalysis * analysis);
+       ComposedAnalysis * analysis);
     ~PGSSAObjectMap() {};
-	
+
     Lattice* remapML(const std::set<pair<MemLocObjectPtr, MemLocObjectPtr> >& ml2ml,
-		     PartEdgePtr newPEdge);
+         PartEdgePtr newPEdge);
     
     /// Insert lattice
     bool insertValue(SSAMemLocPtr memLoc, LatticePtr valObj);
@@ -596,7 +601,13 @@ namespace hssa_private {
   protected:
     /// Get the lattice for a given Phi function
     LatticePtr getPhiValue(PGReachingDefPtr phiRD);
-  };
+
+  public:
+    std::string str(std::string indent="") const;
+    // Variant of the str method that can produce information specific to the current Part.
+    // Useful since AbstractObjects can change from one Part to another.
+    std::string strp(PartEdgePtr pedge, std::string indent="") const;
+  }; // class PGSSAObjectMap
 
   /// The PGSSA based intra-procedural transfer visitor
   class PGSSAIntraProcTransferVisitor : public DFTransferVisitor { // IntraDFTransferVisitor {
@@ -606,12 +617,15 @@ namespace hssa_private {
 
     Composer* composer;
 
+    int debugLevel;
+
   public:
     PGSSAIntraProcTransferVisitor(// const Function &f, 
-				  PartPtr p, CFGNode cn, NodeState &s,
-				  std::map<PartEdgePtr, std::vector<Lattice*> >& dfInfo, 
-				  PGSSA* pgssa_, Composer* composer_)
-      : DFTransferVisitor(p, cn, s, dfInfo), pgssa(pgssa_), composer(composer_) {};
+          PartPtr p, CFGNode cn, NodeState &s,
+          std::map<PartEdgePtr, std::vector<Lattice*> >& dfInfo,
+          PGSSA* pgssa_, Composer* composer_, int debugLevel_)
+      : DFTransferVisitor(p, cn, s, dfInfo), pgssa(pgssa_), composer(composer_), debugLevel(debugLevel_) {
+    };
 
     virtual bool finish() = 0;
     virtual ~PGSSAIntraProcTransferVisitor() {};
@@ -651,194 +665,230 @@ namespace hssa_private {
   
   public:
     PGSSAValueTransferVisitor(// const Function &f, 
-			      PartPtr p, CFGNode cn, NodeState &s,
-			      std::map<PartEdgePtr, std::vector<Lattice*> >& dfInfo, 
-			      PGSSA* pgssa, Composer* composer)
-      : PGSSAIntraProcTransferVisitor(p, cn, s, dfInfo, pgssa, composer), objMap(NULL) {};
-      PGSSAValueTransferVisitor(// const Function &f, 
-				PartPtr p, CFGNode cn, NodeState &s,
-				std::map<PartEdgePtr, std::vector<Lattice*> >& dfInfo, 
-				PGSSA* pgssa, Composer* composer,
-				AbstractObjectMap* objMap_)
-	: PGSSAIntraProcTransferVisitor(p, cn, s, dfInfo, pgssa, composer), objMap(objMap_) {};
+            PartPtr p, CFGNode cn, NodeState &s,
+            std::map<PartEdgePtr, std::vector<Lattice*> >& dfInfo,
+            PGSSA* pgssa, Composer* composer, int debugLevel)
+      : PGSSAIntraProcTransferVisitor(p, cn, s, dfInfo, pgssa, composer, debugLevel), objMap(NULL) {};
 
-      virtual ~PGSSAValueTransferVisitor() {};
+    PGSSAValueTransferVisitor(// const Function &f,
+        PartPtr p, CFGNode cn, NodeState &s,
+        std::map<PartEdgePtr, std::vector<Lattice*> >& dfInfo,
+        PGSSA* pgssa, Composer* composer,
+        AbstractObjectMap* objMap_, int debugLevel)
+      : PGSSAIntraProcTransferVisitor(p, cn, s, dfInfo, pgssa, composer, debugLevel), objMap(objMap_) {};
 
-      /// Get the given SgNode's corresponding Lattice
-      virtual UserLatticePtr getLattice(SgExpression *sgn) {
-	// Check internal table
-	SSAMemLocPtr memLoc = getMemLocObject(sgn);
-	
-	LatticePtr valObj = objMap->getValue(memLoc);
-	if (valObj != PGSSA::EmptyLattice)
-	  return boost::dynamic_pointer_cast<LatticeType>(valObj);
-       
-	// Check global abstract object map and reaching defs
-	PartPtr part = pgssa->getPart(sgn);
-	LatticeType* newLattice = new LatticeType(part->inEdgeFromAny());
-	SSAMemLocSet memLocs;
-	pgssa->getDefMemLocs(sgn, part, memLocs);
-	for (SSAMemLocSet::iterator it = memLocs.begin(); it != memLocs.end(); it ++) {
-	  SgExpression* expr = (* it)->getVarExpr();
-	  if (expr)
-	    newLattice->meetUpdate(getValueObject(expr));
-	}
-	return UserLatticePtr(newLattice);
-      };
+    virtual ~PGSSAValueTransferVisitor() {};
 
-      /// Get the given SgNode's corresponding Lattice
-      virtual UserLatticePtr getOrigLattice(SgExpression *sgn) {
-        // Check internal table
-        SSAMemLocPtr memLoc = getMemLocObject(sgn);
+    /// Get the given SgNode's corresponding Lattice
+    virtual UserLatticePtr getLattice(SgExpression *sgn) {
+      SIGHT_VERB_DECL(scope, (txt()<<"getLattice("<<SgNode2Str(sgn)<<")"), 1, debugLevel)
 
-        LatticePtr valObj = objMap->getValue(memLoc);
+      // Check internal table
+      SSAMemLocPtr memLoc = getMemLocObject(sgn);
+      SIGHT_VERB(dbg << "memLoc="<<memLoc->str()<<endl, 1, debugLevel)
+
+      LatticePtr valObj = objMap->getValue(memLoc);
+      SIGHT_VERB(dbg << "valObj="<<(valObj?valObj->str():"NULL")<<endl, 1, debugLevel)
+      if (valObj != PGSSA::EmptyLattice)
         return boost::dynamic_pointer_cast<LatticeType>(valObj);
-      };
 
-      /// Get the given SgNode's corresponding Lattice
-      virtual UserLatticePtr getCurrentLattice(SgExpression *sgn, bool mustDef = false) {
-	// Check global abstract object map and reaching defs
-	SSAMemLocPtr memLoc = getMemLocObject(sgn);
-	LatticePtr valObj = objMap->getValue(memLoc);
-        
-	if (valObj != PGSSA::EmptyLattice)
-          return boost::dynamic_pointer_cast<LatticeType>(valObj);
-	
-	PartPtr part = pgssa->getPart(sgn);
-        LatticeType* newLattice = new LatticeType(part->inEdgeFromAny());
-	
-	SSAMemLocSet memLocs;
-	pgssa->getDefMemLocs(sgn, part, memLocs, mustDef);
-        for (SSAMemLocSet::iterator it = memLocs.begin(); it != memLocs.end(); it ++) {
-	  SgExpression* expr = (* it)->getVarExpr();
-	  if (expr)
-	    newLattice->meetUpdate(getValueObject(expr));
-	}
-    
-	return UserLatticePtr(newLattice);
-      };
+      // Check global abstract object map and reaching defs
+      PartPtr part = pgssa->getPart(sgn);
+      LatticeType* newLattice = new LatticeType(part->inEdgeFromAny());
+      SSAMemLocSet memLocs;
+      pgssa->getDefMemLocs(sgn, part, memLocs);
+      for (SSAMemLocSet::iterator it = memLocs.begin(); it != memLocs.end(); it ++) {
+        SgExpression* expr = (* it)->getVarExpr();
+        if (expr)
+          newLattice->meetUpdate(getValueObject(expr));
+      }
+      return UserLatticePtr(newLattice);
+    };
 
-      /// Get the given SgExpression's corresponding Lattice at the given Partition Graph node 
-      /// The expression itself may not be in current part
-      virtual UserLatticePtr getLatticeAtPart(SgExpression* expr, PartPtr part) {
-	// Get the definition part
-	PartPtr defPart = pgssa->getPart(expr);
+    /// Get the given SgNode's corresponding Lattice
+    virtual UserLatticePtr getOrigLattice(SgExpression *sgn) {
+      SIGHT_VERB_DECL(scope, (txt()<<"getOrigLattice("<<SgNode2Str(sgn)<<")"), 1, debugLevel)
+      // Check internal table
+      SSAMemLocPtr memLoc = getMemLocObject(sgn);
+      SIGHT_VERB(dbg << "memLoc="<<memLoc->str()<<endl, 1, debugLevel)
 
-	if (defPart == part) {
-	  // The definition part is the given part
-	  // Check internal table
-	  SSAMemLocPtr memLoc = getMemLocObject(expr);
+      LatticePtr valObj = objMap->getValue(memLoc);
+      SIGHT_VERB(dbg << "valObj="<<(valObj?valObj->str():"NULL")<<endl, 1, debugLevel)
 
-	  if (memLoc != PGSSA::EmptySSAMemLoc) {
-	    LatticePtr valObj = objMap->getValue(memLoc);
-	    if (valObj != PGSSA::EmptyLattice)
-	      // If we can find lattice, then return it
-	      return boost::dynamic_pointer_cast<LatticeType>(valObj);
-	  }
-	}
+      return boost::dynamic_pointer_cast<LatticeType>(valObj);
+    };
 
-        // Check global abstract object map and reaching defs
-        LatticeType* newLattice = new LatticeType(part->inEdgeFromAny());
+    /// Get the given SgNode's corresponding Lattice
+    virtual UserLatticePtr getCurrentLattice(SgExpression *sgn, bool mustDef = false) {
+      SIGHT_VERB_DECL(scope, (txt()<<"getCurrentLattice("<<SgNode2Str(sgn)<<", mustDef="<<mustDef<<")"), 1, debugLevel)
 
-	SSAMemLocSet memLocs;
-        pgssa->getDefMemLocs(expr, part, memLocs);
-        for (SSAMemLocSet::iterator it = memLocs.begin(); it != memLocs.end(); it ++) {
-	  SgExpression* expr = (* it)->getVarExpr();
-	  if (expr)
-	    newLattice->meetUpdate(getValueObject(expr));
-	}
+      // Check global abstract object map and reaching defs
+      SSAMemLocPtr memLoc = getMemLocObject(sgn);
+      SIGHT_VERB(dbg << "memLoc="<<memLoc->str()<<endl, 1, debugLevel)
 
-        return UserLatticePtr(newLattice);
-      };
+      LatticePtr valObj = objMap->getValue(memLoc);
+      SIGHT_VERB(dbg << "valObj="<<(valObj?valObj->str():"NULL")<<endl, 1, debugLevel)
 
-      virtual bool setLattice(SgNode* sgn, UserLatticePtr valObj) {
-	return setValueObject(sgn, valObj, true);
-      };
+      if (valObj != PGSSA::EmptyLattice)
+              return boost::dynamic_pointer_cast<LatticeType>(valObj);
 
-      virtual bool setLattice(SgNode* sgn, UserLatticePtr valObj, bool flag) {
-	return setValueObject(sgn, valObj, flag);
-      };
+      PartPtr part = pgssa->getPart(sgn);
+      LatticeType* newLattice = new LatticeType(part->inEdgeFromAny());
 
-      void setLatticeMap(PGSSAObjectMap* objMap_) {
-	objMap = objMap_;
-      };
+      SSAMemLocSet memLocs;
+      pgssa->getDefMemLocs(sgn, part, memLocs, mustDef);
+      for (SSAMemLocSet::iterator it = memLocs.begin(); it != memLocs.end(); it ++) {
+        SIGHT_VERB(dbg << "memLoc="<<(*it)->str()<<endl, 1, debugLevel)
+        SgExpression* expr = (* it)->getVarExpr();
+        if (expr)
+          newLattice->meetUpdate(getValueObject(expr));
+      }
 
-      virtual set<PartPtr> getParts() {
-	return reanalysisParts;
-      };
+      SIGHT_VERB(dbg << "returning newLattice="<<newLattice->str()<<endl, 1, debugLevel)
+      return UserLatticePtr(newLattice);
+    };
+
+    /// Get the given SgExpression's corresponding Lattice at the given Partition Graph node
+    /// The expression itself may not be in current part
+    virtual UserLatticePtr getLatticeAtPart(SgExpression* expr, PartPtr part) {
+      SIGHT_VERB_DECL(scope, (txt()<<"getLatticeAtPart("<<SgNode2Str(expr)<<", part="<<part<<")"), 1, debugLevel)
+
+      // Get the definition part
+      PartPtr defPart = pgssa->getPart(expr);
+
+      if (defPart == part) {
+        SIGHT_VERB(dbg << "At the definition part"<<endl, 1, debugLevel)
+
+        // The definition part is the given part
+        // Check internal table
+        SSAMemLocPtr memLoc = getMemLocObject(expr);
+        SIGHT_VERB(dbg << "memLoc="<<memLoc->str()<<endl, 1, debugLevel)
+
+        if (memLoc != PGSSA::EmptySSAMemLoc) {
+          LatticePtr valObj = objMap->getValue(memLoc);
+          SIGHT_VERB(dbg << "valObj="<<(valObj?valObj->str():"NULL")<<endl, 1, debugLevel)
+
+          if (valObj != PGSSA::EmptyLattice)
+            // If we can find lattice, then return it
+            return boost::dynamic_pointer_cast<LatticeType>(valObj);
+        }
+      }
+
+      // Check global abstract object map and reaching defs
+      LatticeType* newLattice = new LatticeType(part->inEdgeFromAny());
+
+      SSAMemLocSet memLocs;
+      pgssa->getDefMemLocs(expr, part, memLocs);
+      for (SSAMemLocSet::iterator it = memLocs.begin(); it != memLocs.end(); it ++) {
+        SgExpression* expr = (* it)->getVarExpr();
+        if (expr)
+          newLattice->meetUpdate(getValueObject(expr));
+      }
+
+      SIGHT_VERB(dbg << "returning newLattice="<<newLattice->str()<<endl, 1, debugLevel)
+      return UserLatticePtr(newLattice);
+    };
+
+    virtual bool setLattice(SgNode* sgn, UserLatticePtr valObj) {
+      return setValueObject(sgn, valObj, true);
+    };
+
+    virtual bool setLattice(SgNode* sgn, UserLatticePtr valObj, bool flag) {
+      return setValueObject(sgn, valObj, flag);
+    };
+
+    void setLatticeMap(PGSSAObjectMap* objMap_) {
+      objMap = objMap_;
+    };
+
+    virtual set<PartPtr> getParts() {
+      return reanalysisParts;
+    };
 
   protected:
-      /// The global lattice map
-      PGSSAObjectMap* objMap;
-      /// Internal lattice table used for storing the value for the SgNodes that are not presented as MemLocObject
-      
-      ///Get the given SgNode's corresponding ValueObject, i.e. Lattice
-      virtual UserLatticePtr getValueObject(SgNode* sgn) {
-	SSAMemLocPtr memLoc = getMemLocObject(sgn);
-	return boost::dynamic_pointer_cast<LatticeType>(objMap->get(memLoc));
-      };
+    /// The global lattice map
+    PGSSAObjectMap* objMap;
+    /// Internal lattice table used for storing the value for the SgNodes that are not presented as MemLocObject
 
-      /// Get the given part + MemLoc's corresponding ValueObject, i.e. Lattice
-      virtual UserLatticePtr getValueObject(PartPtr part, SSAMemLocPtr memLoc) {
-	// TODO: handle part?
-	return boost::dynamic_pointer_cast<LatticeType>(objMap->get(memLoc));
-      };
+    ///Get the given SgNode's corresponding ValueObject, i.e. Lattice
+    virtual UserLatticePtr getValueObject(SgNode* sgn) {
+      SSAMemLocPtr memLoc = getMemLocObject(sgn);
+      //return boost::dynamic_pointer_cast<LatticeType>(objMap->get(memLoc));
+      return boost::dynamic_pointer_cast<LatticeType>(objMap->getValue(memLoc));
+    };
 
-      /// Set the given SgNode's corresponding ValueObject, i.e. Lattice
-      virtual bool setValueObject(SgNode* sgn, UserLatticePtr valObj, bool needReanalysis) {
-	SSAMemLocPtr memLoc = getMemLocObject(sgn);
-	if (memLoc == PGSSA::EmptySSAMemLoc)
-	  return false;
+    /// Get the given part + MemLoc's corresponding ValueObject, i.e. Lattice
+    virtual UserLatticePtr getValueObject(PartPtr part, SSAMemLocPtr memLoc) {
+      // TODO: handle part?
+      //return boost::dynamic_pointer_cast<LatticeType>(objMap->get(memLoc));
+      return boost::dynamic_pointer_cast<LatticeType>(objMap->getValue(memLoc));
+    };
 
-	if (objMap->insertValue(memLoc, valObj) && needReanalysis) {
-	  PartPtr part = pgssa->getPart(sgn);
-	  if (part != PGSSA::EmptyPart) {
-	    collectUseParts(part, sgn);
-	    return true;
-	  } 
-	}
+    /// Set the given SgNode's corresponding ValueObject, i.e. Lattice
+    virtual bool setValueObject(SgNode* sgn, UserLatticePtr valObj, bool needReanalysis) {
+      SIGHT_VERB_DECL(scope, (txt()<<"setValueObject("<<SgNode2Str(sgn)<<", needReanalysis="<<needReanalysis<<")"), 1, debugLevel)
+      SIGHT_VERB(dbg << "valObj="<<(valObj?valObj->str():"NULL")<<endl, 1, debugLevel)
 
-	return false;
-      };
+      SSAMemLocPtr memLoc = getMemLocObject(sgn);
+      SIGHT_VERB(dbg << "memLoc="<<(memLoc?memLoc->str():"NULL")<<endl, 1, debugLevel)
+      if (memLoc == PGSSA::EmptySSAMemLoc)
+        return false;
 
-      /// Set thegiven part + MemLoc's corresponding ValueObject, i.e. Lattice
-      virtual bool setValueObject(PartPtr part, SSAMemLocPtr memLoc, UserLatticePtr valObj, bool needReanalysis) {
-	// TODO: handle part?
-	if (objMap->insertValue(memLoc, valObj) && needReanalysis) {
-	  collectUseParts(part);
+      if (objMap->insertValue(memLoc, valObj) && needReanalysis) {
+        SIGHT_VERB(dbg << "map modified"<<endl, 1, debugLevel)
+        PartPtr part = pgssa->getPart(sgn);
+        if (part != PGSSA::EmptyPart) {
+          collectUseParts(part, sgn);
+          return true;
+        }
+      }
 
-	  return true;
-	}
+      return false;
+    };
 
-	return false;
-      };
+    /// Set thegiven part + MemLoc's corresponding ValueObject, i.e. Lattice
+    virtual bool setValueObject(PartPtr part, SSAMemLocPtr memLoc, UserLatticePtr valObj, bool needReanalysis) {
+      SIGHT_VERB_DECL(scope, (txt()<<"setValueObject(needReanalysis="<<needReanalysis<<")"), 1, debugLevel)
+      SIGHT_VERB(dbg << "part="<<part->str()<<endl, 1, debugLevel)
+      SIGHT_VERB(dbg << "memLoc="<<memLoc->str()<<endl, 1, debugLevel)
+      SIGHT_VERB(dbg << "valObj="<<(valObj?valObj->str():"NULL")<<endl, 1, debugLevel)
 
-      /// Handle the phi functions 
-      virtual UserLatticePtr getPhiLattice(SgNode* sgn) = 0;
+      // TODO: handle part?
+      if (objMap->insertValue(memLoc, valObj) && needReanalysis) {
+        SIGHT_VERB(dbg << "map modified"<<endl, 1, debugLevel)
+        collectUseParts(part);
+
+        return true;
+      }
+
+      return false;
+    };
+
+    /// Handle the phi functions
+    virtual UserLatticePtr getPhiLattice(SgNode* sgn) = 0;
   };
 
   /// A default implementation of PGSSA based transfer class
   class DefaultPGSSATransferVisitor : public PGSSAIntraProcTransferVisitor {
-
   public:
     DefaultPGSSATransferVisitor(// const Function &f, 
-				PartPtr p, CFGNode cn, NodeState &s,
-				std::map<PartEdgePtr, std::vector<Lattice*> >& dfInfo, 
-				PGSSA* pgssa, Composer* composer)
+        PartPtr p, CFGNode cn, NodeState &s,
+        std::map<PartEdgePtr, std::vector<Lattice*> >& dfInfo,
+        PGSSA* pgssa, Composer* composer, int debugLevel)
       : PGSSAIntraProcTransferVisitor(// f, 
-				      p, cn, s, dfInfo, pgssa, composer) {}
-      virtual ~DefaultPGSSATransferVisitor() {};
+              p, cn, s, dfInfo, pgssa, composer, debugLevel) {}
 
-      virtual bool finish() { return false; };
-      virtual set<PartPtr> getParts();
+    virtual ~DefaultPGSSATransferVisitor() {};
 
-      virtual void setLatticeMap(PGSSAObjectMap* objMap_) {};
+    virtual bool finish() { return false; };
+    virtual set<PartPtr> getParts();
+
+    virtual void setLatticeMap(PGSSAObjectMap* objMap_) {};
   };
 
   typedef boost::shared_ptr<PGSSAIntraProcTransferVisitor> PGSSAIntraProcTransferVisitorPtr;
-
   /// The PGSSA based analysis 
-  class PGSSAAnalysis : public virtual ComposedAnalysis {
+  class PGSSAAnalysis : public ComposedAnalysis {
   protected: 
     /// Current project
     SgProject* project;
@@ -854,15 +904,15 @@ namespace hssa_private {
     SgFunctionDefinition* currFuncDef;
 
   public:
-    PGSSAAnalysis() : ComposedAnalysis(/*trackBase2RefinedPartEdgeMapping*/ false), currFuncDef(NULL), currentObjMap_(NULL) {};
-    PGSSAAnalysis(SgProject* project_) : ComposedAnalysis(/*trackBase2RefinedPartEdgeMapping*/ false), project(project_), currFuncDef(NULL), currentObjMap_(NULL) {};
+    PGSSAAnalysis() : ComposedAnalysis(/*trackBase2RefinedPartEdgeMapping*/ false), currentObjMap_(NULL), currFuncDef(NULL) {};
+    PGSSAAnalysis(SgProject* project_) : ComposedAnalysis(/*trackBase2RefinedPartEdgeMapping*/ false), project(project_), currentObjMap_(NULL), currFuncDef(NULL) {};
 
-      // NodeState* initializeFunctionNodeState(const Function &func, NodeState *fState);
+    // NodeState* initializeFunctionNodeState(const Function &func, NodeState *fState);
 
     /// Get the initial work list (i.e. FlowWorkList) element for Sparse analysis
     // std::list<PartPtr> getInitialWorklist(const Function &func, bool analyzeDueToCallers, 
-      //					  const set<Function> &calleesUpdated, NodeState *fState);
-      virtual std::set<PartPtr> getInitialWorklist();
+    //            const set<Function> &calleesUpdated, NodeState *fState);
+    virtual std::set<PartPtr> getInitialWorklist();
     
     /// These 4 functions may not be useful
     std::map<PartEdgePtr, std::vector<Lattice*> >& getLatticeAnte(NodeState *state);
@@ -885,7 +935,7 @@ namespace hssa_private {
     void remapML(PartEdgePtr fromPEdge, std::vector<Lattice*>& lat);
 
     // void runAnalysis(const Function& func, NodeState* fState, bool analyzeFromDirectionStart, 
-    // 			     std::set<Function> calleesUpdated);
+    //            std::set<Function> calleesUpdated);
     void runAnalysis();
 
     virtual void initNodeState(PartPtr part) {
@@ -904,19 +954,19 @@ namespace hssa_private {
     }
 
     virtual bool transfer(const Function& func, PartPtr part, CFGNode cn, NodeState& state,
-			  std::map<PartEdgePtr, std::vector<Lattice*> >& dfInfo);
+        std::map<PartEdgePtr, std::vector<Lattice*> >& dfInfo);
     virtual std::string str(std::string);
 
   protected:
     /// Visit the partition graph node, including all CFG nodes within the part
     bool visitPart(// const Function& func, 
-		   PartPtr part, list<PartPtr>& SSAWorkList);
+       PartPtr part, list<PartPtr>& SSAWorkList);
 
     /// Get the PGSSA based transfer visitor
     virtual PGSSAIntraProcTransferVisitorPtr getSSATransferVisitor(// const Function& func, 
-								   PartPtr part, CFGNode cn,
-								   NodeState& state,
-								   map<PartEdgePtr, vector<Lattice*> >& dfInfo);
+                   PartPtr part, CFGNode cn,
+                   NodeState& state,
+                   map<PartEdgePtr, vector<Lattice*> >& dfInfo);
   
     /// Collect the lattices corresponding to the given part
     void collectDefsLattice(PartPtr part, vector<Lattice*>& dfInfo);

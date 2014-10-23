@@ -41,7 +41,7 @@ namespace scc_private
   public:
     SVNLattice(PartEdgePtr pedge);
     SVNLattice(PartEdgePtr pedge, SgExpression* value_, int valId_);
-    SVNLattice(const SVNLattice& that) : Lattice(that.pedge), FiniteLattice(that.pedge), full(false), valId(that.valId) {};
+    SVNLattice(const SVNLattice& that) : Lattice(that.pedge), FiniteLattice(that.pedge), valId(that.valId), full(false) {};
 
       /// Part edge
       PartEdgePtr pedge;
@@ -108,11 +108,11 @@ namespace scc_private
 
   class SVNMemLoc : virtual public SSAMemLoc {
   public:
-    SVNMemLoc(HeapSSA* ssaInstance, SgExpression* expr, MemLocObjectPtr memLoc, PartPtr part)
-      : SSAMemLoc(ssaInstance, expr, memLoc, part), MemLocObject(expr), analysis(NULL) {};
+    //SVNMemLoc(HeapSSA* ssaInstance, SgExpression* expr, MemLocObjectPtr memLoc, PartPtr part)
+    //  : MemLocObject(expr), SSAMemLoc(ssaInstance, expr, memLoc, part), analysis(NULL) {};
     SVNMemLoc(HeapSSA* ssaInstance, SgExpression* expr, MemLocObjectPtr memLoc, PartPtr part,
 	      SparseValueNumbering* analysis_)
-      : SSAMemLoc(ssaInstance, expr, memLoc, part), MemLocObject(expr), analysis(analysis_) {};
+      : MemLocObject(expr), SSAMemLoc(ssaInstance, expr, memLoc, part), analysis(analysis_) {};
     SVNMemLoc(SSAMemLocPtr memLoc_, SparseValueNumbering* analysis_);
 
     // pretty print for the object
@@ -160,11 +160,10 @@ namespace scc_private
   /// Sparse Value Numbering Transfer
   class SparseValueNumberingTransfer;
 
-  class SparseValueNumbering : virtual public PGSSAAnalysis {
-
+  class SparseValueNumbering : public PGSSAAnalysis {
   public:
-    SparseValueNumbering() : ComposedAnalysis(/*trackBase2RefinedPartEdgeMapping*/ false), hasVisitor(false) {};
-    SparseValueNumbering(SparseValueNumbering* oldAnalysis) : ComposedAnalysis(/*trackBase2RefinedPartEdgeMapping*/ false), hasVisitor(false) {};
+    SparseValueNumbering() : PGSSAAnalysis(/*trackBase2RefinedPartEdgeMapping*/ false), hasVisitor(false) {};
+    SparseValueNumbering(SparseValueNumbering* oldAnalysis) : PGSSAAnalysis(/*trackBase2RefinedPartEdgeMapping*/ false), hasVisitor(false) {};
 
     void genInitLattice(const Function& func, PartPtr part, PartEdgePtr pedge,
                         std::vector<Lattice*>& initLattices);
@@ -190,7 +189,7 @@ namespace scc_private
     /// Get iterator
     virtual dataflowPartEdgeIterator* getIterator() {
       set<PartPtr> terminalStates = getComposer()->GetEndAStates(this);
-      return new fw_dataflowPartEdgeIterator();
+      return new fw_dataflowPartEdgeIterator(selectIterOrderFromEnvironment());
     }
 
     /// Transfer function

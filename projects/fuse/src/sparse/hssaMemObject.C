@@ -15,25 +15,130 @@
 #include "uniqueNameTraversal.h"
 #include <boost/graph/adjacency_list.hpp>
 #include <boost/graph/topological_sort.hpp>
-    
+
+#include "sight.h"
+#include "sight_verbosity.h"
+using namespace sight;
+
 using namespace boost;
 using namespace hssa_private;
  
 #define foreach BOOST_FOREACH
 #define reverse_foreach BOOST_REVERSE_FOREACH
   
-bool SSAMemLoc::mayEqualML(MemLocObjectPtr o, PartPtr p) {
-  return mustEqualML(o, p);
+#define pgssaDebugLevel 0
+
+bool SSAMemLoc::operator==(const SSAMemLocPtr & that) const
+{
+ /* scope s("SSAMemLoc::operator==()", scope::low);
+  dbg << "this: expr="<<expr<<" "<<str()<<endl;
+  dbg << "    : getDefNode="<<getDefNode(expr)<<"="<<SgNode2Str(getDefNode(expr))<<endl;
+  dbg << "that: expr="<<that->expr<<" "<<that->str()<<endl;
+  dbg << "    : getDefNode="<<getDefNode(that->expr)<<"="<<SgNode2Str(getDefNode(that->expr))<<endl;
+  dbg << "Equal = "<<(expr==that->expr)<<endl;*/
+  return expr==that->expr; }
+bool SSAMemLoc::operator!=(const SSAMemLocPtr & that) const
+{ return expr!=that->expr; }
+bool SSAMemLoc::operator< (const SSAMemLocPtr & that) const
+{
+  /*scope s("SSAMemLoc::operator<()", scope::low);
+  dbg << "this: expr="<<expr<<" "<<str()<<endl;
+  dbg << "    : getDefNode="<<getDefNode(expr)<<"="<<SgNode2Str(getDefNode(expr))<<endl;
+  dbg << "that: expr="<<that->expr<<" "<<that->str()<<endl;
+  dbg << "    : getDefNode="<<getDefNode(that->expr)<<"="<<SgNode2Str(getDefNode(that->expr))<<endl;
+  dbg << "LessThan = "<<(expr<that->expr)<<endl;*/
+  return expr< that->expr; }
+bool SSAMemLoc::operator<=(const SSAMemLocPtr & that) const
+{ return expr<=that->expr; }
+bool SSAMemLoc::operator> (const SSAMemLocPtr & that) const
+{ return expr> that->expr; }
+bool SSAMemLoc::operator>=(const SSAMemLocPtr & that) const
+{ return expr>=that->expr; }
+
+bool SSAMemLoc::mayEqual(MemLocObjectPtr that, PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis)
+{
+  return mustEqual(that, pedge, comp, analysis);
+  /*SSAMemLocPtr that = boost::dynamic_pointer_cast<SSAMemLoc>(that_arg);
+  ROSE_ASSERT(that);
+  return composer->mayEqualML(memLoc, that->memLoc, pedge, analysis);*/
 }
 
-bool SSAMemLoc::mustEqualML(MemLocObjectPtr o, PartPtr p) {
-  return mustEqualML(o);
+bool SSAMemLoc::mustEqual(MemLocObjectPtr that_arg, PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis)
+{
+  SSAMemLocPtr that = boost::dynamic_pointer_cast<SSAMemLoc>(that_arg);
+  ROSE_ASSERT(that);
+  return mustEqual(that);
+  //return composer->mustEqualML(memLoc, that->memLoc, pedge, analysis);
 }
+
+bool SSAMemLoc::mayEqual(SSAMemLocPtr that)
+{
+  return mustEqual(that);
+}
+
+bool SSAMemLoc::mustEqual(SSAMemLocPtr that)
+{
+  return expr==that->expr;
+}
+
+// Returns whether the two abstract objects denote the same set of concrete objects
+bool SSAMemLoc::equalSet(MemLocObjectPtr that, PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis)
+{
+  return mustEqual(that, pedge, comp, analysis);
+  /*SSAMemLocPtr that = boost::dynamic_pointer_cast<SSAMemLoc>(that_arg);
+  ROSE_ASSERT(that);
+  //return mustEqual(that);
+  return composer->equalSetML(memLoc, that->memLoc, pedge, analysis);*/
+}
+
+// Returns whether this abstract object denotes a non-strict subset (the sets may be equal) of the set denoted
+// by the given abstract object.
+bool SSAMemLoc::subSet(MemLocObjectPtr that, PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis)
+{
+  return mustEqual(that, pedge, comp, analysis);
+}
+
+// General version of isLive that accounts for framework details before routing the call to the derived class'
+// isLiveML check. Specifically, it routes the call through the composer to make sure the isLiveML call gets the
+// right PartEdge
+bool SSAMemLoc::isLive(PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis)
+{ return true; }
+
+// General version of meetUpdate that accounts for framework details before routing the call to the derived class'
+// meetUpdateML check. Specifically, it routes the call through the composer to make sure the meetUpdateML
+// call gets the right PartEdge
+bool SSAMemLoc::meetUpdate(MemLocObjectPtr that, PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis)
+{ ROSE_ASSERT(0); }
+
+// General versions of isFull() and isEmpty that account for framework details before routing the call to the
+// derived class' isFull() and isEmpty()  check. Specifically, it routes the call through the composer to make
+// sure the isFullML() and isEmptyML() call gets the right PartEdge.
+// These functions are just aliases for the real implementations in AbstractObject
+bool SSAMemLoc::isFull(PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis)
+{ return expr==NULL; }
+
+bool SSAMemLoc::isEmpty(PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis)
+{ return false; }
+
+// Returns true if this AbstractObject corresponds to a concrete value that is statically-known
+bool SSAMemLoc::isConcrete() { return false; }
+
+// Returns the number of concrete values in this set
+int SSAMemLoc::concreteSetSize() { return -1; }
+
   
 SgNode* SSAMemLoc::getDefNode(SgExpression* expr_) const {
   const StaticSingleAssignment::VarName& varName = StaticSingleAssignment::getVarName(expr_);
-  const StaticSingleAssignment::NodeReachingDefTable& reachingDefs
-    = ssa->getReachingDefsAtNode_(expr_);
+  scope s("SSAMemLoc::getDefNode");
+  dbg << "varName(#"<<varName.size()<<")="<<endl;
+  for(StaticSingleAssignment::VarName::const_iterator i=varName.begin(); i!=varName.end(); i++)
+    dbg << "    "<<SgNode2Str(*i)<<endl;
+
+  const StaticSingleAssignment::NodeReachingDefTable& reachingDefs = ssa->getReachingDefsAtNode_(expr_);
+  dbg << "reachingDefs(#"<<reachingDefs.size()<<")="<<endl;
+  for(StaticSingleAssignment::NodeReachingDefTable::const_iterator i=reachingDefs.begin(); i!=reachingDefs.end(); i++)
+    dbg << "    "<<SgNode2Str(i->second->getDefinitionNode())<<endl;
+
   SgNode* varNode = NULL;
   // Get SSA look-aside info      
   if (reachingDefs.find(varName) != reachingDefs.end()) {
@@ -45,7 +150,7 @@ SgNode* SSAMemLoc::getDefNode(SgExpression* expr_) const {
   return varNode;
 }
 
-bool SSAMemLoc::mayEqualML(MemLocObjectPtr o) const {
+/*bool SSAMemLoc::mayEqualML(MemLocObjectPtr o) const {
   return mustEqualML(o);
 }
 
@@ -59,7 +164,7 @@ bool SSAMemLoc::mustEqualML(MemLocObjectPtr o) const {
   SgNode* defNode2 = getDefNode(expr_);
 
   return expr == expr_ || defNode1 == expr_ || defNode2 == expr || defNode1 == defNode2;
-}
+}*/
  
 /// Internal comparision, i.e. if the two given expressions are same or not
 bool SSAMemLoc::isSameSig(SgExpression* exprL, SgExpression* exprR) {
@@ -97,138 +202,27 @@ bool SSAMemLoc::isSameSig(SgExpression* exprL, SgExpression* exprR) {
   return false;
 }
 
-/*
-bool SSAScalar::mayEqual(MemLocObjectPtr o) const {
-  if (SSAScalar* ssao = dynamic_cast<SSAScalar* >(o.get()))
-    // Both memory locations are SSA scalar
-    return mustEqualML(o);
-  else if (SSAMemLoc* ssao = dynamic_cast<SSAMemLoc* >(o.get())) {
-    return false; // memLoc->mayEqual(ssao->getLabelMemLoc());
-  } else
-    return true;
-}
-
-bool SSAScalar::mustEqual(MemLocObjectPtr o) const {
-  if (SSAScalar* ssao = dynamic_cast<SSAScalar* >(o.get())) {
-    // Both memory locations are SSA scalar
-    SgNode* defNode1 = getDefNode(getVarExpr());
-    SgNode* defNode2 = getDefNode(ssao->getVarExpr());
-    
-    return defNode1 == defNode2;
-  } else if (SSAMemLoc* ssao = dynamic_cast<SSAMemLoc* >(o.get())) {
-    return false; // memLoc->mustEqual(ssao->getLabelMemLoc());
-  } else
-    return false;
-}
-
-bool SSAArray::mayEqual(MemLocObjectPtr o) const {
-  if (SSAMemLoc* ssao = dynamic_cast<SSAMemLoc* >(o.get())) {
-    return false; // memLoc->mayEqual(ssao->getLabelMemLoc());
-  } else
-    return true;
-}
-
-bool SSAArray::mustEqual(MemLocObjectPtr o) const {
-  if (SSAMemLoc* ssao = dynamic_cast<SSAMemLoc* >(o.get())) {
-    return false; // memLoc->mustEqual(ssao->getLabelMemLoc());
-  } else
-    return false;
-}
-
-bool SSAPointer::mayEqual(MemLocObjectPtr o) const {
-  if (SSAMemLoc* ssao = dynamic_cast<SSAMemLoc* >(o.get())) {
-    return false; // memLoc->mayEqual(ssao->getLabelMemLoc());
-  } else
-    return true;
-}
-
-bool SSAPointer::mustEqual(MemLocObjectPtr o) const {
-  if (SSAMemLoc* ssao = dynamic_cast<SSAMemLoc* >(o.get())) {
-    return false; // memLoc->mustEqual(ssao->getLabelMemLoc());
-  } else 
-    return false;
-}
-*/
 
 SSAMemLocPtr SSAMemLocFactory::createSSAMemLoc(SgNode* expr, HeapSSA* ssa) {
-  /* if (SgVarRefExp* var = isSgVarRefExp(expr)) {
-    // Check variable type, then decide the different memory object type       
-    SgType* varType = var->get_type();
-    if (isSgPointerType(varType))
-      // pointer type          
-      return boost::make_shared<SSAPointer>(ssa, var);
-    else if (isSgArrayType(varType))
-      // array type           
-      return boost::make_shared<SSAArray>(ssa, var);
-    else if (isSgClassType(varType))
-      // class/struct type         
-      return boost::make_shared<SSALabeledAggregate>(ssa, var);
-    // normal scalar                 
-    return boost::make_shared<SSAScalar>(ssa, var);
-  } else if (SgPntrArrRefExp* arr = isSgPntrArrRefExp(expr)) {
-    // array reference: A[i]                 
-    // TODO: process subscripts       
-    SgExpression* arrNameExp = NULL;
-    std::vector<SgExpression*>* subscripts = new std::vector<SgExpression*>;
-    SageInterface::isArrayReference(arr, &arrNameExp, &subscripts);
-    if (arrNameExp != NULL)
-      return boost::make_shared<SSAArray>(ssa, arrNameExp);
-  } else if (SgPointerDerefExp* pdRef = isSgPointerDerefExp(expr)) {
-    // pointer dereference: * p     
-    if (SgVarRefExp* var = isSgVarRefExp(pdRef->get_operand()))
-      return boost::make_shared<SSAPointer>(ssa, var);
-  } else { */
-    return boost::make_shared<SSADefault>(ssa, isSgExpression(expr));
-    // }
-  // Do nothing here   
-  // std::cout << "do nothing mem loc " << expr << std::endl;
+  dbg << "PGSSA::createSSAMemLoc() expr="<<SgNode2Str(expr)<<endl;
+  SSAMemLocPtr ret = boost::make_shared<SSADefault>(ssa, isSgExpression(expr));
+  //SSAMemLocPtr ret = makePtr<SSADefault>(ssa, isSgExpression(expr));
+  dbg << "ret="<<ret->str()<<endl;
+  return ret;
 }
 
 SSAMemLocPtr PGSSA::createSSAMemLoc(SgNode* expr, PartPtr part, PGSSA* ssa) {
   PGSSAAnalysis* analysis = ssa->getAnalysis();
   ROSE_ASSERT(analysis && "The PGSSA Analysis should not be NULL");
-  /*
-  if (SgVarRefExp* var = isSgVarRefExp(expr)) {
-    // Variable case:
-    MemLocObjectPtr memLoc = analysis->getComposer()->OperandExpr2MemLoc(expr, expr, part->inEdgeFromAny(), analysis);
-    // Check variable type, then decide the different memory object type
-    SgType* varType = var->get_type();
-    if (isSgPointerType(varType))
-      // pointer type
-      return boost::make_shared<SSAPointer>(ssa, var, memLoc, part);
-    else if (isSgArrayType(varType))
-      // array type
-      return boost::make_shared<SSAArray>(ssa, var, memLoc, part);
-    else if (isSgClassType(varType))
-      // class/struct type
-      return boost::make_shared<SSALabeledAggregate>(ssa, var, memLoc, part);
-    // normal scalar
-    return boost::make_shared<SSAScalar>(ssa, var, memLoc, part);
-  } else if (SgPntrArrRefExp* arr = isSgPntrArrRefExp(expr)) {
-    // array reference: A[i]
-    // TODO: process subscripts
-    SgExpression* arrNameExp = NULL;
-    std::vector<SgExpression*>* subscripts = new std::vector<SgExpression*>;
-    SageInterface::isArrayReference(arr, &arrNameExp, &subscripts);
-    if (arrNameExp != NULL) {
-      // This is array
-      MemLocObjectPtr memLoc = analysis->getComposer()->Expr2MemLoc(expr, part->inEdgeFromAny(), analysis);
-      // std::cout << "array mem loc: " << memLoc->str() << std::endl;
-      return boost::make_shared<SSAArray>(ssa, arrNameExp, memLoc, part);
-    }
-  } else if (SgPointerDerefExp* pdRef = isSgPointerDerefExp(expr)) {
-    // pointer dereference: * p
-    if (SgVarRefExp* var = isSgVarRefExp(pdRef->get_operand())) {
-      // Use the memory location from previous analysis
-      MemLocObjectPtr memLoc = analysis->getComposer()->OperandExpr2MemLoc(var, var, part->inEdgeFromAny(), analysis);
-      return boost::make_shared<SSAPointer>(ssa, pdRef, memLoc, part);
-    }
-  } // else 
-  */
+
   {
     // This is for the case that has no pointer/array
     MemLocObjectPtr memLoc = analysis->getComposer()->OperandExpr2MemLoc(expr, expr, part->inEdgeFromAny(), analysis);
-    return boost::make_shared<SSADefault>(ssa, expr, memLoc, part);
+    dbg << "PGSSA::createSSAMemLoc() expr="<<SgNode2Str(expr)<<", memLoc="<<memLoc->str()<<endl;
+    SSAMemLocPtr ret = boost::make_shared<SSADefault>(ssa, expr, memLoc, part);
+    //SSAMemLocPtr ret = makePtr<SSADefault>(ssa, expr, memLoc, part);
+    dbg << "ret="<<ret->str()<<endl;
+    return ret;
   }
   // Do nothing here
 } 
@@ -242,10 +236,9 @@ PGReachingDefPtr PGSSA::EmptyReachingDef;
 PartPtr PGSSA::EmptyPart;
 
 void PGDefsAndUsesTraversal::collectDefsAndUses(PGSSA* pgssa, PartPtr part, 
-						const std::set<PartPtr>& endNs, 
-						PartSet& visitedParts) {
-  if (visitedParts.find(part) != visitedParts.end()
-      ) //  || endNs.find(part) != endNs.end())
+            const std::set<PartPtr>& endNs,
+            PartSet& visitedParts) {
+  if (visitedParts.find(part) != visitedParts.end()) //  || endNs.find(part) != endNs.end())
     return;
 
   visitedParts.insert(part);
@@ -293,10 +286,10 @@ PGChildUses PGDefsAndUsesTraversal::evaluateSynthesizedAttribute(SgNode* node, S
     //in the base of B : A(3) { ... } where A is a superclass of B, an initialized name for A appears.
     // Clearly, the initialized name for the parent class is not a real variable
     if (initName->get_preinitialization() != SgInitializedName::e_virtual_base_class
-	&& initName->get_preinitialization() != SgInitializedName::e_nonvirtual_base_class) {
+        && initName->get_preinitialization() != SgInitializedName::e_nonvirtual_base_class) {
       // pgssa->getPartOriginalDefTable()[currPart][cfgNode.getNode()].insert(uName->getKey());  
       if (nodePart)
-	pgssa->getPartOriginalDefTable()[nodePart][node].insert(uName->getKey());
+        pgssa->getPartOriginalDefTable()[nodePart][node].insert(uName->getKey());
     }
 
     return PGChildUses();
@@ -414,66 +407,66 @@ PGChildUses PGDefsAndUsesTraversal::evaluateSynthesizedAttribute(SgNode* node, S
     case V_SgXorAssignOp:
     case V_SgAssignOp:
       {
-	//All the uses from the RHS are propagated
-	uses.insert(uses.end(), rhs.getUses().begin(), rhs.getUses().end());
-	
-	SgVarRefExp* currentVar = lhs.getCurrentVar();
-	SgNode* currentOp = lhs.getCurrentOp();
-	
-	if (currentVar != NULL) { 
-	  // Variable case
-	  // All the uses from the LHS are propagated, unless we're an assign op
-	  uses.insert(uses.end(), lhs.getUses().begin(), lhs.getUses().end());
+  //All the uses from the RHS are propagated
+  uses.insert(uses.end(), rhs.getUses().begin(), rhs.getUses().end());
 
-	  vector<SgNode*>::iterator currVarUse = find(uses.begin(), uses.end(), currentVar);
-	  
-	  //An assign op doesn't use the var it's defining. So, remove that var from the uses
-	  if (isSgAssignOp(binaryOp)) {
-	    if (currVarUse != uses.end()) {
-	      uses.erase(currVarUse);
-	    }
-	    
-	    //Also remove the use from the varRef node, because it's not really a use.
-	    pgssa->getPartLocalUsesTable()[currPart][currentVar].clear();
-	  }
-	  // All the other ops always use the var they're defining (+=, -=, /=, etc)
-	  else {
-	    if (currVarUse == uses.end()) {
-	      uses.push_back(currentVar);
-	    }
-	  }
-	} //xxx else 
-	if (currentOp != NULL) {
-	  // LHS heap access case
-	  // Top heap operation from the LHS are propagated
-	  // Not sure if this is needed???
-	  // addDefAtNode(binaryOp, currentOp);
+  SgVarRefExp* currentVar = lhs.getCurrentVar();
+  SgNode* currentOp = lhs.getCurrentOp();
 
-	  // Register as a DPhi node here
-	  addDPhiForNode(node); // xxx currentOp);
+  if (currentVar != NULL) {
+    // Variable case
+    // All the uses from the LHS are propagated, unless we're an assign op
+    uses.insert(uses.end(), lhs.getUses().begin(), lhs.getUses().end());
 
-	  // Register the use/def for the heap variable
-	  addHeapDefAndUse((SgExpression*)binaryOp, true); //xxx currentOp, true);
+    vector<SgNode*>::iterator currVarUse = find(uses.begin(), uses.end(), currentVar);
 
-	  // Remove previous heap use
-	  removeHeapUse((SgExpression*)currentOp);
-	} 
+    //An assign op doesn't use the var it's defining. So, remove that var from the uses
+    if (isSgAssignOp(binaryOp)) {
+      if (currVarUse != uses.end()) {
+        uses.erase(currVarUse);
+      }
+
+      //Also remove the use from the varRef node, because it's not really a use.
+      pgssa->getPartLocalUsesTable()[currPart][currentVar].clear();
+    }
+    // All the other ops always use the var they're defining (+=, -=, /=, etc)
+    else {
+      if (currVarUse == uses.end()) {
+        uses.push_back(currentVar);
+      }
+    }
+  } //xxx else
+  if (currentOp != NULL) {
+    // LHS heap access case
+    // Top heap operation from the LHS are propagated
+    // Not sure if this is needed???
+    // addDefAtNode(binaryOp, currentOp);
+
+    // Register as a DPhi node here
+    addDPhiForNode(node); // xxx currentOp);
+
+    // Register the use/def for the heap variable
+    addHeapDefAndUse((SgExpression*)binaryOp, true); //xxx currentOp, true);
+
+    // Remove previous heap use
+    removeHeapUse((SgExpression*)currentOp);
+  }
  
-	//Set all the uses as being used at this node
-	addUsesToNode(binaryOp, uses);
+  //Set all the uses as being used at this node
+  addUsesToNode(binaryOp, uses);
 
-	if (currentVar != NULL) {
-    	  //Set the current var as being defined here
-	  //It's possible that the LHS has no variable references. For example,
-	  //foo() = 3, where foo() returns a reference
-	  addDefForVarAtNode(currentVar, binaryOp);
+  if (currentVar != NULL) {
+        //Set the current var as being defined here
+    //It's possible that the LHS has no variable references. For example,
+    //foo() = 3, where foo() returns a reference
+    addDefForVarAtNode(currentVar, binaryOp);
 
-	  return PGChildUses(uses, currentVar);
-	} else if (currentOp != NULL) {
-	  return PGChildUses(uses, currentOp, true);
-	} 
+    return PGChildUses(uses, currentVar);
+  } else if (currentOp != NULL) {
+    return PGChildUses(uses, currentOp, true);
+  }
 
-	return PGChildUses(uses, currentVar);
+  return PGChildUses(uses, currentVar);
       }
     case V_SgGreaterThanOp:
     case V_SgGreaterOrEqualOp: 
@@ -482,35 +475,35 @@ PGChildUses PGDefsAndUsesTraversal::evaluateSynthesizedAttribute(SgNode* node, S
     case V_SgEqualityOp:
     case V_SgNotEqualOp:
       {
-	// Handle the comparison condition operation
-	//We want to set all the varRefs as being used here
-	std::vector<SgNode*> uses;
+  // Handle the comparison condition operation
+  //We want to set all the varRefs as being used here
+  std::vector<SgNode*> uses;
         uses.insert(uses.end(), lhs.getUses().begin(), lhs.getUses().end());
         uses.insert(uses.end(), rhs.getUses().begin(), rhs.getUses().end());
 
         //Set all the uses as being used here.
         addUsesToNode(binaryOp, uses);
 
-	if (rhs.getCurrentOp()) {
+  if (rhs.getCurrentOp()) {
           // Propagate the current variable up. The rhs variable is the one that could be
           // potentially defined up the tree
           return PGChildUses(uses, rhs.getCurrentOp(), true);
         } else {
           // Here we handle the PI function creation
-	  SgVarRefExp* lhsVar = lhs.getCurrentVar();
-	  SgNode* lhsOp = lhs.getCurrentOp();
-	  SgVarRefExp* rhsVar = rhs.getCurrentVar();
-	  SgNode* rhsOp = rhs.getCurrentOp();
-	  if (lhsVar && !lhsOp) {
-	    // Add PI def for lhs var
+    SgVarRefExp* lhsVar = lhs.getCurrentVar();
+    SgNode* lhsOp = lhs.getCurrentOp();
+    SgVarRefExp* rhsVar = rhs.getCurrentVar();
+    SgNode* rhsOp = rhs.getCurrentOp();
+    if (lhsVar && !lhsOp) {
+      // Add PI def for lhs var
             addDefForPIAtNode(lhsVar, binaryOp);
-	  }
-	  if (rhsVar && !rhsOp) {
-	    // Add PI def for rhs var
-	    addDefForPIAtNode(rhsVar, binaryOp);
-	  }
+    }
+    if (rhsVar && !rhsOp) {
+      // Add PI def for rhs var
+      addDefForPIAtNode(rhsVar, binaryOp);
+    }
 
-	  // Propagate the current variable up. The rhs variable is the one that could be
+    // Propagate the current variable up. The rhs variable is the one that could be
           // potentially defined up the tree
           return PGChildUses(uses, rhs.getCurrentVar());
         }
@@ -518,23 +511,23 @@ PGChildUses PGDefsAndUsesTraversal::evaluateSynthesizedAttribute(SgNode* node, S
       //Otherwise cover all the non-defining Ops
     default:
       {
-	//We want to set all the varRefs as being used here
-	std::vector<SgNode*> uses;
-	uses.insert(uses.end(), lhs.getUses().begin(), lhs.getUses().end());
-	uses.insert(uses.end(), rhs.getUses().begin(), rhs.getUses().end());
-	
-	//Set all the uses as being used here.
-	addUsesToNode(binaryOp, uses);
+  //We want to set all the varRefs as being used here
+  std::vector<SgNode*> uses;
+  uses.insert(uses.end(), lhs.getUses().begin(), lhs.getUses().end());
+  uses.insert(uses.end(), rhs.getUses().begin(), rhs.getUses().end());
 
-	if (rhs.getCurrentOp()) {
+  //Set all the uses as being used here.
+  addUsesToNode(binaryOp, uses);
+
+  if (rhs.getCurrentOp()) {
           // Propagate the current variable up. The rhs variable is the one that could be   
-	  // potentially defined up the tree                                                
+    // potentially defined up the tree
           return PGChildUses(uses, rhs.getCurrentOp(), true);
-	} else {
-	  // Propagate the current variable up. The rhs variable is the one that could be 
-	  // potentially defined up the tree
-	  return PGChildUses(uses, rhs.getCurrentVar());
-	}
+  } else {
+    // Propagate the current variable up. The rhs variable is the one that could be
+    // potentially defined up the tree
+    return PGChildUses(uses, rhs.getCurrentVar());
+  }
       }
     }
   }
@@ -562,13 +555,13 @@ PGChildUses PGDefsAndUsesTraversal::evaluateSynthesizedAttribute(SgNode* node, S
       vector<SgNode*> successors = SageInterface::querySubTree<SgNode > (unaryOp);
       
       foreach(SgNode* successor, successors) {
-	pgssa->getLocalUsesTable()[successor].clear();
+  pgssa->getLocalUsesTable()[successor].clear();
       }
     }
     else {
       //Guard against unary ops that have no children (exception rethrow statement)
       if (attrs.size() > 0) {
-	uses.insert(uses.end(), attrs[0].getUses().begin(), attrs[0].getUses().end());
+  uses.insert(uses.end(), attrs[0].getUses().begin(), attrs[0].getUses().end());
       }
     }
     
@@ -579,12 +572,12 @@ PGChildUses PGDefsAndUsesTraversal::evaluateSynthesizedAttribute(SgNode* node, S
       
       //The defs can be empty. For example, foo()++ where foo returns a reference
       if (currentVar != NULL) {
-	addDefForVarAtNode(currentVar, unaryOp);
-	
-	//++ and -- always use their operand. Make sure it's part of the uses
-	if (find(uses.begin(), uses.end(), currentVar) == uses.end()) {
-	  uses.push_back(currentVar);
-	}
+  addDefForVarAtNode(currentVar, unaryOp);
+
+  //++ and -- always use their operand. Make sure it's part of the uses
+  if (find(uses.begin(), uses.end(), currentVar) == uses.end()) {
+    uses.push_back(currentVar);
+  }
       }
     }
     //Some other ops also preserve the current var. We don't really distinguish between the pointer variable
@@ -593,7 +586,7 @@ PGChildUses PGDefsAndUsesTraversal::evaluateSynthesizedAttribute(SgNode* node, S
       currentVar = attrs[0].getCurrentVar();
     }
     else if (treatPointersAsStructs && (isSgPointerDerefExp(unaryOp) 
-					|| isSgAddressOfOp(unaryOp))) {
+          || isSgAddressOfOp(unaryOp))) {
       currentVar = attrs[0].getCurrentVar();
     }
     
@@ -670,7 +663,7 @@ void PGDefsAndUsesTraversal::removeHeapUse(SgExpression* sgn) {
   const StaticSingleAssignment::VarName& hvName = pgssa->getHeapVarName(sgn);
   PartPtr nodePart = pgssa->getPart(sgn);
   std::cout << "remove heap use: " << sgn << " on " << nodePart.get() << " " 
-	    << nodePart->str() << std::endl;
+      << nodePart->str() << std::endl;
   pgssa->getPartLocalUsesTable()[nodePart][sgn].erase(hvName);
 }
 
@@ -715,9 +708,9 @@ ValueObjectPtr PGSSA::EmptyValueObject;
 LatticePtr PGSSA::EmptyLattice;
  
 bool PGSSA::build(const std::set<PartPtr>& startNodes, 
-		  const std::set<PartPtr>& endNodes, bool needPiNode_) {
+      const std::set<PartPtr>& endNodes, bool needPiNode_) {
   needPiNode = needPiNode_;
-  build(startNodes, endNodes);
+  return build(startNodes, endNodes);
 }
 
 bool PGSSA::build(SgProject* proj, bool interprocedural, bool treatPointersAsStructures) {
@@ -743,7 +736,7 @@ bool PGSSA::generateUniqueName(SgProject* project, bool treatPointersAsStructure
 }
 
 bool PGSSA::build(const std::set<PartPtr>& startNodes, 
-		  const std::set<PartPtr>& endNodes) {
+      const std::set<PartPtr>& endNodes) {
   // Generate the unique names that are used for PGSSA
   if (!hasUniqueNames)
     hasUniqueNames = generateUniqueName(SageInterface::getProject(), false);
@@ -814,13 +807,13 @@ void PGSSA::clearTables() {
 }
 
 void PGSSA::createDominator(const Function& func, const std::set<PartPtr>& startNs, 
-			    const std::set<PartPtr>& endNs) {
+          const std::set<PartPtr>& endNs) {
   SgFunctionDefinition* function = func.get_declaration()->get_definition();
   map<PartPtr, PartPtr> iPostDominatorMap;
   map<PartPtr, set<PartPtr> > domFrontiers =
     calculateDomFrontiers<PartPtr, PartEdgePtr > (// function, 
-						  startNs, endNs, NULL, 
-						  &iPostDominatorMap);
+              startNs, endNs, NULL,
+              &iPostDominatorMap);
   std::cout << "pd size 1: " << iPostDominatorMap.size() << std::endl;
   
   map<FilteredCfgNode, FilteredCfgNode> iPostDominatorMap2;
@@ -847,8 +840,8 @@ void PGSSA::createDominator(const Function& func, const std::set<PartPtr>& start
 }
 
 void PGSSA::insertPhiFunctions(// SgFunctionDefinition* func, 
-			       const std::set<PartPtr>& startNodes, 
-			       const std::set<PartPtr>& endNodes) {
+             const std::set<PartPtr>& startNodes,
+             const std::set<PartPtr>& endNodes) {
   // ROSE_ASSERT(func != NULL);
 
   // First, find all the places where each name is defined
@@ -857,7 +850,7 @@ void PGSSA::insertPhiFunctions(// SgFunctionDefinition* func,
   // Traverse the partition nodes in backward order
   // back_partIterator
   bw_graphEdgeIterator<PartEdgePtr, PartPtr> backIter(endNodes);
-  for (; backIter != bw_graphEdgeIterator<PartEdgePtr, PartPtr>::end(); backIter ++) {
+  for (; !backIter.isEnd(); backIter ++) {
     PartPtr part = backIter.getPart();
 
     foreach(const FilteredCfgNode& cfgNode, part->CFGNodes()) {
@@ -870,9 +863,9 @@ void PGSSA::insertPhiFunctions(// SgFunctionDefinition* func,
       // Check the definitions at this node and add them to the map
       LocalDefUseTable::const_iterator defEntry = partOriginalDefTable[part].find(node);
       if (defEntry != partOriginalDefTable[part].end()) {
-	foreach(const VarName& definedVar, defEntry->second) {
-	  nameToDefPartsMap[definedVar].push_back(part);
-	}
+        foreach(const VarName& definedVar, defEntry->second) {
+          nameToDefPartsMap[definedVar].push_back(part);
+        }
       }
     
       /* TODO:
@@ -891,8 +884,8 @@ void PGSSA::insertPhiFunctions(// SgFunctionDefinition* func,
   map<PartPtr, PartPtr> iPostDominatorMap;
   map<PartPtr, set<PartPtr> > domFrontiers =
     calculateDomFrontiers<PartPtr, PartEdgePtr > (// func, 
-						  startNodes, endNodes, NULL, 
-						  &iPostDominatorMap);
+              startNodes, endNodes, NULL,
+              &iPostDominatorMap);
  
   // Calculate control dependencies (for annotating the phi functions)
   // multimap< FilteredCfgNode, pair<FilteredCfgNode, FilteredCfgEdge> > controlDependencies =
@@ -911,16 +904,20 @@ void PGSSA::insertPhiFunctions(// SgFunctionDefinition* func,
     foreach(PartPtr phiNode, phiNodes) {
       // Check each CFG node within the partition graph node
       foreach(const FilteredCfgNode& cfgNode, phiNode->CFGNodes()) {
-	SgNode* node = cfgNode.getNode();
-	ROSE_ASSERT(partInReachingDefTable[phiNode][node].count(var) == 0);
+        SgNode* node = cfgNode.getNode();
+        ROSE_ASSERT(partInReachingDefTable[phiNode][node].count(var) == 0);
 
-	// We don't want to insert phi defs for functions that have gone out of scope
-	if (// !isHeapVar(var) &&
-	    !isVarInScope(var, node))
-	  continue;
-      
-	partInReachingDefTable[phiNode][node][var] 
-	  = PGReachingDefPtr(new PGReachingDef(phiNode, node, PGReachingDef::PHI));
+        // We don't want to insert phi defs for functions that have gone out of scope
+        cout << "var("<<var.size()<<"="<<endl;
+        for(VarName::iterator i=var.begin(); i!=var.end(); i++)
+          cout << "    "<<SgNode2Str(*i)<<endl;
+        cout << "node="<<SgNode2Str(node)<<endl;
+        if (// !isHeapVar(var) &&
+            !isVarInScope(var, node))
+          continue;
+
+        partInReachingDefTable[phiNode][node][var]
+          = PGReachingDefPtr(new PGReachingDef(phiNode, node, PGReachingDef::PHI));
       } 
     }
   }
@@ -947,39 +944,39 @@ void PGSSA::insertDefsForExternalVariables(SgFunctionDeclaration* function) {
       //We still need to insert defs for compiler-generated variables (e.g. __func__), 
       // since they don't have defs in the AST
       if (!isBuiltinVar(rootName))
-	continue;
+  continue;
     }
     else if (isSgGlobal(varScope)) {
       //Handle the case of declaring "extern int x" inside the function
       //Then, x has global scope but it actually has a definition inside the function 
       // so we don't need to insert one
       if (SageInterface::isAncestor(function->get_definition(), rootName[0])) {
-	//When else could a var be declared inside a function and be global?
-	  SgVariableDeclaration* varDecl = isSgVariableDeclaration(rootName[0]->get_parent());
-	  ROSE_ASSERT(varDecl != NULL);
-	  ROSE_ASSERT(varDecl->get_declarationModifier().get_storageModifier().isExtern());
-	  continue;
+  //When else could a var be declared inside a function and be global?
+    SgVariableDeclaration* varDecl = isSgVariableDeclaration(rootName[0]->get_parent());
+    ROSE_ASSERT(varDecl != NULL);
+    ROSE_ASSERT(varDecl->get_declarationModifier().get_storageModifier().isExtern());
+    continue;
       }
     }
     
     //Are there any other types of external vars?
     ROSE_ASSERT(isBuiltinVar(rootName) || isSgClassDefinition(varScope) || isSgNamespaceDefinitionStatement(varScope)
-		|| isSgGlobal(varScope));
+    || isSgGlobal(varScope));
     
     //The variable is not in local scope; we need to insert a def for it at the function definition  
       for (size_t i = 0; i < usedVar.size(); i++) {
-	//Create a new varName vector that goes from beginning to end - i
-	VarName newName;
-	newName.assign(usedVar.begin(), usedVar.end() - i);
-	originalVarsAtFunctionEntry.insert(newName);
-	
-	ROSE_ASSERT(expandedVarsAtFunctionEntry.count(newName) == 0);
+  //Create a new varName vector that goes from beginning to end - i
+  VarName newName;
+  newName.assign(usedVar.begin(), usedVar.end() - i);
+  originalVarsAtFunctionEntry.insert(newName);
+
+  ROSE_ASSERT(expandedVarsAtFunctionEntry.count(newName) == 0);
       }
   }
 }
 
 void PGSSA::getDummyDefForHeapVar(PartLocalDefUseTable& partOrigDefTable,
-				  const std::set<PartPtr>& startNodes) { 
+          const std::set<PartPtr>& startNodes) {
   // , SgFunctionDeclaration* function) {
   PartPtr startNode;
   foreach (startNode, startNodes) {
@@ -1015,34 +1012,34 @@ void PGSSA::populateLocalDefsTable(SgFunctionDeclaration* function) {
       // return;
       // }
       if (!pgssa->hasDef(node))
-	return;
+  return;
       
       // This is the table of local definitions at the current node 
       PartPtr part = pgssa->getPart(node);
       if (part == PGSSA::EmptyPart)
-	return;
+  return;
 
       NodePGReachingDefTable& localDefs = pgssa->pgssaLocalDefTable[part]; // [node];
       
       foreach(const VarName& definedVar, pgssa->partOriginalDefTable[part][node]) {
-	if (localDefs.find(definedVar) == localDefs.end())
-	  // This can be pre-defined with PI function
-	  localDefs[definedVar] 
-	    = PGReachingDefPtr(new PGReachingDef(part, node, PGReachingDef::ORIGINAL_DEF));
+  if (localDefs.find(definedVar) == localDefs.end())
+    // This can be pre-defined with PI function
+    localDefs[definedVar]
+      = PGReachingDefPtr(new PGReachingDef(part, node, PGReachingDef::ORIGINAL_DEF));
       }
 
       // Handle the PI function defs
       if (pgssa->needPiNodeSupport())
-	if (SgStatement* stmt = isSgStatement(node))
-	  pgssa->handleCondStmt(stmt);
+  if (SgStatement* stmt = isSgStatement(node))
+    pgssa->handleCondStmt(stmt);
        
       /* TODO:
-	 // Handle expanded_def?
-	 if (pgssa->expandedDefTable.count(node) > 0) {
-	foreach(const VarName& definedVar, pgssa->expandedDefTable[node]) {
-	  localDefs[definedVar] 
-	    = PGReachingDefPtr(new PGReachingDef(node, ReachingDef::EXPANDED_DEF));
-	}
+   // Handle expanded_def?
+   if (pgssa->expandedDefTable.count(node) > 0) {
+  foreach(const VarName& definedVar, pgssa->expandedDefTable[node]) {
+    localDefs[definedVar]
+      = PGReachingDefPtr(new PGReachingDef(node, ReachingDef::EXPANDED_DEF));
+  }
       }*/
     }
   };
@@ -1074,7 +1071,7 @@ void PGSSA::handleCondStmt(SgStatement* stmt) {
     vector< SgNode * > travSuccs = condStmt->get_traversalSuccessorContainer();
     foreach(SgNode* succNode, travSuccs) {
       if (piDefTable.find(succNode) == piDefTable.end())
-	continue;
+  continue;
 
       PartPtr succPart = getPart(succNode);
       std::cout << "For node out: " << succPart->str() << " " << succNode->class_name() << std::endl;
@@ -1103,7 +1100,7 @@ void PGSSA::handleCondStmt(SgStatement* stmt) {
 
       addPiReachingDefs(whileStmt, trueStmt, falseStmt, condExpr, 1, 0);
     }
-  } else if (SgDoWhileStmt* dwStmt = isSgDoWhileStmt(stmt)) {
+  } else if (/*SgDoWhileStmt* dwStmt = */isSgDoWhileStmt(stmt)) {
     SgStatement* condStmt = whileStmt->get_condition();
 
     vector< SgNode * > travSuccs = condStmt->get_traversalSuccessorContainer();
@@ -1154,7 +1151,7 @@ void PGSSA::handleCondStmt(SgStatement* stmt) {
 }
  
 void PGSSA::addPiReachingDefs(SgStatement* stmt, SgStatement* trueStmt, SgStatement* falseStmt, 
-			      SgExpression* condExpr, int trueId, int falseId) {
+            SgExpression* condExpr, int trueId, int falseId) {
   PartPtr part = getPart(stmt);
   foreach(PartEdgePtr edgePtr, part->outEdges()) {
     PartPtr branchPart = edgePtr->target();
@@ -1176,18 +1173,18 @@ void PGSSA::addPiReachingDefs(SgStatement* stmt, SgStatement* trueStmt, SgStatem
     std::set<StaticSingleAssignment::VarName >& defVars = piDefTable[condExpr];
     foreach(const StaticSingleAssignment::VarName& varName, defVars) {
       if (localDefs.find(varName) == localDefs.end()) {
-	// Construct the PI function for each variable
-          localDefs[varName]
-            = PGReachingDefPtr(new PGReachingDef(branchPart, condExpr, condId));
+        // Construct the PI function for each variable
+        localDefs[varName]
+          = PGReachingDefPtr(new PGReachingDef(branchPart, condExpr, condId));
 
-          // std::cout << "add local def: " <<  localDefs[varName]->isPiFunction() << " "
-          //        << varnameToString(varName) << " at " << branchPart->str()
-          //        << " and  " << cfgNode.getNode() << " for " << localDefs[varName].get()
-          //        << " cond id: " << condId << std::endl;
+        // std::cout << "add local def: " <<  localDefs[varName]->isPiFunction() << " "
+        //        << varnameToString(varName) << " at " << branchPart->str()
+        //        << " and  " << cfgNode.getNode() << " for " << localDefs[varName].get()
+        //        << " cond id: " << condId << std::endl;
 
-          // Patch the original def table, i.e. adding the varRef as a definition at the current node of
-          // the ref's uniqueName
-          getPartOriginalDefTable()[branchPart][cfgNode.getNode()].insert(varName);
+        // Patch the original def table, i.e. adding the varRef as a definition at the current node of
+        // the ref's uniqueName
+        getPartOriginalDefTable()[branchPart][cfgNode.getNode()].insert(varName);
       }
     }
   }
@@ -1201,7 +1198,7 @@ bool PGSSA::isNodeInNode(SgNode* expr, SgNode* sgn) {
 
     void visit(SgNode * node) {
       if (node == targetNode)
-	result = true;
+  result = true;
     }
   };
 
@@ -1214,8 +1211,8 @@ bool PGSSA::isNodeInNode(SgNode* expr, SgNode* sgn) {
 }
 
 void PGSSA::renumberAllDefinitions(// SgFunctionDefinition* func, 
-				   const std::set<PartPtr>& startNode, 
-				   const std::set<PartPtr>& endNodes) {
+           const std::set<PartPtr>& startNode,
+           const std::set<PartPtr>& endNodes) {
   //Map from each name to the next index. Not in map means 0            
   map<VarName, int> nameToNextIndexMap;
 
@@ -1226,7 +1223,7 @@ void PGSSA::renumberAllDefinitions(// SgFunctionDefinition* func,
   // We process partition graph nodes in reverse postorder; this provides a natural numbering for definitions      
   // back_partIterator
   bw_graphEdgeIterator<PartEdgePtr, PartPtr> backIter(endNodes);
-  for (; backIter != bw_graphEdgeIterator<PartEdgePtr, PartPtr>::end(); backIter ++) {
+  for (; !backIter.isEnd(); backIter ++) {
     PartPtr part = backIter.getPart();
   
     foreach(const FilteredCfgNode& cfgNode, part->CFGNodes()) {
@@ -1237,20 +1234,20 @@ void PGSSA::renumberAllDefinitions(// SgFunctionDefinition* func,
       // if (cfgNode != functionStartNode) {
       
       foreach(NodePGReachingDefTable::value_type& varDefPair, partInReachingDefTable[part][astNode]) {
-	const VarName& definedVar = varDefPair.first;
+        const VarName& definedVar = varDefPair.first;
         PGReachingDefPtr reachingDef = varDefPair.second;
 
-	if (!reachingDef->isPhiFunction())
-	  continue;
-	
-	// Give an index to the variable      
-	int index = 0;
-	if (nameToNextIndexMap.count(definedVar) > 0) {
-	  index = nameToNextIndexMap[definedVar];
-	}
-	nameToNextIndexMap[definedVar] = index + 1;
-	
-	reachingDef->setRenamingNumber(index);
+  if (!reachingDef->isPhiFunction())
+    continue;
+
+  // Give an index to the variable
+  int index = 0;
+  if (nameToNextIndexMap.count(definedVar) > 0) {
+    index = nameToNextIndexMap[definedVar];
+  }
+  nameToNextIndexMap[definedVar] = index + 1;
+
+  reachingDef->setRenamingNumber(index);
       }
     }
 
@@ -1266,7 +1263,7 @@ void PGSSA::renumberAllDefinitions(// SgFunctionDefinition* func,
       //Give an index to the variable                             
       int index = 0;
       if (nameToNextIndexMap.count(definedVar) > 0) {
-	index = nameToNextIndexMap[definedVar];
+  index = nameToNextIndexMap[definedVar];
       }
       nameToNextIndexMap[definedVar] = index + 1;
 
@@ -1274,31 +1271,31 @@ void PGSSA::renumberAllDefinitions(// SgFunctionDefinition* func,
       
       // Hack the dphi reaching def and renumbering them                                        
       if (isHeapVar(definedVar) && hasDPhi(part)) {
-	// Renumbering the dphi function here 
-	// Give an index to the variable
+  // Renumbering the dphi function here
+  // Give an index to the variable
         int dphiInd = 0;
         if (nameToNextIndexMap.count(definedVar) > 0) {
           dphiInd = nameToNextIndexMap[definedVar];
         }
         nameToNextIndexMap[definedVar] = dphiInd + 1;
 
-	// Go through the CFG nodes within current part and renanming the related dphi reaching defs
-	foreach(const FilteredCfgNode& cfgNode, part->CFGNodes()) {
-	  SgNode* sgn = cfgNode.getNode();
-	  
-	  if (hasDPhi(part, sgn)) {
-	    PGReachingDefPtr dphiReachingDef = getDPhi(part, sgn);
-	    dphiReachingDef->setRenamingNumber(dphiInd);
-	  }
-	}
+  // Go through the CFG nodes within current part and renanming the related dphi reaching defs
+  foreach(const FilteredCfgNode& cfgNode, part->CFGNodes()) {
+    SgNode* sgn = cfgNode.getNode();
+
+    if (hasDPhi(part, sgn)) {
+      PGReachingDefPtr dphiReachingDef = getDPhi(part, sgn);
+      dphiReachingDef->setRenamingNumber(dphiInd);
+    }
+  }
       }
     }
   }    
 }
 
 void PGSSA::runDefUseDataFlow(// SgFunctionDefinition* func, 
-			      const std::set<PartPtr>& startNodes, 
-			      const std::set<PartPtr>& endNodes) {
+            const std::set<PartPtr>& startNodes,
+            const std::set<PartPtr>& endNodes) {
   //Keep track of visited nodes                                                                  
   unordered_set<PartPtr> visited;
   
@@ -1326,14 +1323,14 @@ void PGSSA::runDefUseDataFlow(// SgFunctionDefinition* func,
       // Insert the child in the worklist if the parent is changed or it hasn't been 
       // visited yet 
       if (changed || visited.count(nextPart) == 0) {
-	// Add the part to the worklist                                                   
-	bool insertedNew = worklist.insert(nextPart).second;
-	if (insertedNew && getDebugExtra()) {
-	  if (changed)
-	    cout << "Defs Changed: Added " << currPart->str() << " to the worklist." << endl;
-	  else
-	    cout << "Next unvisited: Added " << nextPart->str() << " to the worklist." << endl;
-	}
+  // Add the part to the worklist
+  bool insertedNew = worklist.insert(nextPart).second;
+  if (insertedNew && getDebugExtra()) {
+    if (changed)
+      cout << "Defs Changed: Added " << currPart->str() << " to the worklist." << endl;
+    else
+      cout << "Next unvisited: Added " << nextPart->str() << " to the worklist." << endl;
+  }
       }
     }
     
@@ -1376,24 +1373,24 @@ bool PGSSA::propagateDefs(PartPtr part) {
     // Now overwrite any local definitions:  
     if (pgssaLocalDefTable.count(part) > 0) {
       foreach(NodePGReachingDefTable::value_type& varDefPair, pgssaLocalDefTable[part]) {
-	const VarName& definedVar = varDefPair.first;
-	PGReachingDefPtr localDef = varDefPair.second;
+  const VarName& definedVar = varDefPair.first;
+  PGReachingDefPtr localDef = varDefPair.second;
 
-	// std::cout << "check out def: " << varnameToString(definedVar) << " and " << isHeapVar(definedVar) << std::endl;
-	// std::cout << "check out def: " << localDef->isPiFunction() << "  " 
-	//	  << varnameToString(definedVar) << " at " << part->str()
-	//	  << " and " << cfgNode->getNode() << " and " 
-	//	  << localDef.get() <<  std::endl;
+  // std::cout << "check out def: " << varnameToString(definedVar) << " and " << isHeapVar(definedVar) << std::endl;
+  // std::cout << "check out def: " << localDef->isPiFunction() << "  "
+  //    << varnameToString(definedVar) << " at " << part->str()
+  //    << " and " << cfgNode->getNode() << " and "
+  //    << localDef.get() <<  std::endl;
 
-	if (getPartOriginalDefTable()[part][cfgNode->getNode()].count(definedVar) > 0) { 
-	  // This var name is defined in this CFG node, here we still use originalDefTable to 
-	  // maintain SgNode --> {varNames }
-	  outDefsTable[definedVar] = localDef;
-	  
-	  // std::cout << "add out def: " << varnameToString(definedVar) << " at " << part->str() 
-	  // 	    << " and " << localDef->isPiFunction() << std::endl;
-	  changedOuts = true;
-	}
+  if (getPartOriginalDefTable()[part][cfgNode->getNode()].count(definedVar) > 0) {
+    // This var name is defined in this CFG node, here we still use originalDefTable to
+    // maintain SgNode --> {varNames }
+    outDefsTable[definedVar] = localDef;
+
+    // std::cout << "add out def: " << varnameToString(definedVar) << " at " << part->str()
+    //       << " and " << localDef->isPiFunction() << std::endl;
+    changedOuts = true;
+  }
       }
     }
 
@@ -1439,134 +1436,134 @@ void PGSSA::updateIncomingPropagatedDefs(PartPtr part) {
      
       // std::cout << "uip prev part: " << prevPart->str() << std::endl;
       foreach(const FilteredCfgNode& prevCfgNode, prevPart->CFGNodes()) {
-	// Check each CFG nodes in previous partition graph node   
-	SgNode* prevNode = prevCfgNode.getNode();
+  // Check each CFG nodes in previous partition graph node
+  SgNode* prevNode = prevCfgNode.getNode();
 
-	// const NodeReachingDefTable& previousDefs = reachingDefsTable[prev].second;
-	NodePGReachingDefTable& previousDefs = partOutReachingDefTable[prevPart][prevNode];
-	// std::cout<< "uip prev node: " << prevNode << std::endl;
+  // const NodeReachingDefTable& previousDefs = reachingDefsTable[prev].second;
+  NodePGReachingDefTable& previousDefs = partOutReachingDefTable[prevPart][prevNode];
+  // std::cout<< "uip prev node: " << prevNode << std::endl;
 
-	// Merge all the previous defs into the IN table of the current node
-	VarName var;
-	PGReachingDefPtr previousDef;
-	foreach(tie(var, previousDef), previousDefs) {
-	  // Here we don't propagate defs for variables that went out of scope 
-	  // (built-in vars are body-scoped but we inserted the def at the SgFunctionDefinition 
-	  // node, so we make an exception)
+  // Merge all the previous defs into the IN table of the current node
+  VarName var;
+  PGReachingDefPtr previousDef;
+  foreach(tie(var, previousDef), previousDefs) {
+    // Here we don't propagate defs for variables that went out of scope
+    // (built-in vars are body-scoped but we inserted the def at the SgFunctionDefinition
+    // node, so we make an exception)
 
-	  // std::cout << " prev checking " << varnameToString(var) << " and " 
-	  // 	    << previousDef.get() << std::endl;
-	  if (!isHeapVar(var) && 
-	      !isVarInScope(var, currNode) && !isBuiltinVar(var))
-	    continue;
-	  
-	  // If this is the first time this def has propagated to this node, just copy it over  
-	  if (incomingDefTable.count(var) == 0) {
-	    incomingDefTable[var] = previousDef;
-	   
-	    // std::cout << " single-def case " << isHeapVar(var) <<  " " << varnameToString(var) 
-	    // 	      << std::endl;
+    // std::cout << " prev checking " << varnameToString(var) << " and "
+    //       << previousDef.get() << std::endl;
+    if (!isHeapVar(var) &&
+        !isVarInScope(var, currNode) && !isBuiltinVar(var))
+      continue;
 
-	    // Process the heap variable and dphi function    
-	    if (isHeapVar(var)) {
-	      // Get the prev node's dphi               
-	      PGReachingDefPtr prevDPhi = previousDef;
-	      if (!prevDPhi->isPhiFunction()
-		  && hasDPhi(prevPart, previousDef->getDefNode())) {
-		prevDPhi = getDPhi(prevPart, previousDef->getDefNode());
-		
-		// PartPtr prevPart_ = getPart(previousDef->getDefNode());
-		// if (prevPart_)
-		//  std::cout << "check dphi: " << previousDef->getDefNode() << " on " 
-		// 	    << prevPart.get() << " " << prevPart->str() << " and " 
-		// 	    << prevPart_.get() << " " << prevPart_->str() << " " 
-		// 	    << prevDPhi->isDPhiFunction() << std::endl;
-	      } 
-	      
-	      PartPtr defPart = getPart(previousDef->getDefNode());  
-	      if (defPart && hasDPhi(part, currNode)) {
-		// && hasDPhi(defPart, previousDef->getDefNode())) {
-		PGReachingDefPtr currDPhi = getDPhi(part, currNode);
-		currDPhi->addJoinedDPhi(currDPhi, prevDPhi);
-		// getDPhi(defPart, previousDef->getDefNode()));
-		std::cout << "update dphi: " << defPart->str() << " --> " << part->str()
-			  << std::endl;
-	      }
-	      // std::cout << " heap var: " << part->str() << " "  
-	      // 	<< hasDPhi(defPart, previousDef->getDefNode()) << " "
-	      // 	<< hasDPhi(prevPart, previousDef->getDefNode()) << " "
-	      // 	<< prevDPhi->isDPhiFunction() << " "
-	      // 	<< (prevDPhi->isPhiFunction() || prevDPhi->isDPhiFunction()) << std::endl;
-	      if (!(prevDPhi->isPhiFunction() || prevDPhi->isDPhiFunction()))
-		continue;
+    // If this is the first time this def has propagated to this node, just copy it over
+    if (incomingDefTable.count(var) == 0) {
+      incomingDefTable[var] = previousDef;
 
-	      // PartPtr part_ = getPart(currNode);
-	      // if (part_)
-	      //   std::cout << "check heap use: " << currNode << " on " << part.get() << " " 
-	      // 	  << part->str() << " and "  << part_.get() << " " << part_->str() << " "
-	      // 	  << hasHeapUse(part, currNode) << " "  << hasHeapUse(part_, currNode) 
-	      // 	  << " " << hasDPhi(part, currNode) << std::endl;
-	      if (hasHeapUse(part, currNode)) {
-		// Set prev node's dphi as all current node's heap uses' reaching def
-		updateHeapUseReachingDef(part, currNode, prevDPhi);
-		std::cout << "update heap use " << currNode << " on " << prevPart.get() 
-			  << " " << prevPart->str() << std::endl;
-	      }
-	    }
-	  } else {
-	    PGReachingDefPtr existingDef = incomingDefTable[var];
-	    // std::cout << "    multi-def case " << existingDef->isPhiFunction() << " and " 
-	    // 	      << (existingDef->getDefNode() == currNode) 
-	    //        << " and " << previousDef->isPiFunction() 
-	    // 	      << " " << existingDef->getDefPart()->str() << " for " 
-	    // 	      << varnameToString(var) << std::endl;
-	    
-	    if (existingDef->isPhiFunction() && existingDef->getDefNode() == currNode) {
-	      // && existingDef->getDefPart() == part) {
-	      //There is a phi node here. We update the phi function to point to the previous 
-	      // reaching definition     
-	      existingDef->addJoinedDef(previousDef, prevEdge);
-	    } else {
-	      // If there is no phi node, and we get a new definition, it better be the same as 
-	      // the one previously propagated.                   
-	      if (!(*previousDef == *existingDef)) {
-		printf("ERROR: At node %s@%d, two different definitions reach for variable %s\n", 
-		       currNode->class_name().c_str(), currNode->get_file_info()->get_line(), 
-		       varnameToString(var).c_str());
-		ROSE_ASSERT(false && "Two different definitions reach for variable");
-	      }
-	    }
-	  
-	    // Process the heap variable and dphi function  
-	    if (isHeapVar(var)) {
-	      SgNode* heapNode = currNode;
-	      if (SgExprStatement* exprStmt = isSgExprStatement(currNode)) {
-		SgExpression * expr = exprStmt->get_expression();
-		heapNode = expr;
-		std::cout << "strange: " << part->str() << " and " << prevPart->str() << std::endl;
-		//xxx ROSE_ASSERT(false);
-	      }
-	      // Get the prev node's dphi 
-	      PGReachingDefPtr prevDPhi = existingDef;
-	      if (!prevDPhi->isPhiFunction()
-		  && hasDPhi(prevPart, previousDef->getDefNode())) {
-		prevDPhi = getDPhi(prevPart, previousDef->getDefNode());
-		//xxx ROSE_ASSERT(false && "Multi-def can not have single DPhi");
-	      }
-	      std::cout << "multi heap var: " << varnameToString(var) << " "
-			<< prevDPhi->isPhiFunction() << " " << prevDPhi->isDPhiFunction() << " "
-			<< part->str() << " --> " << prevPart->str() << " "
-			<< hasDPhi(prevPart, previousDef->getDefNode()) << " " 
-			<< hasDPhi(part, currNode) << " " << hasHeapUse(part, currNode) 
-			<< std::endl;
+      // std::cout << " single-def case " << isHeapVar(var) <<  " " << varnameToString(var)
+      //         << std::endl;
 
-	      PartPtr defPart = getPart(previousDef->getDefNode());
-	      if (// defPart && 
-		  hasDPhi(part, currNode)) {
+      // Process the heap variable and dphi function
+      if (isHeapVar(var)) {
+        // Get the prev node's dphi
+        PGReachingDefPtr prevDPhi = previousDef;
+        if (!prevDPhi->isPhiFunction()
+      && hasDPhi(prevPart, previousDef->getDefNode())) {
+    prevDPhi = getDPhi(prevPart, previousDef->getDefNode());
+
+    // PartPtr prevPart_ = getPart(previousDef->getDefNode());
+    // if (prevPart_)
+    //  std::cout << "check dphi: " << previousDef->getDefNode() << " on "
+    //       << prevPart.get() << " " << prevPart->str() << " and "
+    //       << prevPart_.get() << " " << prevPart_->str() << " "
+    //       << prevDPhi->isDPhiFunction() << std::endl;
+        }
+
+        PartPtr defPart = getPart(previousDef->getDefNode());
+        if (defPart && hasDPhi(part, currNode)) {
+    // && hasDPhi(defPart, previousDef->getDefNode())) {
+    PGReachingDefPtr currDPhi = getDPhi(part, currNode);
+    currDPhi->addJoinedDPhi(currDPhi, prevDPhi);
+    // getDPhi(defPart, previousDef->getDefNode()));
+    std::cout << "update dphi: " << defPart->str() << " --> " << part->str()
+        << std::endl;
+        }
+        // std::cout << " heap var: " << part->str() << " "
+        //   << hasDPhi(defPart, previousDef->getDefNode()) << " "
+        //   << hasDPhi(prevPart, previousDef->getDefNode()) << " "
+        //   << prevDPhi->isDPhiFunction() << " "
+        //   << (prevDPhi->isPhiFunction() || prevDPhi->isDPhiFunction()) << std::endl;
+        if (!(prevDPhi->isPhiFunction() || prevDPhi->isDPhiFunction()))
+    continue;
+
+        // PartPtr part_ = getPart(currNode);
+        // if (part_)
+        //   std::cout << "check heap use: " << currNode << " on " << part.get() << " "
+        //     << part->str() << " and "  << part_.get() << " " << part_->str() << " "
+        //     << hasHeapUse(part, currNode) << " "  << hasHeapUse(part_, currNode)
+        //     << " " << hasDPhi(part, currNode) << std::endl;
+        if (hasHeapUse(part, currNode)) {
+    // Set prev node's dphi as all current node's heap uses' reaching def
+    updateHeapUseReachingDef(part, currNode, prevDPhi);
+    std::cout << "update heap use " << currNode << " on " << prevPart.get()
+        << " " << prevPart->str() << std::endl;
+        }
+      }
+    } else {
+      PGReachingDefPtr existingDef = incomingDefTable[var];
+      // std::cout << "    multi-def case " << existingDef->isPhiFunction() << " and "
+      //         << (existingDef->getDefNode() == currNode)
+      //        << " and " << previousDef->isPiFunction()
+      //         << " " << existingDef->getDefPart()->str() << " for "
+      //         << varnameToString(var) << std::endl;
+
+      if (existingDef->isPhiFunction() && existingDef->getDefNode() == currNode) {
+        // && existingDef->getDefPart() == part) {
+        //There is a phi node here. We update the phi function to point to the previous
+        // reaching definition
+        existingDef->addJoinedDef(previousDef, prevEdge);
+      } else {
+        // If there is no phi node, and we get a new definition, it better be the same as
+        // the one previously propagated.
+        if (!(*previousDef == *existingDef)) {
+    printf("ERROR: At node %s@%d, two different definitions reach for variable %s\n",
+           currNode->class_name().c_str(), currNode->get_file_info()->get_line(),
+           varnameToString(var).c_str());
+    ROSE_ASSERT(false && "Two different definitions reach for variable");
+        }
+      }
+
+      // Process the heap variable and dphi function
+      if (isHeapVar(var)) {
+        SgNode* heapNode = currNode;
+        if (SgExprStatement* exprStmt = isSgExprStatement(currNode)) {
+    SgExpression * expr = exprStmt->get_expression();
+    heapNode = expr;
+    std::cout << "strange: " << part->str() << " and " << prevPart->str() << std::endl;
+    //xxx ROSE_ASSERT(false);
+        }
+        // Get the prev node's dphi
+        PGReachingDefPtr prevDPhi = existingDef;
+        if (!prevDPhi->isPhiFunction()
+      && hasDPhi(prevPart, previousDef->getDefNode())) {
+    prevDPhi = getDPhi(prevPart, previousDef->getDefNode());
+    //xxx ROSE_ASSERT(false && "Multi-def can not have single DPhi");
+        }
+        std::cout << "multi heap var: " << varnameToString(var) << " "
+      << prevDPhi->isPhiFunction() << " " << prevDPhi->isDPhiFunction() << " "
+      << part->str() << " --> " << prevPart->str() << " "
+      << hasDPhi(prevPart, previousDef->getDefNode()) << " "
+      << hasDPhi(part, currNode) << " " << hasHeapUse(part, currNode)
+      << std::endl;
+
+        PartPtr defPart = getPart(previousDef->getDefNode());
+        if (// defPart &&
+      hasDPhi(part, currNode)) {
                 PGReachingDefPtr currDPhi = getDPhi(part, currNode);
                 currDPhi->addJoinedDPhi(currDPhi, prevDPhi);
-		std::cout << "joined dphi" << std::endl;
-	      }
+    std::cout << "joined dphi" << std::endl;
+        }
               // std::cout << " heap var: " << part->str() << " "
               //        << hasDPhi(defPart, previousDef->getDefNode()) << " "
               //        << hasDPhi(prevPart, previousDef->getDefNode()) << " "
@@ -1584,13 +1581,13 @@ void PGSSA::updateIncomingPropagatedDefs(PartPtr part) {
               if (hasHeapUse(part, currNode)) {
                 // Set prev node's dphi as all current node's heap uses' reaching def
                 updateHeapUseReachingDef(part, currNode, prevDPhi);
-		std::cout << "update multi heap use " << currNode << " " << part->str() 
-			  << " on " << prevPart.get() << " " << prevPart->str() << " "
-			  << std::endl;
-	      }
-	    }
-	  }
-	}
+    std::cout << "update multi heap use " << currNode << " " << part->str()
+        << " on " << prevPart.get() << " " << prevPart->str() << " "
+        << std::endl;
+        }
+      }
+    }
+  }
       }
     }
   }
@@ -1601,7 +1598,7 @@ void PGSSA::buildSSAUseTable(const std::set<PartPtr>& endNodes) {
   // Traverse the partition nodes in backward order
   // back_partIterator 
   bw_graphEdgeIterator<PartEdgePtr, PartPtr> backIter(endNodes);
-  for (; backIter != bw_graphEdgeIterator<PartEdgePtr, PartPtr>::end(); backIter ++) {
+  for (; !backIter.isEnd(); backIter ++) {
     PartPtr part = backIter.getPart();
     foreach(const FilteredCfgNode& cfgNode, part->CFGNodes()) {
       SgNode* node = cfgNode.getNode();
@@ -1611,21 +1608,21 @@ void PGSSA::buildSSAUseTable(const std::set<PartPtr>& endNodes) {
       // partLocalUsesTable[part][node];
 
       foreach(const VarName& var, vars) {
-	// ROSE_ASSERT(reachingDefTable.find(var) != reachingDefTable.end());
-	if (reachingDefTable.find(var) == reachingDefTable.end()) //  && isHeapVar(var))
-	  continue;
-	
-	PGReachingDefPtr reachingDef = reachingDefTable[var];
+  // ROSE_ASSERT(reachingDefTable.find(var) != reachingDefTable.end());
+  if (reachingDefTable.find(var) == reachingDefTable.end()) //  && isHeapVar(var))
+    continue;
 
-	if (reachingDef->isPiFunction())
-	  reachingDef = getOrigDefForPi(reachingDef, var);
-	
-	if (isHeapVar(var)) 
-	  // The heap variable includes both dphi function and phi function cases
-	  heapPartUseTable[getPart(reachingDef->getDefNode())].insert(part);
-	else
-	  // For normal scalar case
-	  partUseTable[getPart(reachingDef->getDefNode())].insert(part);
+  PGReachingDefPtr reachingDef = reachingDefTable[var];
+
+  if (reachingDef->isPiFunction())
+    reachingDef = getOrigDefForPi(reachingDef, var);
+
+  if (isHeapVar(var))
+    // The heap variable includes both dphi function and phi function cases
+    heapPartUseTable[getPart(reachingDef->getDefNode())].insert(part);
+  else
+    // For normal scalar case
+    partUseTable[getPart(reachingDef->getDefNode())].insert(part);
       }
     }
   }
@@ -1649,7 +1646,6 @@ PGReachingDefPtr PGSSA::getOrigDefForPi(PGReachingDefPtr piDef, const StaticSing
 }
 
 void PGSSA::registerMemLocObj(SgNode* sgn, PartPtr part, CFGNode cfgNode) {
-  SgExpression* expr = isSgExpression(sgn);
   if (!isSgExpression(sgn) && !isSgInitializedName(sgn)) {
     // std::cout << "Can not create " << part->str() << std::endl;
     return;
@@ -1681,6 +1677,8 @@ bool PGSSA::reRegisterMemLocObj(SgNode* sgn, SSAMemLocPtr oldMemLoc, SSAMemLocPt
   CFGNode cfgNode = memLoc2CFGNode[oldMemLoc];
   memLoc2CFGNode.erase(oldMemLoc);
   memLoc2CFGNode[memLoc] = cfgNode;
+
+  return true;
 }
 
 const StaticSingleAssignment::VarName& PGSSA::getHeapVarName(SgNode* sgn) {
@@ -1710,8 +1708,8 @@ const StaticSingleAssignment::VarName& PGSSA::getHeapVarName(SgNode* sgn) {
 void PGSSA::addDPhi(PartPtr part, CFGNode cfgNode, SgNode* sgn) {
   // ROSE_ASSERT(partDPhiTable.find(sgn) == partDPhiTable.end());
   partDPhiTable[part][sgn] = PGReachingDefPtr(new PGReachingDef(part, sgn, PGReachingDef::DPHI, 
-								PGSSA::EmptyReachingDef));
-  std::cout << "\n add dphi: " << part.get() << " " << part->str() << " and " << sgn << std::endl;
+                PGSSA::EmptyReachingDef));
+//  std::cout << "\n add dphi: " << part.get() << " " << part->str() << " and " << sgn << std::endl;
 }
 
 bool PGSSA::hasDef(SgNode* node) {
@@ -1751,7 +1749,7 @@ bool PGSSA::hasHeapUse(PartPtr part, SgNode* sgn) {
 bool PGSSA::updateHeapUseReachingDef(PartPtr part, SgNode* sgn, PGReachingDefPtr reachingDef) {
   // TODO: the part definition may be wrong
   ROSE_ASSERT(partLocalUsesTable.find(part) != partLocalUsesTable.end() 
-	      && partLocalUsesTable[part].count(sgn) > 0);
+        && partLocalUsesTable[part].count(sgn) > 0);
   foreach (SgNode* useNode, getPartHeapUsesTable()[part][sgn]) {
     partDPhiTable[part][useNode] = reachingDef;
   }
@@ -1789,10 +1787,10 @@ void PGSSA::getReachingDefs(PartPtr part, SgNode* sgn, set<PGReachingDefPtr>& re
     PartEdgePtr edge;
     foreach(tie(def, edge), reachingDef->getParentDefs()) {
       if (def->isPhiFunction()) {
-	PartPtr prevPart = edge->source();
-	getReachingDefs(prevPart, def->getNode(), reachingDefs);
+  PartPtr prevPart = edge->source();
+  getReachingDefs(prevPart, def->getNode(), reachingDefs);
       } else
-	reachingDefs.insert(def);
+  reachingDefs.insert(def);
     }
   }
 }
@@ -1803,7 +1801,7 @@ void PGSSA::getReachingDefs(SgNode* sgn, set<PGReachingDefPtr>& reachingDefs) {
 }
 
 void PGSSA::getReachingDefsAtPart(PartPtr part, SgExpression* expr, 
-				  set<PGReachingDefPtr>& reachingDefs) {
+          set<PGReachingDefPtr>& reachingDefs) {
   set<PGReachingDefPtr> tmpRDs;
   if (isSgVarRefExp(expr)) {
     // Scalar case
@@ -1815,7 +1813,7 @@ void PGSSA::getReachingDefsAtPart(PartPtr part, SgExpression* expr,
       NodePGReachingDefTable& defTable = partInReachingDefTable[part][sgn];
       
       if (defTable.count(varName) > 0)
-	tmpRDs.insert(defTable[varName]);
+  tmpRDs.insert(defTable[varName]);
     }
   } else if (partDPhiTable.count(part) > 0) {
     // Heap case
@@ -1823,7 +1821,7 @@ void PGSSA::getReachingDefsAtPart(PartPtr part, SgExpression* expr,
     foreach(const FilteredCfgNode& currCfgNode, part->CFGNodes()) {
       SgNode* sgn = currCfgNode.getNode();
       if (partDPhiTable[part].count(sgn) > 0)
-	tmpRDs.insert(partDPhiTable[part][sgn]);
+  tmpRDs.insert(partDPhiTable[part][sgn]);
     }
   }
 
@@ -1834,11 +1832,11 @@ void PGSSA::getReachingDefsAtPart(PartPtr part, SgExpression* expr,
       PGReachingDefPtr def;
       PartEdgePtr edge;
       foreach(tie(def, edge), reachingDef->getParentDefs()) {
-	if (def->isPhiFunction()) {
-	  PartPtr prevPart = edge->source();
-	  getReachingDefs(prevPart, def->getNode(), reachingDefs);
-	} else
-	  reachingDefs.insert(def);
+  if (def->isPhiFunction()) {
+    PartPtr prevPart = edge->source();
+    getReachingDefs(prevPart, def->getNode(), reachingDefs);
+  } else
+    reachingDefs.insert(def);
       }
     }
   }
@@ -1883,6 +1881,16 @@ void PGSSA::collectUseParts(PartPtr part, SgNode* sgn, set<PartPtr>& partSet) {
 }
 
 SSAMemLocPtr PGSSA::getMemLocObject(SgNode* sgn) {
+  SIGHT_VERB_IF(2, pgssaDebugLevel)
+  scope s(txt()<<"getMemLocObject("<<SgNode2Str(sgn)<<")");
+  dbg << "<u>node2MemLoc(#"<<node2MemLoc.size()<<")</u>"<<endl;
+  dbg << "<table border=1>";
+  dbg << "<tr><td>SgNode</td><td>MemLoc</td></tr>";
+  for(map<SgNode*, SSAMemLocPtr>::iterator i=node2MemLoc.begin(); i!=node2MemLoc.end(); i++)
+    dbg << "    <tr><td>"<<SgNode2Str(i->first)<<"</td><td>"<<i->second->str()<<"</td></tr>";
+  dbg << "</table>";
+  SIGHT_VERB_FI()
+
   if (node2MemLoc.count(sgn) > 0)
     return node2MemLoc[sgn];
   else { 
@@ -1899,14 +1907,14 @@ void PGSSA::updateMemLocObject(SgNode* sgn, SSAMemLocPtr memLoc) {
 void PGSSA::getDefMemLocs(SgExpression* expr, PartPtr part, SSAMemLocSet& memLocs, bool mustDef) {
   // Check the given expression related reaching defs, i.e. only scalar reaching defs
   if (!hasPointerDeref() && !hasAddressTaken()) {
-      if (SgVarRefExp* varExp = isSgVarRefExp(expr)) {
+    if (SgVarRefExp* varExp = isSgVarRefExp(expr)) {
       // The definiton part is not in the given part, then get reaching def
       PGReachingDefPtr reachingDef = getReachingDef(part, varExp);
       if (reachingDef != EmptyReachingDef) {
-	SSAMemLocPtr memLoc = getMemLocObject(reachingDef->getDefNode());
-	if (memLoc != EmptySSAMemLoc)
-	  memLocs.insert(memLoc);
-	return;
+        SSAMemLocPtr memLoc = getMemLocObject(reachingDef->getDefNode());
+        if (memLoc != EmptySSAMemLoc)
+          memLocs.insert(memLoc);
+        return;
       }
     }
   }
@@ -1921,7 +1929,7 @@ void PGSSA::getDefMemLocs(SgExpression* expr, PartPtr part, SSAMemLocSet& memLoc
 }
 
 void PGSSA::collectHeapRDs(PGReachingDefPtr heapRD, SSAMemLocPtr memLoc, SSAMemLocSet& memLocs, 
-			   ReachingDefSet& visited, bool mustDef) {
+         ReachingDefSet& visited, bool mustDef) {
   if (visited.count(heapRD) > 0)
     return;
  
@@ -1934,7 +1942,7 @@ void PGSSA::collectHeapRDs(PGReachingDefPtr heapRD, SSAMemLocPtr memLoc, SSAMemL
     PartEdgePtr edge;
     foreach(tie(def, edge), heapRD->getParentDefs()) {
       if (def->isPhiFunction() || def->isDPhiFunction())
-	collectHeapRDs(def, memLoc, memLocs, visited);
+        collectHeapRDs(def, memLoc, memLocs, visited);
     }
   } else {
     ROSE_ASSERT(heapRD->isDPhiFunction());
@@ -1945,20 +1953,20 @@ void PGSSA::collectHeapRDs(PGReachingDefPtr heapRD, SSAMemLocPtr memLoc, SSAMemL
     if (!mustDef) {
       // Collect each may/must equal memory location, here's presumption is if mayEqual == true then mustEqual == true; 
       if (defMemLoc->mayEqual(memLoc))
-	memLocs.insert(defMemLoc);
+        memLocs.insert(defMemLoc);
       // For must equal, no need to do more back-trace, stop search
       if (defMemLoc->mustEqual(memLoc))
-	return;
+        return;
     } else {
       // Must def case:
       if (defMemLoc->mustEqual(memLoc)) {
-	memLocs.insert(defMemLoc);
-	return;
+        memLocs.insert(defMemLoc);
+        return;
       } else if (defMemLoc->mayEqual(memLoc)) {
-	// For may equal, give up back-trace
-	return;
+        // For may equal, give up back-trace
+        return;
       } else {
-	// Not may/must equal (i.e. must not equal), then keep doing back-trace
+        // Not may/must equal (i.e. must not equal), then keep doing back-trace
       }
     }
 
@@ -1995,8 +2003,6 @@ PGReachingDefPtr PGSSA::getAnyDPhi(PartPtr part) {
     PGReachingDefPtr heapRD = getDPhi(part, currNode);
     if (!heapRD) {
       map<SgNode*, PGReachingDefPtr >::iterator it = partDPhiTable[part].begin();
-      SgNode* sgn = it->first;
-      
       heapRD = it->second;
     }
 
@@ -2021,12 +2027,12 @@ PGReachingDefPtr PGSSA::getAnyDPhi(PartPtr part) {
       PGReachingDefPtr heapRD  = it->second;
       CFGNode cfgNode = it->first;
       // std::cout << "\ngot part: " << cfgNode.getNode() << " on " << part.get() 
-      // 	<< " " << part->str() << std::endl;
+      //   << " " << part->str() << std::endl;
       
       // ROSE_ASSERT(heapRD);
       // ROSE_ASSERT(heapRD->isDPhiFunction() || heapRD->isPhiFunction());
       if (heapRD && (heapRD->isDPhiFunction() || heapRD->isPhiFunction()))
-	return heapRD;
+  return heapRD;
     }
   }
 
@@ -2064,21 +2070,21 @@ std::string PGReachingDef::str() {
 /// Partition Graph based Abstract Object Map
 ///
 //////////////////////////////////////////////////////////////////////////////////////////////////
-PGSSAObjectMap::PGSSAObjectMap(const AbstractObjectMap& that) : AbstractObjectMap(that) {
+PGSSAObjectMap::PGSSAObjectMap(const AbstractObjectMap& that) /*: AbstractObjectMap(that)*/ {
   ROSE_ASSERT(false);
 }
 
 PGSSAObjectMap::PGSSAObjectMap(LatticePtr defaultLat_, PartEdgePtr pedge, Composer* comp,
-			       ComposedAnalysis * analysis) :
-  AbstractObjectMap(defaultLat_, pedge, comp, analysis) { 
-  mapIsFull = true;
+             ComposedAnalysis * analysis) /*:
+  AbstractObjectMap(defaultLat_, pedge, comp, analysis)*/ {
+//  mapIsFull = true;
   ROSE_ASSERT(dynamic_cast<PGSSAAnalysis* >(analysis));
   pgssa = (dynamic_cast<PGSSAAnalysis* >(analysis))->getPGSSA();
 }
 
 /// Remap the memory location and lattice between caller and callee
 Lattice* PGSSAObjectMap::remapML(const std::set<pair<MemLocObjectPtr, MemLocObjectPtr> >& ml2ml, 
-				 PartEdgePtr newPEdge) {
+         PartEdgePtr newPEdge) {
   /*PGSSAObjectMap* newmapML = new PGSSAObjectMap(* this);
   pair<MemLocObjectPtr, MemLocObjectPtr> p;
   foreach(p, ml2ml) {
@@ -2103,23 +2109,37 @@ Lattice* PGSSAObjectMap::remapML(const std::set<pair<MemLocObjectPtr, MemLocObje
     // memory location has lattice, then do meetUpdate
     if (oldML && newML) {
       if (internalTable.find(oldML) != internalTable.end()) {
-	LatticePtr oldLat = internalTable[oldML];
-	if (internalTable.find(newML) != internalTable.end()) {
-	  LatticePtr newLat = internalTable[newML];
-	  newLat->meetUpdate(oldLat.get());
-	} else
-	  internalTable[newML] = oldLat;
+        LatticePtr oldLat = internalTable[oldML];
+        if (internalTable.find(newML) != internalTable.end()) {
+          LatticePtr newLat = internalTable[newML];
+          newLat->meetUpdate(oldLat.get());
+        } else
+        internalTable[newML] = oldLat;
       }
     }
   }
+  ROSE_ASSERT(0);
 }
 
 bool PGSSAObjectMap::insertValue(SSAMemLocPtr memLoc, LatticePtr valObj) {
+  SIGHT_VERB_DECL(scope, (txt()<<"PGSSAObjectMap::insertValue()"), 1, pgssaDebugLevel)
+  SIGHT_VERB_IF(1, pgssaDebugLevel)
+    dbg << "memLoc="<<memLoc->str()<<endl;
+    dbg << "valObj="<<valObj->str()<<endl;
+    dbg << str()<<endl;
+    dbg << "internalTable.count(memLoc)="<<internalTable.count(memLoc)<<endl;
+  SIGHT_VERB_FI()
+
   if (internalTable.count(memLoc) > 0)
     return false;
 
   internalTable[memLoc] = valObj;
 
+  SIGHT_VERB_IF(1, pgssaDebugLevel)
+  dbg << "<hline>";
+  dbg << "after"<<endl;
+  dbg << str()<<endl;
+  SIGHT_VERB_FI()
   return true;
 }
 
@@ -2165,16 +2185,38 @@ LatticePtr PGSSAObjectMap::getPhiValue(PGReachingDefPtr phiRD) {
 
     if (defLattice != PGSSA::EmptyLattice) {
       if (!first) {
-	// Copy the 1st lattice from parent defs
-	retLattice = LatticePtr(defLattice->copy());
-	first = false;
+  // Copy the 1st lattice from parent defs
+  retLattice = LatticePtr(defLattice->copy());
+  first = false;
       } else 
-	// Meet update parent defs
-	retLattice->meetUpdate(defLattice.get());
+  // Meet update parent defs
+  retLattice->meetUpdate(defLattice.get());
     } 
   }
 
   return retLattice;
+}
+
+std::string PGSSAObjectMap::str(std::string indent) const {
+  return strp(/*latPEdge, */NULLPartEdge, indent);
+}
+
+// Variant of the str method that can produce information specific to the current Part.
+// Useful since AbstractObjects can change from one Part to another.
+std::string PGSSAObjectMap::strp(PartEdgePtr pedge, std::string indent) const
+{
+  ostringstream s;
+  s << "<u>PGSSAObjectMap("<<this<<"):</u>";
+  s << "<table border=1><tr><td>Key</td><td>Value</td>";
+  for(map<SSAMemLocPtr, LatticePtr>::const_iterator i=internalTable.begin(); i!=internalTable.end(); i++) {
+    s << "<tr><td>";
+    s << i->first->strp(pedge, indent+"&nbsp;&nbsp;&nbsp;&nbsp;");
+    s << "</td><td>";
+    s << i->second->str(indent+"&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;");
+    s << "</td></tr>";
+  }
+  s << "</table>"<<endl;
+  return s.str();
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////////////
@@ -2195,7 +2237,7 @@ LatticePtr PGSSAObjectMap::getPhiValue(PGReachingDefPtr phiRD) {
 /// Get theinitialwork list (i.e. FlowWorkList) element for Sparse analysis, here we choose the entry
 /// of partition graph
 /*std::list<PartPtr> PGSSAAnalysis::getInitialWorklist(const Function &func, bool analyzeDueToCallers,
-						     const set<Function> &calleesUpdated, NodeState *fState) {
+                 const set<Function> &calleesUpdated, NodeState *fState) {
   list<PartPtr> dfIt;
   // Just create the worklist with the start node of partition graph
   PartPtr funcPGStart = getComposer()->GetFunctionStartPart(func, this);
@@ -2221,7 +2263,7 @@ std::map<PartEdgePtr, std::vector<Lattice*> >& PGSSAAnalysis::getLatticePost(Nod
 }
 
 void PGSSAAnalysis::setLatticeAnte(NodeState *state, std::map<PartEdgePtr, std::vector<Lattice*> >& dfInfo, 
-				   bool overwrite) {
+           bool overwrite) {
   if (overwrite) 
     state->copyLatticesOW(state->getLatticeAboveAllMod(this), dfInfo);
   else   
@@ -2229,7 +2271,7 @@ void PGSSAAnalysis::setLatticeAnte(NodeState *state, std::map<PartEdgePtr, std::
 }
 
 void PGSSAAnalysis::setLatticePost(NodeState *state, std::map<PartEdgePtr, std::vector<Lattice*> >& dfInfo, 
-				   bool overwrite) {
+           bool overwrite) {
   if (overwrite) 
     state->copyLatticesOW(state->getLatticeBelowAllMod(this), dfInfo);
   else          
@@ -2258,7 +2300,7 @@ set<PartPtr> PGSSAAnalysis::getUltimate() {
 
 dataflowPartEdgeIterator* PGSSAAnalysis::getIterator(const Function &func) {
   set<PartPtr> terminalStates = getComposer()->GetEndAStates(this);
-  return new fw_dataflowPartEdgeIterator();
+  return new fw_dataflowPartEdgeIterator(selectIterOrderFromEnvironment());
 }
  
 /// Remaps the given Lattice across the scope transition (if any) of the given edge
@@ -2273,13 +2315,9 @@ void PGSSAAnalysis::remapML(PartEdgePtr fromPEdge, std::vector<Lattice*>& lat) {
 
 /// This is the main framework for running SSA based analysis
 void PGSSAAnalysis::runAnalysis() {
-  std::cout << "run analysis 1" << std::endl;
-
   // Build partiton graph based SSA form 
   std::set<PartPtr> startParts, endParts;
   std::set<PartPtr> tempStates = getComposer()->GetStartAStates(this);
-
-  std::cout << "run analysis 2 " << std::endl;
 
   startParts.insert(tempStates.begin(), tempStates.end());
   tempStates = getComposer()->GetEndAStates(this);
@@ -2288,9 +2326,16 @@ void PGSSAAnalysis::runAnalysis() {
   // getComposer()->GetFunctionStartPart(func, this);
   pgssa.setAnalysis(this);
 
+  struct timeval start, end;
+  gettimeofday(&start, NULL);
+
   pgssa.build(startParts, endParts, false);
 
-  std::cout << "run analysis 2.1 " << std::endl;
+  gettimeofday(&end, NULL);
+  cout << "  Build SSA graph Elapsed="<<((end.tv_sec*1000000+end.tv_usec) -
+                                         (start.tv_sec*1000000+start.tv_usec))/1000000.0<<"s"<<endl;
+
+  dbg << "pgssa="<<pgssa.str()<<endl;
 
   // Make sure that we've been paired with a valid inter-procedural dataflow analysis
   // ROSE_ASSERT(dynamic_cast<InterProceduralDataflow*>(interAnalysis));
@@ -2304,9 +2349,7 @@ void PGSSAAnalysis::runAnalysis() {
   list<PartPtr> FlowWorkList;
   list<PartPtr> SSAWorkList;
 
-  std::cout << "run analysis 3:  " << startParts.size() << std::endl;
-
-  set<PartPtr> ultimateParts = getUltimate(); // func);
+  set<PartPtr> ultimateParts = getUltimate();
   visited.insert(ultimateParts.begin(), ultimateParts.end());
 
   // Initialize FlowWorkList
@@ -2318,13 +2361,14 @@ void PGSSAAnalysis::runAnalysis() {
   while (!FlowWorkList.empty()) {
     PartPtr currPart = FlowWorkList.front();
     FlowWorkList.pop_front();
+
+    SIGHT_VERB_DECL(scope, (txt()<<"Cur AState "<<currPart->str(), /*toAnchors[part], */ scope::high), 1, pgssaDebugLevel)
  
     // Iterate over the nodes in this function that are downstream from the nodes added above
     // dataflowPartIterator* curNodeIt = getIterator(func);
     // curNodeIt->add(*start);
     // while(*curNodeIt!=dataflowPartIterator::end()) {
    
-    bool modified = false;
     bool firstVisit;
     if ((firstVisit = (visited.find(currPart) == visited.end())))
       visited.insert(currPart);
@@ -2341,28 +2385,27 @@ void PGSSAAnalysis::runAnalysis() {
       SSAWorkList.pop_front();
 
       if (visited.find(currPart) == visited.end())
-	continue;
+        continue;
 
       visitPart(currPart, SSAWorkList);
     } // while (!SSAWorkList.empty())
     
     // Add the descendants of current part to FlowWorkList
     list<PartPtr> descendants = getDescendants(currPart);
-    for (list<PartPtr>::iterator partIter = descendants.begin(); partIter != descendants.end(); 
-	 ++ partIter) 
+    for (list<PartPtr>::iterator partIter = descendants.begin(); partIter != descendants.end(); ++ partIter) {
+      SIGHT_VERB(dbg << "Adding descendant "<<(*partIter)->str(), 1, pgssaDebugLevel)
       FlowWorkList.push_back(* partIter); // descendants.begin(), descendants.end());
-    
-    // (* FlowWorkListIter) ++;
+    }
   } // while (* FlowWorkListIter != dataflowPartIterator::end()) 
 
   std::cout << "finish analysis" << std::endl;
 }
 
 bool PGSSAAnalysis::visitPart(PartPtr part, list<PartPtr>& SSAWorkList) {
+  SIGHT_VERB_DECL(scope, (txt()<<"visitPart()", /*toAnchors[part], */ scope::medium), 1, pgssaDebugLevel)
   // The NodeState associated with this part
   NodeState* state = NodeState::getNodeState(this, part);
 
-  map<PartEdgePtr, vector<Lattice*> >& dfInfoAnte = getLatticeAnte(state);
   // Create a local map for the post dataflow information. It will be deallocated 
   // at the end of the transfer function.
   map<PartEdgePtr, vector<Lattice*> > dfInfo;
@@ -2387,6 +2430,11 @@ bool PGSSAAnalysis::visitPart(PartPtr part, list<PartPtr>& SSAWorkList) {
     // Set current lattice map, i.e. PGSSA based abstract object map
     transferVisitor->setLatticeMap(currentObjMap(NULLPartEdge));
     
+    SIGHT_VERB_IF(1, pgssaDebugLevel)
+    scope s("curObjMap");
+    dbg << currentObjMap(NULLPartEdge)->str()<<endl;
+    SIGHT_VERB_FI()
+
     // Visit the node 
     sgn->accept(*transferVisitor);
     modified = transferVisitor->finish() || modified;
@@ -2409,10 +2457,14 @@ PGSSAObjectMap* PGSSAAnalysis::currentObjMap(const Function& func, PartEdgePtr p
 }
 
 PGSSAObjectMap* PGSSAAnalysis::currentObjMap(PartEdgePtr pedge) {
-  if (!currentObjMap_)
+  /*????if (!currentObjMap_)
     return getObjectMap(pedge);
   else
-    return currentObjMap_;
+    return currentObjMap_;*/
+
+  if (!currentObjMap_)
+    currentObjMap_ = getObjectMap(pedge);
+  return currentObjMap_;
 }
 
 PGSSAObjectMap* PGSSAAnalysis::currentObjMap() {
@@ -2421,18 +2473,18 @@ PGSSAObjectMap* PGSSAAnalysis::currentObjMap() {
 }
  
 PGSSAIntraProcTransferVisitorPtr PGSSAAnalysis::getSSATransferVisitor(// const Function& func, 
-								      PartPtr part, CFGNode cn,
-								      NodeState& state,  
-								      map<PartEdgePtr, vector<Lattice*> >& dfInfo) {
+                      PartPtr part, CFGNode cn,
+                      NodeState& state,
+                      map<PartEdgePtr, vector<Lattice*> >& dfInfo) {
   // Return the default transfer visitor that does nothing
   return boost::shared_ptr<PGSSAIntraProcTransferVisitor>(new DefaultPGSSATransferVisitor(// func, 
-											  part, cn, state, 
-											  dfInfo, &pgssa, getComposer())); 
+                        part, cn, state,
+                        dfInfo, &pgssa, getComposer(), pgssaDebugLevel));
 }
   
 // This one should be replaced with the SSA based transfer function
 bool PGSSAAnalysis::transfer(const Function& func, PartPtr part, CFGNode cn, NodeState& state, 
-			     std::map<PartEdgePtr, std::vector<Lattice*> >& dfInfo) {
+           std::map<PartEdgePtr, std::vector<Lattice*> >& dfInfo) {
 
   return false;
 }

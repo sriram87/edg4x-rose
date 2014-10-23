@@ -12,6 +12,8 @@ using namespace boost;
 using namespace std;
 using namespace scc_private;
 
+#define sparseVNDebugLevel 0
+
 /////////////////////////////////////////////////////////////////////////////////////////////
 ///
 /// Value Numbering based on Sparse Framework
@@ -19,15 +21,16 @@ using namespace scc_private;
 ////////////////////////////////////////////////////////////////////////////////////////////
 
 /// Sparse Value Numbering Lattice
-SVNLattice::SVNLattice(PartEdgePtr pedge) : FiniteLattice(pedge), Lattice(pedge), full(false), 
-					    valId(-1), value(NULL) {
+SVNLattice::SVNLattice(PartEdgePtr pedge) : Lattice(pedge), FiniteLattice(pedge),
+					    valId(-1), full(false), value(NULL) {
   this->pedge = pedge;
 }
 
-SVNLattice::SVNLattice(PartEdgePtr pedge, SgExpression* value_, int valId_) : FiniteLattice(pedge), 
+SVNLattice::SVNLattice(PartEdgePtr pedge, SgExpression* value_, int valId_) :
 									      Lattice(pedge), 
+									      FiniteLattice(pedge),
+									      valId(valId_),
 									      full(false),
-									      valId(valId_), 
 									      value(value_) {
   this->pedge = pedge;
 }
@@ -69,8 +72,8 @@ bool SVNLattice::equalsVal(SgExpression* valExp) {
 
 /// Sparse Value Numbering memory location
 SVNMemLoc::SVNMemLoc(SSAMemLocPtr memLoc_, SparseValueNumbering* analysis_)
-  : SSAMemLoc(memLoc_->getSSAInstance(), memLoc_->getVarExpr(), memLoc_->getLabelMemLoc(), memLoc_->getPart()),
-   MemLocObject(memLoc_->getVarExpr()) {
+  : MemLocObject(memLoc_->getVarExpr()),
+    SSAMemLoc(memLoc_->getSSAInstance(), memLoc_->getVarExpr(), memLoc_->getLabelMemLoc(), memLoc_->getPart()) {
   analysis = analysis_;
 }
 
@@ -93,11 +96,13 @@ bool SVNMemLoc::mayEqualML(MemLocObjectPtr o, PartEdgePtr pedge) {
     SSAMemLocPtr ssaMemLoc = boost::dynamic_pointer_cast<SSAMemLoc>(o);
     if (!ssaMemLoc)
       // Delegate to label memory location that got from predecessor
-      return this->memLoc->mayEqualML(o, pedge);
+      //return this->memLoc->mayEqualML(o, pedge);
+      return this->memLoc->mayEqual(o, pedge, analysis->getComposer(), analysis);
     else {
       // Delegate to label memory location that got from predecessor
       // PartPtr currPart = ((PGSSA* )ssa)->getPart(expr);
-      return this->memLoc->mayEqualML(ssaMemLoc->getLabelMemLoc(), pedge); // currPart->inEdgeFromAny());
+      //return this->memLoc->mayEqualML(ssaMemLoc->getLabelMemLoc(), pedge); // currPart->inEdgeFromAny());
+      return this->memLoc->mayEqual(ssaMemLoc->getLabelMemLoc(), pedge, analysis->getComposer(), analysis);
     }
   } 
 
@@ -118,11 +123,13 @@ bool SVNMemLoc::mustEqualML(MemLocObjectPtr o, PartEdgePtr pedge) {
     SSAMemLocPtr ssaMemLoc = boost::dynamic_pointer_cast<SSAMemLoc>(o);
     if (!ssaMemLoc)
       // Delegate to label memory location that got from predecessor
-      return this->memLoc->mustEqualML(o, pedge);
+      //return this->memLoc->mustEqualML(o, pedge);
+      return this->memLoc->mustEqual(o, pedge, analysis->getComposer(), analysis);
     else {
       // Delegate to label memory location that got from predecessor
       // PartPtr currPart = ((PGSSA* )ssa)->getPart(expr);
-      return this->memLoc->mustEqualML(ssaMemLoc->getLabelMemLoc(), pedge); // currPart->inEdgeFromAny());
+      //return this->memLoc->mustEqualML(ssaMemLoc->getLabelMemLoc(), pedge); // currPart->inEdgeFromAny());
+      return this->memLoc->mustEqual(ssaMemLoc->getLabelMemLoc(), pedge, analysis->getComposer(), analysis);
     }
   } 
   
@@ -135,14 +142,16 @@ bool SVNMemLoc::mayEqualML(MemLocObjectPtr o) const {
   PartPtr currPart = ((PGSSA* )ssa)->getPart(expr);
   if (!ssaMemLoc)
     // Delegate to label memory location that got from predecessor
-    return this->memLoc->mayEqualML(o, currPart->inEdgeFromAny());
+    //return this->memLoc->mayEqualML(o, currPart->inEdgeFromAny());
+    return this->memLoc->mayEqual(o, currPart->inEdgeFromAny(), analysis->getComposer(), analysis);
   else {
     // Compare the signature
     if (SSAMemLoc::isSameSig(this->expr, ssaMemLoc->getVarExpr()))
       return true;
 
     // Delegate to label memory location that got from predecessor
-    return this->memLoc->mayEqualML(ssaMemLoc->getLabelMemLoc(), currPart->inEdgeFromAny());
+    //return this->memLoc->mayEqualML(ssaMemLoc->getLabelMemLoc(), currPart->inEdgeFromAny());
+    return this->memLoc->mayEqual(ssaMemLoc->getLabelMemLoc(), currPart->inEdgeFromAny(), analysis->getComposer(), analysis);
   }
 }
 
@@ -152,14 +161,16 @@ bool SVNMemLoc::mustEqualML(MemLocObjectPtr o) const {
   PartPtr currPart = ((PGSSA* )ssa)->getPart(expr);
   if (!ssaMemLoc)
     // Delegate to label memory location that got from predecessor
-    return this->memLoc->mustEqualML(o, currPart->inEdgeFromAny());
+    //return this->memLoc->mustEqualML(o, currPart->inEdgeFromAny());
+    return this->memLoc->mustEqual(o, currPart->inEdgeFromAny(), analysis->getComposer(), analysis);
   else {
     // Compare the signature
     if (SSAMemLoc::isSameSig(this->expr, ssaMemLoc->getVarExpr()))
       return true;
 
     // Delegate to label memory location that got from predecessor
-    return this->memLoc->mustEqualML(ssaMemLoc->getLabelMemLoc(), currPart->inEdgeFromAny());
+    //return this->memLoc->mustEqualML(ssaMemLoc->getLabelMemLoc(), currPart->inEdgeFromAny());
+    return this->memLoc->mustEqual(ssaMemLoc->getLabelMemLoc(), currPart->inEdgeFromAny(), analysis->getComposer(), analysis);
   }
 }
 
@@ -173,8 +184,9 @@ ComposedAnalysisPtr SparseValueNumbering::copy() {
 
 void SparseValueNumbering::genInitLattice(const Function& func, PartPtr part, PartEdgePtr pedge,
 					  std::vector<Lattice* >& initLattice) {
-  PGSSAObjectMap* l = new PGSSAObjectMap(boost::make_shared<SVNLattice>(pedge), pedge, getComposer(), this);
-  initLattice.push_back(l);
+  /*PGSSAObjectMap* l = new PGSSAObjectMap(boost::make_shared<SVNLattice>(pedge), pedge, getComposer(), this);
+  initLattice.push_back(l);*/
+  ROSE_ASSERT(0);
 }
 
 boost::shared_ptr<PGSSAIntraProcTransferVisitor>
@@ -217,7 +229,7 @@ SparseValueNumberingTransfer::SparseValueNumberingTransfer(// const Function& fu
 							   Composer* composer,
 							   SparseValueNumbering* analysis_)
   : PGSSAValueTransferVisitor<SVNLattice>(part, cn, state, dfInfo, analysis_->getPGSSA(),
-                                          composer), analysis(analysis_), modified(false) {}
+                                          composer, sparseVNDebugLevel), modified(false), analysis(analysis_) {}
 
 /// Initialize the global arithmatic ID manager
 GlobalArithID SparseValueNumberingTransfer::gArithID;
@@ -225,13 +237,13 @@ GlobalArithID SparseValueNumberingTransfer::gArithID;
 /// Create a new lattice based on the valueexpression
 SVNLatticePtr SparseValueNumberingTransfer::createSVNLattice(SgExpression* expr, 
 							     PartEdgePtr pedge) {
-  if (SgValueExp* valExpr = isSgValueExp(expr))
+  if (SgValueExp* valExpr = isSgValueExp(expr)) {
     foreach(SVNLatticePtr l, values) {
       // Check equality
       if (l->equalsVal(valExpr))
-	return SVNLatticePtr(new SVNLattice(pedge, valExpr, l->getVN()));
+	      return SVNLatticePtr(new SVNLattice(pedge, valExpr, l->getVN()));
     }
-
+  }
   SVNLatticePtr l = SVNLatticePtr(new SVNLattice(pedge, expr, gArithID.getValID()));
   values.insert(l);
   
@@ -373,88 +385,88 @@ SVNLatticePtr SparseValueNumberingTransfer::getPhiLattice(SgNode* sgn) {
 
 /// Get the ID for binary operation, if it is an unsupported binary operation, return -1
 int GlobalArithID::getArithID(SgBinaryOp* sgn, int lID, int rID) {
-  if (SgAddOp* addOp = isSgAddOp(sgn)) {
+  if (/*SgAddOp* addOp = */isSgAddOp(sgn)) {
     if (internal_adds.find(lID) != internal_adds.end()) {
       map<int, int>& valMap = internal_adds[lID];
       if (valMap.find(rID) != valMap.end())
-	return valMap[rID];
+	      return valMap[rID];
     } 
     if (internal_adds.find(rID) != internal_adds.end()) {
       map<int, int>& valMap = internal_adds[lID];
       if (valMap.find(lID) != valMap.end())
-	return valMap[lID];
+	      return valMap[lID];
     }
     // Register new value ID
     int newID = getValID();
     internal_adds[lID][rID] = newID;
     internal_adds[rID][lID] = newID;
-  } else if (SgSubtractOp* subOp = isSgSubtractOp(sgn)) {
+  } else if (/*SgSubtractOp* subOp = */isSgSubtractOp(sgn)) {
     if (internal_subs.find(lID) != internal_subs.end()){
       map<int, int>& valMap = internal_subs[lID];
       if (valMap.find(rID) != valMap.end())
-	return valMap[rID];
+	      return valMap[rID];
     }
-    // Registernew value ID
+    // Register new value ID
     int newID = getValID();
     internal_subs[lID][rID] = newID;
-  } else if (SgMultiplyOp* mulOp = isSgMultiplyOp(sgn)) {
+  } else if (/*SgMultiplyOp* mulOp = */isSgMultiplyOp(sgn)) {
     if (internal_muls.find(lID) != internal_muls.end()){
       map<int, int>& valMap = internal_muls[lID];
       if (valMap.find(rID) != valMap.end())
-	return valMap[rID];
+	      return valMap[rID];
     }
     if (internal_muls.find(rID) != internal_muls.end()){
       map<int, int>& valMap = internal_muls[rID];
       if (valMap.find(lID) != valMap.end())
-	return valMap[lID];
+	      return valMap[lID];
     }
     // Register new value ID
     int newID = getValID();
     internal_muls[lID][rID] = newID;
     internal_muls[rID][lID] = newID;
-  } else if (SgDivideOp* divOp = isSgDivideOp(sgn)) {
+  } else if (/*SgDivideOp* divOp = */isSgDivideOp(sgn)) {
     if (internal_divs.find(lID) != internal_divs.end()){
       map<int, int>& valMap = internal_divs[lID];
       if (valMap.find(rID) != valMap.end())
-	return valMap[rID];
+	      return valMap[rID];
     }
     // Register new value ID
     int newID = getValID();
     internal_divs[lID][rID] = newID;
-  } else if (SgModOp* modOp = isSgModOp(sgn)) {
+  } else if (/*SgModOp* modOp = */isSgModOp(sgn)) {
     if (internal_mods.find(lID) != internal_mods.end()){
       map<int, int>& valMap = internal_mods[lID];
       if (valMap.find(rID) != valMap.end())
-	return valMap[rID];
+	      return valMap[rID];
     }
     // Register new value ID
     int newID = getValID();
     internal_mods[lID][rID] = newID;
-  } else if (SgAndOp* andOp = isSgAndOp(sgn)) {
+  } else if (/*SgAndOp* andOp = */isSgAndOp(sgn)) {
     if (internal_ands.find(lID) != internal_ands.end()){
       map<int, int>& valMap = internal_ands[lID];
       if (valMap.find(rID) != valMap.end())
-	return valMap[rID];
+	      return valMap[rID];
     }
     if (internal_ands.find(rID) != internal_ands.end()){
       map<int, int>& valMap = internal_ands[rID];
       if (valMap.find(lID) != valMap.end())
-	return valMap[lID];
+	      return valMap[lID];
     }
     // Register new value ID
     int newID = getValID();
     internal_ands[lID][rID] = newID;
     internal_ands[rID][lID] = newID;
-  } else if (SgOrOp* orOp = isSgOrOp(sgn)) {
+  } else if (/*SgOrOp* orOp = */isSgOrOp(sgn)) {
     if (internal_ors.find(lID) != internal_ors.end()){
       map<int, int>& valMap = internal_ors[lID];
       if (valMap.find(rID) != valMap.end())
-	return valMap[rID];
+	      return valMap[rID];
     }
     if (internal_ors.find(rID) != internal_ors.end()){
       map<int, int>& valMap = internal_ors[rID];
       if (valMap.find(lID) != valMap.end())
-	return valMap[lID];
+	      return valMap[lID];
     }
     // Register new value ID
     int newID = getValID();

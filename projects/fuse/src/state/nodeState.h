@@ -27,7 +27,7 @@ class ComposedAnalysis;
  ************************************************/
 // A fact associated with a CFG node that is not part of a dataflow analysis. In other words, 
 // it is not a lattice and is not meant to evolve during the course of a dataflow analysis.
-class NodeFact: public sight::printable
+class NodeFact
 {
   public:
   
@@ -56,6 +56,8 @@ class NodeFact: public sight::printable
   {
     return fact;
   }*/
+
+  virtual std::string str(std::string indent="") const=0;
 };
 
 

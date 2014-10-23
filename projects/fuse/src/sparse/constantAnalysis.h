@@ -47,8 +47,8 @@ namespace scc_private
 
   class SparseConstantAnalysisTransfer;
   
-  class CAValueObject : public FiniteLattice, 
-    public ValueObject {
+  class CAValueObject : public FiniteLattice, public ValueObject
+  {
   private:
     // the current value of the variable (if known)
     int value;
@@ -80,10 +80,10 @@ namespace scc_private
     // Access functions.
     int getValue() const { return value; };
       
-    bool setValue(int x) { value = x; };
+    bool setValue(int x) { bool modified=value!=x; value = x; return modified; };
   
-    bool setBottom() { bottom = true; top = false; };
-    bool setTop() { top = true; bottom = false; };
+    bool setBottom() { bool modified=!bottom; bottom = true; top = false; return modified; };
+    bool setTop() { bool modified=!top; top = true; bottom = false; return modified; };
   
     virtual bool isTop() { return top; };
     virtual bool isBottom() { return bottom; };
@@ -155,6 +155,8 @@ namespace scc_private
 
     // Returns true if this ValueObject corresponds to a concrete value that is statically-known
     bool isConcrete();
+    // Returns the number of concrete values in this set
+    int concreteSetSize();
     // Returns the type of the concrete value (if there is one)
     SgType* getConcreteType();
    
@@ -169,11 +171,11 @@ namespace scc_private
   
   typedef boost::shared_ptr<CAValueObject> CAValueObjectPtr;
  
-  class SparseConstantAnalysis : virtual public PGSSAAnalysis {
+  class SparseConstantAnalysis : public PGSSAAnalysis {
    
   public:
-    SparseConstantAnalysis() : ComposedAnalysis(/*trackBase2RefinedPartEdgeMapping*/ false), hasVisitor(false) {};
-      SparseConstantAnalysis(SparseConstantAnalysis* oldAnalysis) : ComposedAnalysis(/*trackBase2RefinedPartEdgeMapping*/ false), hasVisitor(false) {};
+    SparseConstantAnalysis() : PGSSAAnalysis(/*trackBase2RefinedPartEdgeMapping*/ false), hasVisitor(false) {};
+    SparseConstantAnalysis(SparseConstantAnalysis* oldAnalysis) : PGSSAAnalysis(/*trackBase2RefinedPartEdgeMapping*/ false), hasVisitor(false) {};
 
     void genInitLattice(const Function& func, PartPtr part, PartEdgePtr pedge, 
 			std::vector<Lattice*>& initLattices);
@@ -196,7 +198,7 @@ namespace scc_private
     /// Get iterator
     dataflowPartEdgeIterator* getIterator() {
       set<PartPtr> terminalStates = getComposer()->GetEndAStates(this);
-      return new fw_dataflowPartEdgeIterator();
+      return new fw_dataflowPartEdgeIterator(selectIterOrderFromEnvironment());
     }
 
     /// Transfer function

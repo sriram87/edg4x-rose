@@ -1,7 +1,6 @@
 #include "sage3basic.h"
 #include "nodeState.h"
 #include "compose.h"
-#include "sight_verbosity.h"
 #include <boost/make_shared.hpp>
 
 using namespace std;
@@ -553,6 +552,7 @@ bool NodeState::unionLatticeMaps(map<PartEdgePtr, vector<Lattice*> >& to,
         modified = (*lTo)->meetUpdate(*lFrom) || modified;
       } else {
         InfiniteLattice* meetResult = dynamic_cast<InfiniteLattice*>((*lTo)->copy());
+        assert(meetResult);
         meetResult->meetUpdate(*lFrom); 
         // Widen the resulting meet
         modified =  dynamic_cast<InfiniteLattice*>(*lTo)->widenUpdate(meetResult) | modified;

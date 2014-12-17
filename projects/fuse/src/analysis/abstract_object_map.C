@@ -4,7 +4,6 @@
 #include "abstract_object_map.h"
 #include "nodeState.h"
 #include "analysis.h"
-#include "sight_verbosity.h"
 
 #define foreach BOOST_FOREACH
 #define reverse_foreach BOOST_REVERSE_FOREACH
@@ -53,7 +52,7 @@ AbstractObjectMap::AbstractObjectMap(const AbstractObjectMap& that, AbstractObje
 {
   implementation->setParent(this);
 }
-AbstractObjectMap::AbstractObjectMap(LatticePtr defaultLat_, PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis) :
+AbstractObjectMap::AbstractObjectMap(AbstractionPtr defaultLat_, PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis) :
   Lattice(pedge), defaultLat(defaultLat_), mapState(empty), comp(comp), analysis(analysis) { }
 
 AbstractObjectMap::~AbstractObjectMap() {
@@ -66,18 +65,49 @@ AbstractObjectMap::~AbstractObjectMap() {
 // other keys that may ever be provided.
 void AbstractObjectMap::initImplementation(AbstractObjectPtr key) {
   if(implementation==NULL) {
-//    cout << "AbstractObjectMap::initImplementation() key="<<key->str()<<", key->isHierarchy()="<<key->isHierarchy()<<endl;
-    /*if(key->isDisjoint()) implementation = ???;
-     else */
-    if(key->isHierarchy() && getenv("DISABLE_HIER_AO")==NULL) implementation = boost::make_shared<HierarchicalAOM>(this);
-    else implementation = boost::make_shared<GenericAOM>(this);
+    implementation = createAOMKind(key, this);
+    /*cout << "AbstractObjectMap::initImplementation() key="<<key->str()<<
+                             ", key->isMappedAO()="<<key->isMappedAO()<<
+                             ", key->isHierarchy()="<<key->isHierarchy()<<
+                             ", getenv(\"DISABLE_HIER_AO\")="<<(getenv("DISABLE_HIER_AO")?getenv("DISABLE_HIER_AO"):"NULL")<<endl;
+    / *if(key->isDisjoint()) implementation = ???;
+     else * /
+    if(key->isMappedAO()) {
+      if(boost::dynamic_pointer_cast<MappedAbstractionBase>(key)->membersIsHierarchy() && getenv("DISABLE_HIER_AO")==NULL)
+        implementation = boost::make_shared<MappedAOMKind>(this, boost::make_shared<HierarchicalAOMFactory>(this), key);
+      else
+        implementation = boost::make_shared<MappedAOMKind>(this, boost::make_shared<GenericAOMFactory>(this), key);
+    } else {
+      if(key->isHierarchy() && getenv("DISABLE_HIER_AO")==NULL)
+        implementation = boost::make_shared<HierarchicalAOM>(this);
+      else
+        implementation = boost::make_shared<GenericAOM>(this);
+    }*/
   }
 }
+
+// Returns a newly-allocated AOMKind object that can map the given key type to values
+AbstractObjectMapKindPtr AbstractObjectMap::createAOMKind(AbstractObjectPtr key, AbstractObjectMap* parent) {
+    /*cout << "AbstractObjectMap::createAOMKind() key="<<key->str()<<
+                             ", key->isMappedAO()="<<key->isMappedAO()<<
+                             ", key->isHierarchy()="<<key->isHierarchy()<<
+                             ", getenv(\"DISABLE_HIER_AO\")="<<(getenv("DISABLE_HIER_AO")?getenv("DISABLE_HIER_AO"):"NULL")<<endl;*/
+    /*if(key->isDisjoint()) implementation = ???;
+     else */
+    if(key->isMappedAO()) {
+      return boost::make_shared<MappedAOMKind>(key, parent);
+    } else {
+      if(key->isHierarchy() && getenv("DISABLE_HIER_AO")==NULL)
+        return boost::make_shared<HierarchicalAOM>(parent);
+      else
+        return boost::make_shared<GenericAOM>(parent);
+    }
+  }
 
 // Add a new memory object --> lattice pair to the frontier.
 // Return true if this causes the map to change and false otherwise.
 // It is assumed that the given Lattice is now owned by the AbstractObjectMap and can be modified and deleted by it.
-bool AbstractObjectMap::insert(AbstractObjectPtr key, LatticePtr val) {
+bool AbstractObjectMap::insert(AbstractObjectPtr key, AbstractionPtr val) {
   initImplementation(key);
   // If the map was empty, the addition of a new mapping will make it non-empty
   // If it was full, the new mapping will constrain it so that it no longer denotes all possible mappings
@@ -96,18 +126,18 @@ bool AbstractObjectMap::remove(AbstractObjectPtr key) {
 }
 
 // Get all x-frontier for a given abstract memory object
-LatticePtr AbstractObjectMap::get(AbstractObjectPtr key) {
+AbstractionPtr AbstractObjectMap::get(AbstractObjectPtr key) {
   // If this map corresponds to all possible mappings, the only mapping that exists for any object is the full lattice
   if(mapState==full) { 
-    //LatticePtr emptyLat(defaultLat->copy());
-    LatticePtr fullLat = defaultLat->copySharedPtr();
-    fullLat->setToFull();
+    //AbstractionPtr emptyLat(defaultLat->copy());
+    AbstractionPtr fullLat = defaultLat->copyA();
+    fullLat->setToFull(latPEdge, comp, analysis);
     return fullLat;
   }
   // If this map corresponds to the empty set of mappings, the only mapping that exists for any object is the empty lattice
   else if(mapState==empty) { 
-    LatticePtr emptyLat = defaultLat->copySharedPtr();
-    emptyLat->setToEmpty();
+    AbstractionPtr emptyLat = defaultLat->copyA();
+    emptyLat->setToEmpty(latPEdge, comp, analysis);
     return emptyLat;
   } else {
     ROSE_ASSERT(mapState==between);
@@ -148,22 +178,22 @@ bool AbstractObjectMap::setMLValueToFull(MemLocObjectPtr ml) {
 }
 
 // Returns whether this lattice denotes the set of all possible execution prefixes.
-bool AbstractObjectMap::isFullLat() {
+bool AbstractObjectMap::isFull() {
   if(mapState == full) return true;
   else if(mapState == empty) return false;
   else {
     ROSE_ASSERT(implementation);
-    return implementation->isFullLat();
+    return implementation->isFull();
   }
 }
 
 // Returns whether this lattice denotes the empty set.
-bool AbstractObjectMap::isEmptyLat() {
+bool AbstractObjectMap::isEmpty() {
   if(mapState == full) return false;
   else if(mapState == empty) return true;
   else {
     ROSE_ASSERT(implementation);
-    return implementation->isEmptyLat();
+    return implementation->isEmpty();
   }
 }
 
@@ -262,18 +292,18 @@ bool AbstractObjectMap::propagateDefs2Use(MemLocObjectPtr use, const std::set<Me
   if(mapState==between) {
     ROSE_ASSERT(implementation);
     SIGHT_VERB(dbg << "use="<<use->str()<<", #defs="<<defs.size()<<endl, 1, AOMDebugLevel)
-    LatticePtr unionLat;
+    AbstractionPtr unionLat;
     for(std::set<MemLocObjectPtr>::const_iterator d=defs.begin(); d!=defs.end(); ++d) {
       SIGHT_VERB(dbg << "unionLat="<<unionLat<<", def="<<(*d)->str()<<endl, 1, AOMDebugLevel)
       // If unionLat has not been assigned a Lattice, assign it to be a copy of the Lattice mapped to the current def.
       // unionLat is unmodified if nothing is mapped to the current def
       if(!unionLat) {
-//        LatticePtr tmp = get(*d);
+//        AbstractionPtr tmp = get(*d);
         unionLat = get(*d);
 /*        cout << "unionLat="<<(unionLat? unionLat->str(): "NULL")<<endl;
         cout << "unionLat->copy="<<(unionLat? unionLat->copy()->str(): "NULL")<<endl;
         cout << "unionLat="<<(unionLat? unionLat->str(): "NULL")<<endl;*/
-        //dbg << "unionLat->copySharedPtr="<<(unionLat? unionLat->copySharedPtr()->str(): "NULL")<<endl;
+        //dbg << "unionLat->copyA="<<(unionLat? unionLat->copyA()->str(): "NULL")<<endl;
         //if(unionLat) unionLat = boost::shared_ptr<Lattice>(unionLat->copy());
 //        Lattice* tmp = unionLat->copy();
 //        cout << "tmp="<<(tmp? tmp->str(): "NULL")<<endl;
@@ -282,8 +312,8 @@ bool AbstractObjectMap::propagateDefs2Use(MemLocObjectPtr use, const std::set<Me
       // If unionLat already contains the union of all the Lattices mapped to the preceding defs,
       // union into it the Lattice mapped to the current def
       } else {
-        if(LatticePtr defLat = get(*d))
-          unionLat->meetUpdate(defLat.get());
+        if(AbstractionPtr defLat = get(*d))
+          unionLat->meetUpdate(defLat, latPEdge, comp, analysis);
       }
     }
     SIGHT_VERB(dbg << "unionLat="<<(unionLat?unionLat->str():"NULL")<<endl, 1, AOMDebugLevel)
@@ -308,7 +338,7 @@ bool AbstractObjectMap::propagateDef2Uses(const std::set<MemLocObjectPtr>& uses,
 
     bool modified=false;
     // If there is a lattice mapped to def
-    if(LatticePtr defLat = get(def)) {
+    if(AbstractionPtr defLat = get(def)) {
       SIGHT_VERB(dbg << "defLat="<<defLat->str()<<endl, 1, AOMDebugLevel)
       // Assign it to all the uses
       for(std::set<MemLocObjectPtr>::const_iterator u=uses.begin(); u!=uses.end(); ++u) {
@@ -323,8 +353,8 @@ bool AbstractObjectMap::propagateDef2Uses(const std::set<MemLocObjectPtr>& uses,
     return false;
 }
 
-// computes the meet of this and that and saves the result in this
-// returns true if this causes this to change and false otherwise
+// Computes the meet of this and that and saves the result in this
+// Returns true if this causes this to change and false otherwise
 bool AbstractObjectMap::meetUpdate(Lattice* thatL) {
   SIGHT_VERB_DECL(scope, ("AbstractObjectMap::meetUpdate()", scope::medium), 2, AOMDebugLevel)
   AbstractObjectMap* that = dynamic_cast<AbstractObjectMap*>(thatL);
@@ -363,13 +393,56 @@ bool AbstractObjectMap::meetUpdate(Lattice* thatL) {
   ROSE_ASSERT(0);
 }
 
+// Computes the intersection of this and that and saves the result in this
+// Returns true if this causes this to change and false otherwise
+bool AbstractObjectMap::intersectUpdate(Lattice* thatL) {
+  SIGHT_VERB_DECL(scope, ("AbstractObjectMap::intersectUpdate()", scope::medium), 2, AOMDebugLevel)
+  AbstractObjectMap* that = dynamic_cast<AbstractObjectMap*>(thatL);
+  ROSE_ASSERT(that);
+
+  SIGHT_VERB(dbg << "mapState="<<state2Str(mapState)<<", that->mapState="<<state2Str(that->mapState)<<endl, 2, AOMDebugLevel)
+  
+  // Empty sets cannot be reduced via intersection operations
+  if(mapState==empty) return false;
+  
+  // The intersection of a full set and another set is the other set
+  else if(mapState==full) {
+    if(that->mapState==empty) return setToEmpty();
+    else if(that->mapState==between) {
+      ROSE_ASSERT(implementation==NULL);
+      implementation = that->implementation->copy();
+      implementation->setParent(this);
+      mapState=between;
+      return true;
+    } else
+      return false;
+  }
+  
+  // Forward call to the implementation object
+  else if(mapState==between) {
+    ROSE_ASSERT(implementation);
+    if(that->mapState==empty) return setToEmpty();
+    else if(that->mapState==full) return false;
+    else {
+      ROSE_ASSERT(that->implementation);
+      SIGHT_VERB(dbg << "Calling implementation->intersectUpdate()"<<endl, 2, AOMDebugLevel)
+      return implementation->intersectUpdate(that->implementation);
+    }
+  }
+  
+  ROSE_ASSERT(0);
+}
+
 bool AbstractObjectMap::finiteLattice() {
-  if(mapState==between) {
+  return true;
+//  // AbstractObjectMaps can grow to an arbitrary size and are thus inherently not finite
+//  return false;
+  /*if(mapState==between) {
     ROSE_ASSERT(implementation);
     return implementation->finiteLattice();
   // If this is a full or empty map, assume the lattice is finite
   } else
-    return true;
+    return true;*/
 }
 
 bool AbstractObjectMap::operator==(Lattice* thatL) {
@@ -393,7 +466,7 @@ bool AbstractObjectMap::operator==(Lattice* thatL) {
 // Add a new memory object --> lattice pair to the frontier.
 // Return true if this causes the map to change and false otherwise.
 // It is assumed that the given Lattice is now owned by the AbstractObjectMap and can be modified and deleted by it.
-bool GenericAOM::insert(AbstractObjectPtr o, LatticePtr lattice) {
+bool GenericAOM::insert(AbstractObjectPtr o, AbstractionPtr lattice) {
   SIGHT_VERB_DECL(scope, ("GenericAOM::insert()", scope::medium), 1, AOMDebugLevel)
   SIGHT_VERB_IF(1, AOMDebugLevel)
     dbg << "    o="<<(parent->latPEdge? o->strp(parent->latPEdge, ""): "NULL")<<" lattice="<<lattice->str("    ")<<endl;
@@ -406,12 +479,12 @@ bool GenericAOM::insert(AbstractObjectPtr o, LatticePtr lattice) {
     return false;
   }
   
-  isFinite = isFinite && lattice->finiteLattice();
+  //isFinite = isFinite && lattice->finiteLattice();
   
   bool retVal = false;
   bool insertDone = false;
   // Points to the Lattice mapped to key o after it has been inserted
-  LatticePtr insertedLattice;
+  AbstractionPtr insertedLattice;
   bool mustEqualSeen = false;
   
   // First, check if there is a key on the frontier that must-equals o to determine
@@ -435,7 +508,7 @@ bool GenericAOM::insert(AbstractObjectPtr o, LatticePtr lattice) {
       // to o is guaranteed to be mayEqual to keyElement. As such, we just meet keyElement's lattice with o's lattice
       // and remove the keyElement's mapping
       } else if(o->equalSet(keyElement, parent->latPEdge, parent->comp, parent->analysis)) {
-         retVal = insertedLattice->meetUpdate(it->second) || retVal;
+         retVal = insertedLattice->meetUpdate(it->second, parent->latPEdge, parent->comp, parent->analysis) || retVal;
          items.erase(it++);
       } else 
         it++;
@@ -452,7 +525,7 @@ bool GenericAOM::insert(AbstractObjectPtr o, LatticePtr lattice) {
       SIGHT_VERB_FI()
 
       // If the old and new mappings of o are different,  we remove the old mapping and add a new one 
-      if(!it->second->equiv(lattice))
+      if(!it->second->equalSet(lattice, parent->latPEdge, parent->comp, parent->analysis))
       {
         SIGHT_VERB(dbg << "    keyElement="<<keyElement->str("            ")<<" mustEqual(o, keyElement, parent->latPEdge)="<<o->mustEqual(keyElement, parent->latPEdge, parent->comp, parent->analysis)<<" insertDone="<<insertDone<<" mustEqualSeen="<<mustEqualSeen<<endl, 1, AOMDebugLevel)
         SIGHT_VERB(dbg << "    Removing i="<<i<<", inserting "<<o->strp(parent->latPEdge, "        ")<<"=&gt;"<<lattice->str("        ")<<endl, 1, AOMDebugLevel)
@@ -472,7 +545,7 @@ bool GenericAOM::insert(AbstractObjectPtr o, LatticePtr lattice) {
     } else if(o->equalSet(keyElement, parent->latPEdge, parent->comp, parent->analysis)) {
       // Meet their respective lattices of the 
       //dbg << "o="<<o->str()<<" <b>equalSet</b> "<<keyElement<<" keyElement="<<keyElement->str()<<endl;
-      retVal = it->second->meetUpdate(lattice) || retVal;
+      retVal = it->second->meetUpdate(lattice, parent->latPEdge, parent->comp, parent->analysis) || retVal;
       insertedLattice = it->second;
       it++;
       insertDone = true;
@@ -498,7 +571,7 @@ bool GenericAOM::insert(AbstractObjectPtr o, LatticePtr lattice) {
   
   // Having inserted the new item we need to clean up the map to ensure that it stays bounded in size
   // Step 1: call isEmpty to check for any keys mapped to empty sets
-  isEmptyLat();
+  isEmpty();
   // Step 2: if the map is larger than some fixed bound, merge some key->value mappings together
   // !!! TODO !!!
   
@@ -526,14 +599,14 @@ bool GenericAOM::remove(AbstractObjectPtr abstractObjectPtr) {
 };
 
 // Get all x-frontier for a given abstract memory object                                                            
-LatticePtr GenericAOM::get(AbstractObjectPtr abstractObjectPtr) {
+AbstractionPtr GenericAOM::get(AbstractObjectPtr abstractObjectPtr) {
   SIGHT_VERB_DECL(scope, ("GenericAOM::get()", scope::medium), 1, AOMDebugLevel)
   SIGHT_VERB_IF(1, AOMDebugLevel)
     dbg << "    o="<<abstractObjectPtr->strp(parent->latPEdge, "    ")<<endl;
     dbg << "        "<<str("        ")<<endl;
   SIGHT_VERB_FI()
 
-  LatticePtr ret;
+  AbstractionPtr ret;
   for (list<MapElement>::iterator it = items.begin();
        it != items.end(); it++) {
     AbstractObjectPtr keyElement = it->first;
@@ -541,9 +614,9 @@ LatticePtr GenericAOM::get(AbstractObjectPtr abstractObjectPtr) {
     if(AOMDebugLevel>=2 || (AOMDebugLevel>=1 && eq)) dbg << "    keyElement(equal="<<eq<<")="<<keyElement->str("    ")<<endl;
     if(eq) {
       // If this is the first matching Lattice, copy this Lattice to ret
-      if(!ret) ret = boost::shared_ptr<Lattice>(it->second->copy());
+      if(!ret) ret = it->second->copyA();
       // Otherwise, merge this latice into ret
-      else     ret->meetUpdate(it->second);
+      else     ret->meetUpdate(it->second, parent->latPEdge, parent->comp, parent->analysis);
       
       // If the current key must-equals the given object, its assignment must have overwritten any prior assignment
       // to this object, meaning that prior assignments can be ignored
@@ -559,7 +632,7 @@ LatticePtr GenericAOM::get(AbstractObjectPtr abstractObjectPtr) {
   SIGHT_VERB(dbg << "ret="<<(ret ? ret->str("    "): "NULL")<<endl, 1, AOMDebugLevel)
   if(ret) return ret;
   // If there is no match for abstractObjectPtr, return a copy of the default lattice
-  return LatticePtr(parent->defaultLat->copy());
+  return parent->defaultLat->copyA();
 };
 
 // Set all the information associated Lattice object with this MemLocObjectPtr to full.
@@ -573,24 +646,24 @@ bool GenericAOM::setMLValueToFull(MemLocObjectPtr ml)
   // that case mustEqual will return false.
   for(list<MapElement>::iterator it = items.begin(); it != items.end(); it++) {
     AbstractObjectPtr keyElement = it->first;
-    if(keyElement->mayEqual(ml, parent->latPEdge, parent->comp, parent->analysis)) {
-      modified = it->second->setToFull() || modified;
+    if(keyElement->mayEqual(AbstractObjectPtr(ml), parent->latPEdge, parent->comp, parent->analysis)) {
+      modified = it->second->setToFull(parent->latPEdge, parent->comp, parent->analysis) || modified;
     }
   }
   return modified;
 }
 
 // Returns whether this lattice denotes the set of all possible execution prefixes.
-bool GenericAOM::isFullLat()
+bool GenericAOM::isFull()
 {
   return false;
 }
 
 /*set<AbstractObjectPtr> cacheAO;*/
-set<LatticePtr> cache;
+set<AbstractionPtr> cache;
 
 // Returns whether this lattice denotes the empty set.
-bool GenericAOM::isEmptyLat()
+bool GenericAOM::isEmpty()
 {
   SIGHT_VERB_DECL(scope, ("GenericAOM::isEmpty()", scope::medium), 2, AOMDebugLevel)
   SIGHT_VERB(dbg << "this="<<str()<<endl, 2, AOMDebugLevel)
@@ -604,7 +677,7 @@ bool GenericAOM::isEmptyLat()
     SIGHT_VERB_FI()
     // If at least one is not empty, return false
     if(!(i->first)->isEmpty(parent->getPartEdge(), parent->comp, parent->analysis) && 
-       !(i->second)->isEmptyLat()) return false;
+       !(i->second)->isEmpty(parent->latPEdge, parent->comp, parent->analysis)) return false;
     
     // If this item mapping is empty, remove it from the items list
     SIGHT_VERB(dbg << "Deleting Empty mapping", 2, AOMDebugLevel)
@@ -631,7 +704,7 @@ std::string GenericAOM::str(std::string indent) const {
 std::string GenericAOM::strp(PartEdgePtr pedge, std::string indent) const
 {
   ostringstream oss;
-  oss << "<u>AbstractObjectMap:</u>"; 
+  oss << "<u>GenericAOM:</u>";
   oss << "<table border=1><tr><td>Key</td><td>Value</td>";
   for(list<MapElement>::const_iterator it = items.begin();
        it != items.end(); it++) {
@@ -647,10 +720,7 @@ std::string GenericAOM::strp(PartEdgePtr pedge, std::string indent) const
 }
 
 // initializes this Lattice to its default state, if it is not already initialized
-void GenericAOM::initialize()
-{
-  // Nothing to do here since Peter P's fixes will eliminate the need for lattices to maintain their own initialized state
-}
+void GenericAOM::initialize() {}
 
 // returns a copy of this lattice
 AbstractObjectMapKindPtr GenericAOM::copy() const
@@ -661,7 +731,7 @@ void GenericAOM::copy(AbstractObjectMapKindPtr thatL) {
   GenericAOMPtr that = boost::dynamic_pointer_cast <GenericAOM> (thatL);
   ROSE_ASSERT(that);
   items = that->items;
-  isFinite = that->isFinite;
+  //isFinite = that->isFinite;
 }
 
 // Called by analyses to transfer this lattice's contents from across function scopes from a caller function 
@@ -738,10 +808,10 @@ AbstractObjectMapKindPtr GenericAOM::remapML(const std::set<MLMapping>& ml2ml, P
       SIGHT_VERB_DECL(indent, (), 1, AOMDebugLevel)
       // If the current item in newM may- or must-equals a key in ml2ml, record this and update newM
       SIGHT_VERB_IF(1, AOMDebugLevel)
-        dbg << "i-&gt;first mustEqual m-&gt;from = "<<i->first->mustEqual(m->from, fromPEdge, parent->comp, parent->analysis)<<endl;
-        dbg << "i-&gt;first mayEqual m-&gt;from = "<<i->first->mayEqual(m->from, fromPEdge, parent->comp, parent->analysis)<<endl;
+        dbg << "i-&gt;first mustEqual m-&gt;from = "<<i->first->mustEqual((AbstractObjectPtr)m->from, fromPEdge, parent->comp, parent->analysis)<<endl;
+        dbg << "i-&gt;first mayEqual m-&gt;from = "<<i->first->mayEqual((AbstractObjectPtr)m->from, fromPEdge, parent->comp, parent->analysis)<<endl;
       SIGHT_VERB_FI()
-      if(i->first->mustEqual(m->from, fromPEdge, parent->comp, parent->analysis) && m->replaceMapping) {
+      if(i->first->mustEqual((AbstractObjectPtr)m->from, fromPEdge, parent->comp, parent->analysis) && m->replaceMapping) {
         // If the value of the current ml2ml mapping is not-NULL
         if(m->to) {
           // Replace the current item in newM with the value of the current pair in ml2ml
@@ -754,9 +824,9 @@ AbstractObjectMapKindPtr GenericAOM::remapML(const std::set<MLMapping>& ml2ml, P
             SIGHT_VERB_IF(2, AOMDebugLevel)
               dbg << "j="<<j->first<<" => "<<j->second<<endl;
               dbg << mIdx << ": m-&gt;value="<<m->to->strp(fromPEdge)<<endl;
-              dbg << "j-&gt;first mustEqual m-&gt;to = "<<j->first->mustEqual(m->to, fromPEdge, parent->comp, parent->analysis)<<endl;
+              dbg << "j-&gt;first mustEqual m-&gt;to = "<<j->first->mustEqual((AbstractObjectPtr)m->to, fromPEdge, parent->comp, parent->analysis)<<endl;
             SIGHT_VERB_FI() 
-            if(j->first->mustEqual(m->to, fromPEdge, parent->comp, parent->analysis)) {
+            if(j->first->mustEqual((AbstractObjectPtr)m->to, fromPEdge, parent->comp, parent->analysis)) {
               SIGHT_VERB(dbg << "Erasing j="<<j->first->str()<<" => "<<j->second->str()<<endl, 2, AOMDebugLevel)
               j = newM->items.erase(j);
               //break;
@@ -771,7 +841,7 @@ AbstractObjectMapKindPtr GenericAOM::remapML(const std::set<MLMapping>& ml2ml, P
           break;
         }
         ml2mlAdded[mIdx]=true;
-      } else if(i->first->mayEqual(m->from, fromPEdge, parent->comp, parent->analysis)) {
+      } else if(i->first->mayEqual((AbstractObjectPtr)m->from, fromPEdge, parent->comp, parent->analysis)) {
         // Insert the value in the current ml2ml mapping immediately before the current item
         SIGHT_VERB(dbg << "Inserting before i: "<<m->to->str()<<" => "<<i->second->str()<<endl, 1, AOMDebugLevel)
         newM->items.insert(i, make_pair(boost::static_pointer_cast<AbstractObject>(m->to), i->second));
@@ -796,7 +866,7 @@ AbstractObjectMapKindPtr GenericAOM::remapML(const std::set<MLMapping>& ml2ml, P
     if(!m->from->isLive(fromPEdge, parent->comp, parent->analysis) || !(m->to && m->to->isLive(parent->latPEdge, parent->comp, parent->analysis))) continue;
     
     if(!ml2mlAdded[mIdx] && m->to)
-      newM->items.push_back(make_pair(m->to, parent->defaultLat->copy()));
+      newM->items.push_back(make_pair(m->to, parent->defaultLat->copyA()));
   }
   
   return newM;
@@ -821,12 +891,12 @@ bool GenericAOM::replaceML(AbstractObjectMapKindPtr newL)
   return modified;
 }
 
-// parent->computes the meet of this and that and saves the result in this
-// returns true if this causes this to change and false otherwise
-// The part of this object is to be used for AbstractObject parent->comparisons.
-bool GenericAOM::meetUpdate(AbstractObjectMapKindPtr thatL)
+// Computes either the union or intersection of this and that, as specified by the ui parameter,
+// and saves the result in this. 
+// Returns true if this causes this to change and false otherwise
+bool GenericAOM::unionIntersectUpdate(AbstractObjectMapKindPtr thatL, uiType ui)
 {
-  SIGHT_VERB_DECL(scope, ("GenericAOM::meetUpdate()", scope::medium), 2, AOMDebugLevel);
+  SIGHT_VERB_DECL(scope, (txt()<<"GenericAOM::unionIntersectUpdate("<<(ui==Union?"Union":"Intersect")<<")", scope::medium), 2, AOMDebugLevel);
 
   // Both incorporateVars() and meetUpdate currently call merge. This is clearly not
   // right but we'll postpone fixing it until we have the right algorithm for merges
@@ -927,10 +997,11 @@ bool GenericAOM::meetUpdate(AbstractObjectMapKindPtr thatL)
             // AbstractObjectMaps, so multiple maps may contain references to the same lattice.
             // As such, instead of updating lattices in-place (this would update the same lattice
             // in other maps) we first copy them and update into the copy.
-            itThis->second = LatticePtr(itThis->second->copy());
+            itThis->second = AbstractionPtr(itThis->second->copyA());
             SIGHT_VERB(scope meetreg(txt()<<"Meeting "<<itThis->first->str(), scope::medium), 2, AOMDebugLevel)
             SIGHT_VERB(scope befreg("before", scope::low); dbg << itThis->second->str()<<endl, 2, AOMDebugLevel)
-            modified = itThis->second->meetUpdate(itThat->second) || modified;
+            if(ui==Union) modified = itThis->second->meetUpdate(itThat->second, parent->latPEdge, parent->comp, parent->analysis) || modified;
+            else          modified = itThis->second->intersectUpdate(itThat->second, parent->latPEdge, parent->comp, parent->analysis) || modified;
             SIGHT_VERB_IF(2, AOMDebugLevel)
             { scope aftreg("after", scope::low); dbg << itThis->second->str()<<endl; }
             dbg << "modified="<<modified<<endl;
@@ -1022,6 +1093,20 @@ bool GenericAOM::meetUpdate(AbstractObjectMapKindPtr thatL)
   return modified;
 }
 
+// Computes the meet of this and that and saves the result in this
+// Returns true if this causes this to change and false otherwise
+bool GenericAOM::meetUpdate(AbstractObjectMapKindPtr thatL)
+{
+  return unionIntersectUpdate(thatL, Union);
+}
+
+// Computes the meet of this and that and saves the result in this
+// Returns true if this causes this to change and false otherwise
+bool GenericAOM::intersectUpdate(AbstractObjectMapKindPtr thatL)
+{
+  return unionIntersectUpdate(thatL, Intersection);
+}
+
 // Identify keys that are must-equal to each other and merge their lattices
 // Return true if this causes the object to change and false otherwise.
 bool GenericAOM::compressMustEq()
@@ -1046,8 +1131,8 @@ bool GenericAOM::compressMustEq()
         // AbstractObjectMaps, so multiple maps may contain references to the same lattice.
         // As such, instead of updating lattices in-place (this would update the same lattice
         // in other maps) we first copy them and update into the copy.
-        x->second = LatticePtr(x->second->copy());
-        modified = x->second->meetUpdate(y->second) || modified;
+        x->second = x->second->copyA();
+        modified = x->second->meetUpdate(y->second, parent->latPEdge, parent->comp, parent->analysis) || modified;
         
         list<MapElement>::iterator tmp = y;
         y++;
@@ -1090,10 +1175,12 @@ bool GenericAOM::compressDead()
   return modified;
 }
 
-bool GenericAOM::finiteLattice()
+/*bool GenericAOM::finiteLattice()
 {
-  return isFinite;
-}
+  //return isFinite;
+  // AbstractObjectMaps can grow to an arbitrary size and are thus inherently not finite
+  return false;
+}*/
 
 bool GenericAOM::operator==(AbstractObjectMapKindPtr that_arg)
 {
@@ -1119,7 +1206,7 @@ HierarchicalAOM::Node::Node() {
 // Creates a sub-tree that holds the remaining portions of the key, from subKey until keyEnd
 // and places val at the leaf of this sub-tree
 HierarchicalAOM::Node::Node(comparablePtr myKey, std::list<comparablePtr>::const_iterator subKey, std::list<comparablePtr>::const_iterator keyEnd, 
-                            AbstractObjectHierarchy::hierKeyPtr fullKey, AbstractObjectPtr obj, LatticePtr val) {
+                            AbstractionHierarchy::hierKeyPtr fullKey, AbstractObjectPtr obj, AbstractionPtr val) {
   std::list<comparablePtr>::const_iterator next = subKey; ++next;
   // If this is the last sub-key in the key, place obj and val inside this Node
   if(subKey==keyEnd) {
@@ -1148,9 +1235,9 @@ HierarchicalAOM::Node::Node(Node* that, PartEdgePtr pedge, Composer* comp, Compo
 // does not have a const qualification because we need to modify the source Node object.
 // This change is functionally transparent to users of this object.
 void HierarchicalAOM::Node::init(Node* that, PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis) {
-  SIGHT_VERB_DECL(scope, ("HierarchicalAOM::Node::Node()", scope::medium), 2, AOMDebugLevel)
-  SIGHT_VERB(dbg << "that="; that->print(dbg); dbg<<endl, 2, AOMDebugLevel)
-  SIGHT_VERB(dbg << "that->key="<<(that->key? that->key->str(): "NULL")<<", that->fullKey="<<(that->fullKey? string(txt()<<that->fullKey): "NULL")<<endl, 2, AOMDebugLevel)
+  SIGHT_VERB_DECL(scope, ("HierarchicalAOM::Node::Node()", scope::medium), 3, AOMDebugLevel)
+  SIGHT_VERB(dbg << "that="; that->print(dbg); dbg<<endl, 3, AOMDebugLevel)
+  SIGHT_VERB(dbg << "that->key="<<(that->key? that->key->str(): "NULL")<<", that->fullKey="<<(that->fullKey? string(txt()<<that->fullKey): "NULL")<<endl, 3, AOMDebugLevel)
   
   // Copy over that node's obj and val
   isObjSingleton = that->isObjSingleton;
@@ -1170,14 +1257,14 @@ void HierarchicalAOM::Node::init(Node* that, PartEdgePtr pedge, Composer* comp, 
   for(map<comparablePtr, NodePtr>::iterator sub=that->subsets.begin(); sub!=that->subsets.end(); sub++) {
     SIGHT_VERB(dbg << "sub="<<sub->second<<endl, 2, AOMDebugLevel)
     if(sub->second->fullKey) {
-      SIGHT_VERB(dbg << "sub->second->fullKey="<<string(txt()<<sub->second->fullKey)<<endl, 2, AOMDebugLevel)
-      SIGHT_VERB(dbg << "live="<<sub->second->fullKey->isLive(pedge, comp, analysis)<<endl, 2, AOMDebugLevel)
+      SIGHT_VERB(dbg << "sub->second->fullKey="<<string(txt()<<sub->second->fullKey)<<endl, 3, AOMDebugLevel)
+      SIGHT_VERB(dbg << "live="<<sub->second->fullKey->isLive(pedge, comp, analysis)<<endl, 3, AOMDebugLevel)
     }
     // Only create sub-keys for live keys
     if(!sub->second->fullKey || sub->second->fullKey->isLive(pedge, comp, analysis)) {
       NodePtr newNode = boost::make_shared<Node>(sub->second, pedge, comp, analysis);
       // If the copied sub-tree didn't end up being empty (due to the fullKeys being out of scope), add it
-      if(!newNode->isEmptyVal())
+      if(!newNode->isEmptyVal(pedge, comp, analysis))
         subsets[sub->first] = newNode;
     }
   }
@@ -1189,26 +1276,26 @@ bool HierarchicalAOM::Node::isSingleton(AbstractObjectPtr obj)
 
 // Set the value at this node to full.
 // Return true if this causes the object to change and false otherwise.
-bool HierarchicalAOM::Node::setValToFull() {
+bool HierarchicalAOM::Node::setValToFull(PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis) {
   bool modified=false;
   
   // Set the value of this Node to full, creating a new Lattice object if needed
   if(originalVal) { 
-    val = val->copySharedPtr();
+    val = val->copyA();
     originalVal = false;
   }
   
-  modified = val->setToFull() || modified;
+  modified = val->setToFull(pedge, comp, analysis) || modified;
   
   return modified;
 }
 
 // Set the value at this node AND all of its sub-trees to full.
 // Return true if this causes the object to change and false otherwise.
-bool HierarchicalAOM::Node::setSubTreeToFull() {
+bool HierarchicalAOM::Node::setSubTreeToFull(PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis) {
   bool modified=false;
   
-  modified = setValToFull() || modified;
+  modified = setValToFull(pedge, comp, analysis) || modified;
     
   // Cut off the children of this node to have the same effect of setting all 
   // children's lattices to full
@@ -1226,12 +1313,24 @@ void HierarchicalAOM::Node::remove(NodePtr child) {
 
 // Union the values of this node and all of its children in to the given lattice.
 // Return whether this causes lat to change.
-bool HierarchicalAOM::Node::meetUpdate(LatticePtr lat) {
+bool HierarchicalAOM::Node::meetUpdate(AbstractionPtr lat, PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis) {
   bool modified=false;
-  if(val) modified = lat->meetUpdate(val.get()) || modified;
+  if(val) modified = lat->meetUpdate(val, pedge, comp, analysis) || modified;
   
   for(map<comparablePtr, NodePtr>::iterator sub=subsets.begin(); sub!=subsets.end(); sub++) 
-    modified = sub->second->meetUpdate(lat) || modified;
+    modified = sub->second->meetUpdate(lat, pedge, comp, analysis) || modified;
+    
+  return modified;
+}
+
+// Intersect the values of this node and all of its children in to the given lattice.
+// Return whether this causes lat to change.
+bool HierarchicalAOM::Node::intersectUpdate(AbstractionPtr lat, PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis) {
+  bool modified=false;
+  if(val) modified = lat->intersectUpdate(val, pedge, comp, analysis) || modified;
+  
+  for(map<comparablePtr, NodePtr>::iterator sub=subsets.begin(); sub!=subsets.end(); sub++) 
+    modified = sub->second->intersectUpdate(lat, pedge, comp, analysis) || modified;
     
   return modified;
 }
@@ -1264,12 +1363,12 @@ bool HierarchicalAOM::Node::isLive(PartEdgePtr pedge, Composer* comp, ComposedAn
 
 // Returns whether the set that this node maps its key to is empty.
 // This is the case if all the values in its sub-tree denote the empty set
-bool HierarchicalAOM::Node::isEmptyVal() const {
+bool HierarchicalAOM::Node::isEmptyVal(PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis) const {
   // val is empty
-  if(!val || val->isEmptyLat()) {
+  if(!val || val->isEmpty(pedge, comp, analysis)) {
     for(map<comparablePtr, NodePtr>::const_iterator sub=subsets.begin(); sub!=subsets.end(); sub++) {
       // If some sub-tree is not empty
-      if(!sub->second->isEmptyVal()) return false;
+      if(!sub->second->isEmptyVal(pedge, comp, analysis)) return false;
     }
     return true;
   // val is not empty
@@ -1280,7 +1379,7 @@ bool HierarchicalAOM::Node::isEmptyVal() const {
 std::ostream& operator<<(std::ostream& s, const HierarchicalAOM::NodePtr& node) {
   s << "<div style=\"border-style:solid; border-color:#888888; border-width=1px\">";
   s << "Node: "<</*key="<<(node->key?node->key->str():"NULL")<<", */" isObjSingleton="<<node->isObjSingleton<<endl;
-  s << "    val("<<node->val<<"| originalVal="<<node->originalVal<<")="<<(node->val?node->val->str():"NULL");
+  s << "    val(origVal="<<node->originalVal<<")="<<(node->val?node->val->str():"NULL");
   //s << "  <table border=1>";
   for(map<comparablePtr, HierarchicalAOM::NodePtr>::const_iterator sub=node->subsets.begin(); sub!=node->subsets.end(); sub++) {
     s << "  <table border=0>";
@@ -1298,17 +1397,17 @@ std::ostream& operator<<(std::ostream& s, const HierarchicalAOM::NodePtr& node) 
 
 HierarchicalAOM::HierarchicalAOM(const HierarchicalAOM& that, AbstractObjectMap* parent) :
 			   AbstractObjectMapKind(parent),
-                           tree    (that.tree),
-			   isFinite(that.isFinite)
+         tree(that.tree)/*,
+			   isFinite(that.isFinite)*/
 { tree = boost::make_shared<Node>(that.tree, parent->latPEdge, parent->comp, parent->analysis); }
 
 HierarchicalAOM::HierarchicalAOM(const HierarchicalAOM& that) :
 			   AbstractObjectMapKind(that.parent),
-			   tree    (that.tree),
-			   isFinite(that.isFinite)
+			   tree(that.tree)/*,
+			   isFinite(that.isFinite)*/
 { tree = boost::make_shared<Node>(that.tree, parent->latPEdge, parent->comp, parent->analysis); }
 
-HierarchicalAOM::HierarchicalAOM(AbstractObjectMap* parent) : AbstractObjectMapKind(parent), isFinite(true)
+HierarchicalAOM::HierarchicalAOM(AbstractObjectMap* parent) : AbstractObjectMapKind(parent)//, isFinite(true)
 { tree = boost::make_shared<Node>(); }
 
 HierarchicalAOM::~HierarchicalAOM() {
@@ -1318,8 +1417,8 @@ HierarchicalAOM::~HierarchicalAOM() {
 // Add a new memory object --> lattice pair to the frontier.
 // Return true if this causes the map to change and false otherwise.
 // It is assumed that the given Lattice is now owned by the AbstractObjectMap and can be modified and deleted by it.
-bool HierarchicalAOM::insert(AbstractObjectPtr obj_arg, LatticePtr val, bool originalVal) {
-  AbstractObjectHierarchyPtr obj = boost::dynamic_pointer_cast<AbstractObjectHierarchy>(obj_arg);
+bool HierarchicalAOM::insert(AbstractObjectPtr obj_arg, AbstractionPtr val, bool originalVal) {
+  AbstractionHierarchyPtr obj = boost::dynamic_pointer_cast<AbstractionHierarchy>(obj_arg);
   ROSE_ASSERT(obj);
 
   SIGHT_VERB_DECL(scope, ("HierarchicalAOM::insert()", scope::medium), 1, AOMDebugLevel)
@@ -1327,7 +1426,7 @@ bool HierarchicalAOM::insert(AbstractObjectPtr obj_arg, LatticePtr val, bool ori
     indent ind;
     dbg << "obj(live="<<obj_arg->isLive(parent->latPEdge, parent->comp, parent->analysis)<<")="<<obj_arg->strp(parent->latPEdge, "")<<endl;
     dbg << "    key="<<obj->getHierKey()<<endl;
-    dbg << "lattice(empty="<<val->isEmptyLat()<<")="<<val->str("    ")<<endl;
+    dbg << "lattice(empty="<<val->isEmpty(parent->latPEdge, parent->comp, parent->analysis)<<")="<<val->str("    ")<<endl;
     indent ind2;
     dbg << str()<<endl;
   SIGHT_VERB_FI()
@@ -1338,10 +1437,10 @@ bool HierarchicalAOM::insert(AbstractObjectPtr obj_arg, LatticePtr val, bool ori
     return false;
   }
   
-  isFinite = isFinite && val->finiteLattice();
+  //isFinite = isFinite && val->finiteLattice();
   
   // Don't add empty values since that wouldn't have any information content
-  if(val->isEmptyLat()) return false;
+  if(val->isEmpty(parent->latPEdge, parent->comp, parent->analysis)) return false;
   
   bool modified = insert(tree, obj->getHierKey()->begin(), obj->getHierKey()->end(), obj->getHierKey(), obj_arg, val, originalVal);
   SIGHT_VERB(dbg << "modified="<<modified<<endl, 1, AOMDebugLevel);
@@ -1351,7 +1450,7 @@ bool HierarchicalAOM::insert(AbstractObjectPtr obj_arg, LatticePtr val, bool ori
 // Recursive body of insert
 bool HierarchicalAOM::insert(NodePtr subTree,
              std::list<comparablePtr>::const_iterator subKey, std::list<comparablePtr>::const_iterator keyEnd,
-             AbstractObjectHierarchy::hierKeyPtr fullKey, AbstractObjectPtr obj, LatticePtr val, bool originalVal)
+             AbstractionHierarchy::hierKeyPtr fullKey, AbstractObjectPtr obj, AbstractionPtr val, bool originalVal)
 {
   bool modified = false;
   SIGHT_VERB_DECL(scope, ("HierarchicalAOM::insert()", scope::medium), 1, AOMDebugLevel)
@@ -1368,7 +1467,7 @@ bool HierarchicalAOM::insert(NodePtr subTree,
         modified = true;
       }
 
-      if(!subTree->val->equiv(val)) {
+      if(!subTree->val->equalSet(val, parent->latPEdge, parent->comp, parent->analysis)) {
         subTree->val = val;
         subTree->originalVal = originalVal;
         modified = true;
@@ -1383,7 +1482,7 @@ bool HierarchicalAOM::insert(NodePtr subTree,
       ROSE_ASSERT(subTree->isObjSingleton == Node::isSingleton(obj));
       if(subTree->isObjSingleton) {
         ROSE_ASSERT(subTree->fullKey);
-        if(!subTree->val->equiv(val)) {
+        if(!subTree->val->equalSet(val, parent->latPEdge, parent->comp, parent->analysis)) {
           subTree->val = val;
           subTree->originalVal = originalVal;
           modified = true;
@@ -1398,12 +1497,23 @@ bool HierarchicalAOM::insert(NodePtr subTree,
         // objects they denote may be different, so union the original and new lattices
         //ROSE_ASSERT(subTree->fullKey);
         
-        // Create a fresh copy of subTree->val if we have not yet done so
-        if(subTree->originalVal) {
-          subTree->val = subTree->val->copySharedPtr();
-          subTree->originalVal = false;
+        // If lattice associated with this sub-tree is NULL (denotes an empty set)
+        if(!subTree->val) {
+          // Copy val into subTree->val if val is not the empty set, in which case don't bother
+          if(!val->isEmpty(parent->latPEdge, parent->comp, parent->analysis)) {
+            subTree->val = val;
+            subTree->originalVal = true;
+            modified = true;
+          }
+        // If the lattice is not NULL (may denote any set, including empty but is at least a valid object)
+        } else {
+          // Create a fresh copy of subTree->val if we have not yet done so
+          if(subTree->originalVal) {
+            subTree->val = subTree->val->copyA();
+            subTree->originalVal = false;
+          }
+          modified = subTree->val->meetUpdate(val, parent->latPEdge, parent->comp, parent->analysis);
         }
-        modified = subTree->val->meetUpdate(val);
         SIGHT_VERB(dbg << "overlap: modified="<<modified<<endl, 1, AOMDebugLevel)
         return modified;
       }
@@ -1430,7 +1540,7 @@ bool HierarchicalAOM::insert(NodePtr subTree,
 // Removes the key matching the argument from the frontier.
 // Return true if this causes the map to change and false otherwise.
 bool HierarchicalAOM::remove(AbstractObjectPtr obj_arg) {
-  AbstractObjectHierarchyPtr obj = boost::dynamic_pointer_cast<AbstractObjectHierarchy>(obj_arg);
+  AbstractionHierarchyPtr obj = boost::dynamic_pointer_cast<AbstractionHierarchy>(obj_arg);
   ROSE_ASSERT(obj);
   pair<pair<NodePtr, NodePtr>, bool> f = find(obj);
   NodePtr foundN = f.first.first;
@@ -1444,26 +1554,29 @@ bool HierarchicalAOM::remove(AbstractObjectPtr obj_arg) {
 }
 
 // Returns the lattice object at the given sub-tree or an empty lattice if there isn't one
-LatticePtr HierarchicalAOM::getVal(NodePtr subTree) {
+AbstractionPtr HierarchicalAOM::getVal(NodePtr subTree) {
   // If val is NULL, create an empty one
   if(!subTree->val) {
     // Create a fresh empty set at this sub-tree, recording that this set is 
     // not an original object from the user
     ROSE_ASSERT(subTree->originalVal);
-    subTree->val = parent->defaultLat->copySharedPtr();
-    subTree->val->setToEmpty();
+    subTree->val = parent->defaultLat->copyA();
+    subTree->val->setToEmpty(parent->latPEdge, parent->comp, parent->analysis);
     subTree->originalVal = false;
   }
   return subTree->val;
 }
 
 // Get all x-frontier for a given abstract memory object
-LatticePtr HierarchicalAOM::get(AbstractObjectPtr obj_arg) {
+AbstractionPtr HierarchicalAOM::get(AbstractObjectPtr obj_arg) {
   SIGHT_VERB_DECL(scope, ("HierarchicalAOM::get()", scope::medium), 1, AOMDebugLevel)
   SIGHT_VERB(dbg << "obj="<<obj_arg->str()<<endl, 1, AOMDebugLevel)
-  AbstractObjectHierarchyPtr obj = boost::dynamic_pointer_cast<AbstractObjectHierarchy>(obj_arg);
+  SIGHT_VERB(dbg << "tree="<<tree<<endl, 1, AOMDebugLevel)
+  AbstractionHierarchyPtr obj = boost::dynamic_pointer_cast<AbstractionHierarchy>(obj_arg);
   ROSE_ASSERT(obj);
   SIGHT_VERB(dbg << "key="<<obj->getHierKey()<<endl, 1, AOMDebugLevel)
+
+  //cout << "key="<<obj->getHierKey()<<endl;
 
   list<comparablePtr>::const_iterator curKey = obj->getHierKey()->begin(),
                                       keyEnd = obj->getHierKey()->end();
@@ -1477,16 +1590,16 @@ LatticePtr HierarchicalAOM::get(AbstractObjectPtr obj_arg) {
   NodePtr subTree = tree;
           
   // The lattice object we'll return
-  //LatticePtr resLat(parent->defaultLat->copy());
-  LatticePtr resLat = parent->defaultLat->copySharedPtr();
-  resLat->setToEmpty();
+  //AbstractionPtr resLat(parent->defaultLat->copy());
+  AbstractionPtr resLat = parent->defaultLat->copyA();
+  resLat->setToEmpty(parent->latPEdge, parent->comp, parent->analysis);
 
   do {
     SIGHT_VERB(dbg << "curKey="<<curKey->str()<<", found="<<(subTree->subsets.find(*curKey)!=subTree->subsets.end())<<endl, 1, AOMDebugLevel)
     SIGHT_VERB(dbg << "subTree="<<subTree<<endl, 2, AOMDebugLevel)
             
     // Union the current node's lattice object into resLat
-    resLat->meetUpdate(getVal(subTree));
+    resLat->meetUpdate(getVal(subTree), parent->latPEdge, parent->comp, parent->analysis);
     SIGHT_VERB(dbg << "resLat="<<resLat->str()<<endl, 2, AOMDebugLevel)
             
     map<comparablePtr, NodePtr>::iterator sub = subTree->subsets.find(*curKey);
@@ -1505,7 +1618,7 @@ LatticePtr HierarchicalAOM::get(AbstractObjectPtr obj_arg) {
   
   // We've now reached the end of the key but there may be more information deeper
   // in the tree about subsets of obj. Union their values into resLat.
-  subTree->meetUpdate(resLat);
+  subTree->meetUpdate(resLat, parent->latPEdge, parent->comp, parent->analysis);
   SIGHT_VERB(dbg << "after sub-tree meet resLat="<<resLat->str()<<endl, 2, AOMDebugLevel)
   
   return resLat;
@@ -1517,7 +1630,7 @@ LatticePtr HierarchicalAOM::get(AbstractObjectPtr obj_arg) {
 // f - boolean that indicates whether the node corresponds to the full key (true) or a prefix
 //     of the key (false).
 std::pair<std::pair<HierarchicalAOM::NodePtr, HierarchicalAOM::NodePtr>, bool> 
-                            HierarchicalAOM::find(AbstractObjectHierarchyPtr obj) {
+                            HierarchicalAOM::find(AbstractionHierarchyPtr obj) {
   SIGHT_VERB_DECL(scope, ("HierarchicalAOM::find()", scope::medium), 2, AOMDebugLevel)
   list<comparablePtr>::const_iterator curKey = obj->getHierKey()->begin(),
                                       keyEnd = obj->getHierKey()->end();
@@ -1532,8 +1645,9 @@ std::pair<std::pair<HierarchicalAOM::NodePtr, HierarchicalAOM::NodePtr>, bool>
   
   do {
     SIGHT_VERB(dbg << "curKey="<<curKey->str()<<endl, 2, AOMDebugLevel)
-    SIGHT_VERB(dbg << "found="<<(subTree->subsets.find(*curKey)!=subTree->subsets.end())<<endl, 2, AOMDebugLevel)
     SIGHT_VERB(dbg << "subTree="<<subTree<<endl, 2, AOMDebugLevel)
+    SIGHT_VERB(dbg << "found="<<(subTree->subsets.find(*curKey)!=subTree->subsets.end())<<endl, 2, AOMDebugLevel)
+
     map<comparablePtr, NodePtr>::iterator sub = subTree->subsets.find(*curKey);
     // If the current sub-key exists in subsets
     if(sub!=subTree->subsets.end()) {
@@ -1557,7 +1671,7 @@ std::pair<std::pair<HierarchicalAOM::NodePtr, HierarchicalAOM::NodePtr>, bool>
 // to others. 
 bool HierarchicalAOM::setMLValueToFull(MemLocObjectPtr obj_arg) {
   bool modified=false;
-  AbstractObjectHierarchyPtr obj = boost::dynamic_pointer_cast<AbstractObjectHierarchy>(obj_arg);
+  AbstractionHierarchyPtr obj = boost::dynamic_pointer_cast<AbstractionHierarchy>(obj_arg);
   ROSE_ASSERT(obj);
   
   // Search for the node that contains the closest key to ml's in the tree,
@@ -1571,7 +1685,7 @@ bool HierarchicalAOM::setMLValueToFull(MemLocObjectPtr obj_arg) {
   
   while(curKey != keyEnd) {
     // Set the current 
-    modified = subTree->setValToFull() || modified;
+    modified = subTree->setValToFull(parent->latPEdge, parent->comp, parent->analysis) || modified;
     
     map<comparablePtr, NodePtr>::iterator sub = subTree->subsets.find(*curKey);
     // If the current sub-key exists in subsets
@@ -1588,23 +1702,23 @@ bool HierarchicalAOM::setMLValueToFull(MemLocObjectPtr obj_arg) {
   
   // If there is a tree node that matches ml's full key, make the whole
   // subtree full
-  modified = subTree->setSubTreeToFull() || modified;
+  modified = subTree->setSubTreeToFull(parent->latPEdge, parent->comp, parent->analysis) || modified;
   
   return modified;
 }
 
 // Returns whether this lattice denotes the set of all possible execution prefixes.
-bool HierarchicalAOM::isFullLat() {
-  if(tree->val && tree->val->isFullLat()) {
+bool HierarchicalAOM::isFull() {
+  if(tree->val && tree->val->isFull(parent->latPEdge, parent->comp, parent->analysis)) {
     // If the root node has a full lattice, then we clean out its sub-trees since 
     // they're now storing redundant info
-    tree->setSubTreeToFull();
+    tree->setSubTreeToFull(parent->latPEdge, parent->comp, parent->analysis);
     return false;
   }
   return true;
 }
 // Returns whether this lattice denotes the empty set.
-bool HierarchicalAOM::isEmptyLat() {
+bool HierarchicalAOM::isEmpty() {
   // Return true if the tree is empty
   return !tree->val && tree->subsets.size()==0;
 }
@@ -1634,7 +1748,7 @@ void HierarchicalAOM::copy(AbstractObjectMapKindPtr thatL) {
   HierarchicalAOMPtr that = boost::dynamic_pointer_cast <HierarchicalAOM> (thatL);
   ROSE_ASSERT(that);
   tree = boost::make_shared<Node>(that->tree, parent->latPEdge, parent->comp, parent->analysis);
-  isFinite = that->isFinite;
+  //isFinite = that->isFinite;
 }
 
 // Called by analyses to transfer this lattice's contents from across function scopes from a caller function 
@@ -1654,7 +1768,7 @@ AbstractObjectMapKindPtr HierarchicalAOM::remapML(const std::set<MLMapping>& ml2
   SIGHT_VERB_DECL(scope, ("HierarchicalAOM::remapML()", scope::high), 1, AOMDebugLevel)
   HierarchicalAOMPtr newAOM = boost::dynamic_pointer_cast<HierarchicalAOM>(copy());
   for(set<MLMapping>::const_iterator m=ml2ml.begin(); m!=ml2ml.end(); m++) {
-    AbstractObjectHierarchyPtr fromHier = boost::dynamic_pointer_cast<AbstractObjectHierarchy>(m->from);
+    AbstractionHierarchyPtr fromHier = boost::dynamic_pointer_cast<AbstractionHierarchy>(m->from);
     ROSE_ASSERT(fromHier);
     SIGHT_VERB(dbg << "from="<<m->from->str()<<endl, 1, AOMDebugLevel)
     SIGHT_VERB(dbg << "from key="<<fromHier->getHierKey()<<endl, 1, AOMDebugLevel)
@@ -1687,7 +1801,7 @@ AbstractObjectMapKindPtr HierarchicalAOM::remapML(const std::set<MLMapping>& ml2
         // with a lifetime that is not limited to a given function and it carries over
         // across function boundaries)
         if(m->to)
-          newAOM->insert(m->to, foundN->val->copySharedPtr(), /*originalVal*/ false);
+          newAOM->insert(m->to, foundN->val->copyA(), /*originalVal*/ false);
       }
     // If foundN equalsSet m->from or contains it, insert the mapping m->to => val but leave the prior one behind
     } else {
@@ -1696,10 +1810,10 @@ AbstractObjectMapKindPtr HierarchicalAOM::remapML(const std::set<MLMapping>& ml2
         // m->from. We focus in this way because f may be a strict superset of m->from
         // and some of the lattice objects in its sub-tree may correspond to objects 
         // that are disjoint from m->from.
-        LatticePtr fromLat = get(m->from);
-        // Insert this lattice under m->to, informing the HierarchicalAOM that it can treat
-        // fromLat as a privately-owned object since no user code will ever directly see it
-        // (it is generated inside of get()
+        AbstractionPtr fromLat = get(m->from);
+        // Insert this lattice under m->to, informing the HierarchicalAOM that it must treat
+        // fromLat as being owned by user code (must be copied before it is modified) since
+        // it appears at multiple locations within the map.
         newAOM->insert(m->to, fromLat, /*originalVal*/ true);
       }
     }
@@ -1714,8 +1828,8 @@ bool HierarchicalAOM::replaceML(AbstractObjectMapKindPtr that_arg) {
   SIGHT_VERB_DECL(scope, ("HierarchicalAOM::replaceML()", scope::high), 1, AOMDebugLevel)
   HierarchicalAOMPtr that = boost::dynamic_pointer_cast <HierarchicalAOM> (that_arg);
   bool modified = false;
-  modified = (isFinite != (isFinite || that->isFinite)) || modified;
-  isFinite = isFinite || that->isFinite;
+  //modified = (isFinite != (isFinite || that->isFinite)) || modified;
+  //isFinite = isFinite || that->isFinite;
   SIGHT_VERB(dbg<<"this="<<str()<<endl, 1, AOMDebugLevel)
   SIGHT_VERB(dbg<<"that="<<that_arg->str()<<endl, 1, AOMDebugLevel)
   
@@ -1753,7 +1867,7 @@ bool HierarchicalAOM::replaceML(NodePtr thisST, NodePtr thatST) {
       if(thatSub->second->isLive(parent->latPEdge, parent->comp, parent->analysis)) {
         NodePtr newNode = boost::make_shared<Node>(thatSub->second, parent->latPEdge, parent->comp, parent->analysis);
         // If the copied sub-tree didn't end up being empty (due to the keys being out of scope), add it
-        if(!newNode->isEmptyVal()) {
+        if(!newNode->isEmptyVal(parent->latPEdge, parent->comp, parent->analysis)) {
           thisST->subsets[thatSub->first] = newNode;
           modified = true;
         }
@@ -1764,21 +1878,22 @@ bool HierarchicalAOM::replaceML(NodePtr thisST, NodePtr thatST) {
   return modified;
 }
 
-// computes the meet of this and that and saves the result in this
-// returns true if this causes this to change and false otherwise
-bool HierarchicalAOM::meetUpdate(AbstractObjectMapKindPtr that_arg) {
-  SIGHT_VERB_DECL(scope, ("HierarchicalAOM::meetUpdate()", scope::high), 1, AOMDebugLevel)
+// Computes the union or intersection of this and that, as specified in the ui parameter
+// and saves the result in this.
+// Returns true if this causes this to change and false otherwise
+bool HierarchicalAOM::unionIntersectUpdate(AbstractObjectMapKindPtr that_arg, uiType ui) {
+  SIGHT_VERB_DECL(scope, ("HierarchicalAOM::unionIntersectUpdate()", scope::high), 1, AOMDebugLevel)
   HierarchicalAOMPtr that = boost::dynamic_pointer_cast <HierarchicalAOM> (that_arg);
   
   bool modified = false;
-  modified = (isFinite != (isFinite || that->isFinite)) || modified;
-  isFinite = isFinite || that->isFinite;
+  /*modified = (isFinite != (isFinite || that->isFinite)) || modified;
+  isFinite = isFinite || that->isFinite;*/
   
-  return meetUpdate(tree, that->tree) || modified;
+  return unionIntersectUpdate(tree, that->tree, ui) || modified;
 }
 
-// Recursive body of meetUpdate
-bool HierarchicalAOM::meetUpdate(NodePtr thisST, NodePtr thatST) {
+// Recursive body of unionIntersectUpdate
+bool HierarchicalAOM::unionIntersectUpdate(NodePtr thisST, NodePtr thatST, uiType ui) {
   bool modified = false;
 
   ROSE_ASSERT(thisST->isObjSingleton == thatST->isObjSingleton);
@@ -1786,20 +1901,39 @@ bool HierarchicalAOM::meetUpdate(NodePtr thisST, NodePtr thatST) {
   // Meet the values at this and that node
   SIGHT_VERB(dbg<<"thisST->val="<<(thisST->val? thisST->val->str(): "NULL")<<endl, 1, AOMDebugLevel)
   SIGHT_VERB(dbg<<"thatST->val="<<(thatST->val? thatST->val->str(): "NULL")<<endl, 1, AOMDebugLevel)
-  // If they're both non-NULL, call meetUpdate
+  // If they're both non-NULL, call unionIntersectUpdate
   if(thisST->val && thatST->val) {
     // If val is an original copy from the user, copy it before modifying it
     if(thisST->originalVal) {
-      thisST->val = thisST->val->copySharedPtr();
+      thisST->val = thisST->val->copyA();
       thisST->originalVal = false;
     }
-    modified = thisST->val->meetUpdate(thatST->val) || modified;
-  // If this is NULL, and that is not, copy from that to this
+    if(ui==Union)
+      modified = thisST->val->meetUpdate(thatST->val, parent->latPEdge, parent->comp, parent->analysis) || modified;
+    else
+      modified = thisST->val->intersectUpdate(thatST->val, parent->latPEdge, parent->comp, parent->analysis) || modified;
+
+  // If this is NULL, and that is not
   } else if(!thisST->val && thatST->val) {
-    thisST->val = thatST->val;
-    thisST->originalVal = true;
-    modified = !thisST->val->isEmptyLat() || modified;
+    // If Union, copy from that to this
+    if(ui == Union) {
+      thisST->val = thatST->val;
+      thisST->originalVal = true;
+      modified = !thisST->val->isEmpty(parent->latPEdge, parent->comp, parent->analysis) || modified;
+    }
+    // If Intersection, don't modify since the intersection contains only the common elements of the maps
+
+  // If this is not NULL, and that is
+  } else if(thisST->val && !thatST->val) {
+    // If Intersection, remove this sub-tree's value since the intersection contains only the common elements of the maps
+    if(ui == Intersection) {
+      modified = !thisST->val->isEmpty(parent->latPEdge, parent->comp, parent->analysis) || modified;
+      thisST->val.reset();
+      thisST->originalVal = false;
+    }
+    // If Union, don't modify it since the union contains the elements that exist in either mep
   }
+
   SIGHT_VERB(dbg<<"merged thisST->val="<<(thisST->val? thisST->val->str(): "NULL")<<endl, 1, AOMDebugLevel)
   SIGHT_VERB_DECL(indent, (), 1, AOMDebugLevel)
   // Otherwise, this doesn't change
@@ -1811,7 +1945,7 @@ bool HierarchicalAOM::meetUpdate(NodePtr thisST, NodePtr thatST) {
     map<comparablePtr, NodePtr>::iterator thisSub=thisST->subsets.find(thatSub->first);
     if(thisSub!=thisST->subsets.end()) {
       // Meet both sub-trees
-      modified = meetUpdate(thisSub->second, thatSub->second) || modified;
+      modified = unionIntersectUpdate(thisSub->second, thatSub->second, ui) || modified;
       SIGHT_VERB(dbg<<"merged thisSub="<<thisSub->second<<endl, 1, AOMDebugLevel)
     // If it doesn't, copy the sub-tree from that into this
     } else {
@@ -1819,7 +1953,7 @@ bool HierarchicalAOM::meetUpdate(NodePtr thisST, NodePtr thatST) {
       if(thatSub->second->isLive(parent->latPEdge, parent->comp, parent->analysis)) {
         NodePtr newNode = boost::make_shared<Node>(thatSub->second, parent->latPEdge, parent->comp, parent->analysis);
         // If the copied sub-tree didn't end up being empty (due to the keys being out of scope), add it
-        if(!newNode->isEmptyVal()) {
+        if(!newNode->isEmptyVal(parent->latPEdge, parent->comp, parent->analysis)) {
           thisST->subsets[thatSub->first] = newNode;
           SIGHT_VERB_IF(1, AOMDebugLevel)
             dbg << "original node "<<thatSub->second<<endl;
@@ -1834,8 +1968,24 @@ bool HierarchicalAOM::meetUpdate(NodePtr thisST, NodePtr thatST) {
   return modified;
 }
 
-bool HierarchicalAOM::finiteLattice()
-{ return isFinite; }
+// Computes the meet of this and that and saves the result in this
+// Returns true if this causes this to change and false otherwise
+bool HierarchicalAOM::meetUpdate(AbstractObjectMapKindPtr that_arg) {
+  return unionIntersectUpdate(that_arg, Union);
+}
+
+// Computes the intersection of this and that and saves the result in this
+// Returns true if this causes this to change and false otherwise
+bool HierarchicalAOM::intersectUpdate(AbstractObjectMapKindPtr that_arg) {
+  return unionIntersectUpdate(that_arg, Intersection);
+}
+
+/*bool HierarchicalAOM::finiteLattice()
+{
+  //return isFinite;
+  // AbstractObjectMaps can grow to an arbitrary size and are thus inherently not finite
+  return false;
+}*/
 
 bool HierarchicalAOM::operator==(AbstractObjectMapKindPtr that_arg) {
   HierarchicalAOMPtr that = boost::dynamic_pointer_cast<HierarchicalAOM>(that_arg);
@@ -1844,6 +1994,488 @@ bool HierarchicalAOM::operator==(AbstractObjectMapKindPtr that_arg) {
   // This will be written once we have the merging algorithm to test
   // these maps' frontiers for semantic equivalence
   return false;
+}
+
+/*************************
+ ***** MappedAOMKind *****
+ *************************/
+
+MappedAOMKind::MappedAOMKind(AbstractObjectPtr exampleKey, AbstractObjectMap* parent/*AbstractObjectMapKindFactoryPtr factory, */):
+  AbstractObjectMapKind(parent)/*,
+  factory(factory)*/
+{
+  assert(exampleKey->isMappedAO());
+
+  ui = boost::dynamic_pointer_cast<MappedAbstractionBase>(exampleKey)->getUI();
+/*
+  // Generate a fresh MAOMap that maps the sub-keys of exampleKey to AbstractObjectMaps
+  assert(boost::dynamic_pointer_cast<MappedAbstractionBase>(exampleKey));
+  mappedAOMap = boost::dynamic_pointer_cast<MappedAbstractionBase>(exampleKey)->genMappedAOMap();
+  assert(mappedAOMap);
+
+  class AOMKindCreator: public MAOMap::setMapFunc {
+    public:
+    AbstractObjectMapKindFactoryPtr factory;
+    AOMKindCreator(AbstractObjectMapKindFactoryPtr factory): factory(factory) {}
+    // Applied to each Key in a given MappedAbstractObject
+    // obj: the AO mapped to the key
+    // valMapped: indicates whether there is a value currently mapped to the key in the AOMap
+    // curVal: if valMapped is true, curVal contains the current value mapped in AOMap
+    // Returns the new value to be mapped to the current key in AOMap
+    boost::shared_ptr<void> operator()(AbstractionPtr obj, boost::shared_ptr<void> curVal, bool valMapped) {
+      assert(valMapped);
+
+      return factory->create();
+    }
+  };
+  AOMKindCreator x(factory);
+  mappedAOMap->set(exampleKey, x);*/
+
+  // Create an empty MAOMap with the same sub-keys as key
+  assert(boost::dynamic_pointer_cast<MappedAbstractionBase>(exampleKey));
+  mappedAOMap = boost::dynamic_pointer_cast<MappedAbstractionBase>(exampleKey)->genMappedAOMap();
+  assert(mappedAOMap);
+
+  // Iterate over the Abstractions in mappedAOMap and make sure they have the same properties
+  class AOMKindOp: public MAOMap::setMapFunc {
+    AbstractObjectMap* parent;
+    public:
+    AOMKindOp(AbstractObjectMap* parent): parent(parent) {}
+    boost::shared_ptr<void> operator()(AbstractionPtr subA, boost::shared_ptr<void> curVal, bool valMapped) {
+      assert(valMapped);
+      AbstractObjectPtr subAO = boost::dynamic_pointer_cast<AbstractObject>(subA);
+      assert(subAO);
+      return AbstractObjectMap::createAOMKind(subAO, parent);
+    }
+  };
+  AOMKindOp x(parent);
+  mappedAOMap->set(exampleKey, x);
+}
+/*
+MappedAOMKind::MappedAOMKind(boost::shared_ptr<MAOMap> mappedAOMap, AbstractObjectMap* parent) {
+  class setApplyMapFunc {
+    public:
+    // Applied to each Key in a map. The value returned for each key is assigned to that key.
+    // curVal: contains the current value mapped in AOMap
+    virtual boost::shared_ptr<void> operator()(boost::shared_ptr<void> curVal)=0;
+  };
+
+  // Applies the given functor to all the keys in this map and sets the value returned by each invocation
+  // of the function to the key that corresponds to the call
+  virtual void setApply(setApplyMapFunc& f)=0;
+}*/
+
+MappedAOMKind::MappedAOMKind(const MappedAOMKind& that, bool emptyMap) :
+    AbstractObjectMapKind(that)/*, factory(that.factory)*/, ui(that.ui)
+{
+  // Copy mappedAOMap's keys but not their values (sub-AOMs)
+  mappedAOMap = that.mappedAOMap->create();
+
+  if(!emptyMap) {
+    // Initialize mappedAOMap's keys with the copies of the values (sub-AOMaps) in that.mappedAOMap
+    class AOMKindOp: public MAOMap::setJoinMapFunc {
+      //AbstractObjectMapKindFactoryPtr factory;
+      public:
+      //AOMKindOp(AbstractObjectMapKindFactoryPtr factory): factory(factory) {}
+      boost::shared_ptr<void> operator()(boost::shared_ptr<void> curVal1, boost::shared_ptr<void> curVal2) {
+        AbstractObjectMapKindPtr thatAOMKind = boost::static_pointer_cast<AbstractObjectMapKind>(curVal2);
+        assert(thatAOMKind);
+        //return factory->copy(thatAOMKind);
+        return thatAOMKind->copy();
+      }
+    };
+    AOMKindOp x;//(/*factory*/);
+    mappedAOMap->setJoin(that.mappedAOMap, x);
+  }
+}
+
+// Add a new memory object --> lattice pair to the frontier.
+// Return true if this causes the map to change and false otherwise.
+// It is assumed that the given Lattice is now owned by the AbstractObjectMap and can be modified and deleted by it.
+bool MappedAOMKind::insert(AbstractObjectPtr key, AbstractionPtr val) {
+  assert(key->isMappedAO());
+  class AOMKindOp: public MAOMap::getMapFunc {
+    public:
+    bool modified;
+    AbstractionPtr val;
+    AOMKindOp(AbstractionPtr val): modified(false), val(val) {}
+    void operator()(AbstractionPtr obj, boost::shared_ptr<void> curVal, bool valMapped) {
+      assert(valMapped);
+      modified = ((AbstractObjectMapKind*)curVal.get())->insert(
+                                boost::dynamic_pointer_cast<AbstractObject>(obj), val) || modified;
+    }
+  };
+  AOMKindOp x(val);
+  mappedAOMap->get(key, x);
+  return x.modified;
+}
+
+// Removes the key matching the argument from the frontier.
+// Return true if this causes the map to change and false otherwise.
+bool MappedAOMKind::remove(AbstractObjectPtr key) {
+  assert(key->isMappedAO());
+  class AOMKindOp: public MAOMap::getMapFunc {
+    public:
+    bool modified;
+    AOMKindOp(): modified(false) {}
+    void operator()(AbstractionPtr obj, boost::shared_ptr<void> curVal, bool valMapped) {
+      assert(valMapped);
+      modified = ((AbstractObjectMapKind*)curVal.get())->remove(
+                         boost::dynamic_pointer_cast<AbstractObject>(obj)) || modified;
+    }
+  };
+  AOMKindOp x;
+  mappedAOMap->get(key, x);
+  return x.modified;
+}
+
+// Get all x-frontier for a given abstract memory object
+AbstractionPtr MappedAOMKind::get(AbstractObjectPtr key) {
+  scope s(txt()<<"MappedAOMKind::get() ui="<<(ui==Union? "Union": "Intersection"));
+  dbg << "key="<<key->str()<<endl;
+  assert(key->isMappedAO());
+
+  // Create a fresh map to hold the mapping of the sub-keys inside the MappedAbstractObject key
+  // to the results of get() for each sub-key.
+  boost::shared_ptr<MAOMap> valMAOMap =
+      boost::dynamic_pointer_cast<MappedAbstractionBase>(key)->genMappedAOMap();
+
+  // Iterate over the keys of key and this map (should be identical) and for each
+  // sub-map apply get on the corresponding sub-key. The returned AbstractionPtr
+  // is then mapped to the corresponding key in valMAOMap.
+  class AOMKindOp: public MAOMap::setMapObjMapJoinMapFunc {
+    public:
+    // A representative value returned from any of the sub-maps. We'll use this value's
+    // implementations of getUnion/getIntersection
+    AbstractionPtr representativeVal;
+
+    // Applied to all the keys that appear in the three maps. The value returned by the function
+    // assigned to the current key in the first map
+    // curVal1: contains the current value mapped in the this MAOMap
+    // curVal2: contains the current value mapped in the Mapped Abstract Object
+    // curVal2: contains the current value mapped in the that MAOMap
+    virtual boost::shared_ptr<void> operator()(boost::shared_ptr<void> curValThis,
+                                               AbstractObjectPtr curValObj,
+                                               boost::shared_ptr<void> curValThat) {
+      representativeVal = ((AbstractObjectMapKind*)curValThat.get())->get(curValObj);
+      return representativeVal;
+    }
+  };
+  AOMKindOp x;
+  valMAOMap->setMapObjMapJoin(key, mappedAOMap, x);
+
+  // Now that valMAOMap is populated with a mapping from keys to the results of get()
+  // that correspond to these keys, return their union or intersection, whichever is the mode
+  // of this MappedAOMKind.
+
+  if(ui==Union) return x.representativeVal->genUnion(valMAOMap);
+  else          return x.representativeVal->genIntersection(valMAOMap);
+}
+
+// Set all the information associated Lattice object with this MemLocObjectPtr to full.
+// Return true if this causes the object to change and false otherwise.
+// This function does nothing because it is a set of abstract objects rather than a map from some abstract objects
+// to others.
+bool MappedAOMKind::setMLValueToFull(MemLocObjectPtr ml) {
+  assert(ml->isMappedAO());
+  class AOMKindOp: public MAOMap::getMapFunc {
+    public:
+    bool modified;
+    AOMKindOp(): modified(false) {}
+    void operator()(AbstractionPtr obj, boost::shared_ptr<void> curVal, bool valMapped) {
+      assert(valMapped);
+      MemLocObjectPtr subML = boost::dynamic_pointer_cast<MemLocObject>(boost::dynamic_pointer_cast<AbstractObject>(obj));
+      assert(subML);
+      modified = ((AbstractObjectMapKind*)curVal.get())->setMLValueToFull(subML) || modified;
+    }
+  };
+  AOMKindOp x;
+  mappedAOMap->get(ml, x);
+  return x.modified;
+}
+
+// Returns whether this lattice denotes the set of all possible execution prefixes.
+bool MappedAOMKind::isFull() {
+  class AOMKindOp: public MAOMap::applyMapFunc {
+    public:
+    bool res;
+    AOMKindOp(): res(true) {}
+    void operator()(boost::shared_ptr<void> curVal) {
+      res = ((AbstractObjectMapKind*)curVal.get())->isFull() && res;
+    }
+  };
+  AOMKindOp x;
+  mappedAOMap->apply(x);
+  return x.res;
+}
+
+// Returns whether this lattice denotes the empty set.
+bool MappedAOMKind::isEmpty() {
+  class AOMKindOp: public MAOMap::applyMapFunc {
+    public:
+    bool res;
+    AOMKindOp(): res(true) {}
+    void operator()(boost::shared_ptr<void> curVal) {
+      res = ((AbstractObjectMapKind*)curVal.get())->isEmpty() && res;
+    }
+  };
+  AOMKindOp x;
+  mappedAOMap->apply(x);
+  return x.res;
+}
+
+std::string MappedAOMKind::str(std::string indent) const {
+  class AOMKindOp: public MAOMap::applyStrMapFunc {
+    public:
+    std::ostringstream out;
+    std::string indent;
+    AOMKindOp(std::string indent) : indent(indent) {
+      out << "<table><tr><td border=\"1\" colspan=\"2\"><b>MappedAOMKind</b>:</td></tr>"<<endl;
+    }
+    void complete() {
+      out << indent << "</table>";
+    }
+    void operator()(const std::string& keyStr, boost::shared_ptr<void> curVal) {
+      out << "<tr><td>"<<keyStr << "</td><td>"<<((AbstractObjectMapKind*)curVal.get())->str()<<"</td><tr>"<<endl;
+    }
+  };
+  AOMKindOp x(indent);
+  mappedAOMap->applyStr(x);
+  return x.out.str();
+}
+
+// Variant of the str method that can produce information specific to the current Part.
+// Useful since AbstractObjects can change from one Part to another.
+std::string MappedAOMKind::strp(PartEdgePtr pedge, std::string indent) const  {
+  class AOMKindOp: public MAOMap::applyStrMapFunc {
+    public:
+    std::ostringstream out;
+    PartEdgePtr pedge;
+    std::string indent;
+    AOMKindOp(PartEdgePtr pedge, std::string indent): pedge(pedge), indent(indent) {
+      out << "[MappedAOMKind: "<<endl;
+    }
+    void complete() {
+      out << indent << "]";
+    }
+    void operator()(const std::string& keyStr, boost::shared_ptr<void> curVal) {
+      out << indent << keyStr << ": "<<((AbstractObjectMapKind*)curVal.get())->strp(pedge, indent+"    ")<<endl;
+    }
+  };
+  AOMKindOp x(pedge, indent);
+  mappedAOMap->applyStr(x);
+  x.complete();
+  return x.out.str();
+}
+
+// -----------------
+// Lattice methods
+// initializes this Lattice to its default state, if it is not already initialized
+void MappedAOMKind::initialize() {}
+
+// returns a copy of this AbstractObjectMapKind
+AbstractObjectMapKindPtr MappedAOMKind::copy() const {
+  return boost::make_shared<MappedAOMKind>(*this);
+}
+
+// overwrites the state of this Lattice with that of that Lattice
+void MappedAOMKind::copy(AbstractObjectMapKindPtr that_arg) {
+  MappedAOMKindPtr that = boost::dynamic_pointer_cast<MappedAOMKind>(that_arg);
+
+  assert(ui == that->ui);
+
+  // We do not copy the factory since we want the factory to point to our parent AOM, not that's parent
+
+  // Copy mappedAOMap's keys but not their values (sub-AOMs)
+  mappedAOMap = that->mappedAOMap->create();
+
+  // Initialize mappedAOMap's keys with the copies of the values (sub-AOMaps) in that.mappedAOMap
+  class AOMKindOp: public MAOMap::setJoinMapFunc {
+    //AbstractObjectMapKindFactoryPtr factory;
+    public:
+    //AOMKindOp(AbstractObjectMapKindFactoryPtr factory): factory(factory) {}
+    boost::shared_ptr<void> operator()(boost::shared_ptr<void> curVal1, boost::shared_ptr<void> curVal2) {
+      AbstractObjectMapKindPtr thatAOMKind = boost::static_pointer_cast<AbstractObjectMapKind>(curVal2);
+      assert(thatAOMKind);
+      //return factory->copy(thatAOMKind);
+      return thatAOMKind->copy();
+    }
+  };
+  AOMKindOp x;//(/*factory*/);
+  mappedAOMap->setJoin(that->mappedAOMap, x);
+}
+
+// Called by analyses to transfer this lattice's contents from across function scopes from a caller function
+//    to a callee's scope and vice versa. If this this lattice maintains any information on the basis of
+//    individual MemLocObjects these mappings must be converted, with MemLocObjects that are keys of the ml2ml
+//    replaced with their corresponding values. If a given key of ml2ml does not appear in the lattice, it must
+//    be added to the lattice and assigned a default initial value. In many cases (e.g. over-approximate sets
+//    of MemLocObjects) this may not require any actual insertions. If the value of a given ml2ml mapping is
+//    NULL (empty boost::shared_ptr), any information for MemLocObjects that must-equal to the key should be
+//    deleted.
+// Since the function is called for the scope change across some Part, it needs to account for the fact that
+//    the keys in ml2ml are in scope on one side of Part, while the values on the other side. Specifically, it is
+//    guaranteed that the keys are in scope at fromPEdge while the values are in scope at the edge returned
+//    by getPartEdge().
+// remapML must return a freshly-allocated object.
+AbstractObjectMapKindPtr MappedAOMKind::remapML(const std::set<MLMapping>& ml2ml, PartEdgePtr fromPEdge) {
+  scope s(txt()<<"MappedAOMKind::remapML() #ml2ml="<<ml2ml.size());
+  // The MemLocs in the ml2ml mapping are MappedAbstractObjects. To call the remapML method
+  // of the AOMKinds within this MappedAOMKind it is necessary to slice them into a separate
+  // ml2ml mapping for each sub-key within them. Each sub-ml2ml mapping maps just the ml2 mapped
+  // to each sub-key of the original mapping.
+
+  // Create a fresh MAOMap that maps each key to the portions of the ml2ml mapping
+  MAOMapPtr subml2ml = mappedAOMap->create();
+
+  // Map each key in subml2ml to a set<MLMapping> that contains just the ml2ml mapping of
+  // the sub-MemLocs in ml2ml that correspond to that key
+  for(set<MLMapping>::const_iterator i=ml2ml.begin(); i!=ml2ml.end(); ++i) {
+    // Convert the current ml->ml pair into a vector of AbstractionPtrs, which can be
+    // passed to a call to subml2ml->setObjVecJoin
+    vector<AbstractionPtr> objs;
+    objs.push_back(i->from);
+    objs.push_back(i->to);
+    dbg << "i->from="<<i->from->str()<<endl;
+    dbg << "i->to="<<(i->to?i->to->str():"NULL")<<endl;
+
+    class AOMKindOp: public MAOMap::setMapObjVecJoinMapFunc {
+      const MLMapping& origMLMapping;
+      public:
+      AOMKindOp(const MLMapping& origMLMapping) : origMLMapping(origMLMapping) {}
+      boost::shared_ptr<void> operator()(boost::shared_ptr<void> curMapVal,
+                                         const std::vector<AbstractObjectPtr>& curObjVals) {
+        assert(curObjVals.size()==2);
+        scope s("AOMKindOp()");
+        boost::shared_ptr<set<MLMapping> > subML2ML;
+        // If we're at the first mapping, initialize subML2ML to be a new set of MLMappings
+        if(!curMapVal) subML2ML = boost::make_shared<set<MLMapping> >();
+        // Otherwise, set subML2ML to point to the previously-allocated mapping
+        else           subML2ML = boost::static_pointer_cast<set<MLMapping> >(curMapVal);
+
+        MemLocObjectPtr from = boost::dynamic_pointer_cast<MemLocObject>(curObjVals[0]);
+        dbg << "curObjVals[0]="<<curObjVals[0]->str()<<endl;
+        assert(from);
+        MemLocObjectPtr to   = boost::dynamic_pointer_cast<MemLocObject>(curObjVals[1]);
+        dbg << "curObjVals[1]="<<(curObjVals[1]?curObjVals[1]->str():"NULL")<<endl;
+
+        subML2ML->insert(MLMapping(from, to, origMLMapping.replaceMapping));
+
+        return subML2ML;
+      }
+    };
+    AOMKindOp x(*i);
+    subml2ml->setObjVecJoin(objs, x);
+  }
+
+  // Create a new MappedAOMKind that will contain the remapped version of this MappedAOMKind
+  MappedAOMKindPtr newK = boost::make_shared<MappedAOMKind>(*this, /* emptyMap */ true);
+  class AOMKindOp2: public MAOMap::set3MapJoinMapFunc {
+    const std::set<MLMapping>& ml2ml;
+    PartEdgePtr fromPEdge;
+    public:
+    AOMKindOp2(const std::set<MLMapping>& ml2ml, PartEdgePtr fromPEdge): ml2ml(ml2ml), fromPEdge(fromPEdge) {}
+    boost::shared_ptr<void> operator()(boost::shared_ptr<void> curValNewK,
+                                       boost::shared_ptr<void> curValMappedAOMap,
+                                       boost::shared_ptr<void> curValSubML2ML) {
+      if(ml2ml.size()>0)
+        return boost::static_pointer_cast<AbstractObjectMapKind>(curValMappedAOMap)->remapML
+                  (*boost::static_pointer_cast<set<MLMapping> >(curValSubML2ML).get(), fromPEdge);
+      else
+        return boost::static_pointer_cast<AbstractObjectMapKind>(curValMappedAOMap)->remapML
+                          (ml2ml, fromPEdge);
+    }
+  };
+  AOMKindOp2 y(ml2ml, fromPEdge);
+  newK->mappedAOMap->set3MapJoin(mappedAOMap, subml2ml, y);
+  return newK;
+}
+
+// Adds information about the MemLocObjects in newL to this Lattice, overwriting any information previously
+//    maintained in this lattice about them.
+// Returns true if the Lattice state is modified and false otherwise.
+bool MappedAOMKind::replaceML(AbstractObjectMapKindPtr newL)  {
+  MappedAOMKindPtr thatMappedAOM = boost::dynamic_pointer_cast<MappedAOMKind>(newL);
+  class AOMKindOp: public MAOMap::applyJoinMapFunc {
+    public:
+    bool modified;
+    AOMKindOp(): modified(false) {}
+    void operator()(boost::shared_ptr<void> curVal1, boost::shared_ptr<void> curVal2) {
+      modified = ((AbstractObjectMapKind*)curVal1.get())->replaceML(
+                       boost::static_pointer_cast<AbstractObjectMapKind>(curVal2)) || modified;
+    }
+  };
+  AOMKindOp x;
+  mappedAOMap->applyJoin(thatMappedAOM->mappedAOMap, x);
+  return x.modified;
+}
+
+// Computes the meet of this and that and saves the result in this
+// Returns true if this causes this to change and false otherwise
+bool MappedAOMKind::meetUpdate(AbstractObjectMapKindPtr that) {
+  MappedAOMKindPtr thatMappedAOM = boost::dynamic_pointer_cast<MappedAOMKind>(that);
+  class AOMKindOp: public MAOMap::applyJoinMapFunc {
+    public:
+    bool modified;
+    AOMKindOp() : modified(false) {}
+    void operator()(boost::shared_ptr<void> curVal1, boost::shared_ptr<void> curVal2) {
+      modified = ((AbstractObjectMapKind*)curVal1.get())->meetUpdate(boost::static_pointer_cast<AbstractObjectMapKind>(curVal2)) || modified;
+    }
+  };
+  AOMKindOp x;
+  mappedAOMap->applyJoin(thatMappedAOM->mappedAOMap, x);
+  return x.modified;
+}
+
+// Computes the intersection of this and that and saves the result in this
+// Returns true if this causes this to change and false otherwise
+bool MappedAOMKind::intersectUpdate(AbstractObjectMapKindPtr that) {
+  MappedAOMKindPtr thatMappedAOM = boost::dynamic_pointer_cast<MappedAOMKind>(that);
+  class AOMKindOp: public MAOMap::applyJoinMapFunc {
+    public:
+    bool modified;
+    AOMKindOp() : modified(false) {}
+    void operator()(boost::shared_ptr<void> curVal1, boost::shared_ptr<void> curVal2) {
+      modified = ((AbstractObjectMapKind*)curVal1.get())->intersectUpdate(boost::static_pointer_cast<AbstractObjectMapKind>(curVal2)) || modified;
+    }
+  };
+  AOMKindOp x;
+  mappedAOMap->applyJoin(thatMappedAOM->mappedAOMap, x);
+  return x.modified;
+}
+
+/*bool MappedAOMKind::finiteLattice() {
+  assert(ml->isMappedAO());
+  class AOMKindOp: public MAOMap::getMapFunc {
+    public:
+    bool res;
+    AOMKindOp(): res(true) {}
+    void operator()(AbstractionPtr obj, boost::shared_ptr<void> curVal, bool valMapped) {
+      assert(valMapped);
+      MemLocObjectPtr subML = boost::dynamic_pointer_cast<MemLocObject>(obj);
+      assert(subML);
+      res &&= ((AbstractObjectMapKind*)curVal.get())->finiteLattice();
+    }
+  };
+  AOMKindOp x;
+  mappedAOMap->get(key, x);
+  return x.res;
+}*/
+
+bool MappedAOMKind::operator==(AbstractObjectMapKindPtr that)  {
+  MappedAOMKindPtr thatMappedAOM = boost::dynamic_pointer_cast<MappedAOMKind>(that);
+  class AOMKindOp: public MAOMap::applyJoinMapFunc {
+    public:
+    bool differ;
+    AOMKindOp() : differ(false) {}
+    void operator()(boost::shared_ptr<void> curVal1, boost::shared_ptr<void> curVal2) {
+      differ = (*((AbstractObjectMapKind*)curVal1.get()) ==
+                boost::static_pointer_cast<AbstractObjectMapKind>(curVal2)) || differ;
+    }
+  };
+  AOMKindOp x;
+  mappedAOMap->applyJoin(thatMappedAOM->mappedAOMap, x);
+  return x.differ;
 }
 
 }; // namespace fuse

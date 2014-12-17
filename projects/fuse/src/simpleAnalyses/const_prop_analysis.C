@@ -7,7 +7,6 @@
 #include <boost/lambda/lambda.hpp>
 #include <boost/lambda/casts.hpp>
 #include "sageInterface.h"
-#include "sight_verbosity.h"
 
 using namespace std;
 using namespace sight;
@@ -15,7 +14,7 @@ using namespace SageInterface;
 
 #include <cwchar>
 
-#define constantPropagationAnalysisDebugLevel 0
+#define constantPropagationAnalysisDebugLevel 1
 
 // Define type conversions for lambda operators that are not supported by Boost::Lambda
 namespace boost { 
@@ -409,64 +408,65 @@ struct plain_return_type_2<arithmetic_action<Act>, long double, wchar_t> {
 namespace fuse {
 
 // ************************
-// **** CPValueObject *****
+// **** CPValueLattice *****
 // ************************
 
-CPValueObjectPtr NULLCPValueObject;
+CPValueLatticePtr NULLCPValueLattice;
 CPValueKindPtr NULLCPValueKind;
 
-CPValueObject::CPValueObject(PartEdgePtr pedge) : 
-  Lattice(pedge), FiniteLattice(pedge), ValueObject(NULL)
+CPValueLattice::CPValueLattice(PartEdgePtr pedge) :
+  Lattice(pedge), FiniteLattice(pedge)
 {
   kind = boost::make_shared<CPUninitializedKind>();
 }
 
-CPValueObject::CPValueObject(CPValueKindPtr kind, PartEdgePtr pedge) : 
-  Lattice(pedge), FiniteLattice(pedge), ValueObject(NULL), kind(kind)
+CPValueLattice::CPValueLattice(CPValueKindPtr kind, PartEdgePtr pedge) :
+  Lattice(pedge), FiniteLattice(pedge), kind(kind)
 {
 }
 
-// This is the same as the implicit definition, so it might not be required to be defined explicitly.
-// I am searching for the minimal example of the use of the data flow classes.
-CPValueObject::CPValueObject(const CPValueObject & that) : 
-  Lattice(that.latPEdge), FiniteLattice(that.latPEdge), ValueObject(that), AbstractObjectHierarchy(that)
+CPValueLattice::CPValueLattice(const CPValueLattice & that) :
+  Lattice(that.latPEdge), FiniteLattice(that.latPEdge)
 {
-  this->kind = that.kind->copyV();
+  this->kind = that.kind->copyAOType();
 }
 
-CPValueKindPtr CPValueObject::getKind() const {
+CPValueKindPtr CPValueLattice::getKind() const {
   return kind;
 }
 
-bool CPValueObject::setKind(CPValueKindPtr kind) {
+bool CPValueLattice::setKind(CPValueKindPtr kind) {
   bool modified = (this->kind->getKind() == kind->getKind() &&
-                   this->kind->equalSetV(kind));
+                   this->kind->equalSetAO(kind));
   this->kind = kind;
   return modified;
 }
-  
+
 void
-CPValueObject::initialize()
+CPValueLattice::initialize()
 {
   // Use the default constructor (implemented above).
   // So nothing to do here.
 }
 
-
 // returns a copy of this lattice
 Lattice*
-CPValueObject::copy() const
+CPValueLattice::copy() const
 {
-  return new CPValueObject(*this);
+  return new CPValueLattice(*this);
 }
+
+// Returns a shared pointer to a newly-allocated copy of this CPValueLatice
+CPValueLatticePtr CPValueLattice::copyCPLat() const
+{ return boost::make_shared<CPValueLattice>(*this); }
 
 
 // Overwrites the state of "this" Lattice with "that" Lattice
 void
-CPValueObject::copy(Lattice* X)
+CPValueLattice::copy(Lattice* X)
 {
   Lattice::copy(X);
-  CPValueObject* that = dynamic_cast<CPValueObject*>(X);
+  CPValueLattice* that = dynamic_cast<CPValueLattice*>(X);
   assert(that);
 
   this->kind = that->kind;
@@ -474,29 +474,29 @@ CPValueObject::copy(Lattice* X)
 
 
 bool
-CPValueObject::operator==(Lattice* X) /*const*/
+CPValueLattice::operator==(Lattice* X) /*const*/
 {
   // Implementation of equality operator.
-  CPValueObject* that = dynamic_cast<CPValueObject*>(X);
+  CPValueLattice* that = dynamic_cast<CPValueLattice*>(X);
   assert(that);
   return (this->kind->getKind() == that->kind->getKind() &&
-          this->kind->equalSetV(that->kind));
+          this->kind->equalSetAO(that->kind));
 }
 
-// computes the meet of this and that and saves the result in this
-// returns true if this causes this to change and false otherwise
+// Computes the meet of this and that and saves the result in this
+// Returns true if this causes this to change and false otherwise
 bool 
-CPValueObject::meetUpdate(Lattice* X)
+CPValueLattice::meetUpdate(Lattice* X)
 {
-  CPValueObject* that = dynamic_cast<CPValueObject*>(X);
+  CPValueLattice* that = dynamic_cast<CPValueLattice*>(X);
   assert(that);
   return meetUpdate(that);
 }
 
 bool
-CPValueObject::meetUpdate(CPValueObject* that)
+CPValueLattice::meetUpdate(CPValueLattice* that)
 {
-  pair<bool, CPValueKindPtr> ret = kind->meetUpdateV(that->kind);
+  pair<bool, CPValueKindPtr> ret = kind->meetUpdateAO(that->kind);
   // Update kind
   kind = ret.second;
   
@@ -541,10 +541,31 @@ CPValueObject::meetUpdate(CPValueObject* that)
   return false;*/
 }
 
+// Computes the intersection of this and that and saves the result in this
+// Returns true if this causes this to change and false otherwise
+bool
+CPValueLattice::intersectUpdate(Lattice* X)
+{
+  CPValueLattice* that = dynamic_cast<CPValueLattice*>(X);
+  assert(that);
+  return intersectUpdate(that);
+}
+
+bool
+CPValueLattice::intersectUpdate(CPValueLattice* that)
+{
+  pair<bool, CPValueKindPtr> ret = kind->intersectUpdateAO(that->kind);
+  // Update kind
+  kind = ret.second;
+
+  // Return whether kind was modified
+  return ret.first;
+}
+
 // Set this Lattice object to represent the set of all possible execution prefixes.
 // Return true if this causes the object to change and false otherwise.
 bool
-CPValueObject::setToFull()
+CPValueLattice::setToFull()
 {
   if(kind->getKind()!=CPValueKind::unknown) {
     kind = boost::make_shared<CPUnknownKind>();
@@ -556,7 +577,7 @@ CPValueObject::setToFull()
 // Set this Lattice object to represent the of no execution prefixes (empty set)
 // Return true if this causes the object to change and false otherwise.
 bool
-CPValueObject::setToEmpty()
+CPValueLattice::setToEmpty()
 {
   if(kind->getKind()!=CPValueKind::uninitialized) {
     kind = boost::make_shared<CPUninitializedKind>();
@@ -568,7 +589,7 @@ CPValueObject::setToEmpty()
 // Set all the information associated Lattice object with this MemLocObjectPtr to full.
 // Return true if this causes the object to change and false otherwise.
 bool
-CPValueObject::setMLValueToFull(MemLocObjectPtr ml)
+CPValueLattice::setMLValueToFull(MemLocObjectPtr ml)
 {
   // Do nothing since this object does not contain information about MemLocObjects
   return false;
@@ -576,22 +597,16 @@ CPValueObject::setMLValueToFull(MemLocObjectPtr ml)
 
 // Returns whether this lattice denotes the set of all possible execution prefixes.
 bool
-CPValueObject::isFullLat()
-{ return isFullV(getPartEdge()); }
+CPValueLattice::isFull()
+{ return kind->isFullAO(getPartEdge()); }
 
 // Returns whether this lattice denotes the empty set.
 bool
-CPValueObject::isEmptyLat()
-{ return isEmptyV(getPartEdge()); }
+CPValueLattice::isEmpty()
+{ return kind->isEmptyAO(getPartEdge()); }
 
 string
-CPValueObject::str(string indent) const
-{
-  return strp(latPEdge, indent);
-}
-
-string
-CPValueObject::strp(PartEdgePtr pedge, string indent) const
+CPValueLattice::str(string indent) const
 {
   return kind->str(indent);
 }
@@ -601,121 +616,165 @@ CPValueObject::strp(PartEdgePtr pedge, string indent) const
 //    - if this CPValueKind can be updated to incorporate the result of the addition, 
 //       return a freshly-allocated CPValueKind that holds the result.
 //    - if the two objects could not be merged and therefore that must be placed after 
-//       this in the parent CPValueObject's list, return that.
-CPValueObjectPtr CPValueObject::op(SgUnaryOp* op) {
-  SIGHT_VERB_DECL(scope, (txt()<<"CPValueObject::op(SgUnaryOp "<<SgNode2Str(op)<<")", scope::medium), 1, constantPropagationAnalysisDebugLevel)
+//       this in the parent CPValueLattice's list, return that.
+CPValueLatticePtr CPValueLattice::op(SgUnaryOp* op) {
+  SIGHT_VERB_DECL(scope, (txt()<<"CPValueLattice::op(SgUnaryOp "<<SgNode2Str(op)<<")", scope::medium), 1, constantPropagationAnalysisDebugLevel)
   SIGHT_VERB(dbg << "this="<<str()<<endl, 1, constantPropagationAnalysisDebugLevel)
-  return boost::make_shared<CPValueObject>(kind->op(op), getPartEdge());
+  return boost::make_shared<CPValueLattice>(kind->op(op), getPartEdge());
 }
 
-CPValueObjectPtr CPValueObject::op(SgBinaryOp* op, CPValueObjectPtr that) {
-  SIGHT_VERB_DECL(scope, (txt()<<"CPValueObject::op(SgBinaryOp "<<SgNode2Str(op)<<")", scope::medium), 1, constantPropagationAnalysisDebugLevel)
+CPValueLatticePtr CPValueLattice::op(SgBinaryOp* op, CPValueLatticePtr that) {
+  SIGHT_VERB_DECL(scope, (txt()<<"CPValueLattice::op(SgBinaryOp "<<SgNode2Str(op)<<")", scope::medium), 1, constantPropagationAnalysisDebugLevel)
   SIGHT_VERB_IF(1, constantPropagationAnalysisDebugLevel)
     dbg << "this="<<str()<<endl;
     dbg << "that="<<(that? that->str(): "NULL")<<endl;
   SIGHT_VERB_FI()
-  if(that) return boost::make_shared<CPValueObject>(kind->op(op, that->kind), getPartEdge());
-  else     return boost::make_shared<CPValueObject>(kind->op(op, NULLCPValueKind), getPartEdge());
+  if(that) return boost::make_shared<CPValueLattice>(kind->op(op, that->kind), getPartEdge());
+  else     return boost::make_shared<CPValueLattice>(kind->op(op, NULLCPValueKind), getPartEdge());
 }
 
-bool CPValueObject::mayEqualV(ValueObjectPtr o, PartEdgePtr pedge)
+// Returns a freshly-allocated CPValueObject that communicates the information from this
+// Lattice to other analyses
+CPValueObjectPtr CPValueLattice::createValueObject()
+{ return boost::make_shared<CPValueObject>(shared_from_this()); }
+
+// ************************
+// **** CPValueObject *****
+// ************************
+
+CPValueObjectPtr NULLCPValueObject;
+
+CPValueObject::CPValueObject(CPValueLatticePtr ground) : ValueObject(NULL), ground(ground)
+{
+}
+
+bool CPValueObject::mayEqualAO(ValueObjectPtr o, PartEdgePtr pedge)
 {
   CPValueObjectPtr that = boost::dynamic_pointer_cast<CPValueObject>(o);
   assert(that);
-  return this->kind->mustEqualV(that->kind);
+  return ground->getKind()->mustEqualAO(that->ground->getKind());
 }
 
-bool CPValueObject::mustEqualV(ValueObjectPtr o, PartEdgePtr pedge)
+bool CPValueObject::mustEqualAO(ValueObjectPtr o, PartEdgePtr pedge)
 {
   CPValueObjectPtr that = boost::dynamic_pointer_cast<CPValueObject>(o);
   assert(that);
-  return this->kind->mustEqualV(that->kind);
+  return ground->getKind()->mustEqualAO(that->ground->getKind());
 }
 
 // Returns whether the two abstract objects denote the same set of concrete objects
-bool CPValueObject::equalSetV(ValueObjectPtr o, PartEdgePtr pedge)
+bool CPValueObject::equalSetAO(ValueObjectPtr o, PartEdgePtr pedge)
 {
   CPValueObjectPtr that = boost::dynamic_pointer_cast<CPValueObject>(o);
   assert(that);
-  return this->kind->equalSetV(that->kind);
+  return ground->getKind()->equalSetAO(that->ground->getKind());
 }
 
 // Returns whether this abstract object denotes a non-strict subset (the sets may be equal) of the set denoted
 // by the given abstract object.
-bool CPValueObject::subSetV(ValueObjectPtr o, PartEdgePtr pedge)
+bool CPValueObject::subSetAO(ValueObjectPtr o, PartEdgePtr pedge)
 {
   CPValueObjectPtr that = boost::dynamic_pointer_cast<CPValueObject>(o);
   assert(that);
-  return this->kind->subSetV(that->kind);
+  return ground->getKind()->subSetAO(that->ground->getKind());
 }
 
 // Computes the meet of this and that and saves the result in this.
 // Returns true if this causes this to change and false otherwise.
-bool CPValueObject::meetUpdateV(ValueObjectPtr o, PartEdgePtr pedge)
+bool CPValueObject::meetUpdateAO(ValueObjectPtr o, PartEdgePtr pedge)
 {
   CPValueObjectPtr that = boost::dynamic_pointer_cast<CPValueObject>(o);
   assert(that);
-  return meetUpdate(that.get());
+  // Note: this does not change the original lattice since the base of a CPValueObject
+  //       always a copy of the original lattice
+  return ground->meetUpdate(that->ground.get());
+}
+
+// Computes the intersection of this and that and saves the result in this.
+// Returns true if this causes this to change and false otherwise.
+bool CPValueObject::intersectUpdateAO(ValueObjectPtr o, PartEdgePtr pedge)
+{
+  CPValueObjectPtr that = boost::dynamic_pointer_cast<CPValueObject>(o);
+  assert(that);
+  // Note: this does not change the original lattice since the base of a CPValueObject
+  //       always a copy of the original lattice
+  return ground->intersectUpdate(that->ground.get());
 }
 
 // Returns whether this lattice denotes the set of all possible execution prefixes.
 bool
-CPValueObject::isFullV(PartEdgePtr pedge)
-{ return kind->isFullV(pedge); }
+CPValueObject::isFullAO(PartEdgePtr pedge)
+{ return ground->getKind()->isFullAO(pedge); }
 
 // Returns whether this lattice denotes the empty set.
 bool
-CPValueObject::isEmptyV(PartEdgePtr pedge)
-{ return kind->isEmptyV(pedge); }
+CPValueObject::isEmptyAO(PartEdgePtr pedge)
+{ return ground->getKind()->isEmptyAO(pedge); }
 
 
 // Allocates a copy of this object and returns a pointer to it
-ValueObjectPtr CPValueObject::copyV() const
+ValueObjectPtr CPValueObject::copyAOType() const
 {
   return boost::make_shared<CPValueObject>(*this);
 }
 
 // Returns true if this ValueObject corresponds to a concrete value that is statically-known
 bool CPValueObject::isConcrete()
-{ return kind->isConcrete(); }
+{ return ground->getKind()->isConcrete(); }
 
 // Returns the number of concrete values in this set
 int CPValueObject::concreteSetSize()
-{ return kind->concreteSetSize(); }
+{ return ground->getKind()->concreteSetSize(); }
 
 // Returns the type of the concrete value (if there is one)
 SgType* CPValueObject::getConcreteType()
 {
-  assert(kind->asConcreteKind());
-  return kind->asConcreteKind()->getVal()->get_type();
+  assert(ground->getKind()->asConcreteKind());
+  return ground->getKind()->asConcreteKind()->getVal()->get_type();
 }
 
 // Returns the concrete value (if there is one) as an SgValueExp, which allows callers to use
 // the normal ROSE mechanisms to decode it
 set<boost::shared_ptr<SgValueExp> > CPValueObject::getConcreteValue()
 {
-  assert(kind->asConcreteKind());
+  assert(ground->getKind()->asConcreteKind());
   set<boost::shared_ptr<SgValueExp> > concreteVals;
-  concreteVals.insert(kind->asConcreteKind()->getVal());
+  concreteVals.insert(ground->getKind()->asConcreteKind()->getVal());
   return concreteVals;
 }
 
 // Returns a key that uniquely identifies this particular AbstractObject in the 
 // set hierarchy.
-const AbstractObjectHierarchy::hierKeyPtr& CPValueObject::getHierKey() const {
+const AbstractionHierarchy::hierKeyPtr& CPValueObject::getHierKey() const {
   if(!isHierKeyCached) {
     ((CPValueObject*)this)->cachedHierKey = boost::make_shared<AOSHierKey>(((CPValueObject*)this)->shared_from_this());
     
     // The all object gets an empty key since it contains all the object types
-    if(getKind()->getKind()==CPValueKind::unknown) { }
+    if(ground->getKind()->getKind()==CPValueKind::unknown) { }
     else {
-      ((CPValueObject*)this)->cachedHierKey->add(boost::make_shared<CPValueKind::comparableKind>(getKind()->getKind()));
-      getKind()->addHierSubKey(((CPValueObject*)this)->cachedHierKey);
+      ((CPValueObject*)this)->cachedHierKey->add(boost::make_shared<CPValueKind::comparableKind>(ground->getKind()->getKind()));
+      ground->getKind()->addHierSubKey(((CPValueObject*)this)->cachedHierKey);
+
+      //dbg << "computed"<<endl;
     }
     ((CPValueObject*)this)->isHierKeyCached = true;
   }
+  //dbg << "((CPValueObject*)this)->cachedHierKey="<<((CPValueObject*)this)->cachedHierKey<<endl;
   return cachedHierKey;
 }
+
+string
+CPValueObject::str(string indent) const
+{
+  return ground->str(indent);
+}
+
+string
+CPValueObject::strp(PartEdgePtr pedge, string indent) const
+{
+  return ground->str(indent);
+}
+
 
 // ******************************
 // **** CPUninitializedKind *****
@@ -729,45 +788,52 @@ const AbstractObjectHierarchy::hierKeyPtr& CPValueObject::getHierKey() const {
 //       this in the parent CPValueObject's list, return that.
 CPValueKindPtr CPUninitializedKind::op(SgUnaryOp* op) {
   // Uninitialized denotes the empty set, so any operation applied to it results in the empty set
-  return copyV();
+  return copyAOType();
 }
 
 CPValueKindPtr CPUninitializedKind::op(SgBinaryOp* op, CPValueKindPtr that) {
   // Uninitialized denotes the empty set, so any operation that involves it results in the empty set
-  return copyV();
+  return copyAOType();
 }
 
 // Returns whether this and that CPValueKinds are may/must equal to each other
-bool CPUninitializedKind::mayEqualV(CPValueKindPtr that)
+bool CPUninitializedKind::mayEqualAO(CPValueKindPtr that)
 {
   // Uninitialized denotes the empty set, which does not overlap with any other set
   return false;
 }
 
-bool CPUninitializedKind::mustEqualV(CPValueKindPtr that) {
+bool CPUninitializedKind::mustEqualAO(CPValueKindPtr that) {
   // Uninitialized denotes the empty set, which may only be equal to another empty set
   return that->getKind() == CPValueKind::uninitialized;
 }
 
 // Returns whether the two CPValueKinds denote the same set of concrete values
-bool CPUninitializedKind::equalSetV(CPValueKindPtr that) {
+bool CPUninitializedKind::equalSetAO(CPValueKindPtr that) {
   // Uninitialized denotes the empty set, which may only be equal to another empty set
   return (that->getKind() == CPValueKind::uninitialized);
 }
 
 // Returns whether this CPValueKind denotes a non-strict subset (the sets may be equal) of the set denoted
 // by the given CPValueKind
-bool CPUninitializedKind::subSetV(CPValueKindPtr that) {
+bool CPUninitializedKind::subSetAO(CPValueKindPtr that) {
   // Uninitialized denotes the empty set, which is a subset of every other set
   return true;
 }
 
 // Computes the meet of this and that and returns the resulting kind
-pair<bool, CPValueKindPtr> CPUninitializedKind::meetUpdateV(CPValueKindPtr that)
+pair<bool, CPValueKindPtr> CPUninitializedKind::meetUpdateAO(CPValueKindPtr that)
 {
   bool modified = that->getKind() != CPValueKind::uninitialized;
   // Uninitialized MEET * => *
-  return make_pair(modified, that->copyV());
+  return make_pair(modified, that->copyAOType());
+}
+
+// Computes the intersection of this and that and returns the resulting kind
+std::pair<bool, CPValueKindPtr> CPUninitializedKind::intersectUpdateAO(CPValueKindPtr that) {
+  bool modified = false;
+  // Uninitialized INTERSECT * => Uninitialized
+  return make_pair(modified, copyAOType());
 }
 
 // Returns true if this ValueObject corresponds to a concrete value that is statically-known
@@ -788,9 +854,9 @@ std::set<boost::shared_ptr<SgValueExp> > CPUninitializedKind::getConcreteValue()
 { return std::set<boost::shared_ptr<SgValueExp> >(); }
 
 // Returns whether this AbstractObject denotes the set of all possible execution prefixes.
-bool CPUninitializedKind::isFullV(PartEdgePtr pedge) { return false; }
+bool CPUninitializedKind::isFullAO(PartEdgePtr pedge) { return false; }
 // Returns whether this AbstractObject denotes the empty set.
-bool CPUninitializedKind::isEmptyV(PartEdgePtr pedge) { return true; }
+bool CPUninitializedKind::isEmptyAO(PartEdgePtr pedge) { return true; }
 
 std::string CPUninitializedKind::str(std::string indent) const
 { return "[CPUninitializedKind]"; }
@@ -956,7 +1022,12 @@ CPValueKindPtr CPConcreteKind::op(SgUnaryOp* op) {
       default: return doUnaryIntegralOp(~ boost::lambda::_1);
     }
   } else if(isSgCastExp(op)) {
-    switch(isSgCastExp(op)->get_type()->variantT()) {
+    SgType* t=isSgCastExp(op)->get_type();
+    // Unwrap any typedefs that alias the base type of t
+    while(SgTypedefType* tt=isSgTypedefType(t))
+      t = tt->get_base_type();
+
+    switch(t->variantT()) {
       case V_SgTypeBool:               return doUnaryOp(boost::lambda::ll_static_cast<bool>              (boost::lambda::_1)); 
       case V_SgTypeComplex:            assert(0);             
       case V_SgTypeFloat:              return doUnaryOp(boost::lambda::ll_static_cast<float>             (boost::lambda::_1));
@@ -985,6 +1056,7 @@ CPValueKindPtr CPConcreteKind::op(SgUnaryOp* op) {
       case V_SgTypeEllipse: case V_SgTypeGlobalVoid: case V_SgTypeImaginary: case V_SgTypeLabel: 
       case V_SgTypeVoid:
       default:
+        cerr << "ERROR: unknown cast expression type. unwrapped type="<<SgNode2Str(t)<<" full type="<<SgNode2Str(isSgCastExp(op)->get_type())<<", op="<<SgNode2Str(op)<<endl;
         assert(0);
     }
   } else if(isSgConjugateOp(op)) {
@@ -1210,32 +1282,37 @@ bool isFloatVal(SgValueExp* v)
 // Returns the offset of the given SgPntrArrRefExp relative to the starting point of its parent expression,
 // which may be a SgVarRefExp, SgDotExp, SgPntrArrRefExp or other expressions
 long long getPntrArrRefOffset(SgPntrArrRefExp* ref, CPConcreteKindPtr that) {
-  /*scope s(txt()<<"getPntrArrRefOffset("<<SgNode2Str(ref));
-  dbg << "rhs="<<SgNode2Str(ref->get_rhs_operand())<<endl;
-  dbg << "lhs="<<SgNode2Str(ref->get_lhs_operand())<<endl;*/
+  //scope s(txt()<<"getPntrArrRefOffset("<<SgNode2Str(ref));
+  cout << "----------------------------------"<<endl;
+  cout << "getPntrArrRefOffset("<<SgNode2Str(ref)<<endl;
+  cout << "rhs="<<SgNode2Str(ref->get_rhs_operand())<<endl;
+  cout << "lhs="<<SgNode2Str(ref->get_lhs_operand())<<endl;
+  cout << "lhs type="<<SgNode2Str(ref->get_lhs_operand()->get_type())<<endl;
 
-  SgArrayType* arrType = isSgArrayType(ref->get_lhs_operand()->get_type());
-  assert(arrType);
-
-  /*dbg << "   index="<<SgNode2Str(arrType->get_index())<<endl;
-  dbg << "   dim="<<SgNode2Str(arrType->get_dim_info())<<"="<<arrType->get_dim_info()<<endl;
-  dbg << "   rank="<<arrType->get_rank()<<endl;
-  dbg << "   eltCount="<<SageInterface::getArrayElementCount(arrType)<<endl;*/
-
-  // Compute the number of entries in the array of the current sub-level in the SgArrayType by 
-  // dividing the number of total entries in the current SgArrayType by the number of sub-arrays
-  // in the next dimension.
-  assert(isSgValueExp(arrType->get_index()));
   unsigned long long subArraySize;
-  long long sTypeIdx;
-  unsigned long long usTypeIdx;
-  if(IsSignedConstInt(isSgValueExp(arrType->get_index()), sTypeIdx)) 
-    subArraySize = SageInterface::getArrayElementCount(arrType) / sTypeIdx;
-  else if(IsUnsignedConstInt(isSgValueExp(arrType->get_index()), usTypeIdx)) 
-    subArraySize = SageInterface::getArrayElementCount(arrType) / usTypeIdx;
-  else
-    // The index in the array's type must be an integer of some sort
-    assert(0);
+  if(SgArrayType* arrType = isSgArrayType(ref->get_lhs_operand()->get_type())) {
+    cout << "   index="<<SgNode2Str(arrType->get_index())<<endl;
+    cout << "   dim="<<SgNode2Str(arrType->get_dim_info())<<"="<<arrType->get_dim_info()<<endl;
+    cout << "   rank="<<arrType->get_rank()<<endl;
+    cout << "   eltCount="<<SageInterface::getArrayElementCount(arrType)<<endl;
+    cout << " that="<<that->str()<<endl;
+
+    // Compute the number of entries in the array of the current sub-level in the SgArrayType by
+    // dividing the number of total entries in the current SgArrayType by the number of sub-arrays
+    // in the next dimension.
+    assert(isSgValueExp(arrType->get_index()));
+    long long sTypeIdx;
+    unsigned long long usTypeIdx;
+    if(IsSignedConstInt(isSgValueExp(arrType->get_index()), sTypeIdx))
+      subArraySize = SageInterface::getArrayElementCount(arrType) / sTypeIdx;
+    else if(IsUnsignedConstInt(isSgValueExp(arrType->get_index()), usTypeIdx))
+      subArraySize = SageInterface::getArrayElementCount(arrType) / usTypeIdx;
+    else
+      // The index in the array's type must be an integer of some sort
+      assert(0);
+  } else if(SgPointerType* paType = isSgPointerType(ref->get_lhs_operand()->get_type())) {
+    subArraySize = 1;
+  }
 
   // Given the number of entries in the next level's sub-array, compute the offset of
   // the next array index (that value), which is a multiple of the next level's sub-array
@@ -2068,13 +2145,13 @@ CPValueKindPtr CPConcreteKind::op(SgBinaryOp* op, CPValueKindPtr that) {
     
     } else if(isSgOrOp(op)) {
       // True || uninitialized => True
-      if(isConstantTrue(getVal().get())) return copyV();
+      if(isConstantTrue(getVal().get())) return copyAOType();
       // False | uninitialized => uninitialized
       else       return boost::make_shared<CPUninitializedKind>();
     
     // * op uninitialized => *
     } else
-      return copyV();
+      return copyAOType();
   }
   
   // * op unknown => unknown
@@ -2292,19 +2369,19 @@ bool CPConcreteKind::lessThanVals(SgValueExp* val1, SgValueExp* val2, bool unkno
 }
 
 // Returns whether this and that CPValueKinds are may/must equal to each other
-bool CPConcreteKind::mayEqualV(CPValueKindPtr that)
+bool CPConcreteKind::mayEqualAO(CPValueKindPtr that)
 {
   // If that is not concrete, use its implementation
-  if(that->getKind() != CPValueKind::concrete) return that->mayEqualV(shared_from_this());
+  if(that->getKind() != CPValueKind::concrete) return that->mayEqualAO(shared_from_this());
   CPConcreteKindPtr thatConcrete = that->asConcreteKind();
   
   return equalVals(exp.get(), thatConcrete->getVal().get(),
                    /*unknownVal, default to mayEquals*/true);
 }
 
-bool CPConcreteKind::mustEqualV(CPValueKindPtr that) {
+bool CPConcreteKind::mustEqualAO(CPValueKindPtr that) {
   // If that is not concrete, use its implementation
-  if(that->getKind() != CPValueKind::concrete) return that->mustEqualV(shared_from_this());
+  if(that->getKind() != CPValueKind::concrete) return that->mustEqualAO(shared_from_this());
   CPConcreteKindPtr thatConcrete = that->asConcreteKind();
   
   return equalVals(exp.get(), thatConcrete->getVal().get(),
@@ -2312,26 +2389,26 @@ bool CPConcreteKind::mustEqualV(CPValueKindPtr that) {
 }
 
 // Returns whether the two CPValueKinds denote the same set of concrete values
-bool CPConcreteKind::equalSetV(CPValueKindPtr that) {
+bool CPConcreteKind::equalSetAO(CPValueKindPtr that) {
   // The logic here is the same as mustEquals
-  return mustEqualV(that);
+  return mustEqualAO(that);
 }
 
 // Returns whether this CPValueKind denotes a non-strict subset (the sets may be equal) of the set denoted
 // by the given CPValueKind
-bool CPConcreteKind::subSetV(CPValueKindPtr that) {
+bool CPConcreteKind::subSetAO(CPValueKindPtr that) {
   // The logic here is the same as mustEquals
-  return mustEqualV(that);
+  return mustEqualAO(that);
 }
 
 // Computes the meet of this and that and returns the resulting kind
-pair<bool, CPValueKindPtr> CPConcreteKind::meetUpdateV(CPValueKindPtr that)
+pair<bool, CPValueKindPtr> CPConcreteKind::meetUpdateAO(CPValueKindPtr that)
 {
   //scope s("CPConcreteKind::meetUpdateV");
   // Concrete MEET Uninitialized => Concrete
   if(that->getKind() == CPValueKind::uninitialized) {
     //dbg << "that=>uninitialized"<<endl;
-    return make_pair(true, copyV());
+    return make_pair(true, copyAOType());
   }
   
   // Concrete MEET Unknown => Unknown
@@ -2345,14 +2422,46 @@ pair<bool, CPValueKindPtr> CPConcreteKind::meetUpdateV(CPValueKindPtr that)
   // That is definitely concrete
   
   // If this and that denote the same concrete value
-  if(mustEqualV(that)) {
+  if(mustEqualAO(that)) {
     //dbg << "must equal, not modified"<<endl;
-    return make_pair(false, copyV());
+    return make_pair(false, copyAOType());
   }
   // If the concrete values differ
   else {
     //dbg << "different, modified"<<endl;
     return make_pair(true, boost::make_shared<CPUnknownKind>());
+  }
+}
+
+// Computes the intersection of this and that and returns the resulting kind
+pair<bool, CPValueKindPtr> CPConcreteKind::intersectUpdateAO(CPValueKindPtr that)
+{
+  //scope s("CPConcreteKind::intersectUpdateV");
+  // Concrete Intersection Unknown => Concrete
+  if(that->getKind() == CPValueKind::unknown) {
+    //dbg << "that=>uninitialized"<<endl;
+    return make_pair(true, copyAOType());
+  }
+
+  // Concrete INTERSECT Uninitialized => Uninitialized
+  // Concrete INTERSECT Offset  => Uninitialized
+  if(that->getKind() == CPValueKind::offsetList ||
+     that->getKind() == CPValueKind::uninitialized) {
+    //dbg << "that=>offsetlist or unknown"<<endl;
+    return make_pair(true, boost::make_shared<CPUninitializedKind>());
+  }
+
+  // That is definitely concrete
+
+  // If this and that denote the same concrete value
+  if(mustEqualAO(that)) {
+    //dbg << "must equal, not modified"<<endl;
+    return make_pair(false, copyAOType());
+  }
+  // If the concrete values differ
+  else {
+    //dbg << "different, modified"<<endl;
+    return make_pair(true, boost::make_shared<CPUninitializedKind>());
   }
 }
 
@@ -2377,9 +2486,9 @@ std::set<boost::shared_ptr<SgValueExp> > CPConcreteKind::getConcreteValue() {
 }
 
 // Returns whether this AbstractObject denotes the set of all possible execution prefixes.
-bool CPConcreteKind::isFullV(PartEdgePtr pedge) { return false; }
+bool CPConcreteKind::isFullAO(PartEdgePtr pedge) { return false; }
 // Returns whether this AbstractObject denotes the empty set.
-bool CPConcreteKind::isEmptyV(PartEdgePtr pedge) { return false; }
+bool CPConcreteKind::isEmptyAO(PartEdgePtr pedge) { return false; }
 
 std::string CPConcreteKind::str(std::string indent) const
 { return txt()<<"[CPConcreteKind: val="<<(exp? SgNode2Str(exp.get()): "NULL")<<"]"; }
@@ -2405,7 +2514,7 @@ CPValueKindPtr CPOffsetListKind::op(SgUnaryOp* op) {
 CPValueKindPtr CPOffsetListKind::op(SgBinaryOp* op, CPValueKindPtr that) {
   // * op uninitialized => *
   if(that && that->getKind() == CPValueKind::uninitialized)
-    return copyV();
+    return copyAOType();
   
   // * op unknown => unknown
   if(that && that->getKind() == CPValueKind::unknown)
@@ -2726,11 +2835,11 @@ CPValueKindPtr CPOffsetListKind::op(SgBinaryOp* op, CPValueKindPtr that) {
 }
 
 // Returns whether this and that CPValueKinds are may/must equal to each other
-bool CPOffsetListKind::mayEqualV(CPValueKindPtr that)
+bool CPOffsetListKind::mayEqualAO(CPValueKindPtr that)
 {
   // If that unknown or uninitialized, use its implementation
   if(that->getKind() == CPValueKind::uninitialized || that->getKind() == CPValueKind::unknown) 
-    return that->mayEqualV(shared_from_this());
+    return that->mayEqualAO(shared_from_this());
 
   if(that->getKind() == CPValueKind::concrete) {
     CPConcreteKindPtr thatConcrete = that->asConcreteKind();
@@ -2785,10 +2894,10 @@ bool CPOffsetListKind::mayEqualV(CPValueKindPtr that)
   assert(0);
 }
 
-bool CPOffsetListKind::mustEqualV(CPValueKindPtr that) {
+bool CPOffsetListKind::mustEqualAO(CPValueKindPtr that) {
   // If that unknown or uninitialized, use its implementation
   if(that->getKind() == CPValueKind::uninitialized || that->getKind() == CPValueKind::unknown) 
-    return that->mayEqualV(shared_from_this());
+    return that->mayEqualAO(shared_from_this());
 
   if(that->getKind() == CPValueKind::concrete) {
     CPConcreteKindPtr thatConcrete = that->asConcreteKind();
@@ -2841,24 +2950,24 @@ bool CPOffsetListKind::mustEqualV(CPValueKindPtr that) {
 }
 
 // Returns whether the two CPValueKinds denote the same set of concrete values
-bool CPOffsetListKind::equalSetV(CPValueKindPtr that) {
+bool CPOffsetListKind::equalSetAO(CPValueKindPtr that) {
   // The logic here is the same as mustEquals
-  return mustEqualV(that);
+  return mustEqualAO(that);
 }
 
 // Returns whether this CPValueKind denotes a non-strict subset (the sets may be equal) of the set denoted
 // by the given CPValueKind
-bool CPOffsetListKind::subSetV(CPValueKindPtr that) {
+bool CPOffsetListKind::subSetAO(CPValueKindPtr that) {
   // The logic here is the same as mustEquals
-  return mustEqualV(that);
+  return mustEqualAO(that);
 }
 
 // Computes the meet of this and that and returns the resulting kind
-pair<bool, CPValueKindPtr> CPOffsetListKind::meetUpdateV(CPValueKindPtr that)
+pair<bool, CPValueKindPtr> CPOffsetListKind::meetUpdateAO(CPValueKindPtr that)
 {
   // OffsetList MEET Uninitialized => OffsetList
   if(that->getKind() == CPValueKind::uninitialized) 
-    return make_pair(true, copyV());
+    return make_pair(true, copyAOType());
   
   // OffsetList MEET Unknown => Unknown
   if(that->getKind() == CPValueKind::unknown)
@@ -2874,9 +2983,9 @@ pair<bool, CPValueKindPtr> CPOffsetListKind::meetUpdateV(CPValueKindPtr that)
       long long thatSV;
       unsigned long long thatUSV;
       if(IsSignedConstInt(thatConcrete->getVal().get(), thatSV)) {
-        if(offsetL.back().get()==thatSV) return make_pair(false, copyV());
+        if(offsetL.back().get()==thatSV) return make_pair(false, copyAOType());
       } else if(IsUnsignedConstInt(thatConcrete->getVal().get(), thatUSV)) {
-        if(offsetL.back().get()==(long long)thatUSV) return make_pair(false, copyV());
+        if(offsetL.back().get()==(long long)thatUSV) return make_pair(false, copyAOType());
       }
     }
     // If the two objects do not denote the same concrete value
@@ -2896,7 +3005,7 @@ pair<bool, CPValueKindPtr> CPOffsetListKind::meetUpdateV(CPValueKindPtr that)
         if(*thisI != *thatI) return make_pair(true, boost::make_shared<CPUnknownKind>());
       }
       // If we reached this point the two offset lists must be identical
-      return make_pair(false, copyV());
+      return make_pair(false, copyAOType());
     // The two objects have lists of different sizes, so they're not identical
     } else
       return make_pair(true, boost::make_shared<CPUnknownKind>());
@@ -2905,6 +3014,60 @@ pair<bool, CPValueKindPtr> CPOffsetListKind::meetUpdateV(CPValueKindPtr that)
   // We've covered all the cases
   assert(0);
 }
+
+// Computes the intersection of this and that and returns the resulting kind
+pair<bool, CPValueKindPtr> CPOffsetListKind::intersectUpdateAO(CPValueKindPtr that)
+{
+  // OffsetList INTERSECT Unknown => OffsetList
+  if(that->getKind() == CPValueKind::unknown)
+    return make_pair(true, copyAOType());
+
+  // OffsetList INTERSECT Uninitialized => Uninitialized
+  if(that->getKind() == CPValueKind::uninitialized)
+    return make_pair(true, boost::make_shared<CPUninitializedKind>());
+
+  // OffsetList INTERSECT Concrete
+  if(that->getKind() == CPValueKind::concrete) {
+    CPConcreteKindPtr thatConcrete = that->asConcreteKind();
+
+    // If this offset is just a single concrete value
+    if(offsetL.size()==1 && offsetL.back().getType()==CPOffsetListKind::intWrap::offsetT) {
+      // If both objects denote the same concrete value
+      long long thatSV;
+      unsigned long long thatUSV;
+      if(IsSignedConstInt(thatConcrete->getVal().get(), thatSV)) {
+        if(offsetL.back().get()==thatSV) return make_pair(false, copyAOType());
+      } else if(IsUnsignedConstInt(thatConcrete->getVal().get(), thatUSV)) {
+        if(offsetL.back().get()==(long long)thatUSV) return make_pair(false, copyAOType());
+      }
+    }
+    // If the two objects do not denote the same concrete value, their intersection is empty
+    return make_pair(true, boost::make_shared<CPUninitializedKind>());
+  }
+
+  // OffsetList INTERSECT OffsetList
+  if(that->getKind() == CPValueKind::offsetList) {
+    CPOffsetListKindPtr thatOffset = that->asOffsetListKind();
+    // Compare the two offset lists directly
+    // !!! (NOTE: this comparison doesn't take types into account when ranks are compared)
+    if(offsetL.size() == thatOffset->offsetL.size()) {
+      list<intWrap>::const_iterator thisI = offsetL.begin();
+      list<intWrap>::const_iterator thatI = thatOffset->offsetL.begin();
+      for(; thisI!=offsetL.end(); thisI++, thatI++) {
+        // If the two offsetList objects are not identical, their intersection is empty
+        if(*thisI != *thatI) return make_pair(true, boost::make_shared<CPUninitializedKind>());
+      }
+      // If we reached this point the two offset lists must be identical
+      return make_pair(false, copyAOType());
+    // The two objects have lists of different sizes, so they're not identical and their intersection is empty
+    } else
+      return make_pair(true, boost::make_shared<CPUninitializedKind>());
+  }
+
+  // We've covered all the cases
+  assert(0);
+}
+
 
 // Returns true if this ValueObject corresponds to a concrete value that is statically-known
 bool CPOffsetListKind::isConcrete()
@@ -2929,9 +3092,9 @@ std::set<boost::shared_ptr<SgValueExp> > CPOffsetListKind::getConcreteValue() {
 }
 
 // Returns whether this AbstractObject denotes the set of all possible execution prefixes.
-bool CPOffsetListKind::isFullV(PartEdgePtr pedge) { return false; }
+bool CPOffsetListKind::isFullAO(PartEdgePtr pedge) { return false; }
 // Returns whether this AbstractObject denotes the empty set.
-bool CPOffsetListKind::isEmptyV(PartEdgePtr pedge) { return false; }
+bool CPOffsetListKind::isEmptyAO(PartEdgePtr pedge) { return false; }
 
 std::string CPOffsetListKind::str(std::string indent) const { 
   ostringstream oss; 
@@ -2958,44 +3121,51 @@ std::string CPOffsetListKind::str(std::string indent) const {
 //       this in the parent CPValueObject's list, return that.
 CPValueKindPtr CPUnknownKind::op(SgUnaryOp* op) {
   // Uninitialized denotes the full value set, so any operation applied to it results in the full set
-  return copyV();
+  return copyAOType();
 }
 
 CPValueKindPtr CPUnknownKind::op(SgBinaryOp* op, CPValueKindPtr that) {
   // Uninitialized denotes the full value set, so any operation that involves it results in the full set
-  return copyV();
+  return copyAOType();
 }
 
 // Returns whether this and that CPValueKinds are may/must equal to each other
-bool CPUnknownKind::mayEqualV(CPValueKindPtr that) {
+bool CPUnknownKind::mayEqualAO(CPValueKindPtr that) {
   // Unknown denotes the full set, which overlaps with every other set
   return true;
 }
 
-bool CPUnknownKind::mustEqualV(CPValueKindPtr that) {
+bool CPUnknownKind::mustEqualAO(CPValueKindPtr that) {
   // Unknown denotes the full set, which has unbounded size and therefore is not must-equal to any set
   return false;
 }
 
 // Returns whether the two CPValueKinds denote the same set of concrete values
-bool CPUnknownKind::equalSetV(CPValueKindPtr that) {
+bool CPUnknownKind::equalSetAO(CPValueKindPtr that) {
   // Unknown denotes the full set, which may only be equal to another full set
   return that->getKind() == CPValueKind::unknown;
 }
 
 // Returns whether this CPValueKind denotes a non-strict subset (the sets may be equal) of the set denoted
 // by the given CPValueKind
-bool CPUnknownKind::subSetV(CPValueKindPtr that) {
+bool CPUnknownKind::subSetAO(CPValueKindPtr that) {
   // Unknown  denotes the full set, which is a subset of another full set
   return that->getKind() == CPValueKind::unknown;
 }
 
 // Computes the meet of this and that and returns the resulting kind
-pair<bool, CPValueKindPtr> CPUnknownKind::meetUpdateV(CPValueKindPtr that)
+pair<bool, CPValueKindPtr> CPUnknownKind::meetUpdateAO(CPValueKindPtr that)
 {
-  bool modified = that->getKind() != CPValueKind::unknown;
+  bool modified = false;
   // Unknown MEET * => Unknown
-  return make_pair(modified, copyV());
+  return make_pair(modified, copyAOType());
+}
+
+// Computes the intersection of this and that and returns the resulting kind
+std::pair<bool, CPValueKindPtr> CPUnknownKind::intersectUpdateAO(CPValueKindPtr that) {
+  bool modified = that->getKind() != CPValueKind::unknown;
+  // Unknown INTERSECT * => *
+  return make_pair(modified, that->copyAOType());
 }
 
 // Returns true if this ValueObject corresponds to a concrete value that is statically-known
@@ -3016,9 +3186,9 @@ std::set<boost::shared_ptr<SgValueExp> > CPUnknownKind::getConcreteValue()
 { return std::set<boost::shared_ptr<SgValueExp> >(); }
 
 // Returns whether this AbstractObject denotes the set of all possible execution prefixes.
-bool CPUnknownKind::isFullV(PartEdgePtr pedge) { return true; }
+bool CPUnknownKind::isFullAO(PartEdgePtr pedge) { return true; }
 // Returns whether this AbstractObject denotes the empty set.
-bool CPUnknownKind::isEmptyV(PartEdgePtr pedge) { return false; }
+bool CPUnknownKind::isEmptyAO(PartEdgePtr pedge) { return false; }
 
 std::string CPUnknownKind::str(std::string indent) const
 { return "[CPUnknownKind]"; }
@@ -3029,19 +3199,19 @@ std::string CPUnknownKind::str(std::string indent) const
 // *************************
 
 // returns a copy of this lattice
-Lattice* CPMemLocObject::copy() const {
+/*Lattice* CPMemLocObject::copy() const {
   return new CPMemLocObject(*this);
-}
+}*/
 
-bool
-CPMemLocObject::operator==(Lattice* X) /*const*/
+/*bool
+CPMemLocObject::operator==(Lattice* X)
 {
   // Implementation of equality operator.
   CPMemLocObject* that = dynamic_cast<CPMemLocObject*>(X);
   assert(that);
   return (this->getRegion() == that->getRegion() &&
           this->getIndex()  == that->getIndex());
-}
+}*/
 
 // Called by analyses to transfer this lattice's contents from across function scopes from a caller function 
 //    to a callee's scope and vice versa. If this this lattice maintains any information on the basis of 
@@ -3055,8 +3225,8 @@ CPMemLocObject::operator==(Lattice* X) /*const*/
 //    the keys in ml2ml are in scope on one side of Part, while the values on the other side. Specifically, it is
 //    guaranteed that the keys are in scope at fromPEdge while the values are in scope at the edge returned 
 //    by getPartEdge().
-Lattice* CPMemLocObject::remapML(const std::set<MLMapping>& ml2ml, PartEdgePtr fromPEdge) {
-  if(isCPFull || isCPEmpty) return dynamic_cast<CPMemLocObject*>(copyMLPtr());
+/*Lattice* CPMemLocObject::remapML(const std::set<MLMapping>& ml2ml, PartEdgePtr fromPEdge) {
+  if(isCPFull || isCPEmpty) return dynamic_cast<CPMemLocObject*>(copyAOTypePtr());
   
   CPMemLocObject* ret=NULL;
   for(std::set<MLMapping>::const_iterator m=ml2ml.begin(); m!=ml2ml.end(); m++) {
@@ -3070,11 +3240,11 @@ Lattice* CPMemLocObject::remapML(const std::set<MLMapping>& ml2ml, PartEdgePtr f
   }
   assert(ret);
   return ret;
-}
+}*/
 
 // Returns whether this object may/must be equal to o within the given Part p
 // These methods are called by composers and should not be called by analyses.
-bool CPMemLocObject::mayEqualML(MemLocObjectPtr o, PartEdgePtr pedge) {
+bool CPMemLocObject::mayEqualAO(MemLocObjectPtr o, PartEdgePtr pedge) {
   CPMemLocObjectPtr that = boost::dynamic_pointer_cast<CPMemLocObject>(o);
   assert(that);
   
@@ -3098,12 +3268,12 @@ bool CPMemLocObject::mayEqualML(MemLocObjectPtr o, PartEdgePtr pedge) {
   // MemRegions, meaning that we need to thread the logic through the composer to the real implementer.
   // However, values are implemented in CP, meaning that we can call mayEqualV directly
   // dbg << "region->mayEqual()=" << region->mayEqual(that->getRegion(), pedge, analysis->getComposer(), analysis) << endl;
-  // dbg << "index->mayEqual()=" << ((!index && !that->index) || index->mayEqualV(that->getIndex(), pedge)) << endl;
+  // dbg << "index->mayEqual()=" << ((!index && !that->index) || index->mayEqualAO(that->getIndex(), pedge)) << endl;
   return region && region->mayEqual(that->getRegion(), pedge, analysis->getComposer(), analysis) && 
-         ((!index && !that->index) || index->mayEqualV(that->getIndex(), pedge));
+         ((!index && !that->index) || index->mayEqualAO(that->getIndex(), pedge));
 }
 
-bool CPMemLocObject::mustEqualML(MemLocObjectPtr o, PartEdgePtr pedge) {
+bool CPMemLocObject::mustEqualAO(MemLocObjectPtr o, PartEdgePtr pedge) {
   CPMemLocObjectPtr that = boost::dynamic_pointer_cast<CPMemLocObject>(o);
   assert(that);
   
@@ -3127,12 +3297,12 @@ bool CPMemLocObject::mustEqualML(MemLocObjectPtr o, PartEdgePtr pedge) {
   // MemRegions, meaning that we need to thread the logic through the composer to the real implementer.
   // However, values are implemented in CP, meaning that we can call mustEqualV directly
   return region && region->mustEqual(that->getRegion(), pedge, analysis->getComposer(), analysis) && 
-         ((!index && !that->index) || index->mustEqualV(that->getIndex(), pedge));
+         ((!index && !that->index) || index->mustEqualAO(that->getIndex(), pedge));
 }
 
 // Returns whether the two abstract objects denote the same set of concrete objects
 // These methods are called by composers and should not be called by analyses.
-bool CPMemLocObject::equalSetML(MemLocObjectPtr o, PartEdgePtr pedge) {
+bool CPMemLocObject::equalSetAO(MemLocObjectPtr o, PartEdgePtr pedge) {
   CPMemLocObjectPtr that = boost::dynamic_pointer_cast<CPMemLocObject>(o);
   assert(that);
   
@@ -3160,13 +3330,13 @@ bool CPMemLocObject::equalSetML(MemLocObjectPtr o, PartEdgePtr pedge) {
   // MemRegions, meaning that we need to thread the logic through the composer to the real implementer.
   // However, values are implemented in CP, meaning that we can call equalSetV directly
   return region && region->equalSet(that->getRegion(), pedge, analysis->getComposer(), analysis) && 
-         ((!index && !that->index) || index->equalSetV(that->getIndex(), pedge));
+         ((!index && !that->index) || index->equalSetAO(that->getIndex(), pedge));
 }
 
 // Returns whether this abstract object denotes a non-strict subset (the sets may be equal) of the set denoted
 // by the given abstract object.
 // These methods are called by composers and should not be called by analyses.
-bool CPMemLocObject::subSetML(MemLocObjectPtr o, PartEdgePtr pedge) {
+bool CPMemLocObject::subSetAO(MemLocObjectPtr o, PartEdgePtr pedge) {
   CPMemLocObjectPtr that = boost::dynamic_pointer_cast<CPMemLocObject>(o);
   assert(that);
   
@@ -3194,11 +3364,11 @@ bool CPMemLocObject::subSetML(MemLocObjectPtr o, PartEdgePtr pedge) {
   // MemRegions, meaning that we need to thread the logic through the composer to the real implementer.
   // However, values are implemented in CP, meaning that we can call subSetV directly
   return region && region->subSet(that->getRegion(), pedge, analysis->getComposer(), analysis) && 
-         ((!index && !that->index) || index->subSetV(that->getIndex(), pedge));
+         ((!index && !that->index) || index->subSetAO(that->getIndex(), pedge));
 }
 
 // Returns true if this object is live at the given part and false otherwise
-bool CPMemLocObject::isLiveML(PartEdgePtr pedge) {
+bool CPMemLocObject::isLiveAO(PartEdgePtr pedge) {
   if(isCPFull || isCPEmpty) return true;
   
 /*  // For now all CPMemLocs are live but in the future we may restrict this only to the CFGNode
@@ -3206,7 +3376,7 @@ bool CPMemLocObject::isLiveML(PartEdgePtr pedge) {
   return true;*/
 
   // Forward the query to the parent analysis
-  //return MemLocObject::isLiveML(pedge);
+  //return MemLocObject::isLiveAO(pedge);
   return MemLocObject::isLive(pedge, analysis->getComposer(), analysis);
 }
 
@@ -3236,114 +3406,173 @@ bool CPMemLocObject::setToEmpty() {
   return true;
 }
 
+/*
 // Returns whether this lattice denotes the set of all possible execution prefixes.
-bool CPMemLocObject::isFullLat() {
-  return isFullML(getPartEdge());
+bool CPMemLocObject::isFull() {
+  return isFullAO(getPartEdge());
 }
 
 // Returns whether this lattice denotes the empty set.
-bool CPMemLocObject::isEmptyLat() {
-  return isEmptyML(getPartEdge());
-}
+bool CPMemLocObject::isEmpty() {
+  return isEmptyAO(getPartEdge());
+}*/
 
 // Returns whether this AbstractObject denotes the set of all possible execution prefixes.
-bool CPMemLocObject::isFullML(PartEdgePtr pedge) {
+bool CPMemLocObject::isFullAO(PartEdgePtr pedge) {
   if(isCPFull) return true;
   
   // Compare the region and index directly. We call isFullMR here because CP does not implement
   // MemRegions, meaning that we need to thread the logic through the composer to the real implementer.
   // However, values are implemented in CP, meaning that we can call isFullV directly
   return region->isFull(pedge, analysis->getComposer(), analysis) && 
-         (!index || index->isFullV(pedge));
+         (!index || index->isFullAO(pedge));
   
 }
 
 // Returns whether this AbstractObject denotes the empty set.
-bool CPMemLocObject::isEmptyML(PartEdgePtr pedge) {
+bool CPMemLocObject::isEmptyAO(PartEdgePtr pedge) {
   if(isCPEmpty) return true;
   
   // Compare the region and index directly. We call isEmptyMR here because CP does not implement
   // MemRegions, meaning that we need to thread the logic through the composer to the real implementer.
   // However, values are implemented in CP, meaning that we can call isEmptyV directly
   return region->isEmpty(pedge, analysis->getComposer(), analysis) && 
-         (!index || index->isEmptyV(pedge));
-}
-
-// Computes the meet of this and that and saves the result in this
-// returns true if this causes this to change and false otherwise
-bool CPMemLocObject::meetUpdateML(MemLocObjectPtr that_arg, PartEdgePtr pedge) {
-  CPMemLocObjectPtr that = boost::dynamic_pointer_cast<CPMemLocObject>(that_arg);
-  assert(that);
-  return meetUpdate(that.get(), pedge, analysis->getComposer(), analysis);
+         (!index || index->isEmptyAO(pedge));
 }
 
 // Computes the meet of this and that and saves the result in this
 // returns true if this causes this to change and false otherwise
 // The part of this object is to be used for AbstractObject comparisons.
-bool CPMemLocObject::meetUpdate(Lattice* that_arg)
+/*bool CPMemLocObject::meetUpdate(Lattice* that_arg)
 {
   CPMemLocObject* that = dynamic_cast<CPMemLocObject*>(that_arg);
   assert(that);
   return meetUpdate(that, getPartEdge(), analysis->getComposer(), analysis);
-}
+}*/
 
 // Computes the meet of this and that and saves the result in this
 // returns true if this causes this to change and false otherwise
-// The part of this object is to be used for AbstractObject comparisons.
+bool CPMemLocObject::meetUpdateAO(MemLocObjectPtr that_arg, PartEdgePtr pedge) {
+  CPMemLocObjectPtr that = boost::dynamic_pointer_cast<CPMemLocObject>(that_arg);
+  assert(that);
+/*  return meetUpdate(that.get(), pedge, analysis->getComposer(), analysis);
+}
+
+
+// Computes the meet of this and that and saves the result in this
+// returns true if this causes this to change and false otherwise
 bool CPMemLocObject::meetUpdate(CPMemLocObject* that, PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis)
-{
-/*  scope S("CPMemLocObject::meetUpdate");
+{*/
+  /*  scope S("CPMemLocObject::meetUpdate");
   dbg << "this="<<str()<<endl;
   dbg << "that="<<that->str()<<endl;*/
   // The regions must be identical
   //assert(getRegion()->equalSet(that->getRegion(), pedge, comp, analysis));
-  
+
   // If this object is full, don't bother
   if(isCPFull)
     return false;
   // If it is empty, jut copy that over this
   else if(isCPEmpty) {
     if(that->isCPEmpty) return false;
-    
+
     isCPFull  = that->isCPFull;
     isCPEmpty = that->isCPEmpty;
     region    = that->region;
     index     = that->index;
     return true;
   } else {
-    // Meet the indexes
-    bool modified = getRegion()->meetUpdate(that->getRegion(), pedge, comp, analysis);
+    // Meet the regions
+    bool modified = getRegion()->meetUpdate(that->getRegion(), pedge, analysis->getComposer(), analysis);
 
     // Meet the indexes, using a direct call to CPValueObject::meetUpdate since we know that both indexes are
     // CPValueObjects.
-    modified = boost::dynamic_pointer_cast<CPValueObject>(getIndex())->meetUpdate(
-                               boost::dynamic_pointer_cast<CPValueObject>(that->getIndex()).get()) || modified;
+    modified = boost::dynamic_pointer_cast<CPValueObject>(getIndex())->meetUpdateAO(
+                               boost::dynamic_pointer_cast<CPValueObject>(that->getIndex()), pedge) || modified;
+
+    return modified;
+  }
+}
+
+/*
+// Computes the intersection of this and that and saves the result in this
+// returns true if this causes this to change and false otherwise
+// The part of this object is to be used for AbstractObject comparisons.
+bool CPMemLocObject::intersectUpdate(Lattice* that_arg)
+{
+  CPMemLocObject* that = dynamic_cast<CPMemLocObject*>(that_arg);
+  assert(that);
+  return meetUpdate(that, getPartEdge(), analysis->getComposer(), analysis);
+}
+*/
+
+// Computes the intersection of this and that and saves the result in this
+// returns true if this causes this to change and false otherwise
+bool CPMemLocObject::intersectUpdateAO(MemLocObjectPtr that_arg, PartEdgePtr pedge) {
+  CPMemLocObjectPtr that = boost::dynamic_pointer_cast<CPMemLocObject>(that_arg);
+  assert(that);
+/*  return intersectUpdate(that.get(), pedge, analysis->getComposer(), analysis);
+}
+
+// Computes the intersection of this and that and saves the result in this
+// returns true if this causes this to change and false otherwise
+bool CPMemLocObject::intersectUpdate(CPMemLocObject* that, PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis)
+{*/
+  /*  scope S("CPMemLocObject::meetUpdate");
+  dbg << "this="<<str()<<endl;
+  dbg << "that="<<that->str()<<endl;*/
+  // The regions must be identical
+  //assert(getRegion()->equalSet(that->getRegion(), pedge, comp, analysis));
+
+  // If this object is empty, don't bother
+  if(isCPEmpty)
+    return false;
+  // If it is full, just copy that over this
+  else if(isCPFull) {
+    if(that->isCPFull) return false;
+
+    isCPFull  = that->isCPFull;
+    isCPEmpty = that->isCPEmpty;
+    region    = that->region;
+    index     = that->index;
+    return true;
+  } else {
+    // Intersect the regions
+    bool modified = getRegion()->intersectUpdate(that->getRegion(), pedge, analysis->getComposer(), analysis);
+
+    // Intersect the indexes, using a direct call to CPValueObject::meetUpdate since we know that both indexes are
+    // CPValueObjects.
+    modified = boost::dynamic_pointer_cast<CPValueObject>(getIndex())->intersectUpdateAO(
+                               boost::dynamic_pointer_cast<CPValueObject>(that->getIndex()), pedge) || modified;
 
     return modified;
   }
 }
 
 // Allocates a copy of this object and returns a pointer to it
-MemLocObjectPtr CPMemLocObject::copyML() const {
+MemLocObjectPtr CPMemLocObject::copyAOType() const {
   return boost::make_shared<CPMemLocObject>(*this);
 }
   
   // Allocates a copy of this object and returns a regular pointer to it
-MemLocObject* CPMemLocObject::copyMLPtr() const {
+/*MemLocObject* CPMemLocObject::copyAOTypePtr() const {
   return new CPMemLocObject(*this);
-}
+}*/
 
 std::string CPMemLocObject::str(std::string indent) const { // pretty print for the object
   if(isCPFull)       return "[CPMemLocObject: Full]";
   else if(isCPEmpty) return "[CPMemLocObject: Empty]";
   
   ostringstream oss; 
-  oss << "[CPMemLocObject: region="<<(region?region->str(indent+"    "):"NULL");
+  //oss << "[CPMemLocObject: region="<<(region?region->str(indent+"    "):"NULL");
+  oss << "<table><tr><td colspan=\"2\">CPMemLocObject</td></tr>";
+  oss << "<tr><td>region:</td><td>"<<(region?region->str():"NULL")<<"</td><tr>";
   if(index) {
-    oss <<", "<<endl<<
-         indent << "             index="<<index->str(indent+"    ");
+    //oss <<", "<<endl<< indent << "             index="<<index->str(indent+"    ");
+    oss << "<tr><td>index:</td><td>"<<index->str()<<"</td></tr>";
   }
-  oss <<"]";
+  //oss <<"]";
+  oss << "</table>"<<endl;
   
   return oss.str();
   return "";
@@ -3422,7 +3651,7 @@ void ConstantPropagationAnalysisTransfer::visit(SgDotExp *dot) {
     for(list<MemLocObjectPtr>::const_iterator ml=coreMLs.begin(); ml!=coreMLs.end(); ml++) {
       CPMemLocObjectPtr cpML = boost::dynamic_pointer_cast<CPMemLocObject>(*ml);
       if(ml==coreMLs.begin())
-        core = boost::dynamic_pointer_cast<CPMemLocObject>(cpML->copyML());
+        core = boost::dynamic_pointer_cast<CPMemLocObject>(cpML->copyAOType());
       else
         core->meetUpdate(cpML.get(), part->inEdgeFromAny(), analysis->getComposer(), analysis);
     }
@@ -3448,7 +3677,7 @@ void ConstantPropagationAnalysisTransfer::visit(SgDotExp *dot) {
   
   //MemLocObjectPtr ml = composer->OperandExpr2MemLoc(dot, dot->get_lhs_operand(), part->inEdgeFromAny(), analysis);
   MemLocObjectPtr ml = analysis->OperandExpr2MemLocUse(dot, dot->get_lhs_operand(), part->inEdgeFromAny());
-  UnionMemLocObjectPtr mlUnion = boost::dynamic_pointer_cast<UnionMemLocObject>(ml);
+  CombinedMemLocObjectPtr mlUnion = boost::dynamic_pointer_cast<CombinedMemLocObject>(ml);
   assert(mlUnion);
   const std::list<MemLocObjectPtr>& mlVals = mlUnion->getMemLocs();
   assert(mlVals.size()==1);
@@ -3456,7 +3685,7 @@ void ConstantPropagationAnalysisTransfer::visit(SgDotExp *dot) {
   assert(core);
   
   // Compute the offset into the region of the core MemLoc that results from the dot expression
-  CPValueObjectPtr offset = core->getCPIndex()->op(dot, NULLCPValueObject);
+  CPValueLatticePtr offset = core->getCPIndex()->ground->op(dot, NULLCPValueLattice);
   SIGHT_VERB(dbg << "offset="<<(offset? offset->str(): "NULL")<<endl, 1, constantPropagationAnalysisDebugLevel)
   
   // Update this node's MemLoc to use the same region as core but with the new offset
@@ -3464,7 +3693,7 @@ void ConstantPropagationAnalysisTransfer::visit(SgDotExp *dot) {
   /*if(dfInfo[NULLPartEdge][1]) delete dfInfo[NULLPartEdge][1];
   dfInfo[NULLPartEdge][1] = new CPMemLocObject(core->getRegion(), offset, dot, part->inEdgeFromAny(), analysis);
   dbg << "dfInfo[1]="<<dfInfo[NULLPartEdge][1]->str()<<endl;*/
-  CPMemLocObjectPtr dotML = boost::make_shared<CPMemLocObject>(core->getRegion(), offset, dot, part->inEdgeFromAny(), analysis);
+  CPMemLocObjectPtr dotML = boost::make_shared<CPMemLocObject>(core->getRegion(), offset->createValueObject(), dot, part->inEdgeFromAny(), analysis);
   SIGHT_VERB(dbg << "dotML="<<(dotML? dotML->str(): "NULL")<<endl, 1, constantPropagationAnalysisDebugLevel)
   //cl2ml->insert(cl, dotML);
   nodeState.addFact(analysis, 0, new CPMemLocObjectNodeFact(dotML));
@@ -3503,7 +3732,7 @@ void ConstantPropagationAnalysisTransfer::visit(SgPntrArrRefExp *paRef) {
   //MemLocObjectPtr ml = composer->OperandExpr2MemLoc(paRef, paRef->get_lhs_operand(), part->inEdgeFromAny(), analysis);
   MemLocObjectPtr ml = analysis->OperandExpr2MemLocUse(paRef, paRef->get_lhs_operand(), part->inEdgeFromAny());
   SIGHT_VERB(dbg << "ml="<<(ml? ml->str(): "NULL")<<endl, 1, constantPropagationAnalysisDebugLevel)
-  UnionMemLocObjectPtr mlUnion = boost::dynamic_pointer_cast<UnionMemLocObject>(ml);
+  CombinedMemLocObjectPtr mlUnion = boost::dynamic_pointer_cast<CombinedMemLocObject>(ml);
   assert(mlUnion);
   const std::list<MemLocObjectPtr>& mlVals = mlUnion->getMemLocs();
   assert(mlVals.size()==1);
@@ -3514,19 +3743,19 @@ void ConstantPropagationAnalysisTransfer::visit(SgPntrArrRefExp *paRef) {
   // In expression array[i], the value location denoted by "i"
   ValueObjectPtr val = composer->OperandExpr2Val(paRef, paRef->get_rhs_operand(), part->inEdgeFromAny(), analysis);
   SIGHT_VERB(dbg << "val="<<val->str()<<endl, 1, constantPropagationAnalysisDebugLevel)
-  UnionValueObjectPtr indexUnion = boost::dynamic_pointer_cast<UnionValueObject>(val);
+  CombinedValueObjectPtr indexUnion = boost::dynamic_pointer_cast<CombinedValueObject>(val);
   assert(indexUnion);
-  const std::list<ValueObjectPtr>& indexVals = indexUnion->getVals();
+  const std::list<ValueObjectPtr>& indexVals = indexUnion->getValues();
   assert(indexVals.size()==1);
   CPValueObjectPtr index = boost::dynamic_pointer_cast<CPValueObject>(*indexVals.begin());
   assert(index);
   SIGHT_VERB(dbg << "index="<<index->str()<<endl, 1, constantPropagationAnalysisDebugLevel)
   
   // Compute the offset into the region of the core MemLoc that results from the arraypntr reference expression
-  CPValueObjectPtr offset = core->getCPIndex()->op(paRef, index);
+  CPValueLatticePtr offset = core->getCPIndex()->ground->op(paRef, index->ground);
   SIGHT_VERB(dbg << "offset="<<offset->str()<<endl, 1, constantPropagationAnalysisDebugLevel)
   
-  CPMemLocObjectPtr paRefML = boost::make_shared<CPMemLocObject>(core->getRegion(), offset, paRef, part->inEdgeFromAny(), analysis);
+  CPMemLocObjectPtr paRefML = boost::make_shared<CPMemLocObject>(core->getRegion(), offset->createValueObject(), paRef, part->inEdgeFromAny(), analysis);
   SIGHT_VERB(dbg << "paRefML="<<(paRefML? paRefML->str(): "NULL")<<endl, 1, constantPropagationAnalysisDebugLevel)
   //cl2ml->insert(cl, paRefML);
   nodeState.addFact(analysis, 0, new CPMemLocObjectNodeFact(paRefML));
@@ -3539,15 +3768,15 @@ void ConstantPropagationAnalysisTransfer::visit(SgBinaryOp *sgn) {
   // all of its operands precede the operator
   if((isSgAndOp(sgn) || isSgOrOp(sgn)) && cn.getIndex()!=2) return;
   
-  CPValueObjectPtr arg1Lat, arg2Lat;//, resLat_tmp;
+  CPValueLatticePtr arg1Lat, arg2Lat;//, resLat_tmp;
   getLattices(sgn, arg1Lat, arg2Lat);//, resLat_tmp);
-  CPValueObjectPtr resLat = arg1Lat->op(sgn, arg2Lat);
+  CPValueLatticePtr resLat = arg1Lat->op(sgn, arg2Lat);
 
 //prodLat->setToEmpty();
  //dbg << "after op modified="<<modified<<endl;
   setLattice(sgn, resLat);
   if(isSgCompoundAssignOp(sgn))
-    setLatticeOperand(sgn, sgn->get_lhs_operand(), boost::dynamic_pointer_cast<CPValueObject>(resLat->copyV()));
+    setLatticeOperand(sgn, sgn->get_lhs_operand(), resLat->copyCPLat());
   //dbg << "after setLattice modified="<<modified<<endl;
 }
 
@@ -3555,9 +3784,9 @@ void ConstantPropagationAnalysisTransfer::visit(SgBinaryOp *sgn) {
 void ConstantPropagationAnalysisTransfer::visit(SgMinusMinusOp *sgn) { 
   SIGHT_VERB_DECL(scope, ("ConstantPropagationAnalysisTransfer::visit(SgMinusMinusOp)", scope::medium), 1, constantPropagationAnalysisDebugLevel)
   
-  CPValueObjectPtr arg1Lat;//, arg2Lat;//, resLat_tmp;
+  CPValueLatticePtr arg1Lat;//, arg2Lat;//, resLat_tmp;
   getLattices(sgn, arg1Lat);//, arg2Lat);//, resLat_tmp);
-  CPValueObjectPtr resLat = arg1Lat->op(sgn);
+  CPValueLatticePtr resLat = arg1Lat->op(sgn);
 //prodLat->setToEmpty();
   setLattice(sgn, resLat);
   setLatticeOperand(sgn, sgn->get_operand(), resLat);
@@ -3566,9 +3795,9 @@ void ConstantPropagationAnalysisTransfer::visit(SgMinusMinusOp *sgn) {
 void ConstantPropagationAnalysisTransfer::visit(SgPlusPlusOp *sgn) { 
   SIGHT_VERB_DECL(scope, ("ConstantPropagationAnalysisTransfer::visit(SgPlusPlusOp)", scope::medium), 1, constantPropagationAnalysisDebugLevel)
   
-  CPValueObjectPtr arg1Lat;//, arg2Lat;//, resLat_tmp;
+  CPValueLatticePtr arg1Lat;//, arg2Lat;//, resLat_tmp;
   getLattices(sgn, arg1Lat);//, arg2Lat);//, resLat_tmp);
-  CPValueObjectPtr resLat = arg1Lat->op(sgn);
+  CPValueLatticePtr resLat = arg1Lat->op(sgn);
 //prodLat->setToEmpty();
   setLattice(sgn, resLat);
   setLatticeOperand(sgn, sgn->get_operand(), resLat);
@@ -3578,9 +3807,9 @@ void ConstantPropagationAnalysisTransfer::visit(SgPlusPlusOp *sgn) {
 // void ConstantPropagationAnalysisTransfer::visit(SgUnaryOp *sgn) { 
 //   scope s("ConstantPropagationAnalysisTransfer::visit(SgUnaryOp)", scope::medium, attrGE("constantPropagationAnalysisDebugLevel", 1));
   
-//   CPValueObjectPtr arg1Lat;//, arg2Lat;//, resLat_tmp;
+//   CPValueLatticePtr arg1Lat;//, arg2Lat;//, resLat_tmp;
 //   getLattices(sgn, arg1Lat);//, arg2Lat);//, resLat_tmp);
-//   CPValueObjectPtr resLat = arg1Lat->op(sgn);
+//   CPValueLatticePtr resLat = arg1Lat->op(sgn);
 // //prodLat->setToEmpty();
 //   setLattice(sgn, resLat);
 // }
@@ -3589,9 +3818,9 @@ void ConstantPropagationAnalysisTransfer::visit(SgPlusPlusOp *sgn) {
 void ConstantPropagationAnalysisTransfer::visit(SgCastExp *sgn) { 
   SIGHT_VERB_DECL(scope, ("ConstantPropagationAnalysisTransfer::visit(SgCastExp)", scope::medium), 1, constantPropagationAnalysisDebugLevel)
   
-  CPValueObjectPtr arg1Lat;//, arg2Lat;//, resLat_tmp;
+  CPValueLatticePtr arg1Lat;//, arg2Lat;//, resLat_tmp;
   getLattices(sgn, arg1Lat);//, arg2Lat);//, resLat_tmp);
-  CPValueObjectPtr resLat = arg1Lat->op(sgn);
+  CPValueLatticePtr resLat = arg1Lat->op(sgn);
 //prodLat->setToEmpty();
   setLattice(sgn, resLat);
 }
@@ -3600,9 +3829,9 @@ void ConstantPropagationAnalysisTransfer::visit(SgCastExp *sgn) {
 void ConstantPropagationAnalysisTransfer::visit(SgMinusOp *sgn) { 
   SIGHT_VERB_DECL(scope, ("ConstantPropagationAnalysisTransfer::visit(SgMinusOp)", scope::medium), 1, constantPropagationAnalysisDebugLevel)
   
-  CPValueObjectPtr arg1Lat;//, arg2Lat;//, resLat_tmp;
+  CPValueLatticePtr arg1Lat;//, arg2Lat;//, resLat_tmp;
   getLattices(sgn, arg1Lat);//, arg2Lat);//, resLat_tmp);
-  CPValueObjectPtr resLat = arg1Lat->op(sgn);
+  CPValueLatticePtr resLat = arg1Lat->op(sgn);
 //prodLat->setToEmpty();
   setLattice(sgn, resLat);
 }
@@ -3611,9 +3840,9 @@ void ConstantPropagationAnalysisTransfer::visit(SgMinusOp *sgn) {
 void ConstantPropagationAnalysisTransfer::visit(SgNotOp *sgn) { 
   SIGHT_VERB_DECL(scope, ("ConstantPropagationAnalysisTransfer::visit(SgNotOp)", scope::medium), 1, constantPropagationAnalysisDebugLevel);
   
-  CPValueObjectPtr arg1Lat;//, arg2Lat;//, resLat_tmp;
+  CPValueLatticePtr arg1Lat;//, arg2Lat;//, resLat_tmp;
   getLattices(sgn, arg1Lat);//, arg2Lat);//, resLat_tmp);
-  CPValueObjectPtr resLat = arg1Lat->op(sgn);
+  CPValueLatticePtr resLat = arg1Lat->op(sgn);
 //prodLat->setToEmpty();
   setLattice(sgn, resLat);
 }
@@ -3625,7 +3854,7 @@ void ConstantPropagationAnalysisTransfer::visit(SgValueExp *val) {
 //prodLat->setToEmpty();
   SgTreeCopy copyHelp;
   boost::shared_ptr<SgValueExp> valCopy((SgValueExp*)(val->copy(copyHelp)));
-  setLattice(val, boost::make_shared<CPValueObject>(boost::make_shared<CPConcreteKind>(valCopy), part->inEdgeFromAny()));
+  setLattice(val, boost::make_shared<CPValueLattice>(boost::make_shared<CPConcreteKind>(valCopy), part->inEdgeFromAny()));
 }
 
 
@@ -3633,8 +3862,8 @@ ConstantPropagationAnalysisTransfer::ConstantPropagationAnalysisTransfer(
           PartPtr part, CFGNode cn, NodeState& state, 
           map<PartEdgePtr, vector<Lattice*> >& dfInfo, 
           Composer* composer, ConstantPropagationAnalysis* analysis)
-   : VariableStateTransfer<CPValueObject, ConstantPropagationAnalysis>
-                       (state, dfInfo, boost::make_shared<CPValueObject>(part->inEdgeFromAny()), 
+   : VariableStateTransfer<CPValueLattice, ConstantPropagationAnalysis>
+                       (state, dfInfo, boost::make_shared<CPValueLattice>(part->inEdgeFromAny()),
                         composer, analysis, part, cn, 
                         constantPropagationAnalysisDebugLevel, "constantPropagationAnalysisDebugLevel")
 {
@@ -3648,7 +3877,7 @@ ConstantPropagationAnalysisTransfer::ConstantPropagationAnalysisTransfer(
 // **********************************************************************
 
 // GB: Is this needed for boost shared-pointers?
-ConstantPropagationAnalysis::ConstantPropagationAnalysis() : FWDataflow(/*trackBase2RefinedPartEdgeMapping*/ false)
+ConstantPropagationAnalysis::ConstantPropagationAnalysis(bool useSSA) : FWDataflow(/*trackBase2RefinedPartEdgeMapping*/ false, useSSA)
 {
 }
 
@@ -3665,17 +3894,17 @@ CPMemLocObjectPtr ConstantPropagationAnalysis::createBasicCPML(SgNode* n, PartEd
   CPMemLocObjectPtr ml;
   if(isSgVarRefExp(n) || isSgInitializedName(n))
     return boost::make_shared<CPMemLocObject>(
-                                curMR, boost::make_shared<CPValueObject>(
+                                curMR, boost::make_shared<CPValueLattice>(
                                            boost::make_shared<CPOffsetListKind>(CPOffsetListKind::offset(0)),
-                                           pedge), 
+                                           pedge)->createValueObject(),
                                 n, pedge, this);
   // Otherwise, create one that refers to an unknown offset within mr
   else
     return boost::make_shared<CPMemLocObject>(
-                                curMR, boost::make_shared<CPValueObject>(
+                                curMR, boost::make_shared<CPValueLattice>(
             // !!! Should create ServerImplKind here!!!
                                            boost::make_shared<CPOffsetListKind>(CPOffsetListKind::offset(0)),
-                                           pedge), 
+                                           pedge)->createValueObject(),
                                        // boost::make_shared<CPValueObject>(boost::make_shared<CPUninitializedKind>(), pedge), 
                                 n, pedge, this);
   
@@ -3688,7 +3917,7 @@ void ConstantPropagationAnalysis::genInitLattice(PartPtr part, PartEdgePtr pedge
 {
   SIGHT_VERB_DECL(scope, ("genInitLattice", scope::medium), 1, constantPropagationAnalysisDebugLevel)
   
-  AbstractObjectMap* ml2val = new AbstractObjectMap(boost::make_shared<CPValueObject>(pedge),
+  AbstractObjectMap* ml2val = new AbstractObjectMap(boost::make_shared<CPValueLattice>(pedge),
                                                     pedge,
                                                     getComposer(), this);
   /*dbg << "ConstantPropagationAnalysis::initializeState, analysis="<<returning l="<<l<<" n=<"<<escape(p.getNode()->unparseToString())<<" | "<<p.getNode()->class_name()<<" | "<<p.getIndex()<<">\n";
@@ -3762,15 +3991,15 @@ ValueObjectPtr ConstantPropagationAnalysis::Expr2Val(SgNode* n, PartEdgePtr pedg
   // If pedge doesn't have wildcards
   if(pedge->source() && pedge->target()) {
     // Get the NodeState at the source of this edge
-    NodeState* state = NodeState::getNodeState(this, (SSAAnalysis? NULLPart: pedge->source()));
+    NodeState* state = NodeState::getNodeState(this, (useSSA? NULLPart: pedge->source()));
     SIGHT_VERB(dbg << "state="<<state->str(this)<<endl, 1, constantPropagationAnalysisDebugLevel)
     
     // Get the value map at the current edge
     AbstractObjectMap* cpMap =
-              SSAAnalysis? dynamic_cast<AbstractObjectMap*>(state->getLatticeAbove(this, NULLPartEdge, 0)) :
+              useSSA? dynamic_cast<AbstractObjectMap*>(state->getLatticeAbove(this, NULLPartEdge, 0)) :
                            dynamic_cast<AbstractObjectMap*>(state->getLatticeBelow(this, pedge,        0));
     if(cpMap == NULL) {
-      Lattice* l = SSAAnalysis? state->getLatticeBelow(this, NULLPartEdge, 0) :
+      Lattice* l = useSSA? state->getLatticeBelow(this, NULLPartEdge, 0) :
                                 state->getLatticeBelow(this, pedge,        0);
       SIGHT_VERB(dbg << "l="<<l->str()<<endl, 1, constantPropagationAnalysisDebugLevel)
     }
@@ -3789,11 +4018,11 @@ ValueObjectPtr ConstantPropagationAnalysis::Expr2Val(SgNode* n, PartEdgePtr pedg
     SIGHT_VERB_FI()
 
     // Return the lattice associated with n's expression
-    CPValueObjectPtr val = boost::dynamic_pointer_cast<CPValueObject>(cpMap->get(ml));
+    CPValueLatticePtr val = boost::dynamic_pointer_cast<CPValueLattice>(cpMap->get(ml));
     assert(val);
     SIGHT_VERB(dbg << "val="<<val->str()<<endl, 1, constantPropagationAnalysisDebugLevel)
     
-    return val->copyV();
+    return val->copyCPLat()->createValueObject();
   // If the target of this edge is a wildcard
   } else if(pedge->source()) {
     // Get the NodeState at the source of this edge
@@ -3802,7 +4031,7 @@ ValueObjectPtr ConstantPropagationAnalysis::Expr2Val(SgNode* n, PartEdgePtr pedg
         
     map<PartEdgePtr, vector<Lattice*> >& e2lats = state->getLatticeBelowAllMod(this);
     assert(e2lats.size()>=1);
-    CPValueObjectPtr mergedVal;
+    CPValueLatticePtr mergedLat;
     for(map<PartEdgePtr, vector<Lattice*> >::iterator lats=e2lats.begin(); lats!=e2lats.end(); lats++) {
       PartEdge* edgePtr = lats->first.get();
       assert(edgePtr->source() == pedge.get()->source());
@@ -3823,17 +4052,17 @@ ValueObjectPtr ConstantPropagationAnalysis::Expr2Val(SgNode* n, PartEdgePtr pedg
         dbg << "cpMap="<<cpMap<<"="<<cpMap->str()<<endl;
       SIGHT_VERB_FI() 
       
-      CPValueObjectPtr val = boost::dynamic_pointer_cast<CPValueObject> (boost::dynamic_pointer_cast<ValueObject>(cpMap->get(ml)));
+      CPValueLatticePtr val = boost::dynamic_pointer_cast<CPValueLattice> (boost::dynamic_pointer_cast<ValueObject>(cpMap->get(ml)));
       SIGHT_VERB(dbg << "val="<<val->str()<<endl, 1, constantPropagationAnalysisDebugLevel)
 
       if(lats==e2lats.begin())
-        mergedVal = boost::dynamic_pointer_cast<CPValueObject>(val->copyV());
+        mergedLat = val->copyCPLat();
       else 
-        mergedVal->meetUpdate(val.get());
+        mergedLat->meetUpdate(val.get());
       
-      SIGHT_VERB(dbg << "mergedVal="<<mergedVal->str()<<endl, 1, constantPropagationAnalysisDebugLevel)
+      SIGHT_VERB(dbg << "mergedLat="<<mergedLat->str()<<endl, 1, constantPropagationAnalysisDebugLevel)
     }
-    return mergedVal;
+    return mergedLat->createValueObject();
   
   // If the source of this edge is a wildcard
   } else if(pedge->target()) {
@@ -3851,11 +4080,11 @@ ValueObjectPtr ConstantPropagationAnalysis::Expr2Val(SgNode* n, PartEdgePtr pedg
     SIGHT_VERB_FI()
 
     // Return the lattice associated with n's expression since that is likely to be more precise
-    CPValueObjectPtr val = boost::dynamic_pointer_cast<CPValueObject>(cpMap->get(ml));
+    CPValueLatticePtr val = boost::dynamic_pointer_cast<CPValueLattice>(cpMap->get(ml));
     assert(val);
     SIGHT_VERB(dbg << "val="<<val->str()<<endl, 1, constantPropagationAnalysisDebugLevel)
     
-    return val->copyV();
+    return val->copyCPLat()->createValueObject();
   }
   assert(0);
 }
@@ -3868,7 +4097,9 @@ MemLocObjectPtr ConstantPropagationAnalysis::Expr2MemLoc(SgNode* n, PartEdgePtr 
   //if(isSgInitializedName(n) || isSgVarRefExp(n)) {
   if(!isSgDotExp(n) && !isSgPntrArrRefExp(n)) {
     SIGHT_VERB(dbg << "Creating basic CPML"<<endl, 1, constantPropagationAnalysisDebugLevel)
-    return createBasicCPML(n, pedge);
+    MemLocObjectPtr ret = createBasicCPML(n, pedge);
+    SIGHT_VERB(dbg << "ret = "<<ret->str()<<endl, 1, constantPropagationAnalysisDebugLevel)
+    return ret;
   }
   
   // NOTE: this is a temporary hack where we assume the appropriate index for the CFGNode
@@ -3922,7 +4153,7 @@ MemLocObjectPtr ConstantPropagationAnalysis::Expr2MemLoc(SgNode* n, PartEdgePtr 
     assert(ml);
     SIGHT_VERB(dbg << "ml="<<ml->str()<<endl, 1, constantPropagationAnalysisDebugLevel)
     
-    return ml->copyML();
+    return ml->copyAOType();
   // If the target of this edge is a wildcard
   } else if(pedge->source()) {
     // Get the NodeState at the source of this edge
@@ -3955,9 +4186,9 @@ MemLocObjectPtr ConstantPropagationAnalysis::Expr2MemLoc(SgNode* n, PartEdgePtr 
       SIGHT_VERB(dbg << "ml="<<ml->str()<<endl, 1, constantPropagationAnalysisDebugLevel)
       
       if(lats==e2lats.begin())
-        mergedML = boost::dynamic_pointer_cast<CPMemLocObject>(ml->copyML());
+        mergedML = boost::dynamic_pointer_cast<CPMemLocObject>(ml->copyAOType());
       else
-        mergedML->meetUpdate(ml.get(), edge, getComposer(), this);
+        mergedML->meetUpdate((MemLocObjectPtr)ml, edge, getComposer(), this);
       
       SIGHT_VERB(dbg << "mergedML="<<mergedML->str()<<endl, 1, constantPropagationAnalysisDebugLevel)
     }
@@ -3985,7 +4216,7 @@ MemLocObjectPtr ConstantPropagationAnalysis::Expr2MemLoc(SgNode* n, PartEdgePtr 
     assert(ml);
     SIGHT_VERB(dbg << "ml="<<ml->str()<<endl, 1, constantPropagationAnalysisDebugLevel)
     
-    return ml->copyML();
+    return ml->copyAOType();
   }
   
   // If pedge doesn't have wildcards
@@ -4004,7 +4235,7 @@ MemLocObjectPtr ConstantPropagationAnalysis::Expr2MemLoc(SgNode* n, PartEdgePtr 
     
     if(constantPropagationAnalysisDebugLevel()>=1) dbg << "ml="<<ml->str()<<endl;
     
-    return ml->copyML();
+    return ml->copyAOType();
   // If the target of this edge is a wildcard
   } else if(pedge->source()) {
     // Get the NodeState at the source of this edge
@@ -4030,7 +4261,7 @@ MemLocObjectPtr ConstantPropagationAnalysis::Expr2MemLoc(SgNode* n, PartEdgePtr 
       if(constantPropagationAnalysisDebugLevel()>=1) dbg << "ml="<<ml->str()<<endl;
       
       if(lats==e2lats.begin())
-        mergedML = boost::dynamic_pointer_cast<CPMemLocObject>(ml->copyML());
+        mergedML = boost::dynamic_pointer_cast<CPMemLocObject>(ml->copyAOType());
       else
         mergedML->meetUpdate(ml, lats->first, getComposer(), this);
       
@@ -4051,7 +4282,7 @@ MemLocObjectPtr ConstantPropagationAnalysis::Expr2MemLoc(SgNode* n, PartEdgePtr 
     
     if(constantPropagationAnalysisDebugLevel()>=1) dbg << "ml="<<ml->str()<<endl;
     
-    return ml->copyML();
+    return ml->copyAOType();
   }*/
   assert(0);
 }

@@ -4,7 +4,6 @@
 #include "compose.h"
 #include "printAnalysisStates.h"
 #include "ats_graph_structure.h"
-#include "sight_verbosity.h"
 #include <memory>
 using std::auto_ptr;
 
@@ -22,22 +21,22 @@ using namespace sight;
 
 namespace fuse
 {
-#define composedAnalysisDebugLevel 0
-  
+#define composedAnalysisDebugLevel 1
+
 /****************************
  ***** ComposedAnalysis *****
  ****************************/
 
-ComposedAnalysis::ComposedAnalysis(bool trackBase2RefinedPartEdgeMapping): 
-      trackBase2RefinedPartEdgeMapping(trackBase2RefinedPartEdgeMapping) {
+ComposedAnalysis::ComposedAnalysis(bool trackBase2RefinedPartEdgeMapping, bool useSSA):
+      useSSA(useSSA), trackBase2RefinedPartEdgeMapping(trackBase2RefinedPartEdgeMapping) {
   startStatesInitialized = false;
   endStatesInitialized = false;
 
-  SSAAnalysis = getenv("SSA_ANALYSIS"); //&& !implementsATSGraph();
-  //cout <<str()<<": SSAAnalysis="<<SSAAnalysis<<", implementsATSGraph()="<<implementsATSGraph()<<endl;
+  //useSSA = getenv("SSA_ANALYSIS"); //&& !implementsATSGraph();
+  //cout <<str()<<": useSSA="<<useSSA<<", implementsATSGraph()="<<implementsATSGraph()<<endl;
   /*cout << str()<<":"<<endl;
-  scanf("%d", &SSAAnalysis);*/
-  ats = NULL;
+  scanf("%d", &useSSA);*/
+  ssa = NULL;
   ssaLatsInitialized = false;
 }
 
@@ -112,13 +111,22 @@ bool ComposedAnalysis::mustEqual(AbstractObjectPtr ao1, AbstractObjectPtr ao2, P
   }
 }*/
 
+// Initializes the analysis before running it
+void ComposedAnalysis::initAnalysis() {
+  // Creates the SSA if needed. This is done here to make sure that the SSA is created
+  // without calling any methods from this analysis, even if it is composed tightly with
+  // itself
+  if(useSSA)
+    ssa = composer->GetSSAGraph(this);
+}
+
 // Methods used by client analyses to get a MemLoc from the composer while also documenting
 // whether the MemLoc corresponds to a definition or a use of the set of memory locations
 // denoted by n.
 MemLocObjectPtr  ComposedAnalysis::Expr2MemLocDef(SgNode* n, PartEdgePtr pedge) {
   MemLocObjectPtr ml = composer->Expr2MemLoc(n, pedge, this);
   // If we're running on the dense ATS, return this MemLoc as is
-  if(!SSAAnalysis) return ml;
+  if(!useSSA) return ml;
   // Otherwise, if we are running on top of the SSA graph, wrap this memloc with
   else             return makePtr<SSAMemLocObject>(ml, pedge->source()?pedge->source():pedge->target(), n, SSAMemLocObject::def);
 }
@@ -127,11 +135,11 @@ MemLocObjectPtr  ComposedAnalysis::Expr2MemLocUse(SgNode* n, PartEdgePtr pedge) 
   MemLocObjectPtr ml = composer->Expr2MemLoc(n, pedge, this);
   //dbg << "ml="<<ml->str()<<endl;
   // If we're running on the dense ATS, return this MemLoc as is
-  if(!SSAAnalysis) return ml;
+  if(!useSSA) return ml;
   // Otherwise, if we are running on top of the SSA graph, wrap this memloc with
   else {
     /*ROSE_ASSERT(ats);
-    const std::set<SSAMemLocObjectPtr>& defs = ats->getDefs(makePtr<SSAMemLocObject>(ml, pedge->source()?pedge->source():pedge->target(), n, SSAMemLocObject::use));
+    const std::set<SSAMemLocObjectPtr>& defs = ssa->getDefs(makePtr<SSAMemLocObject>(ml, pedge->source()?pedge->source():pedge->target(), n, SSAMemLocObject::use));
     ROSE_ASSERT(defs.size()==1);
     dbg << "*defs.begin()="<<(*defs.begin())->str()<<endl;
     return *defs.begin();*/
@@ -141,7 +149,7 @@ MemLocObjectPtr  ComposedAnalysis::Expr2MemLocUse(SgNode* n, PartEdgePtr pedge) 
 MemLocObjectPtr ComposedAnalysis::OperandExpr2MemLocDef(SgNode* n, SgNode* operand, PartEdgePtr pedge) {
   MemLocObjectPtr ml = composer->OperandExpr2MemLoc(n, operand, pedge, this);
   // If we're running on the dense ATS, return this MemLoc as is
-  if(!SSAAnalysis) return ml;
+  if(!useSSA) return ml;
   // Otherwise, if we are running on top of the SSA graph, wrap this memloc with
   else             return makePtr<SSAMemLocObject>(ml, pedge->source()?pedge->source():pedge->target(), operand, SSAMemLocObject::def);
 }
@@ -150,15 +158,23 @@ MemLocObjectPtr ComposedAnalysis::OperandExpr2MemLocUse(SgNode* n, SgNode* opera
   MemLocObjectPtr ml = composer->OperandExpr2MemLoc(n, operand, pedge, this);
   //dbg << "ml="<<ml->str()<<endl;
   // If we're running on the dense ATS, return this MemLoc as is
-  if(!SSAAnalysis) return ml;
+  if(!useSSA) return ml;
   // Otherwise, if we are running on top of the SSA graph, wrap this memloc with
   //else             return makePtr<SSAMemLocObject>(ml, pedge->source()?pedge->source():pedge->target(), n, SSAMemLocObject::use);
   else {
-    ROSE_ASSERT(ats);
-    const std::set<SSAMemLocObjectPtr>& defs = ats->getDefs(makePtr<SSAMemLocObject>(ml, pedge->source()?pedge->source():pedge->target(), operand, SSAMemLocObject::use));
+    ROSE_ASSERT(ssa);
+    const std::set<SSAMemLocObjectPtr>& defs = ssa->getDefs(makePtr<SSAMemLocObject>(ml, pedge->source()?pedge->source():pedge->target(), operand, SSAMemLocObject::use));
+    if(defs.size()>1) {
+      for(set<SSAMemLocObjectPtr>::const_iterator d=defs.begin(); d!=defs.end(); ++d)
+        cerr << "d="<<(*d)->str()<<endl;
+    }
     ROSE_ASSERT(defs.size()==1);
-    //dbg << "*defs.begin()="<<(*defs.begin())->str()<<endl;
-    return *defs.begin();
+    //if(defs.size()==1) {
+      //dbg << "*defs.begin()="<<(*defs.begin())->str()<<endl;
+      return *defs.begin();
+    /*} else {
+      return MemLocObjectPtr();
+    }*/
   }
 }
 
@@ -294,8 +310,8 @@ void ComposedAnalysis::initializeStateSSA(PartPtr part, NodeState& state)
 
 
 void ComposedAnalysis::runAnalysis() {
-  if(SSAAnalysis) runAnalysisSSA();
-  else            runAnalysisDense();
+  if(useSSA) runAnalysisSSA();
+  else       runAnalysisDense();
 }
 
 void ComposedAnalysis::runAnalysisDense()
@@ -481,9 +497,6 @@ void ComposedAnalysis::runAnalysisSSA()
   // Set of all the Parts that have been initialized
   set<PartPtr> initialized;
 
-  ats = composer->GetATSGraph(this);
-  ats->buildSSA();
-
   // Re-analyze it from scratch
   set<PartPtr> startingParts = getInitialWorklist();
   set<PartPtr> ultimateParts = getUltimate();
@@ -516,7 +529,7 @@ void ComposedAnalysis::runAnalysisSSA()
   map<PartPtr, anchor> nextTransferAnchors;
 
   // graph widget that visualizes the flow of the worklist algorithm
-  //SIGHT_VERB(atsGraph worklistGraph((getDirection() == fw? startingParts: ultimateParts), partAnchors, getDirection() == fw), 1, composedAnalysisDebugLevel)
+  //SIGSSAGraphatsGraph worklistGraph((getDirection() == fw? startingParts: ultimateParts), partAnchors, getDirection() == fw), 1, composedAnalysisDebugLevel)
   atsGraph worklistGraph((getDirection() == fw? startingParts: ultimateParts), partAnchors, getDirection() == fw);
 
   while(curNodeIt && !curNodeIt->isEnd())
@@ -717,17 +730,17 @@ void ComposedAnalysis::transferPropagateAStateSSA(ComposedAnalysis* analysis,
   bool modified = false;
 
   // If this is a Phi Node
-  if(ats->isPhiNode(part)) {
+  if(ssa->isPhiNode(part)) {
     // Iterate over all of the phi node's uses and propagate them to its defs
-    const map<SSAMemLocObjectPtr, set<SSAMemLocObjectPtr> >& phiDefs = ats->getDefsUsesAtPhiNode(part);
+    const map<SSAMemLocObjectPtr, set<SSAMemLocObjectPtr> >& phiDefs = ssa->getDefsUsesAtPhiNode(part);
     for(map<SSAMemLocObjectPtr, set<SSAMemLocObjectPtr> >::const_iterator phiD=phiDefs.begin(); phiD!=phiDefs.end(); phiD++) {
       ROSE_ASSERT(dfInfo.find(NULLPartEdge) != dfInfo.end());
       for(vector<Lattice*>::iterator df=dfInfo[NULLPartEdge].begin(); df!=dfInfo[NULLPartEdge].end(); df++) {
         // Ask the analysis to propagate information from the defs to the use
-        modified = (*df)->propagateDefs2Use((MemLocObjectPtr)phiD->first, ATSGraph::SSAMLSet2MLSet(phiD->second)) || modified;
+        modified = (*df)->propagateDefs2Use((MemLocObjectPtr)phiD->first, SSAGraph::SSAMLSet2MLSet(phiD->second)) || modified;
 
         // Now ask then analysis to propagate information from the phi node's defs to their corresponding uses
-        //modified = (*df)->propagateDef2Uses(ats->getUsesML(phiD->first), (MemLocObjectPtr)phiD->first) || modified;
+        //modified = (*df)->propagateDef2Uses(ssa->getUsesML(phiD->first), (MemLocObjectPtr)phiD->first) || modified;
       }
     }
   }
@@ -1095,7 +1108,7 @@ void ComposedAnalysis::propagateDF2DescSSA(ComposedAnalysis* analysis,
     ROSE_ASSERT(calls.size());
     SgFunctionCallExp* call = isSgFunctionCallExp(calls.begin()->getNode());
 
-    const list<pair<SSAMemLocObjectPtr, set<SSAMemLocObjectPtr> > >& funcArg2Param = ats->getFunc2Params(part);
+    const list<pair<SSAMemLocObjectPtr, set<SSAMemLocObjectPtr> > >& funcArg2Param = ssa->getFunc2Params(part);
     ROSE_ASSERT(call->get_args()->get_expressions().size() == funcArg2Param.size());
     for(list<pair<SSAMemLocObjectPtr, set<SSAMemLocObjectPtr> > >::const_iterator a2p=funcArg2Param.begin(); a2p!=funcArg2Param.end(); ++a2p) {
       SIGHT_VERB_IF(1, composedAnalysisDebugLevel)
@@ -1106,13 +1119,13 @@ void ComposedAnalysis::propagateDF2DescSSA(ComposedAnalysis* analysis,
       SIGHT_VERB_FI()
 
       // Get all the definitions that reach the current argument use
-      const set<SSAMemLocObjectPtr>& argDefs = ats->getDefs(a2p->first);
+      const set<SSAMemLocObjectPtr>& argDefs = ssa->getDefs(a2p->first);
       // Propagate info from each of these defs to each corresponding parameter of any function
       // this call may invoke
       BOOST_FOREACH(const SSAMemLocObjectPtr& def, argDefs) {
         for(vector<Lattice*>::iterator df=dfInfo[NULLPartEdge].begin(); df!=dfInfo[NULLPartEdge].end(); df++) {
           // Ask then analysis to propagate information from this argument def to its corresponding uses
-          modified = (*df)->propagateDef2Uses(ATSGraph::SSAMLSet2MLSet(a2p->second), (MemLocObjectPtr)def) || modified;
+          modified = (*df)->propagateDef2Uses(SSAGraph::SSAMLSet2MLSet(a2p->second), (MemLocObjectPtr)def) || modified;
         }
       }
       for(vector<Lattice*>::iterator df=dfInfo[NULLPartEdge].begin(); df!=dfInfo[NULLPartEdge].end(); df++) {
@@ -1127,23 +1140,23 @@ void ComposedAnalysis::propagateDF2DescSSA(ComposedAnalysis* analysis,
     set<PartPtr> useParts;
   
     { SIGHT_VERB_DECL(scope, ("Defs->Uses:"), 1, composedAnalysisDebugLevel)
-    set<SSAMemLocObjectPtr> defs = ats->getDefs(part);
+    set<SSAMemLocObjectPtr> defs = ssa->getDefs(part);
     for(set<SSAMemLocObjectPtr>::iterator d=defs.begin(); d!=defs.end(); d++) {
       SIGHT_VERB(dbg << "def "<<(*d)->str()<<endl, 1, composedAnalysisDebugLevel)
-      set<SSAMemLocObjectPtr> uses = ats->getUses(*d);
+      set<SSAMemLocObjectPtr> uses = ssa->getUses(*d);
       for(set<SSAMemLocObjectPtr>::iterator u=uses.begin(); u!=uses.end(); u++) {
         SIGHT_VERB(dbg << "    use"<<(*u)->str()<<endl, 1, composedAnalysisDebugLevel)
         useParts.insert((*u)->loc);
       }
     }}
   
-    if(ats->isPhiNode(part)) {
+    if(ssa->isPhiNode(part)) {
       { SIGHT_VERB_DECL(scope, ("Phi Defs->Uses:"), 1, composedAnalysisDebugLevel)
-      const map<SSAMemLocObjectPtr, set<SSAMemLocObjectPtr> >& phiDefs = ats->getDefsUsesAtPhiNode(part);
+      const map<SSAMemLocObjectPtr, set<SSAMemLocObjectPtr> >& phiDefs = ssa->getDefsUsesAtPhiNode(part);
   
       for(map<SSAMemLocObjectPtr, set<SSAMemLocObjectPtr> >::const_iterator group=phiDefs.begin(); group!=phiDefs.end(); ++group) {
         SIGHT_VERB(dbg << "phi def "<<(group->first)->str()<<endl, 1, composedAnalysisDebugLevel)
-        set<SSAMemLocObjectPtr> uses = ats->getUses(group->first);
+        set<SSAMemLocObjectPtr> uses = ssa->getUses(group->first);
         for(set<SSAMemLocObjectPtr>::iterator u=uses.begin(); u!=uses.end(); u++) {
           SIGHT_VERB(dbg << "    use"<<(*u)->str()<<endl, 1, composedAnalysisDebugLevel)
           useParts.insert((*u)->loc);
@@ -1300,8 +1313,8 @@ void FWDataflow::initNodeState(PartPtr part) {
   // registers if not already registered
   NodeState* state = NodeState::getNodeState(this, part);
   // fill the state with Lattices
-  if(SSAAnalysis) initializeStateSSA(part, *state);
-  else            initializeStateDense(part, *state);
+  if(useSSA) initializeStateSSA(part, *state);
+  else       initializeStateDense(part, *state);
   SIGHT_VERB(dbg << "analysis=" << this->str() << ", state=" << state->str(this), 2, composedAnalysisDebugLevel)
 }
 
@@ -1309,8 +1322,8 @@ void BWDataflow::initNodeState(PartPtr part) {
   // registers if not already registered
   NodeState* state = NodeState::getNodeState(this, part);
   // fill the state with Lattices
-  if(SSAAnalysis) initializeStateSSA(part, *state);
-  else            initializeStateDense(part, *state);
+  if(useSSA) initializeStateSSA(part, *state);
+  else       initializeStateDense(part, *state);
   SIGHT_VERB(dbg << "analysis=" << this->str() << ", state=" << state->str(this), 2, composedAnalysisDebugLevel)
 }
 
@@ -1434,8 +1447,8 @@ bool checkDataflowInfoPass::transfer(PartPtr part, CFGNode cn, NodeState& state,
   }
 
   PartEdgePtr accessEdge;
-  if(SSAAnalysis) accessEdge = NULLPartEdge;
-  else            accessEdge = part->inEdgeFromAny();
+  if(useSSA) accessEdge = NULLPartEdge;
+  else       accessEdge = part->inEdgeFromAny();
   return dynamic_cast<BoolAndLattice*>(dfInfo[accessEdge][0])->set(true);
 }
 

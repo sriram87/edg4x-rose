@@ -17,7 +17,6 @@
 #include <boost/graph/topological_sort.hpp>
 
 #include "sight.h"
-#include "sight_verbosity.h"
 using namespace sight;
 
 using namespace boost;

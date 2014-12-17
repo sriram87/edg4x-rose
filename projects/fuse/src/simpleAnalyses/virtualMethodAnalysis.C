@@ -1,7 +1,6 @@
 #include "sage3basic.h"
 #include "virtualMethodAnalysis.h"
 #include "sight.h"
-#include "sight_verbosity.h"
 #include "sageInterface.h"
 #include "midend/programAnalysis/CallGraphAnalysis/CallGraph.h"
 using namespace std;
@@ -9,7 +8,7 @@ using namespace sight;
 using namespace SageInterface;
 
 namespace fuse {
-#define VirtualMethodAnalysisDebugLevel 0
+#define VirtualMethodAnalysisDebugLevel 1
 
 /********************************
  ***** ClassInheritanceTree *****
@@ -283,6 +282,149 @@ bool ClassInheritanceTree::meetUpdate(Lattice* that_arg) {
   return modified;
 }
 
+// Computes the intersection of this and that and saves the result in this
+// returns true if this causes this to change and false otherwise
+// The part of this object is to be used for AbstractObject comparisons.
+// Meet update finds the common tree prefix among the two treeS
+bool ClassInheritanceTree::intersectUpdate(Lattice* that_arg) {
+  SIGHT_VERB(scope reg("ClassInheritanceTree::intersectUpdate()", scope::medium), 1, VirtualMethodAnalysisDebugLevel)
+  ClassInheritanceTree* that = dynamic_cast<ClassInheritanceTree*>(that_arg);
+  ROSE_ASSERT(that);
+
+  SIGHT_VERB_IF(1, VirtualMethodAnalysisDebugLevel)
+    dbg << "state="<<state2Str(state)<<", that->state="<<state2Str(that->state)<<endl;
+    { scope s("this", scope::low); dbg << "this="<<str()<<endl; }
+    { scope s("that", scope::low); dbg << "that="<<that->str()<<endl; }
+  SIGHT_VERB_FI()
+  // Empty Intersect * = Empty
+  if(state==empty) return false;
+  // If that tree is empty, make this tree empty as well
+  if(that->state==empty) {
+    if(state==empty) return false;
+    else { setToEmpty(); return true; }
+  }
+  // Neither tree is full
+
+  // If this tree is full, copy the state of that tree over this tree
+  if(state==full) {
+    if(that->state==full) return false;
+    else { copyFrom(*that); return true; }
+  }
+  // If that is full, don't modify this
+  if(that->state==empty) return false;
+
+  // Both trees are neither full nor empty
+
+  // If the two inheritance trees don't have the same base classes, they have
+  // nothing in common, which makes this the empty hierarchy (no class hierarchy
+  // satisfies all the constraints and thus the set of hierarchies denoted is empty)
+  if(bases.size() != that->bases.size()) {
+    SIGHT_VERB(dbg << "Inconsistent base sizes: setting to Empty. #bases="<<bases.size()<<", #that->bases="<<that->bases.size()<<endl, 1, VirtualMethodAnalysisDebugLevel)
+    setToEmpty();
+    return true;
+  }
+
+  // Iterate from the bases to their children looking for the point in the
+  // iteration where the trees stop being identical. If the trees are not identical but
+  // one is a suffix of the other, then the intersection contains the suffix sub-tree is the intersection is equal to the suffix tree.
+  // If they're not identical in other ways, their intersection is empty because
+  // in that case they specify contradictory constraints on the class hierarchy.
+
+  // The worklist contains a list of pairs, one node from each tree
+  std::list<std::pair<NodePtr, NodePtr> > worklist;
+
+  // Initialize the list with the base nodes
+  for(std::list<NodePtr>::iterator thisB=bases.begin(), thatB=that->bases.begin();
+      thisB!=bases.end(); ++thisB, ++thatB) {
+    // If the two inheritance trees don't have the same base classes, they have
+    // nothing in common, which makes this the empty hierarchy (over-constrained)
+    if((*thisB)->def != (*thatB)->def) {
+      SIGHT_VERB(dbg << "Inconsistent bases: setting to Empty. (*thisB)->def="<<(*thisB)->def<<"="<<SgNode2Str((*thisB)->def)<<" != (*thatB)->def="<<(*thatB)->def<<"="<<SgNode2Str((*thatB)->def)<<endl, 1, VirtualMethodAnalysisDebugLevel)
+      setToFull();
+      return true;
+    }
+    worklist.push_back(make_pair(*thisB, *thatB));
+  }
+  SIGHT_VERB(dbg << "#worklist="<<worklist.size()<<", #bases="<<bases.size()<<endl, 1, VirtualMethodAnalysisDebugLevel)
+
+  // Determine which case we're in:
+  // - this == that
+  // - this is a suffix of that: intersection == this
+  // - that is a suffix of this: intersection == that
+  // - other: intersection = empty
+
+  // To discover this we iterate through both trees. Initially allEqual==true.
+  // - If we see a difference where one sub-tree is different from the other, we set the
+  //   intersection to empty and exit
+  // - If we see a difference where one sub-tree is a suffix of another, and
+  //   - If allEqual == true, we set allEqual=false, and set thisSuffixOfThat or
+  //     thatSuffixOfThis to true, as appropriate.
+  //   - Else, if the type of suffix disagrees with the current value of thisSuffixOfThat or
+  //     thatSuffixOfThis, the trees are incompatible and we set their intersection
+  //     to empty and exit
+  // - If we see any other kind of difference, we set their intersection to empty and exit
+
+  bool allEqual = true;
+  bool thisSuffixOfThat = false;
+  bool thatSuffixOfThis = false;
+
+  // Keep iterating through the worklist as long as the node pairs
+  // have identical SgClassDefinitions.
+  while(worklist.size()>0) {
+    SIGHT_VERB(scope reg("worklist", scope::low), 1, VirtualMethodAnalysisDebugLevel)
+    SIGHT_VERB(dbg << "#worklist="<<worklist.size()<<endl, 1, VirtualMethodAnalysisDebugLevel)
+
+    pair<NodePtr, NodePtr> cur = worklist.front();
+    worklist.pop_front();
+    SIGHT_VERB(dbg << "cur=<"<<cur.first->str()<<","<<endl<<"    "<<cur.second->str()<<">"<<endl, 1, VirtualMethodAnalysisDebugLevel)
+
+    // If the children of the current nodes on both trees are the same
+    if(cur.first->child == cur.second->child) {
+      // If they're not NULL, move on to the children of the current nodes
+      // by pushing them onto the worklist
+      if(cur.first->child) {
+        SIGHT_VERB(dbg << "same non-NULL children"<<endl, 1, VirtualMethodAnalysisDebugLevel)
+        worklist.push_back(make_pair(cur.first->child, cur.second->child));
+      }
+    // Otherwise, if that is a suffix of this (that is not NULL, while this is)
+    } else if(!cur.first->child) {
+      if(allEqual) {
+        allEqual = false;
+        assert(!thisSuffixOfThat && !thatSuffixOfThis);
+        thatSuffixOfThis = true;
+      } else if(thisSuffixOfThat) {
+        setToEmpty();
+        return true;
+      }
+    // Otherwise, if this is a suffix of that (this is not NULL, while that is)
+    } else if(!cur.second->child) {
+      if(allEqual) {
+        allEqual = false;
+        assert(!thisSuffixOfThat && !thatSuffixOfThis);
+        thisSuffixOfThat = true;
+      } else if(thisSuffixOfThat) {
+        setToEmpty();
+        return true;
+      }
+    // Otherwise, if the children are generally unequal, the intersection is empty
+    } else {
+      setToEmpty();
+      return true;
+    }
+  }
+
+  // If the trees are equal or this is a suffix of that, this is already the intersection of this and that
+  if(allEqual || thisSuffixOfThat)
+    return false;
+  // Otherwise, copy that to this
+  else {
+    bases = that->bases;
+    leaves = that->leaves;
+    inclusive = that->inclusive;
+    return true;
+  }
+}
+
 // Returns the set of functions the given SgFunctionCallExp may refer to given
 // the type constraints encoded in this tree
 set<SgFunctionDeclaration*> ClassInheritanceTree::getCalleeDefs(SgFunctionCallExp* call) {
@@ -382,10 +524,10 @@ bool ClassInheritanceTree::setMLValueToFull(MemLocObjectPtr ml) {
 }
 
 // Returns whether this lattice denotes the set of all possible execution prefixes.
-bool ClassInheritanceTree::isFullLat() { return state == full; }
+bool ClassInheritanceTree::isFull() { return state == full; }
 
 // Returns whether this lattice denotes the empty set.
-bool ClassInheritanceTree::isEmptyLat() { return state == empty; }
+bool ClassInheritanceTree::isEmpty() { return state == empty; }
 
 std::string ClassInheritanceTree::str(std::string indent) const {
   if(state == full)  return "[ClassInheritanceTree: FULL]";
@@ -845,7 +987,7 @@ std::string VirtualMethodPartEdge::str(std::string indent) const
  *********************************/
 
 VirtualMethodAnalysis::VirtualMethodAnalysis(bool trackBase2RefinedPartEdgeMapping) : 
-      FWDataflow(trackBase2RefinedPartEdgeMapping) { 
+      FWDataflow(trackBase2RefinedPartEdgeMapping, /*useSSA*/ useSSA) {
   cacheInitialized_GetStartAStates_Spec = false;
   cacheInitialized_GetEndAStates_Spec = false;
 }

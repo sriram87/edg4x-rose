@@ -11,7 +11,6 @@
 using namespace std;
 
 #include "sight.h"
-#include "sight_verbosity.h"
 using namespace sight;
 
 template <class LatticeType>

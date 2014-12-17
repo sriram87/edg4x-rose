@@ -5,8 +5,6 @@
 #include "abstract_object_map.h"
 #include "compose.h"
 #include <vector>
-#include "sight_verbosity.h"
-
 
 namespace fuse {
 template <class LatticeType, class AnalysisType>
@@ -60,7 +58,7 @@ class VariableStateTransfer : public DFTransferVisitor
     assert(sgn);
     //MemLocObjectPtr p = composer->OperandExpr2MemLoc(sgn, operand, part->inEdgeFromAny(), analysis);
     MemLocObjectPtr p = analysis->OperandExpr2MemLocUse(sgn, operand, part->inEdgeFromAny());
-    SIGHT_VERB(dbg << "p="<<(p? p->str("&nbsp;&nbsp;&nbsp;&nbsp;"): "NULL")<<endl, 1, dLevel)
+    //SIGHT_VERB(dbg << "p="<<(p? p->str("&nbsp;&nbsp;&nbsp;&nbsp;"): "NULL")<<endl, 1, dLevel)
     return getLattice(p);
     
     /*ValueObjectPtr val = composer->OperandExpr2Val(sgn, operand, part->inEdgeFromAny(), analysis);
@@ -88,7 +86,7 @@ class VariableStateTransfer : public DFTransferVisitor
   
   LatticePtr getLattice(const AbstractObjectPtr o) {
     LatticePtr l = boost::dynamic_pointer_cast<LatticeType>(prodLat->get(o));
-    SIGHT_VERB(dbg << "getLattice(o="<<o->strp(part->inEdgeFromAny(), "")<<", l="<<l->strp(part->inEdgeFromAny(), "")<<endl, 1, dLevel)
+    SIGHT_VERB(dbg << "getLattice(o="<<o->strp(part->inEdgeFromAny(), "")<<", l="<<l->str("")<<endl, 1, dLevel)
     assert(l);
     return l;
   }
@@ -153,7 +151,8 @@ class VariableStateTransfer : public DFTransferVisitor
   }
 
   bool getLattices(SgBinaryOp *sgn, LatticePtr &arg1Lat, LatticePtr &arg2Lat/*, LatticePtr &resLat*/) {
-    arg1Lat = getLatticeOperand(sgn, sgn->get_lhs_operand());
+    if(!isSgAssignOp(sgn)) arg1Lat = getLatticeOperand(sgn, sgn->get_lhs_operand());
+    else                   arg1Lat = LatticePtr();
     arg2Lat = getLatticeOperand(sgn, sgn->get_rhs_operand());
     /*resLat  = getLattice(sgn);*/
 
@@ -201,7 +200,7 @@ public:
 //    assert(dfInfo[NULLPartEdge].size()==2);
     //#SA: Incoming dfInfo is associated with inEdgeFromAny/outEdgeToAny
     PartEdgePtr wildCardPartEdge;
-    if(((ComposedAnalysis*)analysis)->SSAAnalysis) wildCardPartEdge = NULLPartEdge;
+    if(((ComposedAnalysis*)analysis)->useSSA) wildCardPartEdge = NULLPartEdge;
     else wildCardPartEdge = ((ComposedAnalysis*)analysis)->getDirection()==ComposedAnalysis::fw? part->inEdgeFromAny() : part->outEdgeToAny();
 
     assert(dfInfo[wildCardPartEdge][0]);
@@ -221,8 +220,8 @@ public:
                 
     SIGHT_VERB_IF(1, dLevel)
       //dbg << "resLat=\n"; { indent ind; dbg << resLat->str("")<<"\n";}
-      dbg << "lhsLat=\n"; { indent ind; dbg << lhsLat->str("")<<"\n";}
-      dbg << "rhsLat=\n"; { indent ind; dbg << rhsLat->str("")<<"\n"; }
+      dbg << "lhsLat=\n"; { indent ind; dbg << (lhsLat?lhsLat->str(""):"NULL")<<"\n";}
+      dbg << "rhsLat=\n"; { indent ind; dbg << (rhsLat?rhsLat->str(""):"NULL")<<"\n"; }
     SIGHT_VERB_FI()
     
     // Copy the lattice of the right-hand-side to both the left-hand-side variable and to the assignment expression itself

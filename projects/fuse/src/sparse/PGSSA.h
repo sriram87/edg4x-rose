@@ -24,7 +24,6 @@
 #include <vector>
 
 #include "sight.h"
-#include "sight_verbosity.h"
 using namespace sight;
 
 namespace hssa_private {

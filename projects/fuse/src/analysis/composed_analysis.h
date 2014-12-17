@@ -5,7 +5,7 @@
 #include "analysis.h"
 #include "lattice.h"
 #include "abstract_object.h"
-#include "ats.h"
+#include "ssa.h"
 #include <boost/shared_ptr.hpp>
 #include <vector>
 #include <set>
@@ -26,9 +26,9 @@ class ComposedAnalysis : public virtual Dataflow
   public:
   // Indicates whether we should do the analysis using an SSA graph of the ATS this analysis runs on (true)
   // or whether we should run on the raw dense ATS with no support info (false).
-  bool SSAAnalysis;
+  bool useSSA;
   // The object that describes the ATS, from which we'll compute the SSA
-  ATSGraph* ats;
+  SSAGraph* ssa;
   // The global lattices that describe the state of the entire application. These lattices same lattices
   // will be attached to the NodeState of every part.
   std::vector<Lattice*> ssaLats;
@@ -39,7 +39,8 @@ class ComposedAnalysis : public virtual Dataflow
   
   // trackBase2RefinedPartEdgeMapping - records whether the mapping from base PartEdges to their
   //     corresponding refined parts should be tracked
-  ComposedAnalysis(bool trackBase2RefinedPartEdgeMapping);
+  // useSSA - records whether the analysis should use the SSA graph for its execution
+  ComposedAnalysis(bool trackBase2RefinedPartEdgeMapping, bool useSSA);
   
   // Informs this analysis about the identity of the Composer object that composes
   // this analysis with others
@@ -58,6 +59,9 @@ class ComposedAnalysis : public virtual Dataflow
   // Returns a shared pointer to a freshly-allocated copy of this ComposedAnalysis object
   virtual ComposedAnalysisPtr copy()=0;
   
+  // Initializes the analysis before running it
+  virtual void initAnalysis();
+
   // Abstract interpretation functions that return this analysis' abstractions that 
   // represent the outcome of the given SgExpression. The default implementations of 
   // these throw NotImplementedException so that if a derived class does not implement 
@@ -350,7 +354,7 @@ class FWDataflow  : public ComposedAnalysis
 {
   public:
   
-  FWDataflow(bool trackBase2RefinedPartEdgeMapping): ComposedAnalysis(trackBase2RefinedPartEdgeMapping)
+  FWDataflow(bool trackBase2RefinedPartEdgeMapping, bool useSSA): ComposedAnalysis(trackBase2RefinedPartEdgeMapping, useSSA)
   {}
 
   void initNodeState(PartPtr part);
@@ -387,7 +391,7 @@ class BWDataflow  : public ComposedAnalysis
 {
   public:
   
-  BWDataflow(bool trackBase2RefinedPartEdgeMapping): ComposedAnalysis(trackBase2RefinedPartEdgeMapping)
+  BWDataflow(bool trackBase2RefinedPartEdgeMapping, bool useSSA): ComposedAnalysis(trackBase2RefinedPartEdgeMapping, useSSA)
   {}
 
   void initNodeState(PartPtr part);
@@ -426,7 +430,11 @@ class UndirDataflow  : public ComposedAnalysis
 {
   public:
   
-  UndirDataflow() : ComposedAnalysis(/*trackBase2RefinedPartEdgeMapping*/ false)
+  UndirDataflow() : ComposedAnalysis(/*trackBase2RefinedPartEdgeMapping*/ false, /*useSSA*/ false)
+  {}
+
+  UndirDataflow(bool trackBase2RefinedPartEdgeMapping, bool useSSA) :
+    ComposedAnalysis(trackBase2RefinedPartEdgeMapping, useSSA)
   {}
 
   // relevant only for directional dataflow analysis
@@ -481,7 +489,7 @@ class printDataflowInfoPass : public FWDataflow
   Analysis* analysis;
 
   public:
-  printDataflowInfoPass(Analysis *analysis) : FWDataflow(/*trackBase2RefinedPartEdgeMapping*/ false)
+  printDataflowInfoPass(Analysis *analysis) : FWDataflow(/*trackBase2RefinedPartEdgeMapping*/ false, /*useSSA*/ false)
   {
           this->analysis = analysis;
   }
@@ -508,8 +516,8 @@ class checkDataflowInfoPass : public FWDataflow
   int numErrors;
 
   public:
-  checkDataflowInfoPass() : FWDataflow(/*trackBase2RefinedPartEdgeMapping*/ false), numErrors(0) { }
-  checkDataflowInfoPass(int numErrors): FWDataflow(/*trackBase2RefinedPartEdgeMapping*/ false), numErrors(numErrors) { }
+  checkDataflowInfoPass() : FWDataflow(/*trackBase2RefinedPartEdgeMapping*/ false, /*useSSA*/ false), numErrors(0) { }
+  checkDataflowInfoPass(int numErrors): FWDataflow(/*trackBase2RefinedPartEdgeMapping*/ false, /*useSSA*/ false), numErrors(numErrors) { }
   
   // Returns a shared pointer to a freshly-allocated copy of this ComposedAnalysis object
   ComposedAnalysisPtr copy() { return boost::make_shared<checkDataflowInfoPass>(numErrors); }

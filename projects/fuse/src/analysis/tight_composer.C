@@ -7,7 +7,7 @@
 #include <boost/enable_shared_from_this.hpp>
 #include "sight.h"
 #include "stx_analysis.h"
-#include "ats.h"
+#include "ssa.h"
 #include <algorithm>
 
 using namespace std;
@@ -177,8 +177,8 @@ namespace fuse {
    * TightComposer Methods *
    ******************************/
 
-  TightComposer::TightComposer(const std::list<ComposedAnalysis*>& analyses, bool trackBase2RefinedPartEdgeMapping) : 
-    ComposedAnalysis(trackBase2RefinedPartEdgeMapping), allAnalyses(analyses) {    
+  TightComposer::TightComposer(const std::list<ComposedAnalysis*>& analyses, bool trackBase2RefinedPartEdgeMapping, bool useSSA) :
+    ComposedAnalysis(trackBase2RefinedPartEdgeMapping, useSSA), allAnalyses(analyses) {
     list<ComposedAnalysis*>::iterator a=allAnalyses.begin();
     // get the first analysis' direction
     // all other analyses should be in the same direction
@@ -260,7 +260,7 @@ namespace fuse {
 
     if(recursiveQueries(queryList, client)) {
       // return boost::make_shared<FullAOType>();
-      boost::shared_ptr<AnalysisMapAOType> amao_p = boost::make_shared<AnalysisMapAOType>();
+      boost::shared_ptr<AnalysisMapAOType> amao_p = boost::make_shared<AnalysisMapAOType>(Intersection, client);
       // Query the parent composer
       boost::shared_ptr<CombinedAOType> cao_p = boost::make_shared<CombinedAOType>();
       for(qIt = queryList.begin(); qIt != queryList.end(); ++qIt) {
@@ -271,13 +271,13 @@ namespace fuse {
         }
         cao_p->add(ao_p, query.pedge, this, client);
       }
-      amao_p->add(dynamic_cast<ComposedAnalysis*>(getComposer()), cao_p, pedge, this, client);
+      //amao_p->add(dynamic_cast<ComposedAnalysis*>(getComposer()), cao_p, pedge, this, client);
       return amao_p;
     }
 
     initializeQueryList(queryList);
 
-    boost::shared_ptr<AnalysisMapAOType> amao_p = boost::make_shared<AnalysisMapAOType>();
+    boost::shared_ptr<AnalysisMapAOType> amao_p = boost::make_shared<AnalysisMapAOType>(Intersection, client);
     list<ComposedAnalysis*>::iterator a = allAnalyses.begin();    
     
     // Dispatch queries to each analysis
@@ -339,7 +339,7 @@ namespace fuse {
     function<CodeLocObjectPtr (SgNode*, PartEdgePtr)> ComposerExpr2AnyOp(bind(&Composer::Expr2CodeLoc, getComposer(), _1, _2, this));
 
     CodeLocObjectPtr cl_p = Expr2Any<CodeLocObject, FullCodeLocObject, 
-                                     PartEdgeUnionCodeLocObject, IntersectAnalMapCodeLocObject>("Expr2CodeLoc",
+                                     PartEdgeUnionCodeLocObject, AnalMapCodeLocObject>("Expr2CodeLoc",
                                                                                                 queryList,
                                                                                                 pedge,
                                                                                                 client,
@@ -388,7 +388,7 @@ namespace fuse {
     function<ValueObjectPtr (SgNode*, PartEdgePtr)> ComposerExpr2AnyOp(bind(&Composer::Expr2Val, getComposer(), _1, _2, this));
 
     ValueObjectPtr v_p = Expr2Any<ValueObject, FullValueObject, 
-                                  PartEdgeUnionValueObject, IntersectAnalMapValueObject>("Expr2Val",
+                                  PartEdgeUnionValueObject, AnalMapValueObject>("Expr2Val",
                                                                                          queryList,
                                                                                          pedge,
                                                                                          client,
@@ -439,8 +439,8 @@ namespace fuse {
     assert(getComposer() != this);
     function<MemRegionObjectPtr (SgNode*, PartEdgePtr)> ComposerExpr2AnyOp(bind(&Composer::Expr2MemRegion, getComposer(), _1, _2, this));
 
-    MemRegionObjectPtr mr_p = Expr2Any<MemRegionObject, FullMemRegionObject, 
-                                       PartEdgeUnionMemRegionObject, IntersectAnalMapMemRegionObject>("Expr2MemRegion",
+    MemRegionObjectPtr mr_p = Expr2Any<MemRegionObject, FullMemRegionObject,
+                                       PartEdgeUnionMemRegionObject, AnalMapMemRegionObject>("Expr2MemRegion",
                                                                                                       queryList,
                                                                                                       pedge,
                                                                                                       client,
@@ -489,7 +489,7 @@ namespace fuse {
     function<MemLocObjectPtr (SgNode*, PartEdgePtr)> ComposerExpr2AnyOp(bind(&Composer::Expr2MemLoc, getComposer(), _1, _2, this));
 
     MemLocObjectPtr ml_p = Expr2Any<MemLocObject, FullMemLocObject, 
-                                     PartEdgeUnionMemLocObject, IntersectAnalMapMemLocObject>("Expr2MemLoc",
+                                     PartEdgeUnionMemLocObject, AnalMapMemLocObject>("Expr2MemLoc",
                                                                                               queryList,
                                                                                               pedge,
                                                                                               client,
@@ -536,45 +536,45 @@ namespace fuse {
   // MayEquals
   // Returns whether the given pair of AbstractObjects are may-equal at the given PartEdge
   bool TightComposer::mayEqualV (ValueObjectPtr val1, ValueObjectPtr val2, PartEdgePtr pedge, ComposedAnalysis* client) {
-    return val1->mayEqualV(val2, pedge);
+    return val1->mayEqualAO(val2, pedge);
   }
 
   bool TightComposer::mayEqualMR(MemRegionObjectPtr mr1, MemRegionObjectPtr mr2,  PartEdgePtr pedge, ComposedAnalysis* client) {
-    return mr1->mayEqualMR(mr2, pedge);
+    return mr1->mayEqualAO(mr2, pedge);
   }
 
   // MustEquals
   bool TightComposer::mustEqualV (ValueObjectPtr val1, ValueObjectPtr val2, PartEdgePtr pedge, ComposedAnalysis* client) {
-    return val1->mustEqualV(val2, pedge);
+    return val1->mustEqualAO(val2, pedge);
   }
 
   bool TightComposer::mustEqualMR(MemRegionObjectPtr mr1, MemRegionObjectPtr mr2, PartEdgePtr pedge, ComposedAnalysis* client) {
-    return mr1->mustEqualMR(mr2, pedge);
+    return mr1->mustEqualAO(mr2, pedge);
   }
   
   // Returns whether the two abstract objects denote the same set of concrete objects
   bool TightComposer::equalSetV (ValueObjectPtr val1, ValueObjectPtr val2, PartEdgePtr pedge, ComposedAnalysis* client) {
-    return val1->equalSetV(val2, pedge);
+    return val1->equalSetAO(val2, pedge);
   }
 
   bool TightComposer::equalSetMR(MemRegionObjectPtr mr1, MemRegionObjectPtr mr2,  PartEdgePtr pedge, ComposedAnalysis* client) {
-    return mr1->equalSetMR(mr2, pedge);
+    return mr1->equalSetAO(mr2, pedge);
   }
   
   bool TightComposer::subSetV(ValueObjectPtr val1, ValueObjectPtr val2, PartEdgePtr pedge, ComposedAnalysis* client) {
-    return val1->subSetV(val2, pedge);
+    return val1->subSetAO(val2, pedge);
   }
 
   bool TightComposer::subSetMR(MemRegionObjectPtr mr1, MemRegionObjectPtr mr2,  PartEdgePtr pedge, ComposedAnalysis* client) {
-    return mr1->subSetMR(mr2, pedge);
+    return mr1->subSetAO(mr2, pedge);
   }
     
   bool TightComposer::isLiveV (ValueObjectPtr val, PartEdgePtr pedge, ComposedAnalysis* client) {
-    return val->isLiveV(pedge);
+    return val->isLiveAO(pedge);
   }
 
   bool TightComposer::isLiveMR(MemRegionObjectPtr mr, PartEdgePtr pedge, ComposedAnalysis* client) {
-    return mr->isLiveMR(pedge);
+    return mr->isLiveAO(pedge);
   }
   
   // Calls the isLive() method of the given AbstractObject that denotes an operand of the given SgNode n within
@@ -592,34 +592,34 @@ namespace fuse {
   // Computes the meet of from and to and saves the result in to.
   // Returns true if this causes this to change and false otherwise.
   bool TightComposer::meetUpdateV (ValueObjectPtr to, ValueObjectPtr from, PartEdgePtr pedge, ComposedAnalysis* analysis) {
-    return to->meetUpdateV(from, pedge);
+    return to->meetUpdateAO(from, pedge);
   }
 
   bool TightComposer::meetUpdateMR(MemRegionObjectPtr to, MemRegionObjectPtr from, PartEdgePtr pedge, ComposedAnalysis* analysis) {
-    return to->meetUpdateMR(from, pedge);
+    return to->meetUpdateAO(from, pedge);
   }
   
   // Returns whether the given AbstractObject corresponds to the set of all sub-executions or the empty set
   bool TightComposer::isFullV (ValueObjectPtr ao, PartEdgePtr pedge, ComposedAnalysis* analysis) {
-    return ao->isFullV(pedge);
+    return ao->isFullAO(pedge);
   }
 
   bool TightComposer::isFullMR(MemRegionObjectPtr ao, PartEdgePtr pedge, ComposedAnalysis* analysis) {
-    return ao->isFullMR(pedge);
+    return ao->isFullAO(pedge);
   }
   
   // Returns whether the given AbstractObject corresponds to the empty set
   bool TightComposer::isEmptyV (ValueObjectPtr ao, PartEdgePtr pedge, ComposedAnalysis* analysis) {
-    return ao->isEmptyV(pedge);
+    return ao->isEmptyAO(pedge);
   }
 
   bool TightComposer::isEmptyMR(MemRegionObjectPtr ao, PartEdgePtr pedge, ComposedAnalysis* analysis) {
-    return ao->isEmptyMR(pedge);
+    return ao->isEmptyAO(pedge);
   }
   
   // Returns a ValueObject that denotes the size of this memory region
   ValueObjectPtr TightComposer::getRegionSizeMR(MemRegionObjectPtr ao, PartEdgePtr pedge, ComposedAnalysis* analysis) {
-    return ao->getRegionSizeMR(pedge);
+    return ao->getRegionSizeAO(pedge);
   }
 
   // query all analyses in the composition list with GetStartAStates
@@ -842,7 +842,7 @@ namespace fuse {
   }
 
   // Return an ATSGraph object that describes the overall structure of the transition system
-  ATSGraph* TightComposer::GetATSGraph(ComposedAnalysis* client)
+  SSAGraph* TightComposer::GetSSAGraph(ComposedAnalysis* client)
   { ROSE_ASSERT(0); }
 
   std::string TightComposer::str(std::string indent) const {

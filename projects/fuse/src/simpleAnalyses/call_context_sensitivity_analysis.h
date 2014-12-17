@@ -280,7 +280,7 @@ class CallCtxSensPartEdge : public PartEdge {
 
 // Memory region object that wraps server-provided MemRegionObjects but adds to them the context
 // from which they were derived.
-class CallCtxSensMR : public MemRegionObject, public AbstractObjectHierarchy
+class CallCtxSensMR : public MemRegionObject
 {
   protected:
     // The server MemRegionObject that this object wraps
@@ -301,31 +301,31 @@ class CallCtxSensMR : public MemRegionObject, public AbstractObjectHierarchy
     std::string str(std::string indent="") const;// { return ((const CallCtxSensMR*)this)->str(indent); }
 
     // copy this object and return a pointer to it
-    MemRegionObjectPtr copyMR() const;
+    MemRegionObjectPtr copyAOType() const;
 
-    bool mayEqualMR(MemRegionObjectPtr that, PartEdgePtr pedge);
-    bool mustEqualMR(MemRegionObjectPtr that, PartEdgePtr pedge);
+    bool mayEqualAO(MemRegionObjectPtr that, PartEdgePtr pedge);
+    bool mustEqualAO(MemRegionObjectPtr that, PartEdgePtr pedge);
     
     // Returns whether the two abstract objects denote the same set of concrete objects
-    bool equalSetMR(MemRegionObjectPtr o, PartEdgePtr pedge);
+    bool equalSetAO(MemRegionObjectPtr o, PartEdgePtr pedge);
     
     // Returns whether this abstract object denotes a non-strict subset (the sets may be equal) of the set denoted
     // by the given abstract object.
-    bool subSetMR(MemRegionObjectPtr o, PartEdgePtr pedge);
+    bool subSetAO(MemRegionObjectPtr o, PartEdgePtr pedge);
     
-    bool isLiveMR(PartEdgePtr pedge);
+    bool isLiveAO(PartEdgePtr pedge);
     
     // Computes the meet of this and that and saves the result in this
     // returns true if this causes this to change and false otherwise
-    bool meetUpdateMR(MemRegionObjectPtr that, PartEdgePtr pedge);
+    bool meetUpdateAO(MemRegionObjectPtr that, PartEdgePtr pedge);
     
     // Returns whether this AbstractObject denotes the set of all possible execution prefixes.
-    bool isFullMR(PartEdgePtr pedge);
+    bool isFullAO(PartEdgePtr pedge);
     // Returns whether this AbstractObject denotes the empty set.
-    bool isEmptyMR(PartEdgePtr pedge);
+    bool isEmptyAO(PartEdgePtr pedge);
     
     // Returns a ValueObject that denotes the size of this memory region
-    ValueObjectPtr getRegionSizeMR(PartEdgePtr pedge);
+    ValueObjectPtr getRegionSizeAO(PartEdgePtr pedge);
     
     // Set this object to represent the set of all possible MemLocs
     // Return true if this causes the object to change and false otherwise.
@@ -347,7 +347,7 @@ class CallCtxSensMR : public MemRegionObject, public AbstractObjectHierarchy
     // Returns whether all instances of this class form a hierarchy. Every instance of the same
     // class created by the same analysis must return the same value from this method!
     bool isHierarchy() const;
-    // AbstractObjects that form a hierarchy must inherit from the AbstractObjectHierarchy class
+    // AbstractObjects that form a hierarchy must inherit from the AbstractionHierarchy class
     
     // Returns a key that uniquely identifies this particular AbstractObject in the 
     // set hierarchy.
@@ -376,6 +376,8 @@ class CallCtxSensML : public MemLocObject
     CallCtxSensML(SgNode* sgn, MemLocObjectPtr baseML, const CallPartContext& context, CallContextSensitivityAnalysis* ccsa);
     CallCtxSensML(const CallCtxSensML& that);
     
+    virtual SgNode* getBase() const { return baseML->getBase(); }
+
     // pretty print
     //std::string str(std::string indent="") const;
     std::string str(std::string indent="") const;// { return ((const CallCtxSensML*)this)->str(indent); }
@@ -414,7 +416,7 @@ class CallCtxSensML : public MemLocObject
     // Returns whether all instances of this class form a hierarchy. Every instance of the same
     // class created by the same analysis must return the same value from this method!
     bool isHierarchy() const;
-    // AbstractObjects that form a hierarchy must inherit from the AbstractObjectHierarchy class
+    // AbstractObjects that form a hierarchy must inherit from the AbstractionHierarchy class
     
     // Returns a key that uniquely identifies this particular AbstractObject in the 
     // set hierarchy.
@@ -426,7 +428,7 @@ class CallCtxSensML : public MemLocObject
    ############################## */
 
 // Lattice object associated with each PartEdge of the server analysis. Maintains multiple CallCtxSensPartEdges
-// that may reach thi
+// that may reach a given Part.
 class CallCtxSensLattice: public FiniteLattice
 {
   private:
@@ -464,9 +466,6 @@ class CallCtxSensLattice: public FiniteLattice
    *    such calls are modeled by considering both possibilities: one outgoing edge for the case where the top element
    *    in the context stack is popped and one where the stack is unchanged.
    */
-  /*std::list<PartPtr> context;
-  bool recursive;
-  */
   public:
   CallCtxSensLattice(PartEdgePtr baseEdge, ComposedAnalysis* analysis/*, const std::list<PartPtr>& context, bool recursive*/);
   
@@ -524,6 +523,10 @@ class CallCtxSensLattice: public FiniteLattice
   // Returns true if this causes this to change and false otherwise
   bool meetUpdate(Lattice* that);
   
+  // Computes the intersection of this and that and saves the result in this
+  // Returns true if this causes this to change and false otherwise
+  bool intersectUpdate(Lattice* that);
+
   // Set this Lattice object to represent the set of all possible execution prefixes.
   // Return true if this causes the object to change and false otherwise.
   bool setToFull();
@@ -537,9 +540,9 @@ class CallCtxSensLattice: public FiniteLattice
   bool setMLValueToFull(MemLocObjectPtr ml);
   
   // Returns whether this lattice denotes the set of all possible execution prefixes.
-  bool isFullLat();
+  bool isFull();
   // Returns whether this lattice denotes the empty set.
-  bool isEmptyLat();
+  bool isEmpty();
   
   std::string str(std::string indent="") const;
 }; // CallCtxSensLattice
@@ -569,8 +572,8 @@ class CallContextSensitivityAnalysis : public FWDataflow
   sensType type;
   
   public:
-  CallContextSensitivityAnalysis(int sensDepth, sensType type, bool trackBase2RefinedPartEdgeMapping) : 
-    FWDataflow(trackBase2RefinedPartEdgeMapping), sensDepth(sensDepth), type(type) {}
+  CallContextSensitivityAnalysis(int sensDepth, sensType type, bool trackBase2RefinedPartEdgeMapping) :
+    FWDataflow(trackBase2RefinedPartEdgeMapping, /*useSSA*/ false), sensDepth(sensDepth), type(type) {}
   
   // Returns a shared pointer to a freshly-allocated copy of this ComposedAnalysis object
   ComposedAnalysisPtr copy() { return boost::make_shared<CallContextSensitivityAnalysis>(sensDepth, type, trackBase2RefinedPartEdgeMapping); }

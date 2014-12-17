@@ -1,6 +1,5 @@
 #include "sage3basic.h"
 #include "dead_path_elim_analysis.h"
-#include "sight_verbosity.h"
 
 using namespace std;
 using namespace sight;
@@ -635,6 +634,14 @@ bool DeadPathElimPartEdge::meetUpdate(Lattice* that_arg)
   return modified;
 }
 
+// Computes the intersection of this and that and saves the result in this
+// Returns true if this causes this to change and false otherwise
+bool DeadPathElimPartEdge::intersectUpdate(Lattice* that_arg)
+{
+  // We will almost certainly not need to use intersections for this object
+  assert(0);
+}
+
 // Set this Lattice object to represent the set of all possible execution prefixes.
 // Return true if this causes the object to change and false otherwise.
 bool DeadPathElimPartEdge::setToFull()
@@ -671,11 +678,11 @@ bool DeadPathElimPartEdge::setToDead()
 }
 
 // Returns whether this lattice denotes the set of all possible execution prefixes.
-bool DeadPathElimPartEdge::isFullLat()
+bool DeadPathElimPartEdge::isFull()
 { return level == live; }
 
 // Returns whether this lattice denotes the empty set.
-bool DeadPathElimPartEdge::isEmptyLat()
+bool DeadPathElimPartEdge::isEmpty()
 { return level == bottom; }
 
 // Returns whether this lattice denotes the set of all possible execution prefixes.
@@ -909,7 +916,8 @@ void DeadPathElimTransfer::visit(SgNode *sgn)
   }
 }
 
-DeadPathElimAnalysis::DeadPathElimAnalysis(bool trackBase2RefinedPartEdgeMapping): FWDataflow(trackBase2RefinedPartEdgeMapping)
+DeadPathElimAnalysis::DeadPathElimAnalysis(bool trackBase2RefinedPartEdgeMapping):
+    FWDataflow(trackBase2RefinedPartEdgeMapping, /*useSSA*/ false)
 {
   cacheInitialized_GetStartAStates_Spec=false;
   cacheInitialized_GetEndAStates_Spec=false;

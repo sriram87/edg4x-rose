@@ -263,6 +263,10 @@ class DeadPathElimPartEdge : public FiniteLattice, public PartEdge {
   // Returns true if this causes this to change and false otherwise
   bool meetUpdate(Lattice* that);
   
+  // Computes the meet of this and that and saves the result in this
+  // Returns true if this causes this to change and false otherwise
+  bool intersectUpdate(Lattice* that);
+
   // Set this Lattice object to represent the set of all possible execution prefixes.
   // Return true if this causes the object to change and false otherwise.
   bool setToFull();
@@ -276,9 +280,9 @@ class DeadPathElimPartEdge : public FiniteLattice, public PartEdge {
   bool setMLValueToFull(MemLocObjectPtr ml);
   
   // Returns whether this lattice denotes the set of all possible execution prefixes.
-  bool isFullLat();
+  bool isFull();
   // Returns whether this lattice denotes the empty set.
-  bool isEmptyLat();
+  bool isEmpty();
   
   // Returns whether this AbstractObject denotes the set of all possible execution prefixes.
   bool isFull(PartEdgePtr pedge);

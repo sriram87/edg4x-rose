@@ -63,10 +63,10 @@ namespace fuse
   class PointsToAnalysis : public virtual FWDataflow
   {
   public:
-    PointsToAnalysis() : FWDataflow(/*trackBase2RefinedPartEdgeMapping*/ false) { }
+    PointsToAnalysis(bool useSSA) : FWDataflow(/*trackBase2RefinedPartEdgeMapping*/ false, useSSA) { }
     
     // Returns a shared pointer to a freshly-allocated copy of this ComposedAnalysis object
-    ComposedAnalysisPtr copy() { return boost::make_shared<PointsToAnalysis>(); }
+    ComposedAnalysisPtr copy() { return boost::make_shared<PointsToAnalysis>(useSSA); }
 
     void genInitLattice(PartPtr part, PartEdgePtr pedge,
                         std::vector<Lattice*>& initLattices);
@@ -106,6 +106,7 @@ namespace fuse
   //! AbstractObjectSet is used to store the set of MemLocObjects denoted by an expression.
   class PTMemLocObject : public MemLocObject {
     boost::shared_ptr<AbstractObjectSet> aos_p;
+    PointsToAnalysis* ptanalysis;
   public:
     PTMemLocObject(PartEdgePtr pedge, Composer* composer, PointsToAnalysis* ptanalysis);
     PTMemLocObject(const PTMemLocObject& thatPTML);

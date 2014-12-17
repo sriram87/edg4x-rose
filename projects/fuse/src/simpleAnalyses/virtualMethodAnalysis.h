@@ -64,6 +64,8 @@ class ClassInheritanceTree: public FiniteLattice {
 
     Node(SgClassDefinition* def): def(def) {}
     
+    // Copy constructor that creates a deep copy
+
     std::string str(std::string indent="") const {
       std::ostringstream s;
       s << "[ClassInheritanceTree::Node:(this="<<this<<", #parents="<<parents.size()<<", child="<<child.get()<<"="<<(child?child->def:NULL)<<endl;
@@ -126,9 +128,15 @@ class ClassInheritanceTree: public FiniteLattice {
   // Computes the meet of this and that and saves the result in this
   // returns true if this causes this to change and false otherwise
   // The part of this object is to be used for AbstractObject comparisons.
-  // Meet update finds the common tree prefix among the two treeS
+  // meetUpdate finds the common tree prefix among the two treeS
   bool meetUpdate(Lattice* that);
   
+  // Computes the intersection of this and that and saves the result in this
+  // returns true if this causes this to change and false otherwise
+  // The part of this object is to be used for AbstractObject comparisons.
+  // intersectUpdate finds the common tree prefix among the two treeS
+  bool intersectUpdate(Lattice* that);
+
   // Returns the set of functions the given SgFunctionCallExp may refer to given
   // the type constraints encoded in this tree
   std::set<SgFunctionDeclaration*> getCalleeDefs(SgFunctionCallExp* call);
@@ -148,10 +156,10 @@ class ClassInheritanceTree: public FiniteLattice {
   bool setMLValueToFull(MemLocObjectPtr ml);
 
   // Returns whether this lattice denotes the set of all possible execution prefixes.
-  bool isFullLat();
+  bool isFull();
 
   // Returns whether this lattice denotes the empty set.
-  bool isEmptyLat();
+  bool isEmpty();
 
   std::string str(std::string indent="") const;
   std::string strp(PartEdgePtr pedge, std::string indent) const { return str(indent); }

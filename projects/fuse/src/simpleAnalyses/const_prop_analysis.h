@@ -4,7 +4,8 @@
 #include "compose.h"
 namespace fuse
 {
-    class CPValueObject;
+  class CPValueLattice;
+  class CPValueObject;
 };
 #include "VariableStateTransfer.h"
 #include "abstract_object_map.h"
@@ -21,7 +22,11 @@ class ConstantPropagationAnalysis;
 // This is a forward dataflow analysis that implements a simple abstraction of values 
 // that consists of the universal set, a single constant value and an empty set. It 
 // maintains a map of memory locations to these value abstractions.
-  
+
+class CPValueLattice;
+typedef boost::shared_ptr<CPValueLattice> CPValueLatticePtr;
+extern CPValueLatticePtr NULLCPValueLattice;
+
 class CPValueObject;
 typedef boost::shared_ptr<CPValueObject> CPValueObjectPtr;
 extern CPValueObjectPtr NULLCPValueObject;
@@ -109,19 +114,22 @@ class CPValueKind: public sight::printable, public boost::enable_shared_from_thi
   virtual CPValueKindPtr op(SgBinaryOp* op, CPValueKindPtr that)=0;
   
   // Returns whether this and that CPValueKinds are may/must equal to each other
-  virtual bool mayEqualV(CPValueKindPtr that)=0;
-  virtual bool mustEqualV(CPValueKindPtr that)=0;
+  virtual bool mayEqualAO(CPValueKindPtr that)=0;
+  virtual bool mustEqualAO(CPValueKindPtr that)=0;
   
   // Returns whether the two CPValueKinds denote the same set of concrete values
-  virtual bool equalSetV(CPValueKindPtr that)=0;
+  virtual bool equalSetAO(CPValueKindPtr that)=0;
   
   // Returns whether this CPValueKind denotes a non-strict subset (the sets may be equal) of the set denoted
   // by the given CPValueKind
-  virtual bool subSetV(CPValueKindPtr that)=0;
+  virtual bool subSetAO(CPValueKindPtr that)=0;
   
   // Computes the meet of this and that and returns the resulting kind
-  virtual std::pair<bool, CPValueKindPtr> meetUpdateV(CPValueKindPtr that)=0;
+  virtual std::pair<bool, CPValueKindPtr> meetUpdateAO(CPValueKindPtr that)=0;
   
+  // Computes the intersection of this and that and returns the resulting kind
+  virtual std::pair<bool, CPValueKindPtr> intersectUpdateAO(CPValueKindPtr that)=0;
+
   // Returns true if this ValueObject corresponds to a concrete value that is statically-known
   virtual bool isConcrete()=0;
   // Returns the number of concrete values in this set
@@ -133,19 +141,19 @@ class CPValueKind: public sight::printable, public boost::enable_shared_from_thi
   virtual std::set<boost::shared_ptr<SgValueExp> > getConcreteValue()=0;
   
   // Returns whether this AbstractObject denotes the set of all possible execution prefixes.
-  virtual bool isFullV(PartEdgePtr pedge)=0;
+  virtual bool isFullAO(PartEdgePtr pedge)=0;
   // Returns whether this AbstractObject denotes the empty set.
-  virtual bool isEmptyV(PartEdgePtr pedge)=0;
+  virtual bool isEmptyAO(PartEdgePtr pedge)=0;
   
   // Returns a copy of this CPConcreteKind
-  virtual CPValueKindPtr copyV() const=0;
+  virtual CPValueKindPtr copyAOType() const=0;
   
   // Appends to the given hierarchical key the additional information that uniquely 
   // identifies this type's set
-  virtual void addHierSubKey(const AbstractObjectHierarchy::hierKeyPtr& key)=0;
+  virtual void addHierSubKey(const AbstractionHierarchy::hierKeyPtr& key)=0;
 }; // CPValueKind
 
-// CPValueObject form a set hierarchy and thus implement the AbstractObjectHierarchy
+// CPValueObject form a set hierarchy and thus implement the AbstractionHierarchy
 // interface. The hierarchy is:
 // empty key: unknown
 // non-empty:
@@ -161,64 +169,66 @@ class CPValueKind: public sight::printable, public boost::enable_shared_from_thi
 // std::list<comparableKind, comparableSgNode>
 
 
-class CPValueObject : public FiniteLattice, public ValueObject, public AbstractObjectHierarchy {
-  //SgNode* n;
-
-  // StxValueObjects are used to identify both raw values and the locations of class fields within 
-  // a class. Since there may be arbitrary amounts of padding between such fields, we can only determine
-  // the order of their offsets within the class object, not the actual concrete values of these offsets.
-  // Since the application may use these offsets to find additional memory regions (e.g. a.b.c, (&a.b)+1 or 
-  // array[1].a[2].b[3]), we represent such derived offsets as sequences of StxValueObjects, the sum of
-  // which corresponds to the actual offset. 
-  // Thus, 
-  // a.b.c: region(a), rank(b in a) + rank(c in b)
-  // (&a.b)+1: region(a), rank(b in a) + concrete(1)
-  // array[1].a[2].b[3]: region(array), concrete(1*sizeof(elt of array)) + rank(a in array elt) + 
-  //                                    concrete(2*sizeof elt of array[1]) + rank(b in array[1] elt) +
-  //                                    concrete(3*sizeof elt of array[1].a[2])
-  // We maintain such sums of StxValueObjects as a linked list, with each object in the chain pointing
-  // to the next one. However, not all combinations need to be represented explicitly:
-  // concrete + concrete: concrete object that denotes the sum of the arguments
-  // concrete + rank, rank + concrete: maintained as a list
-  // rank + rank: unknown
-  // * + unknown, unknown + *: a single unknown value object
-/*  // pointer(memregion, *1) + *2, *2 + pointer(memregion, *1): 
-  //          resulting object is pointer(memregion, *1+*2), with the + following the above rules */
-  
+// CPValueLattice are used to identify both raw values and the locations of class fields within
+// a class. Since there may be arbitrary amounts of padding between such fields, we can only determine
+// the order of their offsets within the class object, not the actual concrete values of these offsets.
+// Since the application may use these offsets to find additional memory regions (e.g. a.b.c, (&a.b)+1 or
+// array[1].a[2].b[3]), we represent such derived offsets as sequences of StxValueObjects, the sum of
+// which corresponds to the actual offset.
+// Thus,
+// a.b.c: region(a), rank(b in a) + rank(c in b)
+// (&a.b)+1: region(a), rank(b in a) + concrete(1)
+// array[1].a[2].b[3]: region(array), concrete(1*sizeof(elt of array)) + rank(a in array elt) +
+//                                    concrete(2*sizeof elt of array[1]) + rank(b in array[1] elt) +
+//                                    concrete(3*sizeof elt of array[1].a[2])
+// We maintain such sums of StxValueObjects as a linked list, with each object in the chain pointing
+// to the next one. However, not all combinations need to be represented explicitly:
+// concrete + concrete: concrete object that denotes the sum of the arguments
+// concrete + rank, rank + concrete: maintained as a list
+// rank + rank: unknown
+// * + unknown, unknown + *: a single unknown value object
+/*  // pointer(memregion, *1) + *2, *2 + pointer(memregion, *1):
+//          resulting object is pointer(memregion, *1+*2), with the + following the above rules */
+class CPValueLattice : public FiniteLattice, public boost::enable_shared_from_this<CPValueLattice> {
   CPValueKindPtr kind;
-  
+
+  friend class CPValueObject;
+
   public:
 
   // Do we need a default constructor?
-  CPValueObject(PartEdgePtr pedge);
-  CPValueObject(CPValueKindPtr kind, PartEdgePtr pedge);
-  
-  // Do we need th copy constructor?
-  CPValueObject(const CPValueObject & X);
-  
-  // Wrapper for shared_from_this that returns an instance of this class rather than its parent
-  CPValueObjectPtr shared_from_this() { return boost::static_pointer_cast<CPValueObject>(ValueObject::shared_from_this()); }
-  
+  CPValueLattice(PartEdgePtr pedge);
+  CPValueLattice(CPValueKindPtr kind, PartEdgePtr pedge);
+  CPValueLattice(const CPValueLattice & X);
+
   // Access functions.
   CPValueKindPtr getKind() const;
   // Sets this object's kind to the given kind, returning true if this causes the CPValueObject to change
   bool setKind(CPValueKindPtr kind);
-  
+
   void initialize();
-  
-  // returns a copy of this lattice
+
+  // Returns a copy of this lattice
   Lattice* copy() const;
   
+  // Returns a shared pointer to a newly-allocated copy of this CPValueLatice
+  CPValueLatticePtr copyCPLat() const;
+
   // overwrites the state of "this" Lattice with "that" Lattice
   void copy(Lattice* that);
   
   bool operator==(Lattice* that) /*const*/;
   
-  // computes the meet of this and that and saves the result in this
+  // Computes the meet of this and that and saves the result in this
   // returns true if this causes this to change and false otherwise
   bool meetUpdate(Lattice* that);
-  bool meetUpdate(CPValueObject* that);
+  bool meetUpdate(CPValueLattice* that);
   
+  // Computes the intersection of this and that and saves the result in this
+  // returns true if this causes this to change and false otherwise
+  bool intersectUpdate(Lattice* that);
+  bool intersectUpdate(CPValueLattice* that);
+
   // Set this Lattice object to represent the set of all possible execution prefixes.
   // Return true if this causes the object to change and false otherwise.
   bool setToFull();
@@ -232,13 +242,12 @@ class CPValueObject : public FiniteLattice, public ValueObject, public AbstractO
   bool setMLValueToFull(MemLocObjectPtr ml);
   
   // Returns whether this lattice denotes the set of all possible execution prefixes.
-  bool isFullLat();
+  bool isFull();
   // Returns whether this lattice denotes the empty set.
-  bool isEmptyLat();
+  bool isEmpty();
   
   // pretty print for the object
   std::string str(std::string indent="") const;
-  std::string strp(PartEdgePtr pedge, std::string indent="") const;
   
   // Applies the given unary or binary operation to this and the given CPValueKind
   // Returns:
@@ -246,29 +255,49 @@ class CPValueObject : public FiniteLattice, public ValueObject, public AbstractO
   //       return a freshly-allocated CPValueKind that holds the result.
   //    - if the two objects could not be merged and therefore that must be placed after 
   //       this in the parent CPValueObject's list, return that.
-  CPValueObjectPtr op(SgUnaryOp* op);
-  CPValueObjectPtr op(SgBinaryOp* op, CPValueObjectPtr that);
-    
-  bool mayEqualV(ValueObjectPtr o, PartEdgePtr pedge);
-  bool mustEqualV(ValueObjectPtr o, PartEdgePtr pedge);
+  CPValueLatticePtr op(SgUnaryOp* op);
+  CPValueLatticePtr op(SgBinaryOp* op, CPValueLatticePtr that);
+
+  // Returns a freshly-allocated CPValueObject that communicates the information from this
+  // Lattice to other analyses
+  CPValueObjectPtr createValueObject();
+}; // class CPValueLattice
+
+
+// CPValueObjects are ValueObjects that are defined by CPValueLattices
+class CPValueObject : public ValueObject {
+  public:
+  // The lattice that grounds the definition of this ValueObject.
+  CPValueLatticePtr ground;
+
+  CPValueObject(CPValueLatticePtr ground);
+
+  // Wrapper for shared_from_this that returns an instance of this class rather than its parent
+  CPValueObjectPtr shared_from_this() { return boost::static_pointer_cast<CPValueObject>(ValueObject::shared_from_this()); }
+
+  bool mayEqualAO(ValueObjectPtr o, PartEdgePtr pedge);
+  bool mustEqualAO(ValueObjectPtr o, PartEdgePtr pedge);
   
   // Returns whether the two abstract objects denote the same set of concrete objects
-  bool equalSetV(ValueObjectPtr o, PartEdgePtr pedge);
+  bool equalSetAO(ValueObjectPtr o, PartEdgePtr pedge);
   
   // Returns whether this abstract object denotes a non-strict subset (the sets may be equal) of the set denoted
   // by the given abstract object.
-  bool subSetV(ValueObjectPtr o, PartEdgePtr pedge);
+  bool subSetAO(ValueObjectPtr o, PartEdgePtr pedge);
   
   // Computes the meet of this and that and returns the resulting kind
-  bool meetUpdateV(ValueObjectPtr that, PartEdgePtr pedge);
+  bool meetUpdateAO(ValueObjectPtr that, PartEdgePtr pedge);
   
+  // Computes the intersect of this and that and returns the resulting kind
+  bool intersectUpdateAO(ValueObjectPtr that, PartEdgePtr pedge);
+
   // Returns whether this AbstractObject denotes the set of all possible execution prefixes.
-  bool isFullV(PartEdgePtr pedge);
+  bool isFullAO(PartEdgePtr pedge);
   // Returns whether this AbstractObject denotes the empty set.
-  bool isEmptyV(PartEdgePtr pedge);
+  bool isEmptyAO(PartEdgePtr pedge);
   
   // Allocates a copy of this object and returns a pointer to it
-  ValueObjectPtr copyV() const;
+  ValueObjectPtr copyAOType() const;
 
   // Returns true if this ValueObject corresponds to a concrete value that is statically-known
   bool isConcrete();
@@ -287,6 +316,10 @@ class CPValueObject : public FiniteLattice, public ValueObject, public AbstractO
   // Returns a key that uniquely identifies this particular AbstractObject in the 
   // set hierarchy.
   const hierKeyPtr& getHierKey() const;
+
+  // pretty print for the object
+  std::string str(std::string indent="") const;
+  std::string strp(PartEdgePtr pedge, std::string indent="") const;
 }; // class CPValueObject
 
 class CPUninitializedKind : public CPValueKind {
@@ -304,19 +337,22 @@ class CPUninitializedKind : public CPValueKind {
   CPValueKindPtr op(SgBinaryOp* op, CPValueKindPtr that);
   
   // Returns whether this and that CPValueKinds are may/must equal to each other
-  bool mayEqualV(CPValueKindPtr that);
-  bool mustEqualV(CPValueKindPtr that);
+  bool mayEqualAO(CPValueKindPtr that);
+  bool mustEqualAO(CPValueKindPtr that);
   
   // Returns whether the two CPValueKinds denote the same set of concrete values
-  bool equalSetV(CPValueKindPtr that);
+  bool equalSetAO(CPValueKindPtr that);
   
   // Returns whether this CPValueKind denotes a non-strict subset (the sets may be equal) of the set denoted
   // by the given CPValueKind
-  bool subSetV(CPValueKindPtr that);
+  bool subSetAO(CPValueKindPtr that);
   
   // Computes the meet of this and that and returns the resulting kind
-  std::pair<bool, CPValueKindPtr> meetUpdateV(CPValueKindPtr that);
+  std::pair<bool, CPValueKindPtr> meetUpdateAO(CPValueKindPtr that);
   
+  // Computes the intersection of this and that and returns the resulting kind
+  std::pair<bool, CPValueKindPtr> intersectUpdateAO(CPValueKindPtr that);
+
   // Returns true if this ValueObject corresponds to a concrete value that is statically-known
   bool isConcrete();
   // Returns the number of concrete values in this set
@@ -328,18 +364,18 @@ class CPUninitializedKind : public CPValueKind {
   std::set<boost::shared_ptr<SgValueExp> > getConcreteValue();
   
   // Returns whether this AbstractObject denotes the set of all possible execution prefixes.
-  bool isFullV(PartEdgePtr pedge);
+  bool isFullAO(PartEdgePtr pedge);
   // Returns whether this AbstractObject denotes the empty set.
-  bool isEmptyV(PartEdgePtr pedge);
+  bool isEmptyAO(PartEdgePtr pedge);
   
   // Returns a copy of this CPUninitializedKind
-  CPValueKindPtr copyV() const { return boost::make_shared<CPUninitializedKind>(); }
+  CPValueKindPtr copyAOType() const { return boost::make_shared<CPUninitializedKind>(); }
   
   std::string str(std::string indent="") const;
   
   // Appends to the given hierarchical key the additional information that uniquely 
   // identifies this type's set
-  void addHierSubKey(const AbstractObjectHierarchy::hierKeyPtr& key)
+  void addHierSubKey(const AbstractionHierarchy::hierKeyPtr& key)
   // Don't add anything else since the hier-level key already separates the empty
   // set from all the other sets
   { }
@@ -421,19 +457,22 @@ class CPConcreteKind : public CPValueKind {
   static bool lessThanVals(SgValueExp* val1, SgValueExp* val2, bool unknownVal);
   
   // Returns whether this and that CPValueKinds are may/must equal to each other
-  bool mayEqualV(CPValueKindPtr that);
-  bool mustEqualV(CPValueKindPtr that);
+  bool mayEqualAO(CPValueKindPtr that);
+  bool mustEqualAO(CPValueKindPtr that);
   
   // Returns whether the two CPValueKinds denote the same set of concrete values
-  bool equalSetV(CPValueKindPtr that);
+  bool equalSetAO(CPValueKindPtr that);
   
   // Returns whether this CPValueKind denotes a non-strict subset (the sets may be equal) of the set denoted
   // by the given CPValueKind
-  bool subSetV(CPValueKindPtr that);
+  bool subSetAO(CPValueKindPtr that);
   
   // Computes the meet of this and that and returns the resulting kind
-  std::pair<bool, CPValueKindPtr> meetUpdateV(CPValueKindPtr that);
+  std::pair<bool, CPValueKindPtr> meetUpdateAO(CPValueKindPtr that);
   
+  // Computes the intersection of this and that and returns the resulting kind
+  std::pair<bool, CPValueKindPtr> intersectUpdateAO(CPValueKindPtr that);
+
   // Returns true if this ValueObject corresponds to a concrete value that is statically-known
   bool isConcrete();
   // Returns the number of concrete values in this set
@@ -445,12 +484,12 @@ class CPConcreteKind : public CPValueKind {
   std::set<boost::shared_ptr<SgValueExp> > getConcreteValue();
   
   // Returns whether this AbstractObject denotes the set of all possible execution prefixes.
-  bool isFullV(PartEdgePtr pedge);
+  bool isFullAO(PartEdgePtr pedge);
   // Returns whether this AbstractObject denotes the empty set.
-  bool isEmptyV(PartEdgePtr pedge);
+  bool isEmptyAO(PartEdgePtr pedge);
   
   // Returns a copy of this CPConcreteKind
-  CPValueKindPtr copyV() const { return boost::make_shared<CPConcreteKind>(getVal()); }
+  CPValueKindPtr copyAOType() const { return boost::make_shared<CPConcreteKind>(getVal()); }
   
   std::string str(std::string indent="") const;
   
@@ -482,7 +521,7 @@ class CPConcreteKind : public CPValueKind {
   
   // Appends to the given hierarchical key the additional information that uniquely 
   // identifies this type's set
-  void addHierSubKey(const AbstractObjectHierarchy::hierKeyPtr& key)
+  void addHierSubKey(const AbstractionHierarchy::hierKeyPtr& key)
   { key->add(boost::make_shared<comparableSgValueExp>(exp.get())); }
 
 }; // CPConcreteKind
@@ -574,19 +613,22 @@ class CPOffsetListKind : public CPValueKind {
   CPValueKindPtr op(SgBinaryOp* op, CPValueKindPtr that);
   
   // Returns whether this and that CPValueKinds are may/must equal to each other
-  bool mayEqualV(CPValueKindPtr that);
-  bool mustEqualV(CPValueKindPtr that);
+  bool mayEqualAO(CPValueKindPtr that);
+  bool mustEqualAO(CPValueKindPtr that);
   
   // Returns whether the two CPValueKinds denote the same set of concrete values
-  bool equalSetV(CPValueKindPtr that);
+  bool equalSetAO(CPValueKindPtr that);
   
   // Returns whether this CPValueKind denotes a non-strict subset (the sets may be equal) of the set denoted
   // by the given CPValueKind
-  bool subSetV(CPValueKindPtr that);
+  bool subSetAO(CPValueKindPtr that);
   
   // Computes the meet of this and that and returns the resulting kind
-  std::pair<bool, CPValueKindPtr> meetUpdateV(CPValueKindPtr that);
+  std::pair<bool, CPValueKindPtr> meetUpdateAO(CPValueKindPtr that);
   
+  // Computes the intersection of this and that and returns the resulting kind
+  std::pair<bool, CPValueKindPtr> intersectUpdateAO(CPValueKindPtr that);
+
   // Returns true if this ValueObject corresponds to a concrete value that is statically-known
   bool isConcrete();
   // Returns the number of concrete values in this set
@@ -598,18 +640,18 @@ class CPOffsetListKind : public CPValueKind {
   std::set<boost::shared_ptr<SgValueExp> > getConcreteValue();
   
   // Returns whether this AbstractObject denotes the set of all possible execution prefixes.
-  bool isFullV(PartEdgePtr pedge);
+  bool isFullAO(PartEdgePtr pedge);
   // Returns whether this AbstractObject denotes the empty set.
-  bool isEmptyV(PartEdgePtr pedge);
+  bool isEmptyAO(PartEdgePtr pedge);
   
   // Returns a copy of this CPOffsetListKind
-  CPValueKindPtr copyV() const { return boost::make_shared<CPOffsetListKind>(offsetL); }
+  CPValueKindPtr copyAOType() const { return boost::make_shared<CPOffsetListKind>(offsetL); }
   
   std::string str(std::string indent="") const;
   
   // Appends to the given hierarchical key the additional information that uniquely 
   // identifies this type's set
-  void addHierSubKey(const AbstractObjectHierarchy::hierKeyPtr& key) { 
+  void addHierSubKey(const AbstractionHierarchy::hierKeyPtr& key) {
     // Add all the intWrap objects on the offset list to the key
     for(std::list<intWrap>::iterator o=offsetL.begin(); o!=offsetL.end(); o++)
       key->add(boost::make_shared<intWrap>(*o));
@@ -631,19 +673,22 @@ class CPUnknownKind : public CPValueKind {
   CPValueKindPtr op(SgBinaryOp* op, CPValueKindPtr that);
   
   // Returns whether this and that CPValueKinds are may/must equal to each other
-  bool mayEqualV(CPValueKindPtr that);
-  bool mustEqualV(CPValueKindPtr that);
+  bool mayEqualAO(CPValueKindPtr that);
+  bool mustEqualAO(CPValueKindPtr that);
   
   // Returns whether the two CPValueKinds denote the same set of concrete values
-  bool equalSetV(CPValueKindPtr that);
+  bool equalSetAO(CPValueKindPtr that);
   
   // Returns whether this CPValueKind denotes a non-strict subset (the sets may be equal) of the set denoted
   // by the given CPValueKind
-  bool subSetV(CPValueKindPtr that);
+  bool subSetAO(CPValueKindPtr that);
   
   // Computes the meet of this and that and returns the resulting kind
-  std::pair<bool, CPValueKindPtr> meetUpdateV(CPValueKindPtr that);
+  std::pair<bool, CPValueKindPtr> meetUpdateAO(CPValueKindPtr that);
   
+  // Computes the intersection of this and that and returns the resulting kind
+  std::pair<bool, CPValueKindPtr> intersectUpdateAO(CPValueKindPtr that);
+
   // Returns true if this ValueObject corresponds to a concrete value that is statically-known
   bool isConcrete();
   // Returns the number of concrete values in this set
@@ -655,18 +700,18 @@ class CPUnknownKind : public CPValueKind {
   std::set<boost::shared_ptr<SgValueExp> > getConcreteValue();
   
   // Returns whether this AbstractObject denotes the set of all possible execution prefixes.
-  bool isFullV(PartEdgePtr pedge);
+  bool isFullAO(PartEdgePtr pedge);
   // Returns whether this AbstractObject denotes the empty set.
-  bool isEmptyV(PartEdgePtr pedge);
+  bool isEmptyAO(PartEdgePtr pedge);
   
   // Returns a copy of this CPUnknownKind
-  CPValueKindPtr copyV() const { return boost::make_shared<CPUnknownKind>(); }
+  CPValueKindPtr copyAOType() const { return boost::make_shared<CPUnknownKind>(); }
   
   std::string str(std::string indent="") const;
   
   // Appends to the given hierarchical key the additional information that uniquely 
   // identifies this type's set
-  void addHierSubKey(const AbstractObjectHierarchy::hierKeyPtr& key)
+  void addHierSubKey(const AbstractionHierarchy::hierKeyPtr& key)
   // Don't add anything else since the full set is denoted by the empty key
   { }
 }; // CPUnknownKind
@@ -674,7 +719,7 @@ class CPUnknownKind : public CPValueKind {
 class CPMemLocObject;
 typedef boost::shared_ptr<CPMemLocObject> CPMemLocObjectPtr;
 
-class CPMemLocObject: public virtual MemLocObject, public FiniteLattice
+class CPMemLocObject: public virtual MemLocObject/*, public FiniteLattice*/
 {
   ConstantPropagationAnalysis* analysis;
   // Records whether this object is full or empty
@@ -684,24 +729,18 @@ class CPMemLocObject: public virtual MemLocObject, public FiniteLattice
   public:
   CPMemLocObject(bool isCPFull, bool isCPEmpty, SgNode* base, PartEdgePtr pedge, ConstantPropagationAnalysis* analysis) : 
     MemLocObject(base),
-    Lattice(pedge),
-    FiniteLattice(pedge),
     analysis(analysis),
     isCPFull(isCPFull), isCPEmpty(isCPEmpty)
   { }
   
   CPMemLocObject(MemRegionObjectPtr region, CPValueObjectPtr index, SgNode* base, PartEdgePtr pedge, ConstantPropagationAnalysis* analysis) : 
     MemLocObject(region, index, base),
-    Lattice(pedge),
-    FiniteLattice(pedge),
     analysis(analysis),
     isCPFull(false), isCPEmpty(false)
   { }
   
   CPMemLocObject(const CPMemLocObject& that) : 
     MemLocObject(that), 
-    Lattice(that.getPartEdge()),
-    FiniteLattice(that.getPartEdge()), 
     analysis(that.analysis),
     isCPFull(false), isCPEmpty(false)
   { }
@@ -711,13 +750,13 @@ class CPMemLocObject: public virtual MemLocObject, public FiniteLattice
   }
   
   // returns a copy of this lattice
-  Lattice* copy() const;
+  //Lattice* copy() const;
   
   // Initializes this Lattice to its default state, if it is not already initialized
-  void initialize() {}
+  //void initialize() {}
 
   
-  bool operator==(Lattice*);
+  //bool operator==(Lattice*);
   
   // Called by analyses to transfer this lattice's contents from across function scopes from a caller function 
   //    to a callee's scope and vice versa. If this this lattice maintains any information on the basis of 
@@ -731,29 +770,29 @@ class CPMemLocObject: public virtual MemLocObject, public FiniteLattice
   //    the keys in ml2ml are in scope on one side of Part, while the values on the other side. Specifically, it is
   //    guaranteed that the keys are in scope at fromPEdge while the values are in scope at the edge returned 
   //    by getPartEdge().
-  Lattice* remapML(const std::set<MLMapping>& ml2ml, PartEdgePtr fromPEdge);
+  //Lattice* remapML(const std::set<MLMapping>& ml2ml, PartEdgePtr fromPEdge);
   
   // Adds information about the MemLocObjects in newL to this Lattice, overwriting any information previously 
   //    maintained in this lattice about them.
   // Returns true if the Lattice state is modified and false otherwise.
-  bool replaceML(Lattice* newL) { return false; }
+  //bool replaceML(Lattice* newL) { return false; }
   
   // Returns whether this object may/must be equal to o within the given Part p
   // These methods are called by composers and should not be called by analyses.
-  bool mayEqualML(MemLocObjectPtr o, PartEdgePtr pedge);
-  bool mustEqualML(MemLocObjectPtr o, PartEdgePtr pedge);
+  bool mayEqualAO(MemLocObjectPtr o, PartEdgePtr pedge);
+  bool mustEqualAO(MemLocObjectPtr o, PartEdgePtr pedge);
   
   // Returns whether the two abstract objects denote the same set of concrete objects
   // These methods are called by composers and should not be called by analyses.
-  bool equalSetML(MemLocObjectPtr o, PartEdgePtr pedge);
+  bool equalSetAO(MemLocObjectPtr o, PartEdgePtr pedge);
   
   // Returns whether this abstract object denotes a non-strict subset (the sets may be equal) of the set denoted
   // by the given abstract object.
   // These methods are called by composers and should not be called by analyses.
-  bool subSetML(MemLocObjectPtr o, PartEdgePtr pedge);
+  bool subSetAO(MemLocObjectPtr o, PartEdgePtr pedge);
   
   // Returns true if this object is live at the given part and false otherwise
-  bool isLiveML(PartEdgePtr pedge);
+  bool isLiveAO(PartEdgePtr pedge);
   
   // Set this Lattice object to represent the set of all possible execution prefixes.
   // Return true if this causes the object to change and false otherwise.
@@ -764,37 +803,49 @@ class CPMemLocObject: public virtual MemLocObject, public FiniteLattice
   
   // Set all the value information that this Lattice object associates with this MemLocObjectPtr to full.
   // Return true if this causes the object to change and false otherwise.
-  bool setMLValueToFull(MemLocObjectPtr ml) { return false; }
-  
+  //bool setMLValueToFull(MemLocObjectPtr ml) { return false; }
+  /*
   // Returns whether this lattice denotes the set of all possible execution prefixes.
-  bool isFullLat();
+  bool isFull();
   // Returns whether this lattice denotes the empty set.
-  bool isEmptyLat();
+  bool isEmpty();*/
   
   // Returns whether this AbstractObject denotes the set of all possible execution prefixes.
-  bool isFullML(PartEdgePtr pedge);
+  bool isFullAO(PartEdgePtr pedge);
   // Returns whether this AbstractObject denotes the empty set.
-  bool isEmptyML(PartEdgePtr pedge);
+  bool isEmptyAO(PartEdgePtr pedge);
   
   // Computes the meet of this and that and saves the result in this
   // returns true if this causes this to change and false otherwise
-  bool meetUpdateML(MemLocObjectPtr that, PartEdgePtr pedge);
+  bool meetUpdateAO(MemLocObjectPtr that, PartEdgePtr pedge);
   
-  // Computes the meet of this and that and saves the result in this
+/*  // Computes the meet of this and that and saves the result in this
   // returns true if this causes this to change and false otherwise
   // The part of this object is to be used for AbstractObject comparisons.
   bool meetUpdate(Lattice* that);
   
   // Computes the meet of this and that and saves the result in this
   // returns true if this causes this to change and false otherwise
+  bool meetUpdate(CPMemLocObject* that, PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis);*/
+
+  // Computes the meet of this and that and saves the result in this
+  // returns true if this causes this to change and false otherwise
+  bool intersectUpdateAO(MemLocObjectPtr that, PartEdgePtr pedge);
+/*
+  // Computes intersection meet of this and that and saves the result in this
+  // returns true if this causes this to change and false otherwise
   // The part of this object is to be used for AbstractObject comparisons.
-  bool meetUpdate(CPMemLocObject* that, PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis);
-  
+  bool intersectUpdate(Lattice* that);
+
+  // Computes the meet of this and that and saves the result in this
+  // returns true if this causes this to change and false otherwise
+  bool intersectUpdate(CPMemLocObject* that, PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis);*/
+
   // Allocates a copy of this object and returns a pointer to it
-  MemLocObjectPtr copyML() const;
+  MemLocObjectPtr copyAOType() const;
   
   // Allocates a copy of this object and returns a regular pointer to it
-  MemLocObject* copyMLPtr() const;
+  //MemLocObject* copyAOTypePtr() const;
   
   std::string str(std::string indent="") const; // pretty print for the object
 }; // CPMemLocObject
@@ -817,10 +868,10 @@ class ConstantPropagationAnalysis : virtual public FWDataflow
   //AbstractObjectMap constVars;
    
   public:
-  ConstantPropagationAnalysis();
+  ConstantPropagationAnalysis(bool useSSA);
   
   // Returns a shared pointer to a freshly-allocated copy of this ComposedAnalysis object
-  ComposedAnalysisPtr copy() { return boost::make_shared<ConstantPropagationAnalysis>(); }
+  ComposedAnalysisPtr copy() { return boost::make_shared<ConstantPropagationAnalysis>(useSSA); }
 
   // Creates a basic CPMemLocObject for the given SgNode. This object does not take into
   // account any constant propagation and will be used as a seed from which to propagate 
@@ -847,12 +898,12 @@ class ConstantPropagationAnalysis : virtual public FWDataflow
   
   // pretty print for the object
   std::string str(std::string indent="") const
-  { return "ConstantPropagationAnalysis"; }
+  { return "ConstPropAnal"; }
   
   friend class ConstantPropagationAnalysisTransfer;
 }; // class ConstantPropagationAnalysis
 
-class ConstantPropagationAnalysisTransfer : public VariableStateTransfer<CPValueObject, ConstantPropagationAnalysis>
+class ConstantPropagationAnalysisTransfer : public VariableStateTransfer<CPValueLattice, ConstantPropagationAnalysis>
 {
   private:
   

@@ -1,7 +1,6 @@
 #include "sage3basic.h"
 #include "call_context_sensitivity_analysis.h"
 
-#include "sight_verbosity.h"
 using namespace std;
 using namespace sight;
 
@@ -534,16 +533,16 @@ string CallCtxSensMR::str(string indent) const{
 }
 
 // copy this object and return a pointer to it
-MemRegionObjectPtr CallCtxSensMR::copyMR() const 
+MemRegionObjectPtr CallCtxSensMR::copyAOType() const
 { return boost::make_shared<CallCtxSensMR>(*this); }
 
-bool CallCtxSensMR::mayEqualMR(MemRegionObjectPtr that_arg, PartEdgePtr pedge_arg) {
+bool CallCtxSensMR::mayEqualAO(MemRegionObjectPtr that_arg, PartEdgePtr pedge_arg) {
   CallCtxSensMRPtr that = boost::dynamic_pointer_cast<CallCtxSensMR>(that_arg);
   assert(that);
   CallCtxSensPartEdgePtr pedge = dynamicConstPtrCast<CallCtxSensPartEdge>(pedge_arg);
   assert(pedge);
   
-  /*scope reg("CallCtxSensMR::mayEqualMR()", scope::low);
+  /*scope reg("CallCtxSensMR::mayEqualAO()", scope::low);
   dbg << "context="<<context.str()<<endl;
   dbg << "that->context="<<that->context.str()<<endl;
   dbg << "context.setOverlap(that->context)="<<context.setOverlap(that->context)<<endl;*/
@@ -555,7 +554,7 @@ bool CallCtxSensMR::mayEqualMR(MemRegionObjectPtr that_arg, PartEdgePtr pedge_ar
     return false;
 }
 
-bool CallCtxSensMR::mustEqualMR(MemRegionObjectPtr that_arg, PartEdgePtr pedge_arg) {
+bool CallCtxSensMR::mustEqualAO(MemRegionObjectPtr that_arg, PartEdgePtr pedge_arg) {
   CallCtxSensMRPtr that = boost::dynamic_pointer_cast<CallCtxSensMR>(that_arg);
   assert(that);
   CallCtxSensPartEdgePtr pedge = dynamicConstPtrCast<CallCtxSensPartEdge>(pedge_arg);
@@ -571,7 +570,7 @@ bool CallCtxSensMR::mustEqualMR(MemRegionObjectPtr that_arg, PartEdgePtr pedge_a
 }
 
 // Returns whether the two abstract objects denote the same set of concrete objects
-bool CallCtxSensMR::equalSetMR(MemRegionObjectPtr that_arg, PartEdgePtr pedge_arg) {
+bool CallCtxSensMR::equalSetAO(MemRegionObjectPtr that_arg, PartEdgePtr pedge_arg) {
   CallCtxSensMRPtr that = boost::dynamic_pointer_cast<CallCtxSensMR>(that_arg);
   assert(that);
   CallCtxSensPartEdgePtr pedge = dynamicConstPtrCast<CallCtxSensPartEdge>(pedge_arg);
@@ -587,7 +586,7 @@ bool CallCtxSensMR::equalSetMR(MemRegionObjectPtr that_arg, PartEdgePtr pedge_ar
 
 // Returns whether this abstract object denotes a non-strict subset (the sets may be equal) of the set denoted
 // by the given abstract object.
-bool CallCtxSensMR::subSetMR(MemRegionObjectPtr that_arg, PartEdgePtr pedge_arg) {
+bool CallCtxSensMR::subSetAO(MemRegionObjectPtr that_arg, PartEdgePtr pedge_arg) {
   CallCtxSensMRPtr that = boost::dynamic_pointer_cast<CallCtxSensMR>(that_arg);
   assert(that);
   CallCtxSensPartEdgePtr pedge = dynamicConstPtrCast<CallCtxSensPartEdge>(pedge_arg);
@@ -601,8 +600,8 @@ bool CallCtxSensMR::subSetMR(MemRegionObjectPtr that_arg, PartEdgePtr pedge_arg)
     return false;
 }
 
-bool CallCtxSensMR::isLiveMR(PartEdgePtr pedge_arg) {
-  //dbg << "CallCtxSensMR::isLiveMR(pedge_arg="<<pedge_arg->str()<<")"<<endl;
+bool CallCtxSensMR::isLiveAO(PartEdgePtr pedge_arg) {
+  //dbg << "CallCtxSensMR::isLiveAO(pedge_arg="<<pedge_arg->str()<<")"<<endl;
 
   CallCtxSensPartEdgePtr pedge = dynamicConstPtrCast<CallCtxSensPartEdge>(pedge_arg);
   assert(pedge);
@@ -612,7 +611,7 @@ bool CallCtxSensMR::isLiveMR(PartEdgePtr pedge_arg) {
   // Note: we use either the source or the target context, whichever is available since 
   //       MemLocs can't be generated at context switch points, meaning that the contexts
   //       at each edge's source and destination must be identical.
-/*  scope reg("CallCtxSensMR::isLiveMR()", scope::low);
+/*  scope reg("CallCtxSensMR::isLiveAO()", scope::low);
   dbg << "this="<<str()<<endl;
   dbg << "context="<<context.str()<<endl;
   if(pedge->src) dbg << "pedge->src->context="<<pedge->src->context.str()<<endl;
@@ -624,7 +623,7 @@ bool CallCtxSensMR::isLiveMR(PartEdgePtr pedge_arg) {
 
 // Computes the meet of this and that and saves the result in this
 // returns true if this causes this to change and false otherwise
-bool CallCtxSensMR::meetUpdateMR(MemRegionObjectPtr that_arg, PartEdgePtr pedge_arg) {
+bool CallCtxSensMR::meetUpdateAO(MemRegionObjectPtr that_arg, PartEdgePtr pedge_arg) {
   CallCtxSensMRPtr that = boost::dynamic_pointer_cast<CallCtxSensMR>(that_arg);
   assert(that);
   CallCtxSensPartEdgePtr pedge = dynamicConstPtrCast<CallCtxSensPartEdge>(pedge_arg);
@@ -638,12 +637,12 @@ bool CallCtxSensMR::meetUpdateMR(MemRegionObjectPtr that_arg, PartEdgePtr pedge_
 }
 
 // Returns whether this AbstractObject denotes the set of all possible execution prefixes.
-bool CallCtxSensMR::isFullMR(PartEdgePtr pedge) {
+bool CallCtxSensMR::isFullAO(PartEdgePtr pedge) {
   return context.isFull(pedge) && baseMR->isFull(pedge->getParent(), ccsa->getComposer(), ccsa);
 }
 
 // Returns whether this AbstractObject denotes the empty set.
-bool CallCtxSensMR::isEmptyMR(PartEdgePtr pedge) {
+bool CallCtxSensMR::isEmptyAO(PartEdgePtr pedge) {
   return context.isEmpty(pedge) || baseMR->isEmpty(pedge->getParent(), ccsa->getComposer(), ccsa);
 }
 
@@ -665,11 +664,11 @@ bool CallCtxSensMR::setToEmpty() {
 }
 
 // Returns a ValueObject that denotes the size of this memory region
-ValueObjectPtr CallCtxSensMR::getRegionSizeMR(PartEdgePtr pedge_arg) {
+ValueObjectPtr CallCtxSensMR::getRegionSizeAO(PartEdgePtr pedge_arg) {
   CallCtxSensPartEdgePtr pedge = dynamicConstPtrCast<CallCtxSensPartEdge>(pedge_arg);
   assert(pedge);
   assert(context.setOverlap(pedge->src ? pedge->src->context : pedge->tgt->context));
-  return baseMR->getRegionSizeMR(pedge);
+  return baseMR->getRegionSizeAO(pedge);
 }
 
 // Returns whether all instances of this class form a hierarchy. Every instance of the same
@@ -680,8 +679,8 @@ bool CallCtxSensMR::isHierarchy() const {
 
 // Returns a key that uniquely identifies this particular AbstractObject in the 
 // set hierarchy.
-const AbstractObjectHierarchy::hierKeyPtr& CallCtxSensMR::getHierKey() const {
-  AbstractObjectHierarchyPtr hierBaseMR = boost::dynamic_pointer_cast<AbstractObjectHierarchy>(baseMR);
+const AbstractionHierarchy::hierKeyPtr& CallCtxSensMR::getHierKey() const {
+  AbstractionHierarchyPtr hierBaseMR = boost::dynamic_pointer_cast<AbstractionHierarchy>(baseMR);
   ROSE_ASSERT(hierBaseMR);
   return hierBaseMR->getHierKey();
 }
@@ -844,8 +843,8 @@ bool CallCtxSensML::isHierarchy() const {
 
 // Returns a key that uniquely identifies this particular AbstractObject in the 
 // set hierarchy.
-const AbstractObjectHierarchy::hierKeyPtr& CallCtxSensML::getHierKey() const {
-  AbstractObjectHierarchyPtr hierBaseML = boost::dynamic_pointer_cast<AbstractObjectHierarchy>(baseML);
+const AbstractionHierarchy::hierKeyPtr& CallCtxSensML::getHierKey() const {
+  AbstractionHierarchyPtr hierBaseML = boost::dynamic_pointer_cast<AbstractionHierarchy>(baseML);
   ROSE_ASSERT(hierBaseML);
   return hierBaseML->getHierKey();
 }
@@ -1055,6 +1054,14 @@ bool CallCtxSensLattice::meetUpdate(Lattice* that_arg)
   return modified;
 }
 
+// Computes the intersection of this and that and saves the result in this
+// Returns true if this causes this to change and false otherwise
+bool CallCtxSensLattice::intersectUpdate(Lattice* that)
+{
+  // Intersections are almost certainly useless for these lattices
+  assert(0);
+}
+
 // Set this Lattice object to represent the set of all possible execution prefixes.
 // Return true if this causes the object to change and false otherwise.
 bool CallCtxSensLattice::setToFull()
@@ -1077,11 +1084,11 @@ bool CallCtxSensLattice::setMLValueToFull(MemLocObjectPtr ml)
 { return false; }
 
 // Returns whether this lattice denotes the set of all possible execution prefixes.
-bool CallCtxSensLattice::isFullLat()
+bool CallCtxSensLattice::isFull()
 { return false; }
 
 // Returns whether this lattice denotes the empty set.
-bool CallCtxSensLattice::isEmptyLat()
+bool CallCtxSensLattice::isEmpty()
 {
   return outgoing.size()==0 && 
          incoming.size()==0;
@@ -1142,6 +1149,9 @@ bool CallContextSensitivityAnalysis::transfer(PartPtr part, CFGNode cn, NodeStat
               std::map<PartEdgePtr, std::vector<Lattice*> >& dfInfo)
 {
   //#SA: Incoming dfInfo is associated with inEdgeFromAny
+  for(map<PartEdgePtr, vector<Lattice*> >::const_iterator df=dfInfo.begin(); df!=dfInfo.end(); ++df)
+    dbg << "    "<<(df->first?df->first->str():"NULL")<<": #"<<df->second.size()<<endl;
+
   assert(dfInfo[part->inEdgeFromAny()].size()==1);
   SIGHT_VERB_DECL(scope, ("CallContextSensitivityAnalysis::transfer()", scope::medium), 1, callContextSensitivityDebugLevel)
   CallCtxSensLattice* oldCCSLat = dynamic_cast<CallCtxSensLattice*>(dfInfo[part->inEdgeFromAny()][0]);

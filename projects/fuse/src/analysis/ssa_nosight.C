@@ -14,7 +14,7 @@ using namespace boost;
 
 namespace fuse {
 
-const ATSGraph::VertexVertexMap& ATSGraph::getDominatorTree() //const
+const SSAGraph::VertexVertexMap& SSAGraph::getDominatorTree() //const
 {
   if (!dominatorTree.empty())
       return dominatorTree;
@@ -29,7 +29,7 @@ const ATSGraph::VertexVertexMap& ATSGraph::getDominatorTree() //const
   return dominatorTree;
 }
 
-const ATSGraph::VertexVertexMap& ATSGraph::getPostdominatorTree() //const
+const SSAGraph::VertexVertexMap& SSAGraph::getPostdominatorTree() //const
 {
   if (!postdominatorTree.empty())
     return postdominatorTree;
@@ -46,13 +46,13 @@ const ATSGraph::VertexVertexMap& ATSGraph::getPostdominatorTree() //const
   return postdominatorTree;
 }
 
-void ATSGraph::calculateDominanceFrontiers()
+void SSAGraph::calculateDominanceFrontiers()
 {
-  //cout << "ATSGraph::calculateDominanceFrontiers() #dominanceFrontiers="<<dominanceFrontiers.size()<<endl;
+  //cout << "SSAGraph::calculateDominanceFrontiers() #dominanceFrontiers="<<dominanceFrontiers.size()<<endl;
   boost::adjacency_list<boost::vecS, boost::vecS, boost::bidirectionalS, PartPtr, PartEdgePtr> ATS;
 
   //Build the dominator tree
-  ATSGraph::VertexVertexMap dominatorTreeMap = getDominatorTree();
+  SSAGraph::VertexVertexMap dominatorTreeMap = getDominatorTree();
 
   //TODO: This code converts a VertexVertex Map to a  boost graph. Should be factored out
   typedef adjacency_list<vecS, vecS, bidirectionalS, PartPtr> TreeType;
@@ -62,7 +62,7 @@ void ATSGraph::calculateDominanceFrontiers()
   set<PartPtr> addedNodes;
   map<PartPtr, TreeVertex> PartPtroVertex;
 
-  BOOST_FOREACH(ATSGraph::VertexVertexMap::value_type& nodeDominatorPair, dominatorTreeMap)
+  BOOST_FOREACH(SSAGraph::VertexVertexMap::value_type& nodeDominatorPair, dominatorTreeMap)
   {
     PartPtr node = (*this)[nodeDominatorPair.first];
     PartPtr dominator = (*this)[nodeDominatorPair.second];
@@ -98,7 +98,7 @@ void ATSGraph::calculateDominanceFrontiers()
 
   /*cout << "Calculate dominance frontiers"<<endl;
   cout << "    dominatorTreeMap="<<endl;
-  BOOST_FOREACH(ATSGraph::VertexVertexMap::value_type& nodeDominatorPair, dominatorTreeMap)
+  BOOST_FOREACH(SSAGraph::VertexVertexMap::value_type& nodeDominatorPair, dominatorTreeMap)
   {
     PartPtr node = (*this)[nodeDominatorPair.first];
     PartPtr dominator = (*this)[nodeDominatorPair.second];
@@ -122,7 +122,7 @@ void ATSGraph::calculateDominanceFrontiers()
       PartPtr successor = outEdge->target();
 
       //Get the immediate dominator of the successor
-      ATSGraph::Vertex successorVertex = getVertexForNode(successor);
+      SSAGraph::Vertex successorVertex = getVertexForNode(successor);
       /*cout << "    successor("<<successorVertex<<")="<<successor->str()<<endl;
       cout << "    successor->inEdges="<<endl;
       BOOST_FOREACH(PartEdgePtr inEdge, successor->inEdges()) {
@@ -132,11 +132,11 @@ void ATSGraph::calculateDominanceFrontiers()
      // DQ (11/3/2011): EDG compilains about this (but GNU allowed it, I think that EDG might be correct.
      // since it might be a private variable.  But since we are only trying to compile ROSE with ROSE (using the
      // new EDG 4.3 front-end as a tests) we can just skip this case for now.
-        ROSE_ASSERT(successorVertex != ATSGraph::GraphTraits::null_vertex());
+        ROSE_ASSERT(successorVertex != SSAGraph::GraphTraits::null_vertex());
 #endif
       //ROSE_ASSERT(dominatorTreeMap.count(successorVertex) == 1);
       if(dominatorTreeMap.count(successorVertex) == 1) {
-        ATSGraph::Vertex iDominatorVertex = dominatorTreeMap[successorVertex];
+        SSAGraph::Vertex iDominatorVertex = dominatorTreeMap[successorVertex];
         PartPtr iDominator = (*this)[iDominatorVertex];
 
         // If we have a successor that we don't dominate, that successor is in our dominance frontier
@@ -158,15 +158,15 @@ void ATSGraph::calculateDominanceFrontiers()
       BOOST_FOREACH(PartPtr childDFNode, childDominanceFrontier)
       {
         //Get the immediate dominator of the child DF node
-        ATSGraph::Vertex childDFVertex = getVertexForNode(childDFNode);
+        SSAGraph::Vertex childDFVertex = getVertexForNode(childDFNode);
 #if !USE_ROSE
        // DQ (11/3/2011): EDG compilains about this (but GNU allowed it, I think that EDG might be correct.
        // since it might be a private variable.  But since we are only trying to compile ROSE with ROSE (using the
        // new EDG 4.3 front-end as a tests) we can just skip this case for now.
-          ROSE_ASSERT(childDFVertex != ATSGraph::GraphTraits::null_vertex());
+          ROSE_ASSERT(childDFVertex != SSAGraph::GraphTraits::null_vertex());
 #endif
         ROSE_ASSERT(dominatorTreeMap.count(childDFVertex) == 1);
-        ATSGraph::Vertex iDominatorVertex = dominatorTreeMap[childDFVertex];
+        SSAGraph::Vertex iDominatorVertex = dominatorTreeMap[childDFVertex];
         PartPtr iDominator = (*this)[iDominatorVertex];
 
         if (iDominator != currentNode)
@@ -179,9 +179,9 @@ void ATSGraph::calculateDominanceFrontiers()
   }
 
   //While we're at it, calculate the postdominator tree
-  ATSGraph::VertexVertexMap postDominatorTreeMap = getPostdominatorTree();
+  SSAGraph::VertexVertexMap postDominatorTreeMap = getPostdominatorTree();
 
-  BOOST_FOREACH(ATSGraph::VertexVertexMap::value_type& nodePostDominatorPair, postDominatorTreeMap)
+  BOOST_FOREACH(SSAGraph::VertexVertexMap::value_type& nodePostDominatorPair, postDominatorTreeMap)
   {
     PartPtr node = (*this)[nodePostDominatorPair.first];
     PartPtr postDominator = (*this)[nodePostDominatorPair.second];

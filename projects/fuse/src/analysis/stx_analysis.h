@@ -301,7 +301,7 @@ extern StxPartEdgePtr NULLStxPartEdge;
 // The keys the differentiate StxValueObjects are:
 // std::list<comparableSgNode>
 
-class StxValueObject : public ValueObject, public AbstractObjectHierarchy
+class StxValueObject : public ValueObject/*, public AbstractObjectHierarchy*/
 {
   public:
   SgValueExp* val;
@@ -309,15 +309,15 @@ class StxValueObject : public ValueObject, public AbstractObjectHierarchy
   StxValueObject(SgNode* n);
   StxValueObject(const StxValueObject& that);
   
-  bool mayEqualV(ValueObjectPtr o, PartEdgePtr pedge);
-  bool mustEqualV(ValueObjectPtr o, PartEdgePtr pedge);
+  bool mayEqualAO(ValueObjectPtr o, PartEdgePtr pedge);
+  bool mustEqualAO(ValueObjectPtr o, PartEdgePtr pedge);
   
   // Returns whether the two abstract objects denote the same set of concrete objects
-  bool equalSetV(ValueObjectPtr o, PartEdgePtr pedge);
+  bool equalSetAO(ValueObjectPtr o, PartEdgePtr pedge);
   
   // Returns whether this abstract object denotes a non-strict subset (the sets may be equal) of the set denoted
   // by the given abstract object.
-  bool subSetV(ValueObjectPtr o, PartEdgePtr pedge);
+  bool subSetAO(ValueObjectPtr o, PartEdgePtr pedge);
   
   // Returns true if this object is live at the given part and false otherwise
   /*bool isLive(PartEdgePtr pedge) const
@@ -325,13 +325,17 @@ class StxValueObject : public ValueObject, public AbstractObjectHierarchy
   
   // Computes the meet of this and that and saves the result in this.
   // Returns true if this causes this to change and false otherwise.
-  bool meetUpdateV(ValueObjectPtr that, PartEdgePtr pedge);
+  bool meetUpdateAO(ValueObjectPtr that, PartEdgePtr pedge);
 
-  bool isFullV(PartEdgePtr pedge);
-  bool isEmptyV(PartEdgePtr pedge);
+  bool isFullAO(PartEdgePtr pedge);
+  bool isEmptyAO(PartEdgePtr pedge);
   
   // Returns true if the given pair of SgValueExps represent the same value and false otherwise
   static bool equalValExp(SgValueExp* a, SgValueExp* b);
+
+  // Returns true if the first SgValueExp epresents a value that is < the second and false otherwise
+  // If both SgValueExp denote different types, returns false
+  static bool lessValExp(SgValueExp* a, SgValueExp* b);
 
   // Returns true if this ValueObject corresponds to a concrete value that is statically-known
   bool isConcrete();
@@ -346,7 +350,7 @@ class StxValueObject : public ValueObject, public AbstractObjectHierarchy
   std::string str(std::string indent) const; // pretty print for the object
     
   // Allocates a copy of this object and returns a pointer to it
-  ValueObjectPtr copyV() const;
+  ValueObjectPtr copyAOType() const;
   
   // Returns whether all instances of this class form a hierarchy. Every instance of the same
   // class created by the same analysis must return the same value from this method!
@@ -462,10 +466,10 @@ class StxMemRegionType
   virtual void* getUID() const=0;
   
   // Returns true if this object is live at the given part and false otherwise
-  virtual bool isLiveMR(PartEdgePtr pedge)=0;
+  virtual bool isLiveAO(PartEdgePtr pedge)=0;
 
   // Returns a ValueObject that denotes the size of this memory region
-  virtual ValueObjectPtr getRegionSizeMR(PartEdgePtr pedge)=0;
+  virtual ValueObjectPtr getRegionSizeAO(PartEdgePtr pedge)=0;
   
   // Returns true if this MemRegionObject denotes a finite set of concrete regions
   virtual bool isConcrete()=0;
@@ -479,7 +483,7 @@ class StxMemRegionType
 
   // Appends to the given hierarchical key the additional information that uniquely 
   // identifies this type's set
-  virtual void addHierSubKey(const AbstractObjectHierarchy::hierKeyPtr& key)=0;
+  virtual void addHierSubKey(const AbstractionHierarchy::hierKeyPtr& key)=0;
   
   StxMemRegionType() {};
   
@@ -487,7 +491,7 @@ class StxMemRegionType
 };
 typedef boost::shared_ptr<StxMemRegionType> StxMemRegionTypePtr;
 
-// StxMemRegionObjects form a set hierarchy and thus implement the AbstractObjectHierarchy
+// StxMemRegionObjects form a set hierarchy and thus implement the AbstractionHierarchy
 // interface. The hierarchy is:
 // empty key: all
 // non-empty:
@@ -499,7 +503,7 @@ typedef boost::shared_ptr<StxMemRegionType> StxMemRegionTypePtr;
 // The keys the differentiate MemRegionObjects are:
 // std::list<comparableType, comparableSgNode>
 
-class StxMemRegionObject : public MemRegionObject, public AbstractObjectHierarchy
+class StxMemRegionObject : public MemRegionObject/*, public AbstractionHierarchy*/
 {
   StxMemRegionTypePtr type;
   
@@ -512,30 +516,30 @@ class StxMemRegionObject : public MemRegionObject, public AbstractObjectHierarch
   
   // Returns whether this object may/must be equal to o within the given Part p
   // These methods are called by composers and should not be called by analyses.
-  bool mayEqualMR(MemRegionObjectPtr o, PartEdgePtr pedge);
-  bool mustEqualMR(MemRegionObjectPtr o, PartEdgePtr pedge);
+  bool mayEqualAO(MemRegionObjectPtr o, PartEdgePtr pedge);
+  bool mustEqualAO(MemRegionObjectPtr o, PartEdgePtr pedge);
   
   // Returns whether the two abstract objects denote the same set of concrete objects
-  bool equalSetMR(MemRegionObjectPtr o, PartEdgePtr pedge);
+  bool equalSetAO(MemRegionObjectPtr o, PartEdgePtr pedge);
   
   // Returns whether this abstract object denotes a non-strict subset (the sets may be equal) of the set denoted
   // by the given abstract object.
-  bool subSetMR(MemRegionObjectPtr o, PartEdgePtr pedge);
+  bool subSetAO(MemRegionObjectPtr o, PartEdgePtr pedge);
   
   // Returns true if this object is live at the given part and false otherwise
-  bool isLiveMR(PartEdgePtr pedge);
+  bool isLiveAO(PartEdgePtr pedge);
   
   // Computes the meet of this and that and saves the result in this
   // returns true if this causes this to change and false otherwise
-  bool meetUpdateMR(MemRegionObjectPtr that, PartEdgePtr pedge);
+  bool meetUpdateAO(MemRegionObjectPtr that, PartEdgePtr pedge);
   
   // Returns whether this AbstractObject denotes the set of all possible execution prefixes.
-  bool isFullMR(PartEdgePtr pedge);
+  bool isFullAO(PartEdgePtr pedge);
   // Returns whether this AbstractObject denotes the empty set.
-  bool isEmptyMR(PartEdgePtr pedge);
+  bool isEmptyAO(PartEdgePtr pedge);
   
   // Returns a ValueObject that denotes the size of this memory region
-  ValueObjectPtr getRegionSizeMR(PartEdgePtr pedge);
+  ValueObjectPtr getRegionSizeAO(PartEdgePtr pedge);
 
   // Returns true if this MemRegionObject denotes a finite set of concrete regions
   bool isConcrete() { return type->isConcrete(); }
@@ -551,7 +555,7 @@ class StxMemRegionObject : public MemRegionObject, public AbstractObjectHierarch
   ValueObjectPtr getRegionSize(PartEdgePtr pedge) const;
   
   // Allocates a copy of this object and returns a pointer to it
-  MemRegionObjectPtr copyMR() const;
+  MemRegionObjectPtr copyAOType() const;
   
   std::string str(std::string indent="") const; // pretty print for the object
 
@@ -591,10 +595,10 @@ class StxExprMemRegionType : public StxMemRegionType
   void* getUID() const { return expr; }
   
   // Returns true if this object is live at the given part and false otherwise
-  bool isLiveMR(PartEdgePtr pedge);
+  bool isLiveAO(PartEdgePtr pedge);
   
   // Returns a ValueObject that denotes the size of this memory region
-  ValueObjectPtr getRegionSizeMR(PartEdgePtr pedge);
+  ValueObjectPtr getRegionSizeAO(PartEdgePtr pedge);
 
   // Returns true if this MemRegionObject denotes a finite set of concrete regions
   bool isConcrete() { return true; }
@@ -608,7 +612,7 @@ class StxExprMemRegionType : public StxMemRegionType
   
   // Appends to the given hierarchical key the additional information that uniquely 
   // identifies this type's set
-  void addHierSubKey(const AbstractObjectHierarchy::hierKeyPtr& key)
+  void addHierSubKey(const AbstractionHierarchy::hierKeyPtr& key)
   { key->add(boost::make_shared<comparableSgNode>(expr)); }
   
   std::string str(std::string indent) const; // pretty print for the object
@@ -642,10 +646,10 @@ class StxNamedMemRegionType : public StxMemRegionType
   void* getUID() const { return iname; }
   
   // Returns true if this object is live at the given part and false otherwise
-  bool isLiveMR(PartEdgePtr pedge);
+  bool isLiveAO(PartEdgePtr pedge);
   
   // Returns a ValueObject that denotes the size of this memory region
-  ValueObjectPtr getRegionSizeMR(PartEdgePtr pedge);
+  ValueObjectPtr getRegionSizeAO(PartEdgePtr pedge);
 
   // Returns true if this MemRegionObject denotes a finite set of concrete regions
   bool isConcrete() { return symbol && isSgVariableSymbol(symbol); }
@@ -659,7 +663,7 @@ class StxNamedMemRegionType : public StxMemRegionType
   
   // Appends to the given hierarchical key the additional information that uniquely 
   // identifies this type's set
-  void addHierSubKey(const AbstractObjectHierarchy::hierKeyPtr& key)
+  void addHierSubKey(const AbstractionHierarchy::hierKeyPtr& key)
   { key->add(boost::make_shared<comparableSgNode>(iname)); }
   
   std::string str(std::string indent) const; // pretty print for the object
@@ -690,10 +694,10 @@ class StxStorageMemRegionType : public StxMemRegionType
   void* getUID() const { return NULL; }
   
   // Returns true if this object is live at the given part and false otherwise
-  bool isLiveMR(PartEdgePtr pedge) { return true; }
+  bool isLiveAO(PartEdgePtr pedge) { return true; }
   
   // Returns a ValueObject that denotes the size of this memory region
-  ValueObjectPtr getRegionSizeMR(PartEdgePtr pedge);
+  ValueObjectPtr getRegionSizeAO(PartEdgePtr pedge);
 
   // Returns true if this MemRegionObject denotes a finite set of concrete regions
   bool isConcrete() { return false; }
@@ -707,8 +711,14 @@ class StxStorageMemRegionType : public StxMemRegionType
   
   // Appends to the given hierarchical key the additional information that uniquely 
   // identifies this type's set
-  // Nothing added since all instances of the storage type denote the same set
-  void addHierSubKey(const AbstractObjectHierarchy::hierKeyPtr& key) { }
+  // Nothing added since all instances of the storage type denote the same set.
+  // However, we record that we've reached the end of the hierarchy
+  // since no additional precision can be added hierarchically to objects built from
+  // this MemRegion
+  void addHierSubKey(const AbstractionHierarchy::hierKeyPtr& key) {
+    key->reachedEndOfHierarchy();
+    std::cout << "addHierSubKey() key="<<key<<std::endl;
+  }
   
   std::string str(std::string indent) const; // pretty print for the object
 };
@@ -735,10 +745,10 @@ class StxAllMemRegionType : public StxMemRegionType
   void* getUID() const { return NULL; }
   
   // Returns true if this object is live at the given part and false otherwise
-  bool isLiveMR(PartEdgePtr pedge) { return true; }
+  bool isLiveAO(PartEdgePtr pedge) { return true; }
   
   // Returns a ValueObject that denotes the size of this memory region
-  ValueObjectPtr getRegionSizeMR(PartEdgePtr pedge);
+  ValueObjectPtr getRegionSizeAO(PartEdgePtr pedge);
 
   // Returns true if this MemRegionObject denotes a finite set of concrete regions
   bool isConcrete() { return false; }
@@ -753,7 +763,7 @@ class StxAllMemRegionType : public StxMemRegionType
   // Appends to the given hierarchical key the additional information that uniquely 
   // identifies this type's set
   // Nothing added since all instances of the all type denote the same full set
-  void addHierSubKey(const AbstractObjectHierarchy::hierKeyPtr& key) { }
+  void addHierSubKey(const AbstractionHierarchy::hierKeyPtr& key) { }
   
   std::string str(std::string indent) const; // pretty print for the object
 };
@@ -768,6 +778,24 @@ void collectRefinedEdges(Composer* composer, std::set<PartEdgePtr>& refined, con
 
 // Returns the number of bytes an instance of the given SgType occupies
 StxValueObjectPtr getTypeSize(SgType* type);
+
+// Generic wrapper for comparing SgValueExps's that implements the comparable interface
+// by looking at the values encoded by the SgValueExps
+class comparableSgValueExp: public comparable {
+  protected:
+  SgValueExp *v;
+  public:
+  comparableSgValueExp(SgValueExp* v);
+
+  // This == That
+  bool equal(const comparable& that_arg) const;
+
+  // This < That
+  bool less(const comparable& that_arg) const;
+
+  std::string str(std::string indent="") const;
+};
+typedef boost::shared_ptr<comparableSgValueExp> comparableSgValueExpPtr;
 
 }; //namespace fuse
 

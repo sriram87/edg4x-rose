@@ -2,7 +2,6 @@
 #include "live_dead_analysis.h"
 #include "compose.h"
 #include <boost/make_shared.hpp>
-#include "sight_verbosity.h"
 
 using namespace std;
 using namespace sight;
@@ -16,7 +15,7 @@ namespace fuse {
 // ###############################
 
 LiveDeadMemAnalysis::LiveDeadMemAnalysis(funcSideEffectUses* fseu): 
-    BWDataflow(/*trackBase2RefinedPartEdgeMapping*/ false), fseu(fseu)
+    BWDataflow(/*trackBase2RefinedPartEdgeMapping*/ false, /*useSSA*/ false), fseu(fseu)
 {
 }
 

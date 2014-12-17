@@ -13,7 +13,6 @@
 #include <map>
 #include <boost/make_shared.hpp>
 #include "sight.h"
-#include "sight_verbosity.h"
 using namespace std;
 using namespace sight;
 
@@ -49,6 +48,7 @@ void FuseInit(int argc, char **argv) {
   setenv("SIGHT_LAYOUT_EXEC", (txt()<<ROSE_PREFIX<<"/projects/fuse/src/fuseLayout").c_str(), 1);
   //setenv("SIGHT_LAYOUT_EXEC", (txt()<<ROSE_PREFIX<<"/bin//fuseLayout").c_str(), 1);
   SightInit(argc, argv);
+  modularApp::setNamedMeasures(namedMeasures("time", new timeMeasure()));
 }
 
 /****************

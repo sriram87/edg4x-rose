@@ -31,6 +31,9 @@ namespace fuse
   // returns a string containing a unique name that is not otherwise used inside this project
   std::string genUniqueName();
 
+  // Returns the type of the given node or NULL if none is defined for this node type
+  SgType* getType(SgNode* n);
+
   // returns the SgFunctionDeclaration for the function with the given name
   SgFunctionDeclaration* getFuncDecl(std::string name);
 
@@ -42,13 +45,13 @@ namespace fuse
   std::string SgNode2Str(SgNode* sgn);
 
   // Returns a string representation of this CFG node's key information
-  std::string CFGNode2Str(CFGNode n);
+  std::string CFGNode2Str(const CFGNode& n);
 
   // Returns a string representation of this CFG edge's key information
-  std::string CFGEdge2Str(CFGEdge e);
+  std::string CFGEdge2Str(const CFGEdge& e);
 
   // Returns a string representation of this CFG paths's key information
-  std::string CFGPath2Str(CFGPath p);
+  std::string CFGPath2Str(const CFGPath& p);
 
   // Base class for objects that can be compared using the == and < operators
   class comparable;
@@ -68,7 +71,7 @@ namespace fuse
     
     // Implementations of the other comparison operations
     bool operator==(const comparable& that) const;
-    bool operator<(const comparable& that) const;
+    bool operator< (const comparable& that) const;
     bool operator!=(const comparable& that) const { return !(*this == that); }
     bool operator<=(const comparable& that) const { return (*this == that)  || (*this < that); }
     bool operator> (const comparable& that) const { return !(*this == that) && !(*this < that); }
@@ -95,27 +98,15 @@ namespace fuse
     protected:
     SgNode *n;
     public:
-    comparableSgNode(SgNode* n): n(n) {}
+    comparableSgNode(SgNode* n);
+
     // This == That
-    bool equal(const comparable& that_arg) const {
-      //try{
-        const comparableSgNode& that = dynamic_cast<const comparableSgNode&>(that_arg);
-        return n == that.n;
-      /*} catch (std::bad_cast bc) {
-        ROSE_ASSERT(0);
-      }*/
-    }
+    bool equal(const comparable& that_arg) const;
 
     // This < That
-    bool less(const comparable& that_arg) const {
-      //try{
-        const comparableSgNode& that = dynamic_cast<const comparableSgNode&>(that_arg);
-        return n < that.n;
-      /*} catch (std::bad_cast bc) {
-        ROSE_ASSERT(0);
-      }*/
-    }
-    std::string str(std::string indent="") const { return SgNode2Str(n); }
+    bool less(const comparable& that_arg) const;
+
+    std::string str(std::string indent="") const;
   };
   typedef boost::shared_ptr<comparableSgNode> comparableSgNodePtr;
 

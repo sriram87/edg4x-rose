@@ -1,6 +1,7 @@
 #ifndef ANALYSIS_H
 #define ANALYSIS_H
 
+#include "rose.h"
 #include "graphIterator.h"
 #include "cfgUtils.h"
 #include "CallGraphTraverse.h"
@@ -9,7 +10,7 @@ namespace fuse {
 class Analysis;
 };
 
-#include "lattice.h"
+//#include "lattice.h"
 #include "nodeState.h"
 #include "partitions.h"
 #include <vector>
@@ -99,6 +100,7 @@ class DFTransferVisitor : public ROSE_VisitorPatternDefaultBase
   virtual ~DFTransferVisitor() { }
 };
 
+class Lattice;
 class Dataflow : virtual public Analysis
 {
   public:

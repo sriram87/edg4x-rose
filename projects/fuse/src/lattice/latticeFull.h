@@ -52,6 +52,10 @@ class BoolAndLattice : public FiniteLattice
   // returns true if this causes this to change and false otherwise
   bool meetUpdate(Lattice* that);
   
+  // Computes the intersection of this and that and saves the result in this
+  // returns true if this causes this to change and false otherwise
+  bool intersectUpdate(Lattice* that);
+
   // computes the meet of this and that and returns the result
   //Lattice* meet(Lattice* that);
     
@@ -89,12 +93,12 @@ class BoolAndLattice : public FiniteLattice
   bool setMLValueToFull(MemLocObjectPtr ml);
   
   // Returns whether this lattice denotes the set of all possible execution prefixes.
-  bool isFullLat();
+  bool isFull();
   // Returns whether this lattice denotes the empty set.
-  bool isEmptyLat();
+  bool isEmpty();
   
   std::string str(std::string indent="") const;
-};
+}; // class BoolAndLattice
 
 class IntMaxLattice : public InfiniteLattice
 {
@@ -105,7 +109,7 @@ class IntMaxLattice : public InfiniteLattice
   
   IntMaxLattice(PartEdgePtr pedge) : Lattice(pedge), InfiniteLattice(pedge)
   {
-    state = -1;
+    state = -infinity;
   }
   
   IntMaxLattice(int state, PartEdgePtr pedge) : Lattice(pedge), InfiniteLattice(pedge)
@@ -135,6 +139,10 @@ class IntMaxLattice : public InfiniteLattice
   // returns true if this causes this to change and false otherwise
   bool meetUpdate(Lattice* that);
   
+  // Computes the intersection of this and that and saves the result in this
+  // returns true if this causes this to change and false otherwise
+  bool intersectUpdate(Lattice* that);
+
   // computes the meet of this and that and returns the result
   //Lattice* meet(Lattice* that);
   
@@ -172,12 +180,12 @@ class IntMaxLattice : public InfiniteLattice
   bool setMLValueToFull(MemLocObjectPtr ml);
   
   // Returns whether this lattice denotes the set of all possible execution prefixes.
-  bool isFullLat();
+  bool isFull();
   // Returns whether this lattice denotes the empty set.
-  bool isEmptyLat();
+  bool isEmpty();
   
   std::string str(std::string indent="") const;
-};
+}; // class IntMaxLattice
 
 /*########################
   ### Utility lattices ###
@@ -236,10 +244,14 @@ class ProductLattice : public virtual Lattice
   // Returns true if the Lattice state is modified and false otherwise.
   bool replaceML(Lattice* newL);
   
-  // computes the meet of this and that and saves the result in this
+  // Computes the meet of this and that and saves the result in this
   // returns true if this causes this to change and false otherwise
   bool meetUpdate(Lattice* that);
-  
+
+  // Computes the intersection of this and that and saves the result in this
+  // returns true if this causes this to change and false otherwise
+  bool intersectUpdate(Lattice* that);
+
   // Computes the meet of this and that and returns the result
   virtual bool finiteLattice();
   
@@ -259,9 +271,9 @@ class ProductLattice : public virtual Lattice
   bool setMLValueToFull(MemLocObjectPtr ml);
   
   // Returns whether this lattice denotes the set of all possible execution prefixes.
-  bool isFullLat();
+  bool isFull();
   // Returns whether this lattice denotes the empty set.
-  bool isEmptyLat();
+  bool isEmpty();
   
   // The string that represents this object
   // If indent!="", every line of this string must be prefixed by indent

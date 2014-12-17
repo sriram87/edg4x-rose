@@ -3,12 +3,12 @@
 #include "tight_composer.h"
 #include "const_prop_analysis.h"
 #include "live_dead_analysis.h"
-#include "ortho_array_analysis.h"
 #include "call_context_sensitivity_analysis.h"
 #include "dead_path_elim_analysis.h"
 #include "printAnalysisStates.h"
 #include "pointsToAnalysis.h"
 #include "virtualMethodAnalysis.h"
+#include "dynamicMonitor.h"
 //#include "constantAnalysis.h"
 //#include "valueNumbering.h"
 #include "defsAnalysis.h"
@@ -33,10 +33,11 @@ using namespace SageInterface;
 // Regex expressions for the composition command, defined globally so that they can be used inside main 
 // (where they're initialized) as well as inside output_nested_results()
 sregex composer, lcComposer, lpComposer, tComposer,
-       analysis, cpAnalysis, ldAnalysis, ccsAnalysis, dpAnalysis, ptAnalysis,
+       analysis, noAnalysis, cpAnalysis, ldAnalysis, ccsAnalysis, dpAnalysis, ptAnalysis,
                  vmAnalysis, spcpAnalysis, spvnAnalysis,
                  ssacpAnalysis, ssaldAnalysis, ssaccsAnalysis, ssadpAnalysis, ssaptAnalysis,
                  ssavmAnalysis, ssaspcpAnalysis, ssaspvnAnalysis,
+                 dynMonitor,
        analysisList, compSpec;
 
 // Displays nested results to std::cout with indenting
@@ -72,13 +73,15 @@ struct output_nested_results
     smatch subWhat;
     //dbg << "match="<<match<<", parentComposerType="<<composerType2Str(parentComposerType)<<", parentComposer="<<parentComposer<<endl;
     if(regex_match(match, subWhat, analysis)) {
-//      cout << "analysis match="<<match<<", smatch="<<subWhat<<endl;
+      /*cout << "analysis match="<<match<<", smatch="<<subWhat<<endl;
+      cout << "regex_match(match, subWhat, cpAnalysis)="<<regex_match(match, subWhat, cpAnalysis)<<endl;
+      cout << "regex_match(match, subWhat, ssacpAnalysis)="<<regex_match(match, subWhat, ssacpAnalysis)<<endl;*/
       // Create the selected analysis and add it to the parent's sub-analysis list
-           if(regex_match(match, subWhat, cpAnalysis))   {  /*dbg << "CP"<<endl;*/ parentSubAnalyses.push_back(new ConstantPropagationAnalysis()); }
-      else if(regex_match(match, subWhat, ssacpAnalysis))   {  /*dbg << "CP"<<endl;*/ parentSubAnalyses.push_back(new ConstantPropagationAnalysis()); }
-      else if(regex_match(match, subWhat, ldAnalysis))   { parentSubAnalyses.push_back(new LiveDeadMemAnalysis()); }
+           if(regex_match(match, subWhat, cpAnalysis))      {  /*dbg << "CP"<<endl;*/ parentSubAnalyses.push_back(new ConstantPropagationAnalysis(/*useSSA*/false)); }
+      else if(regex_match(match, subWhat, ssacpAnalysis))   {  /*dbg << "CP"<<endl;*/ parentSubAnalyses.push_back(new ConstantPropagationAnalysis(/*useSSA*/true)); }
+      else if(regex_match(match, subWhat, ldAnalysis))      { parentSubAnalyses.push_back(new LiveDeadMemAnalysis()); }
       else if(regex_match(match, subWhat, ssaldAnalysis))   { parentSubAnalyses.push_back(new LiveDeadMemAnalysis()); }
-      else if(regex_match(match, subWhat, dpAnalysis))   { parentSubAnalyses.push_back(new DeadPathElimAnalysis(true)); }
+      else if(regex_match(match, subWhat, dpAnalysis))      { parentSubAnalyses.push_back(new DeadPathElimAnalysis(false)); }
       else if(regex_match(match, subWhat, ssadpAnalysis))   { parentSubAnalyses.push_back(new DeadPathElimAnalysis(true)); }
       else if(regex_match(match, subWhat, ccsAnalysis))  {
         parentSubAnalyses.push_back(new CallContextSensitivityAnalysis(1, CallContextSensitivityAnalysis::callSite, /*trackBase2RefinedPartEdgeMapping*/ true));
@@ -92,10 +95,11 @@ struct output_nested_results
             ons);*/
       }
       else if(regex_match(match, subWhat, ssaccsAnalysis))  { parentSubAnalyses.push_back(new CallContextSensitivityAnalysis(1, CallContextSensitivityAnalysis::callSite, /*trackBase2RefinedPartEdgeMapping*/ true)); }
-      else if(regex_match(match, subWhat, ptAnalysis))   { parentSubAnalyses.push_back(new PointsToAnalysis()); }
-      else if(regex_match(match, subWhat, ssaptAnalysis))   { parentSubAnalyses.push_back(new PointsToAnalysis()); }
-      else if(regex_match(match, subWhat, vmAnalysis))   { parentSubAnalyses.push_back(new VirtualMethodAnalysis(true)); }
-      else if(regex_match(match, subWhat, ssavmAnalysis))   { parentSubAnalyses.push_back(new VirtualMethodAnalysis(true)); }
+      else if(regex_match(match, subWhat, ptAnalysis))      { parentSubAnalyses.push_back(new PointsToAnalysis(/*useSSA*/false)); }
+      else if(regex_match(match, subWhat, ssaptAnalysis))   { parentSubAnalyses.push_back(new PointsToAnalysis(/*useSSA*/true)); }
+      else if(regex_match(match, subWhat, vmAnalysis))      { parentSubAnalyses.push_back(new VirtualMethodAnalysis(/*useSSA*/false)); }
+      else if(regex_match(match, subWhat, ssavmAnalysis))   { parentSubAnalyses.push_back(new VirtualMethodAnalysis(/*useSSA*/true)); }
+      else if(regex_match(match, subWhat, dynMonitor))      { parentSubAnalyses.push_back(new DynamicMonitor()); }
 
       //else if(regex_match(match, subWhat, spcpAnalysis)) { parentSubAnalyses.push_back(new SparseConstantAnalysis()); }
       //else if(regex_match(match, subWhat, spvnAnalysis)) { parentSubAnalyses.push_back(new SparseValueNumbering()); }
@@ -142,7 +146,7 @@ struct output_nested_results
         if(parentComposer) *parentComposer = lp;
       } else if(parentComposerType == tight) {
 //dbg << "TightComposer parentComposer="<<parentComposer<<endl;
-        TightComposer* t = new TightComposer(mySubAnalyses);
+        TightComposer* t = new TightComposer(mySubAnalyses, /*trackBase2RefinedPartEdgeMapping*/ false, /*useSSA*/ false);
         parentSubAnalyses.push_back(t);
         if(parentComposer) *parentComposer = t;
       }
@@ -229,6 +233,12 @@ class ValueASTAttribute: public CPAstAttributeInterface {
     collectRefinedEdges(composer, refinedEdges, (dir==above? cn.inEdges(): cn.outEdges()));
 
     allInScopeVars = getAllVarSymbols(n);
+    { scope s("allInScopeVars");
+      for(std::list<SgVariableSymbol *>::iterator v=allInScopeVars.begin(); v!=allInScopeVars.end(); ++v) {
+        dbg << SgNode2Str(*v)<<endl;
+      }
+    }
+
   }
  
   // Apply Expr2Value for the given expression to all the edges in refinedEdges and return
@@ -417,7 +427,6 @@ void printAttributes(Labeler* labeler, VariableIdMapping* vim, string attributeN
 int main(int argc, char** argv)
 {
   FuseInit(argc, argv);
-  modularApp fuseMA("Fuse", namedMeasures("time", new timeMeasure()));
   
   printf("========== S T A R T ==========\n");
   
@@ -478,6 +487,7 @@ int main(int argc, char** argv)
   composer = by_ref(lcComposer) | by_ref(lpComposer) | by_ref(tComposer);
   //composer = as_xpr(icase("loosechain")) | icase("lc") | icase("loosepar") | icase("lp");
   
+  noAnalysis   = as_xpr(icase("noanalysis"))                        | icase("none");
   cpAnalysis   = as_xpr(icase("constantpropagationanalysis"))       | icase("constprop")   | icase("cp");
   ldAnalysis   = as_xpr(icase("livedeadmemanalysis"))               | icase("livedead")    | icase("ld");
   ccsAnalysis  = as_xpr(icase("callctxsensanalysis"))               | icase("callctxsens") | icase("ccs");
@@ -494,13 +504,15 @@ int main(int argc, char** argv)
   ssavmAnalysis   = as_xpr(icase("SSA:virtualmethodanalysis"))             | icase("SSA:virtualmem")  | icase("SSA:vm");
   ssaspcpAnalysis = as_xpr(icase("SSA:sparseconstantpropagationanalysis")) | icase("SSA:spconstprop") | icase("SSA:spcp");
   ssaspvnAnalysis = as_xpr(icase("SSA:sparsevaluenumberinganalysis"))      | icase("SSA:spvalnum")    | icase("SSA:spvn");
-
-  analysis = by_ref(cpAnalysis)   | by_ref(ldAnalysis) | by_ref(ccsAnalysis) |
+  dynMonitor      = as_xpr(icase("dynamicmonitor"))                        | icase("dynmon")          | icase("dm");
+  analysis = by_ref(noAnalysis)   |
+             by_ref(cpAnalysis)   | by_ref(ldAnalysis) | by_ref(ccsAnalysis) |
              by_ref(dpAnalysis)   | by_ref(ptAnalysis) | by_ref(vmAnalysis)  |
              by_ref(spcpAnalysis) | by_ref(spvnAnalysis) |
              by_ref(ssacpAnalysis)   | by_ref(ssaldAnalysis) | by_ref(ssaccsAnalysis) |
              by_ref(ssadpAnalysis)   | by_ref(ssaptAnalysis) | by_ref(ssavmAnalysis)  |
-             by_ref(ssaspcpAnalysis) | by_ref(ssaspvnAnalysis);
+             by_ref(ssaspcpAnalysis) | by_ref(ssaspvnAnalysis) |
+             by_ref(dynMonitor);
   analysisList = '(' >> *_s >> (by_ref(analysis) | by_ref(compSpec)) >> *_s >> (!('(' >> *_s >>  +_w   >> *_s >> ')') ) >>
         *(*_s >> "," >> *_s >> (by_ref(analysis) | by_ref(compSpec)) >> *_s >> (!('(' >> *_s >>  +_w   >> *_s >> ')') ) ) >> *_s >> ')';
   compSpec = *_s >> by_ref(composer) >> *_s >> analysisList >> *_s;
@@ -540,32 +552,37 @@ int main(int argc, char** argv)
       
       ((ChainComposer*)rootComposer)->runAnalysis();
       
+/*      DynamicMonitor dynMon(rootComposer);
+      dynMon.runAnalysis();*/
+
       gettimeofday(&end, NULL);
       cout << "Elapsed="<<((end.tv_sec*1000000+end.tv_usec) - 
                            (start.tv_sec*1000000+start.tv_usec))/1000000.0<<"s"<<endl;
   
-//      VariableIdMapping vIDMap;
-//      vIDMap.computeVariableSymbolMapping(getProject());
-////      ValueASTAttribute::place(rootComposer, cdip);
-////      ValueASTAttribute::show(rootComposer, vIDMap);
-//      Labeler labeler(getProject());
-////      labeler.createLabels(getProject());
-//      ValueASTAttribute::placeLabeler(rootComposer, cdip, labeler);
-//      FuseRDAstAttribute::placeLabeler(rootComposer, cdip, vIDMap, labeler);
-//      AstAnnotator ara(&labeler);
-//      ara.annotateAstAttributesAsCommentsBeforeStatements(getProject(), "fuse_cp_below");
-//      ara.annotateAstAttributesAsCommentsBeforeStatements(getProject(), "fuse_rd");
-////      printAttributes<ValueASTAttribute>(&labeler, &vIDMap, "fuse_cp_above");
-//
-///*      ValueASTAttribute::placeLabeler(rootComposer, cdip, labeler);
-//      AstAnnotator ara(&labeler);
-//      ara.annotateAstAttributesAsCommentsBeforeStatements(getProject(), "fuse_cp_below");
-//      FuseRDAstAttribute::placeLabeler(rootComposer, cdip, vIDMap, labeler);
-//      printAttributes<FuseRDAstAttribute>(&labeler, &vIDMap, "fuse_rd");*/
+      VariableIdMapping vIDMap;
+      vIDMap.computeVariableSymbolMapping(getProject());
+//      ValueASTAttribute::place(rootComposer, cdip);
+//      ValueASTAttribute::show(rootComposer, vIDMap);
+      Labeler labeler(getProject());
+//      labeler.createLabels(getProject());
+      ValueASTAttribute::placeLabeler(rootComposer, cdip, labeler);
+      FuseRDAstAttribute::placeLabeler(rootComposer, cdip, vIDMap, labeler);
+      AstAnnotator ara(&labeler);
+      ara.annotateAstAttributesAsCommentsBeforeStatements(getProject(), "fuse_cp_below");
+      ara.annotateAstAttributesAsCommentsBeforeStatements(getProject(), "fuse_rd");
+//      printAttributes<ValueASTAttribute>(&labeler, &vIDMap, "fuse_cp_above");
+
+/*      ValueASTAttribute::placeLabeler(rootComposer, cdip, labeler);
+      AstAnnotator ara(&labeler);
+      ara.annotateAstAttributesAsCommentsBeforeStatements(getProject(), "fuse_cp_below");
+      FuseRDAstAttribute::placeLabeler(rootComposer, cdip, vIDMap, labeler);
+      printAttributes<FuseRDAstAttribute>(&labeler, &vIDMap, "fuse_rd");*/
       
       //cout << "rootComposer="<<rootComposer<<" cdip->getNumErrors()="<<cdip->getNumErrors()<<endl;
-      if(cdip->getNumErrors() > 0) cout << cdip->getNumErrors() << " Errors Reported!"<<endl;
-      else                         cout << "PASS"<<endl;
+      if(cdip) {
+        if(cdip->getNumErrors() > 0) cout << cdip->getNumErrors() << " Errors Reported!"<<endl;
+        else                         cout << "PASS"<<endl;
+      }
 
     } else
       cout << "FAIL composer\n";

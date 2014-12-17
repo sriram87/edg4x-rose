@@ -180,7 +180,7 @@ namespace fuse
 
   std::string PointsToAnalysis::str(std::string indent="") const
   { 
-    return "PointsToAnalysis"; 
+    return "PtsToAnal";
   }
 
   MemLocObjectPtr PointsToAnalysis::Expr2MemLoc(SgNode* sgn, PartEdgePtr pedge)
@@ -221,7 +221,7 @@ namespace fuse
       }
 
       boost::shared_ptr<AbstractObjectSet> aos_p = boost::dynamic_pointer_cast<AbstractObjectSet>(aom_p->get(opML_p));
-      assert(!aos_p->isEmptyLat());
+      assert(!aos_p->isEmpty());
       if(pointsToAnalysisDebugLevel() >= 2) dbg << "MLSet=" << aos_p->str() << endl;
       ptML_p->add(aos_p, pedge, getComposer(), this);
       break;
@@ -244,7 +244,7 @@ namespace fuse
    ******************/
 
   PTMemLocObject::PTMemLocObject(PartEdgePtr pedge, Composer* composer, PointsToAnalysis* ptanalysis)
-    : MemLocObject(NULL) { 
+    : MemLocObject(NULL), ptanalysis(ptanalysis) {
     aos_p = boost::make_shared<AbstractObjectSet>(pedge, composer, ptanalysis, AbstractObjectSet::may);
   }
 
@@ -261,7 +261,7 @@ namespace fuse
         MemLocObjectPtr  curML = boost::dynamic_pointer_cast<MemLocObject>(*ml);
         memRegions.push_back(curML->getRegion());
       }
-      ((PTMemLocObject*)this)->region = boost::make_shared<UnionMemRegionObject> (memRegions);
+      ((PTMemLocObject*)this)->region = boost::make_shared<CombinedMemRegionObject> (Union, ptanalysis, memRegions);
     }
     return region;
   }
@@ -275,7 +275,7 @@ namespace fuse
         indexes.push_back(curML->getIndex());
       }
 
-      ((PTMemLocObject*)this)->index = boost::make_shared<UnionValueObject> (indexes);
+      ((PTMemLocObject*)this)->index = boost::make_shared<CombinedValueObject> (Union, ptanalysis, indexes);
     }
     return index;
   }
@@ -287,7 +287,7 @@ namespace fuse
       return;
     }
     // If the set is already full return
-    else if(aos_p->isFullLat()) return;
+    else if(aos_p->isFull()) return;
     // Add the element otherwise
     else aos_p->insert(ml_p);
   }
@@ -441,11 +441,11 @@ namespace fuse
   }
 
   bool PTMemLocObject::isFull(PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis) {
-    return aos_p->isFullLat();
+    return aos_p->isFull();
   }
 
   bool PTMemLocObject::isEmpty(PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis) {
-    return aos_p->isEmptyLat();
+    return aos_p->isEmpty();
   }
 
   MemLocObjectPtr PTMemLocObject::copyML() const {

@@ -6,10 +6,9 @@
 #include <boost/foreach.hpp>
 #include <boost/graph/adjacency_list.hpp>
 #include <boost/graph/topological_sort.hpp>
-#include "ats.h"
+#include "ssa.h"
 
 #include "sight.h"
-#include "sight_verbosity.h"
 using namespace std;
 using namespace sight;
 using namespace boost;
@@ -17,11 +16,13 @@ using namespace boost;
 namespace fuse {
 
 #define atsDebugLevel 0
-#define moduleProfile true
+#define moduleProfile false
 
 /* ###########################
    ##### SSAMemLocObject #####
    ########################### */
+
+SSAMemLocObjectPtr NULLSSAMemLocObject;
 
 SSAMemLocObject::SSAMemLocObject(const SSAMemLocObject& that) : MemLocObject(that)
 {
@@ -45,6 +46,7 @@ string SSAMemLocObject::str(string indent) const {
 MemLocObjectPtr SSAMemLocObject::copyML() const
 { return makePtr<SSAMemLocObject>(*this); }
 
+SgNode* SSAMemLocObject::getBase() const { return baseML->getBase(); }
 MemRegionObjectPtr SSAMemLocObject::getRegion() const { return baseML->getRegion(); }
 ValueObjectPtr     SSAMemLocObject::getIndex()  const { return baseML->getIndex(); }
 
@@ -172,8 +174,8 @@ bool SSAMemLocObject::isHierarchy() const {
 
 // Returns a key that uniquely identifies this particular AbstractObject in the
 // set hierarchy.
-const AbstractObjectHierarchy::hierKeyPtr& SSAMemLocObject::getHierKey() const {
-/*  AbstractObjectHierarchyPtr hierBaseML = boost::dynamic_pointer_cast<AbstractObjectHierarchy>(baseML);
+const AbstractionHierarchy::hierKeyPtr& SSAMemLocObject::getHierKey() const {
+/*  AbstractionHierarchyPtr hierBaseML = boost::dynamic_pointer_cast<AbstractionHierarchy>(baseML);
   ROSE_ASSERT(hierBaseML);
   return hierBaseML->getHierKey();*/
 
@@ -215,7 +217,7 @@ bool SSAMemLocObject::less(const comparable& that_arg) const {
 }
 
 SSAMLHierKey::SSAMLHierKey(SSAMemLocObjectPtr ssaML): ssaML(ssaML) {
-  AbstractObjectHierarchyPtr hierBaseML = boost::dynamic_pointer_cast<AbstractObjectHierarchy>(ssaML->baseML);
+  AbstractionHierarchyPtr hierBaseML = boost::dynamic_pointer_cast<AbstractionHierarchy>(ssaML->baseML);
   ROSE_ASSERT(hierBaseML);
 
   const list<comparablePtr>& thatList = hierBaseML->getHierKey()->getList();
@@ -229,10 +231,10 @@ bool SSAMLHierKey::isLive(PartEdgePtr pedge, Composer* comp, ComposedAnalysis* a
 
 
 /********************
- ***** ATSGraph *****
+ ***** SSAGraph *****
  ********************/
 
-ATSGraph::ATSGraph(Composer* comp, ComposedAnalysis* analysis) : comp(comp), analysis(analysis)
+SSAGraph::SSAGraph(Composer* comp, ComposedAnalysis* analysis) : comp(comp), analysis(analysis)
 {
   // The following two variables are used to record the nodes traversed.
   nodesToVertices.clear();
@@ -247,9 +249,11 @@ ATSGraph::ATSGraph(Composer* comp, ComposedAnalysis* analysis) : comp(comp), ana
   BOOST_FOREACH (const PartPtr& s, startStates) {
     buildCFG(s, nodesToVertices, nodesProcessed);
   }
+
+  buildSSA();
 }
 
-void ATSGraph::buildCFG(PartPtr node,
+void SSAGraph::buildCFG(PartPtr node,
                         std::map<PartPtr, Vertex>& nodesAdded,
                         std::set<PartPtr>& nodesProcessed)
 {
@@ -306,14 +310,14 @@ void ATSGraph::buildCFG(PartPtr node,
 }
 
 // Return the anchor Parts of a given function
-std::set<PartPtr> ATSGraph::GetStartAStates()
+std::set<PartPtr> SSAGraph::GetStartAStates()
 { return comp->GetStartAStates(analysis); }
 
 // There may be multiple terminal points in the application (multiple calls to exit(), returns from main(), etc.)
-std::set<PartPtr> ATSGraph::GetEndAStates()
+std::set<PartPtr> SSAGraph::GetEndAStates()
 { return comp->GetEndAStates(analysis); }
 
-ATSGraph::Vertex ATSGraph::getVertexForNode(PartPtr node) const
+SSAGraph::Vertex SSAGraph::getVertexForNode(PartPtr node) const
 {
   std::map<PartPtr, Vertex>::const_iterator vertexIter = nodesToVertices.find(node);
   if (vertexIter == nodesToVertices.end())
@@ -325,7 +329,7 @@ ATSGraph::Vertex ATSGraph::getVertexForNode(PartPtr node) const
   }
 }
 
-set<PartPtr> ATSGraph::calculateIteratedDominanceFrontier(const vector<PartPtr>& startNodes)
+set<PartPtr> SSAGraph::calculateIteratedDominanceFrontier(const vector<PartPtr>& startNodes)
 {
   set<PartPtr> result;
   set<PartPtr> visitedNodes;
@@ -357,12 +361,12 @@ set<PartPtr> ATSGraph::calculateIteratedDominanceFrontier(const vector<PartPtr>&
   return result;
 }
 
-void ATSGraph::showDominatorTree() {
+void SSAGraph::showDominatorTree() {
   ostringstream dot;
 
   dot << "digraph DominatorTree {"<<endl;
 
-  typedef graph_traits<ATSGraph>::vertex_iterator vertex_iter;
+  typedef graph_traits<SSAGraph>::vertex_iterator vertex_iter;
   for(std::pair<vertex_iter, vertex_iter> vp = vertices(*this); vp.first != vp.second; ++vp.first)
     dot << "node"<<*(vp.first)<<" [label=\""<<(*this)[*(vp.first)]->str()<<"\"];"<<endl;
 
@@ -374,11 +378,11 @@ void ATSGraph::showDominatorTree() {
   sight::structure::graph g(dot.str());
 }
 
-void ATSGraph::showDominanceFrontier() {
+void SSAGraph::showDominanceFrontier() {
   ostringstream dot;
 
   dot << "digraph DominatorTree {"<<endl;
-  typedef graph_traits<ATSGraph>::vertex_iterator vertex_iter;
+  typedef graph_traits<SSAGraph>::vertex_iterator vertex_iter;
   for(std::pair<vertex_iter, vertex_iter> vp = vertices(*this); vp.first != vp.second; ++vp.first)
     dot << "node"<<*(vp.first)<<" [label=\""<<(*this)[*(vp.first)]->str()<<"\"];"<<endl;
 
@@ -398,12 +402,12 @@ void ATSGraph::showDominanceFrontier() {
   sight::structure::graph g(dot.str());
 }
 
-std::set<SSAMemLocObjectPtr> ATSGraph::emptySSAMemLocObjectSet;
-std::list<SSAMemLocObjectPtr> ATSGraph::emptySSAMemLocObjectList;
-std::list<std::pair<SSAMemLocObjectPtr, std::set<SSAMemLocObjectPtr> > > ATSGraph::emptySSAMemLocObjectMapping;
+std::set<SSAMemLocObjectPtr> SSAGraph::emptySSAMemLocObjectSet;
+std::list<SSAMemLocObjectPtr> SSAGraph::emptySSAMemLocObjectList;
+std::list<std::pair<SSAMemLocObjectPtr, std::set<SSAMemLocObjectPtr> > > SSAGraph::emptySSAMemLocObjectMapping;
 
 // Given a set of SSAMemLocObjectPtrs returns a corresponding set of MemLocObjectPtrs
-set<MemLocObjectPtr> ATSGraph::SSAMLSet2MLSet(const set<SSAMemLocObjectPtr>& s) {
+set<MemLocObjectPtr> SSAGraph::SSAMLSet2MLSet(const set<SSAMemLocObjectPtr>& s) {
   set<MemLocObjectPtr> ret;
   for(set<SSAMemLocObjectPtr>::const_iterator i=s.begin(); i!=s.end(); i++)
     ret.insert((MemLocObjectPtr)*i);
@@ -411,28 +415,28 @@ set<MemLocObjectPtr> ATSGraph::SSAMLSet2MLSet(const set<SSAMemLocObjectPtr>& s) 
 }
 
 // Return the set of uses at this part
-const std::set<SSAMemLocObjectPtr>& ATSGraph::getUses(PartPtr part) const {
+const std::set<SSAMemLocObjectPtr>& SSAGraph::getUses(PartPtr part) const {
   std::map<PartPtr, std::set<SSAMemLocObjectPtr> >::const_iterator i=uses.find(part);
   if(i!=uses.end()) return i->second;
   else              return emptySSAMemLocObjectSet;
 }
 
-std::set<MemLocObjectPtr> ATSGraph::getUsesML(PartPtr part) const
+std::set<MemLocObjectPtr> SSAGraph::getUsesML(PartPtr part) const
 { return SSAMLSet2MLSet(getUses(part)); }
 
 
 // Return the set of defs at this part
-const std::set<SSAMemLocObjectPtr>& ATSGraph::getDefs(PartPtr part) const {
+const std::set<SSAMemLocObjectPtr>& SSAGraph::getDefs(PartPtr part) const {
   std::map<PartPtr, std::set<SSAMemLocObjectPtr> >::const_iterator i=defs.find(part);
   if(i!=defs.end()) return i->second;
   else              return emptySSAMemLocObjectSet;
 }
 
-std::set<MemLocObjectPtr> ATSGraph::getDefsML(PartPtr part) const
+std::set<MemLocObjectPtr> SSAGraph::getDefsML(PartPtr part) const
 { return SSAMLSet2MLSet(getDefs(part)); }
 
 // Collects all the defs and uses at each Part and stores them into defs and uses
-void ATSGraph::collectDefsUses() {
+void SSAGraph::collectDefsUses() {
   set<PartPtr> startStates = comp->GetStartAStates(analysis);
   for(fw_partEdgeIterator state(startStates); !state.isEnd(); state++) {
     PartPtr part = state.getPart();
@@ -443,15 +447,20 @@ void ATSGraph::collectDefsUses() {
     for(set<CFGNode>::iterator cn=cfgNodes.begin(); cn!=cfgNodes.end(); cn++) {
       SgNode* sgn = cn->getNode();
       if(SgBinaryOp* binOp = isSgBinaryOp(sgn)) {
-        if(isSgAssignOp(sgn) || isSgCompoundAssignOp(sgn))
-          partDefs.insert(makePtr<SSAMemLocObject>(comp->Expr2MemLoc(binOp->get_lhs_operand(), state.getPartEdge(), analysis), part, binOp->get_lhs_operand(), SSAMemLocObject::def));
+        if(SgPntrArrRefExp* par = isSgPntrArrRefExp(binOp)) {
+          partUses.insert(makePtr<SSAMemLocObject>(comp->Expr2MemLoc(par->get_rhs_operand(), state.getPartEdge(), analysis), part, par->get_rhs_operand(), SSAMemLocObject::use));
+          partUses.insert(makePtr<SSAMemLocObject>(comp->Expr2MemLoc(par->get_lhs_operand(), state.getPartEdge(), analysis), part, par->get_lhs_operand(), SSAMemLocObject::use));
+        } else {
+          if(isSgAssignOp(sgn) || isSgCompoundAssignOp(sgn))
+            partDefs.insert(makePtr<SSAMemLocObject>(comp->Expr2MemLoc(binOp->get_lhs_operand(), state.getPartEdge(), analysis), part, binOp->get_lhs_operand(), SSAMemLocObject::def));
 
-        //if(!isSgAssignOp(sgn))
-          partUses.insert(makePtr<SSAMemLocObject>(comp->Expr2MemLoc(binOp->get_lhs_operand(), state.getPartEdge(), analysis), part, binOp->get_lhs_operand(), SSAMemLocObject::use));
+          if(!isSgAssignOp(sgn))
+          //!!! We're using the memory location info of the lhs, not its value, should differentiate these
+            partUses.insert(makePtr<SSAMemLocObject>(comp->Expr2MemLoc(binOp->get_lhs_operand(), state.getPartEdge(), analysis), part, binOp->get_lhs_operand(), SSAMemLocObject::use));
 
-        partUses.insert(makePtr<SSAMemLocObject>(comp->Expr2MemLoc(binOp->get_rhs_operand(), state.getPartEdge(), analysis), part, binOp->get_rhs_operand(), SSAMemLocObject::use));
-        partDefs.insert(makePtr<SSAMemLocObject>(comp->Expr2MemLoc(binOp, state.getPartEdge(), analysis), part, binOp, SSAMemLocObject::def));
-
+          partUses.insert(makePtr<SSAMemLocObject>(comp->Expr2MemLoc(binOp->get_rhs_operand(), state.getPartEdge(), analysis), part, binOp->get_rhs_operand(), SSAMemLocObject::use));
+          partDefs.insert(makePtr<SSAMemLocObject>(comp->Expr2MemLoc(binOp, state.getPartEdge(), analysis), part, binOp, SSAMemLocObject::def));
+        }
         // !!!! Should add a use of the memory location of the LHS
       } else if(SgUnaryOp* unOp = isSgUnaryOp(sgn)) {
         if(isSgMinusMinusOp(sgn) || isSgPlusPlusOp(sgn))
@@ -586,7 +595,7 @@ void ATSGraph::collectDefsUses() {
   }
 }
 
-void ATSGraph::showDefsUses() {
+void SSAGraph::showDefsUses() {
   dbg << "<u>defs</u>"<<endl;
   dbg << "<table border=1>";
   for(map<PartPtr, set<SSAMemLocObjectPtr> >::iterator d=defs.begin(); d!=defs.end(); ++d) {
@@ -624,7 +633,7 @@ void ATSGraph::showDefsUses() {
 }
 
 // Finds all the Parts where phi nodes should be placed and identifies the MemLocs they must define
-/*void ATSGraph::placePhiNodes() {
+/*void SSAGraph::placePhiNodes() {
   SIGHT_VERB_DECL(scope, ("placePhiNodes"), 1, atsDebugLevel)
 
     { scope s2("def2use");
@@ -678,7 +687,7 @@ void ReplaceStringInPlace(std::string& subject, const std::string& search,
     }
 }
 
-void ATSGraph::showPhiNodes() {
+void SSAGraph::showPhiNodes() {
   scope s("showPhiNodes");
 
   /*dbg << "<u>phiDefs</u>"<<endl;
@@ -800,9 +809,29 @@ void ATSGraph::showPhiNodes() {
   sight::structure::graph g(dot.str());
 }
 
+// Returns the mapping of phiDef MemLocs at the given phiNode before the given part
+  // to the defs and phiDefs that reach them.
+  const std::map<SSAMemLocObjectPtr, std::set<SSAMemLocObjectPtr> >& SSAGraph::getDefsUsesAtPhiNode(PartPtr part) const {
+    ROSE_ASSERT(isPhiNode(part));
+    std::map<PartPtr, std::map<SSAMemLocObjectPtr, std::set<SSAMemLocObjectPtr> > >::const_iterator i=phiDefs.find(part);
+    ROSE_ASSERT(i!=phiDefs.end());
+    return i->second;
+  }
+
+  // Returns the set of defs and phiDefs that reach the given phiDef
+  const std::set<SSAMemLocObjectPtr>& SSAGraph::getReachingDefsAtPhiDef(SSAMemLocObjectPtr pd) const {
+    ROSE_ASSERT(isPhiNode(pd->getLoc()));
+    std::map<PartPtr, std::map<SSAMemLocObjectPtr, std::set<SSAMemLocObjectPtr> > >::const_iterator i=phiDefs.find(pd->getLoc());
+    ROSE_ASSERT(i!=phiDefs.end());
+    std::map<SSAMemLocObjectPtr, std::set<SSAMemLocObjectPtr> >::const_iterator j=i->second.find(pd);
+    ROSE_ASSERT(j!=i->second.end());
+
+    return j->second;
+  }
+
 /*
 // Returns the ID of the given phiNode part
-int ATSGraph::getPhiNodeID(PartPtr part) {
+int SSAGraph::getPhiNodeID(PartPtr part) {
   map<PartPtr, int>::iterator i=phiNodeID.find(part);
   int ID=0;
   // If the given part does not yet have an ID, generate a fresh one
@@ -818,7 +847,7 @@ int ATSGraph::getPhiNodeID(PartPtr part) {
 }*/
 
 // Returns whether the given def terminates at the given phi node
-bool ATSGraph::defTerminatesAtPhiNode(PartPtr phiPart, SSAMemLocObjectPtr def) const {
+bool SSAGraph::defTerminatesAtPhiNode(PartPtr phiPart, SSAMemLocObjectPtr def) const {
   SIGHT_VERB_DECL(scope, (txt()<<"defTerminatesAtPhiNode()"), 2, atsDebugLevel)
 
   map<PartPtr, map<SSAMemLocObjectPtr, set<SSAMemLocObjectPtr> > >::const_iterator node=phiDefs.find(phiPart);
@@ -842,7 +871,7 @@ bool ATSGraph::defTerminatesAtPhiNode(PartPtr phiPart, SSAMemLocObjectPtr def) c
 }
 
 // Connect a def/phiDef to a use/phiDef that it reaches
-void ATSGraph::addDefUseLink(SSAMemLocObjectPtr use, SSAMemLocObjectPtr def) {
+void SSAGraph::addDefUseLink(SSAMemLocObjectPtr use, SSAMemLocObjectPtr def) {
   ROSE_ASSERT(use->getAccess()==SSAMemLocObject::use || use->getAccess()==SSAMemLocObject::phiDef);
   ROSE_ASSERT(def->getAccess()==SSAMemLocObject::def || use->getAccess()==SSAMemLocObject::phiDef);
   use2def[use].insert(def);
@@ -851,7 +880,7 @@ void ATSGraph::addDefUseLink(SSAMemLocObjectPtr use, SSAMemLocObjectPtr def) {
 }
 
 // Erases all the regular non-phi uses recorded for the given part
-void ATSGraph::eraseUsesFromU2D(PartPtr part) {
+void SSAGraph::eraseUsesFromU2D(PartPtr part) {
   // Find all the uses in uses[part] and phiDefs[part] and remove them from use2def and def2use
   if(uses.find(part) != uses.end()) {
     for(set<SSAMemLocObjectPtr>::iterator use=uses[part].begin(); use!=uses[part].end(); ++use) {
@@ -868,7 +897,7 @@ void ATSGraph::eraseUsesFromU2D(PartPtr part) {
 
 // For each use->def link recorded in use2def and phiDefs, adds a corresponding
 // reverse link in def2use
-void ATSGraph::setDef2Use() {
+void SSAGraph::setDef2Use() {
   // Reset def2use in preparation of it being synchornized with use2def and phiDefs
   def2use.clear();
 
@@ -888,9 +917,9 @@ void ATSGraph::setDef2Use() {
 }
 
 // Returns the SSA uses for the given def
-const std::set<SSAMemLocObjectPtr>& ATSGraph::getUses(SSAMemLocObjectPtr def) const {
+const std::set<SSAMemLocObjectPtr>& SSAGraph::getUses(SSAMemLocObjectPtr def) const {
   map<SSAMemLocObjectPtr, set<SSAMemLocObjectPtr> >::const_iterator i=def2use.find(def);
-  /*dbg << "ATSGraph::getUses("<<def->str()<<") found="<<(i != def2use.end())<<endl;
+  /*dbg << "SSAGraph::getUses("<<def->str()<<") found="<<(i != def2use.end())<<endl;
   { scope s2("def2use");
     for(map<SSAMemLocObjectPtr, set<SSAMemLocObjectPtr>  >::const_iterator i=def2use.begin(); i!=def2use.end(); i++) {
       dbg << "i->first="<<i->first.get()<<endl;
@@ -903,22 +932,22 @@ const std::set<SSAMemLocObjectPtr>& ATSGraph::getUses(SSAMemLocObjectPtr def) co
   else                   return emptySSAMemLocObjectSet;
 }
 
-std::set<MemLocObjectPtr> ATSGraph::getUsesML(SSAMemLocObjectPtr def) const
+std::set<MemLocObjectPtr> SSAGraph::getUsesML(SSAMemLocObjectPtr def) const
 { return SSAMLSet2MLSet(getUses(def)); }
 
 // Returns the SSA defs for the given use
-const std::set<SSAMemLocObjectPtr>& ATSGraph::getDefs(SSAMemLocObjectPtr use) const {
-  //dbg << "ATSGraph::getDefs() use="<<use->str()<<endl;
+const std::set<SSAMemLocObjectPtr>& SSAGraph::getDefs(SSAMemLocObjectPtr use) const {
+  //dbg << "SSAGraph::getDefs() use="<<use->str()<<endl;
   map<SSAMemLocObjectPtr, set<SSAMemLocObjectPtr> >::const_iterator i=use2def.find(use);
   if(i != use2def.end()) return i->second;
   else                   return emptySSAMemLocObjectSet;
 }
 
-std::set<MemLocObjectPtr> ATSGraph::getDefsML(SSAMemLocObjectPtr use) const
+std::set<MemLocObjectPtr> SSAGraph::getDefsML(SSAMemLocObjectPtr use) const
 { return SSAMLSet2MLSet(getDefs(use)); }
 
 // Get the list of definitions of the arguments within the function call at the given part
-const std::list<std::pair<SSAMemLocObjectPtr, std::set<SSAMemLocObjectPtr> > >& ATSGraph::getFunc2Params(PartPtr part) const
+const std::list<std::pair<SSAMemLocObjectPtr, std::set<SSAMemLocObjectPtr> > >& SSAGraph::getFunc2Params(PartPtr part) const
 {
   ROSE_ASSERT(part->mustOutgoingFuncCall());
   std::map<PartPtr, std::list<std::pair<SSAMemLocObjectPtr, std::set<SSAMemLocObjectPtr> > > >::const_iterator i=funcArg2Param.find(part);
@@ -932,7 +961,7 @@ const std::list<std::pair<SSAMemLocObjectPtr, std::set<SSAMemLocObjectPtr> > >& 
 // Otherwise, if def may-defines use, then use is not removed, a def->use connection is recorded
 //    and false is returned.
 // Otherwise, nothing is changed and false is returned.
-bool ATSGraph::matchUseToDef(PartEdgePtr pedge, SSAMemLocObjectPtr use, SSAMemLocObjectPtr def, 
+bool SSAGraph::matchUseToDef(PartEdgePtr pedge, SSAMemLocObjectPtr use, SSAMemLocObjectPtr def,
                              set<SSAMemLocObjectPtr>& liveUses) {
   // If the current def definitely writes to the current use
   if(def->baseML->mustEqual(use->baseML, pedge, comp, analysis)) {
@@ -1017,7 +1046,7 @@ bool ATSGraph::matchUseToDef(PartEdgePtr pedge, SSAMemLocObjectPtr use, SSAMemLo
 //   mapping has the same baseML but new definition location.
 // However, if it is may-equals but not must-equals, the mapping from defs is added to the group (the
 //   second element in pair) without removing the original.
-void ATSGraph::assignDefAfterLiveDefs(list<pair<MemLocObjectPtr, set<SSAMemLocObjectPtr> > >& curLiveDefs,
+void SSAGraph::assignDefAfterLiveDefs(list<pair<MemLocObjectPtr, set<SSAMemLocObjectPtr> > >& curLiveDefs,
                                       set<SSAMemLocObjectPtr>& defs,
                                       PartEdgePtr pedge) {
   for(set<SSAMemLocObjectPtr>::iterator def=defs.begin(); def!=defs.end(); ++def) {
@@ -1046,7 +1075,7 @@ void ATSGraph::assignDefAfterLiveDefs(list<pair<MemLocObjectPtr, set<SSAMemLocOb
     // If this def fits into no groups in curLiveDefs, add a new one
     else if(mayEqualLiveDefs.size()==0) {
       set<SSAMemLocObjectPtr> defSet; defSet.insert(*def);
-      curLiveDefs.push_back(make_pair((*def)->baseML->copyML(), set<SSAMemLocObjectPtr>(defSet)));
+      curLiveDefs.push_back(make_pair((*def)->baseML->copyAOType(), set<SSAMemLocObjectPtr>(defSet)));
 
     // Otherwise, if this def fits into exactly one group in curLiveDefs, add it there
     } else if(mayEqualLiveDefs.size()==1) {
@@ -1076,20 +1105,25 @@ void ATSGraph::assignDefAfterLiveDefs(list<pair<MemLocObjectPtr, set<SSAMemLocOb
 
 // Merge the two given lists of live definition groups, updating toLiveDefs with the result
 // Returns true if toLiveDefs is modified and false otherwise.
-bool ATSGraph::mergeLiveDefs(list<pair<MemLocObjectPtr, set<SSAMemLocObjectPtr> > >& toLiveDefs,
+bool SSAGraph::mergeLiveDefs(list<pair<MemLocObjectPtr, set<SSAMemLocObjectPtr> > >& toLiveDefs,
                              list<pair<MemLocObjectPtr, set<SSAMemLocObjectPtr> > >& fromLiveDefs,
                              PartEdgePtr pedge) {
   SIGHT_VERB_DECL(scope, ("mergeLiveDefs"), 2, atsDebugLevel)
   bool modified = false;
   for(list<pair<MemLocObjectPtr, set<SSAMemLocObjectPtr> > >::iterator from=fromLiveDefs.begin(); from!=fromLiveDefs.end(); ++from) {
-    // Merge may only be called when propagating liveDefs to successor Parts at the end of a transfer
+/*    // Merge may only be called when propagating liveDefs to successor Parts at the end of a transfer
     // function. Since at this point we've already done detection ambiguities and placement of phi nodes
     // to deal with these ambiguities, we're sure that each def grouping has no ambiguity and thus,
     // exactly 1 member.
-    ROSE_ASSERT(from->second.size()==1);
+    dbg << "from->first="<<from->first->str()<<endl;
+    BOOST_FOREACH(const SSAMemLocObjectPtr& f, from->second) {
+      dbg << "    f="<<f->str()<<endl;
+    }
 
-    SSAMemLocObjectPtr fromDef = *from->second.begin();
-    SIGHT_VERB_DECL(scope, (txt()<<"fromDef="<<fromDef->str()), 2, atsDebugLevel)
+    ROSE_ASSERT(from->second.size()==1);*/
+
+    //SSAMemLocObjectPtr fromDef = *from->second.begin();
+    //SIGHT_VERB_DECL(scope, (txt()<<"fromDef="<<fromDef->str()), 2, atsDebugLevel)
 
     // Find the groups in toLiveDefs that from overlaps. Since there may be multiple,
     // we collect them all into matchingDefs
@@ -1103,7 +1137,7 @@ bool ATSGraph::mergeLiveDefs(list<pair<MemLocObjectPtr, set<SSAMemLocObjectPtr> 
 
     // If this group in fromLiveDefs matches no groups in toLiveDefs, add a new one
     if(matchingToLiveDefs.size()==0) {
-      toLiveDefs.push_back(make_pair(from->first->copyML(), from->second));
+      toLiveDefs.push_back(make_pair(from->first->copyAOType(), from->second));
       SIGHT_VERB(dbg << "Adding new group "<<from->first->str(), 2, atsDebugLevel)
       modified = true;
 
@@ -1146,9 +1180,11 @@ bool ATSGraph::mergeLiveDefs(list<pair<MemLocObjectPtr, set<SSAMemLocObjectPtr> 
       }
       SIGHT_VERB_FI()*/
 
-      // Finally, add from to (*matchingToLiveDefs.begin())->second
+      // Finally, add all the definitions in from to (*matchingToLiveDefs.begin())->second
       unsigned int origSize=(*matchingToLiveDefs.begin())->second.size();
-      (*matchingToLiveDefs.begin())->second.insert(fromDef);
+      BOOST_FOREACH(const SSAMemLocObjectPtr& fromDef, from->second) {
+        (*matchingToLiveDefs.begin())->second.insert(fromDef);
+      }
       modified = modified || (origSize!=(*matchingToLiveDefs.begin())->second.size());
       SIGHT_VERB(dbg << "    modified="<<modified<<", origSize="<<origSize<<", (*matchingToLiveDefs.begin())->second.size()="<<(*matchingToLiveDefs.begin())->second.size(), 2, atsDebugLevel)
 
@@ -1193,7 +1229,7 @@ void printLiveDefs(std::string label, const list<pair<MemLocObjectPtr, set<SSAMe
 }
 
 // Returns whether the two collections of live defs contain the same defs
-bool ATSGraph::equalLiveDefs(const list<pair<MemLocObjectPtr, set<SSAMemLocObjectPtr> > >& aLD,
+bool SSAGraph::equalLiveDefs(const list<pair<MemLocObjectPtr, set<SSAMemLocObjectPtr> > >& aLD,
                              const list<pair<MemLocObjectPtr, set<SSAMemLocObjectPtr> > >& bLD)
 {
   if(aLD.size() != bLD.size()) { SIGHT_VERB(dbg << "different sizes;"<<endl, 2, atsDebugLevel) return false; }
@@ -1213,7 +1249,7 @@ bool ATSGraph::equalLiveDefs(const list<pair<MemLocObjectPtr, set<SSAMemLocObjec
 }
 
 // Computes the mapping from MemLoc uses to their defs
-void ATSGraph::computeUse2Def() {
+void SSAGraph::computeUse2Def() {
   SIGHT_DECL(module, (instance("computeUse2Def", 0, 0)), moduleProfile)
   SIGHT_VERB_DECL(scope, ("computeUse2Def"), 2, atsDebugLevel)
 
@@ -1422,6 +1458,9 @@ void ATSGraph::computeUse2Def() {
       succIn.push_back((*e)->target()->inEdgeFromAny());
       list<pair<MemLocObjectPtr, set<SSAMemLocObjectPtr> > > newInLiveDefs;
       for(list<PartEdgePtr>::iterator inE=succIn.begin(); inE!=succIn.end(); ++inE) {
+        SIGHT_VERB(dbg << "inE="<<(*inE)->str()<<endl, 2, atsDebugLevel)
+        SIGHT_VERB(printLiveDefs(txt()<<"edgeLiveDefs[*inE]", edgeLiveDefs[*inE]), 2, atsDebugLevel)
+
         if(inE==succIn.begin()) newInLiveDefs = edgeLiveDefs[*inE];
         else mergeLiveDefs(newInLiveDefs, edgeLiveDefs[*inE], *inE);
       }
@@ -1469,7 +1508,7 @@ void ATSGraph::computeUse2Def() {
 }
 
 /*// Computes the mapping from MemLoc uses to their defs
-void ATSGraph::computeUse2Def() {
+void SSAGraph::computeUse2Def() {
   SIGHT_VERB_DECL(scope, ("computeUse2Def"), 1, atsDebugLevel)
 
   // Maps each Part to set of MemLocs that were used later than the Part and that
@@ -1638,7 +1677,7 @@ void ATSGraph::computeUse2Def() {
   }
 }*/
 
-void ATSGraph::showUse2Def() {
+void SSAGraph::showUse2Def() {
   ostringstream dot;
 
   { scope s1("use2def");
@@ -1722,7 +1761,7 @@ void ATSGraph::showUse2Def() {
   sight::structure::graph g(dot.str());
 }
 
-void ATSGraph::buildSSA() {
+void SSAGraph::buildSSA() {
   // Only run if the SSA has not yet been built
   static bool ssaBuilt=false;
   if(ssaBuilt) return;
@@ -1736,7 +1775,7 @@ void ATSGraph::buildSSA() {
 
   SIGHT_VERB_DECL(scope, ("buildSSA", scope::high), 1, atsDebugLevel)
 
-  getDominatorTree();
+  /*getDominatorTree();
   SIGHT_VERB_IF(1, atsDebugLevel)
   scope s("Dominator Tree");
   showDominatorTree();
@@ -1746,7 +1785,7 @@ void ATSGraph::buildSSA() {
   SIGHT_VERB_IF(1, atsDebugLevel)
   scope s("Dominance Frontier");
   showDominanceFrontier();
-  SIGHT_VERB_FI()
+  SIGHT_VERB_FI()*/
 
   collectDefsUses();
   SIGHT_VERB_IF(1, atsDebugLevel)

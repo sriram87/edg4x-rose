@@ -68,7 +68,7 @@ Regular ATS Nodes {
 */
 
 // Wraps regular MemLocObjects with enough information to guarantee the static single assignment
-// property from the SSA graph in ATSGraph. An SSA def is uniquely defined by
+// property from the SSAGraph. An SSA def is uniquely defined by
 // - the Part where it occurs,
 // - the SgNode at that part that is being used or defined
 // - whether it is being used or defined (in expressions like a++ the same expression a is
@@ -96,6 +96,10 @@ class SSAMemLocObject : public MemLocObject, public comparable {
 
   SSAMemLocObject(const SSAMemLocObject& that);
 
+  PartPtr getLoc() const { return loc; }
+
+  SgNode* getSgNode() const { return sgn; }
+
   std::string accessType2Str(accessType access) const {
     return (access==def?   "def":
            (access==use?   "use":
@@ -109,6 +113,7 @@ class SSAMemLocObject : public MemLocObject, public comparable {
   // copy this object and return a pointer to it
   MemLocObjectPtr copyML() const;
 
+  SgNode* getBase() const;
   MemRegionObjectPtr getRegion() const;
   ValueObjectPtr     getIndex() const;
 
@@ -151,35 +156,37 @@ class SSAMemLocObject : public MemLocObject, public comparable {
   // Returns whether all instances of this class form a hierarchy. Every instance of the same
   // class created by the same analysis must return the same value from this method!
   bool isHierarchy() const;
-  // AbstractObjects that form a hierarchy must inherit from the AbstractObjectHierarchy class
+  // AbstractObjects that form a hierarchy must inherit from the AbstractionHierarchy class
 
   // Returns a key that uniquely identifies this particular AbstractObject in the
   // set hierarchy.
-  const AbstractObjectHierarchy::hierKeyPtr& getHierKey() const;
+  const AbstractionHierarchy::hierKeyPtr& getHierKey() const;
 
   // Methods for the comparable API
   bool equal(const comparable& that) const;
   bool less(const comparable& that) const;
 }; // class SSAMemLocObject
 
-class SSAMLHierKey: public AbstractObjectHierarchy::hierKey {
+extern SSAMemLocObjectPtr NULLSSAMemLocObject;
+
+class SSAMLHierKey: public AbstractionHierarchy::hierKey {
   SSAMemLocObjectPtr ssaML;
   public:
   SSAMLHierKey(SSAMemLocObjectPtr ssaML);
   bool isLive(PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis);
 }; // class SSAMLHierKey
 
-class ATSGraph: public boost::adjacency_list<boost::vecS, boost::vecS, boost::bidirectionalS, PartPtr, PartEdgePtr>
+class SSAGraph: public boost::adjacency_list<boost::vecS, boost::vecS, boost::bidirectionalS, PartPtr, PartEdgePtr>
 {
   protected:
   Composer* comp;
   ComposedAnalysis* analysis;
 
   public:
-  ATSGraph(Composer* comp, ComposedAnalysis* analysis);
+  SSAGraph(Composer* comp, ComposedAnalysis* analysis);
 
   protected:
-  typedef boost::graph_traits<ATSGraph>   GraphTraits;
+  typedef boost::graph_traits<SSAGraph>   GraphTraits;
   typedef GraphTraits::vertex_descriptor  Vertex;
   typedef GraphTraits::edge_descriptor    Edge;
 
@@ -221,9 +228,9 @@ class ATSGraph: public boost::adjacency_list<boost::vecS, boost::vecS, boost::bi
   // There may be multiple terminal points in the application (multiple calls to exit(), returns from main(), etc.)
   std::set<PartPtr> GetEndAStates();
 
-  const ATSGraph::VertexVertexMap& getDominatorTree();// const;
+  const SSAGraph::VertexVertexMap& getDominatorTree();// const;
 
-  const ATSGraph::VertexVertexMap& getPostdominatorTree();// const;
+  const SSAGraph::VertexVertexMap& getPostdominatorTree();// const;
 
   Vertex getVertexForNode(PartPtr node) const;
 
@@ -314,12 +321,11 @@ class ATSGraph: public boost::adjacency_list<boost::vecS, boost::vecS, boost::bi
 
   // Returns the mapping of phiDef MemLocs at the given phiNode before the given part
   // to the defs and phiDefs that reach them.
-  const std::map<SSAMemLocObjectPtr, std::set<SSAMemLocObjectPtr> >& getDefsUsesAtPhiNode(PartPtr part) const {
-    ROSE_ASSERT(isPhiNode(part));
-    std::map<PartPtr, std::map<SSAMemLocObjectPtr, std::set<SSAMemLocObjectPtr> > >::const_iterator i=phiDefs.find(part);
-    ROSE_ASSERT(i!=phiDefs.end());
-    return i->second;
-  }
+  const std::map<SSAMemLocObjectPtr, std::set<SSAMemLocObjectPtr> >& getDefsUsesAtPhiNode(PartPtr part) const;
+
+  // Returns the set of defs and phiDefs that reach the given phiDef
+  const std::set<SSAMemLocObjectPtr>& getReachingDefsAtPhiDef(SSAMemLocObjectPtr pd) const;
+
   /*const std::map<SSAMemLocObjectPtr, std::set<SSAMemLocObjectPtr> >& getDefsUsesAtPhiNodeBefore(PartPtr part) const {
     ROSE_ASSERT(isPhiNodeBefore(part));
     std::map<PartPtr, std::map<SSAMemLocObjectPtr, std::set<SSAMemLocObjectPtr> > >::const_iterator i=phiDefsBefore.find(part);
@@ -399,6 +405,6 @@ class ATSGraph: public boost::adjacency_list<boost::vecS, boost::vecS, boost::bi
 
   // Creates all the look-aside data structures required to represent the ATS in SSA form
   void buildSSA();
-}; // class ATSGraph
+}; // class SSAGraph
 
 }; // namespace fuse

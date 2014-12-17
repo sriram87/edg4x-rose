@@ -3,7 +3,6 @@
 #include "compose.h"
 #include "VirtualCFGIterator.h"
 #include <boost/make_shared.hpp>
-#include "sight_verbosity.h"
 
 #include <map>
 #include <set>

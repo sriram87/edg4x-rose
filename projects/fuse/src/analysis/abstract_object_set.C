@@ -2,7 +2,6 @@
 #include "abstract_object_set.h"
 #include <ostream>
 #include <typeinfo>
-#include "sight_verbosity.h"
 
 using namespace std;
 using namespace sight;
@@ -45,7 +44,7 @@ bool AbstractObjectSet::insert(AbstractObjectPtr that)
   
   // Having inserted the new item we need to clean up the map to ensure that it stays bounded in size
   // Step 1: call isEmpty to check for any keys mapped to empty sets
-  isEmptyLat();
+  isEmpty();
   // Step 2: if the map is larger than some fixed bound, merge some key->value mappings together
   // !!! TODO !!!
   
@@ -214,13 +213,13 @@ bool AbstractObjectSet::setMLValueToFull(MemLocObjectPtr ml)
 }
 
 // Returns whether this lattice denotes the set of all possible execution prefixes.
-bool AbstractObjectSet::isFullLat()
+bool AbstractObjectSet::isFull()
 {
   return setIsFull;
 }
 
 // Returns whether this lattice denotes the empty set.
-bool AbstractObjectSet::isEmptyLat()
+bool AbstractObjectSet::isEmpty()
 {
   // Check if all items are empty
   for(std::list<AbstractObjectPtr>::iterator i=items.begin(); i!=items.end();) {
@@ -360,12 +359,12 @@ Lattice* AbstractObjectSet::remapML(const std::set<MLMapping>& ml2ml, PartEdgePt
       
       // If the current item in this set may- or must-equals a key in ml2ml, record this and add the corresponding
       // value in ml2ml to be added to newS
-      if((*i)->mustEqual(m->from, fromPEdge, comp, analysis)) {
+      if((*i)->mustEqual((AbstractObjectPtr)m->from, fromPEdge, comp, analysis)) {
         SIGHT_VERB2(dbg << "mustEqual"<<endl, 2, AbstractObjectSetDebugLevel)
         existsMustEqual = true;
         // Insert the corresponding value in ml2ml if it is not NULL
         if(m->to) vals2add.insert(m->to);
-      } else if(mode == may && (*i)->mayEqual(m->from, fromPEdge, comp, analysis)) {
+      } else if(mode == may && (*i)->mayEqual((AbstractObjectPtr)m->from, fromPEdge, comp, analysis)) {
         SIGHT_VERB2(dbg << "mayEqual"<<endl, 2, AbstractObjectSetDebugLevel)
         existsMayEqual = true;
         // Insert the corresponding value in ml2ml if it is not NULL
@@ -418,15 +417,16 @@ bool AbstractObjectSet::replaceML(Lattice* newL)
   return modified;
 }
 
-// computes the meet of this and that and saves the result in this
+// Computes the union or intersection of this and that and saves the result in this
 // returns true if this causes this to change and false otherwise
 // The part of this object is to be used for AbstractObject comparisons.
-// meet(s1, s2) : In may mode uses insert() to add AbstractObjects from both s1 and s2 to the meet. In must mode only
-//             inserts objects into the meet that must exist in both AbstractObjectSets.
-bool AbstractObjectSet::meetUpdate(Lattice* thatL)
+// meet(s1, s2) : In may mode Union uses insert() to add AbstractObjects from both s1 and s2 to the result,
+//                  and Intersect only inserts objects into the meet that must exist in both AbstractObjectSets.
+//                In must mode the reverse happens.
+bool AbstractObjectSet::unionIntersectUpdate(Lattice* thatL, uiType ui)
 {
   try {
-    SIGHT_VERB2(scope reg(txt()<<"AbstractObjectSet::meetUpdate("<<(mode==may? "may": "must")<<")", scope::medium), 2, AbstractObjectSetDebugLevel)
+    SIGHT_VERB2(scope reg(txt()<<"AbstractObjectSet::meetUpdate("<<(mode==may? "may": "must")<<", ui="<<(ui==Union?"Union":"Intersection")<<")", scope::medium), 2, AbstractObjectSetDebugLevel)
     AbstractObjectSet *that = dynamic_cast <AbstractObjectSet*> (thatL);
     SIGHT_VERB_IF(2, AbstractObjectSetDebugLevel)
       { scope thisScope("this", scope::low);
@@ -434,15 +434,23 @@ bool AbstractObjectSet::meetUpdate(Lattice* thatL)
       { scope thisScope("that", scope::low);
       dbg << that->str()<<endl; }
     SIGHT_VERB_FI()
-    if(setIsFull) return false;
-    if(that->setIsFull) {
-      setToFull();
-      return true;
+    if(ui == Union) {
+      if(isFull()) return false;
+      if(that->isFull()) {
+        setToFull();
+        return true;
+      }
+    } else if(ui == Intersection) {
+      if(isEmpty()) return false;
+      if(that->isEmpty()) {
+        setToEmpty();
+        return true;
+      }
     }
     
     // Copy over from that all the elements that don't already exist in this
     bool modified = false;
-    if(mode == may) {
+    if((ui==Union && mode == may) || (ui==Intersection && mode==must)) {
       SIGHT_VERB2(dbg << "latPEdge="<<latPEdge->str()<<endl, 2, AbstractObjectSetDebugLevel)
       SIGHT_VERB2(dbg << "that->items("<<that->items.size()<<"="<<endl, 2, AbstractObjectSetDebugLevel)
       SIGHT_VERB2(indent ind, 2, AbstractObjectSetDebugLevel);
@@ -456,7 +464,7 @@ bool AbstractObjectSet::meetUpdate(Lattice* thatL)
         modified = insert(*it) || modified;
         SIGHT_VERB2(dbg << "modified = "<<modified<<endl, 2, AbstractObjectSetDebugLevel)
       }
-    } else if(mode==must) {
+    } else if((ui==Union && mode == must) || (ui==Intersection && mode==may)) {
       // Remove all the AbstractObjects in this that do not also appear in that
       for(std::list<AbstractObjectPtr>::iterator it=that->items.begin(); it!=that->items.end(); it++) {
         // Do not copy over mappings with keys that are dead in this set's host part
@@ -465,13 +473,24 @@ bool AbstractObjectSet::meetUpdate(Lattice* thatL)
         if(!containsMust(*it))
           modified = remove(*it) || modified;
       }
-    }
+    } else
+      assert(0);
 
     return modified;
   } catch (bad_cast & bc) { 
     assert(false);
   }
 }
+// Computes the union of this and that and saves the result in this.
+// Returns true if this causes this to change and false otherwise.
+bool AbstractObjectSet::meetUpdate(Lattice* thatL)
+{ return unionIntersectUpdate(thatL, Union); }
+
+// Computes the intersection of this and that and saves the result in this.
+// Returns true if this causes this to change and false otherwise.
+bool AbstractObjectSet::intersectUpdate(Lattice* thatL)
+{ return unionIntersectUpdate(thatL, Intersection); }
+
 
 bool AbstractObjectSet::operator==(Lattice* thatL)
 {

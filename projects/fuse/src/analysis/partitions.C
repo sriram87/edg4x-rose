@@ -8,7 +8,6 @@
 #include <boost/graph/topological_sort.hpp>
 
 #include "sight.h"
-#include "sight_verbosity.h"
 using namespace std;
 using namespace sight;
 using namespace boost;
@@ -71,6 +70,7 @@ void MLRemapper::init(const PartEdgePtr pedge, ComposedAnalysis* client)
         ml2ml.insert(
             MLMapping(client->getComposer()->Expr2MemLoc(isSgReturnStmt(n->getNode())->get_expression(), pedge->source()->inEdgeFromAny(), client),
                       boost::make_shared<FuncResultMemLocObject>(Function(SageInterface::getEnclosingFunctionDeclaration(n->getNode()))),
+                      //boost::make_shared<CombinedMemLocObject>(Union, client, boost::make_shared<FuncResultMemLocObject>(Function(SageInterface::getEnclosingFunctionDeclaration(n->getNode())))),
                       false));
         fwML2ML[client].insert(ml2ml);
       // Else, if this is an edge out of a function's call (must be to a SgFunctionParameterList)
@@ -428,6 +428,7 @@ void setArgByRef2ParamMap(PartEdgePtr callEdge, SgFunctionCallExp* call,
   paramArgByRef2ParamMap.insert(MLMapping(composer->Expr2MemLoc(call, callEdge, client),
                                           //composer->Expr2MemLoc(func.get_declaration()->search_for_symbol_from_symbol_table(), funcStartPart->outEdgeToAny(), client)
                                           boost::make_shared<FuncResultMemLocObject>(func), true));
+                                          //boost::make_shared<CombinedMemLocObject>(Union, client, boost::make_shared<FuncResultMemLocObject>(func)), true));
 }
 
 // Given a map produced by setArgParamMap or setArgByRef2ParamMap, return the same map but where the key->value 

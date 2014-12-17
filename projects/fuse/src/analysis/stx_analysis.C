@@ -7,7 +7,6 @@
 #include <boost/enable_shared_from_this.hpp>
 #include <boost/make_shared.hpp>
 #include "VirtualCFGIterator.h"
-#include "sight_verbosity.h"
 
 #include <boost/function.hpp>
 #include <boost/bind.hpp>
@@ -1063,7 +1062,7 @@ std::string StxPartEdge::str(std::string indent) const
  ***** StxValueObject *****
  **************************/
 
-StxValueObject::StxValueObject(SgNode* n) : ValueObject(n), AbstractObjectHierarchy()
+StxValueObject::StxValueObject(SgNode* n) : ValueObject(n)//, AbstractionHierarchy()
 {
   // If a valid node is passed, check if it is an SgValue
   if(n) {
@@ -1085,10 +1084,10 @@ StxValueObject::StxValueObject(SgNode* n) : ValueObject(n), AbstractObjectHierar
 }
 
 StxValueObject::StxValueObject(const StxValueObject& that) : 
-        ValueObject((const ValueObject&)that), AbstractObjectHierarchy(that), val(that.val)
+        ValueObject((const ValueObject&)that)/*, AbstractionHierarchy(that)*/, val(that.val)
 { }
 
-bool StxValueObject::mayEqualV(ValueObjectPtr that_arg, PartEdgePtr pedge)
+bool StxValueObject::mayEqualAO(ValueObjectPtr that_arg, PartEdgePtr pedge)
 {
   StxValueObjectPtr that = boost::dynamic_pointer_cast <StxValueObject> (that_arg);
   // ValueObject abstractions of different types may be equal to each other (can't tell either way)
@@ -1101,7 +1100,7 @@ bool StxValueObject::mayEqualV(ValueObjectPtr that_arg, PartEdgePtr pedge)
   return equalValExp(val, that->val);
 }
 
-bool StxValueObject::mustEqualV(ValueObjectPtr that_arg, PartEdgePtr pedge)
+bool StxValueObject::mustEqualAO(ValueObjectPtr that_arg, PartEdgePtr pedge)
 {
   //const StxValueObject & that = dynamic_cast <const StxValueObject&> (that_arg);
   StxValueObjectPtr that = boost::dynamic_pointer_cast <StxValueObject> (that_arg);
@@ -1117,7 +1116,7 @@ bool StxValueObject::mustEqualV(ValueObjectPtr that_arg, PartEdgePtr pedge)
 }
 
 // Returns whether the two abstract objects denote the same set of concrete objects
-bool StxValueObject::equalSetV(ValueObjectPtr that_arg, PartEdgePtr pedge)
+bool StxValueObject::equalSetAO(ValueObjectPtr that_arg, PartEdgePtr pedge)
 {
   //const StxValueObject & that = dynamic_cast <const StxValueObject&> (that_arg);
   StxValueObjectPtr that = boost::dynamic_pointer_cast <StxValueObject> (that_arg);
@@ -1135,7 +1134,7 @@ bool StxValueObject::equalSetV(ValueObjectPtr that_arg, PartEdgePtr pedge)
 
 // Returns whether this abstract object denotes a non-strict subset (the sets may be equal) of the set denoted
 // by the given abstract object.
-bool StxValueObject::subSetV(ValueObjectPtr that_arg, PartEdgePtr pedge)
+bool StxValueObject::subSetAO(ValueObjectPtr that_arg, PartEdgePtr pedge)
 {
   //const StxValueObject & that = dynamic_cast <const StxValueObject&> (that);
   StxValueObjectPtr that = boost::dynamic_pointer_cast <StxValueObject> (that_arg);
@@ -1202,15 +1201,65 @@ bool StxValueObject::equalValExp(SgValueExp* a, SgValueExp* b)
     return false;
 }
 
+// Returns true if the first SgValueExp epresents a value that is < the second and false otherwise
+// If both SgValueExp denote different types, returns false
+bool StxValueObject::lessValExp(SgValueExp* a, SgValueExp* b)
+{
+  if(isSgBoolValExp(a) && isSgBoolValExp(b))
+    return isSgBoolValExp(a)->get_value() < isSgBoolValExp(b)->get_value();
+  else if(isSgCharVal(a) && isSgCharVal(a))
+    return isSgCharVal(a)->get_value() < isSgCharVal(b)->get_value();
+  else if(isSgComplexVal(a) && isSgComplexVal(b))
+    return lessValExp(isSgComplexVal(a)->get_real_value(), isSgComplexVal(b)->get_real_value()) ||
+           (equalValExp(isSgComplexVal(a)->get_real_value(),      isSgComplexVal(b)->get_real_value()) &&
+            lessValExp (isSgComplexVal(a)->get_imaginary_value(), isSgComplexVal(b)->get_imaginary_value()));
+  else if(isSgDoubleVal(a) && isSgDoubleVal(b))
+    return isSgDoubleVal(a)->get_value() < isSgDoubleVal(b)->get_value();
+  else if(isSgEnumVal(a) && isSgEnumVal(b))
+    return isSgEnumVal(a)->get_value() < isSgEnumVal(b)->get_value();
+  else if(isSgFloatVal(a) && isSgFloatVal(b))
+    return isSgFloatVal(a)->get_value() < isSgFloatVal(b)->get_value();
+  else if(isSgIntVal(a) && isSgIntVal(b))
+    return isSgIntVal(a)->get_value() < isSgIntVal(b)->get_value();
+  else if(isSgLongDoubleVal(a) && isSgLongDoubleVal(b))
+    return isSgLongDoubleVal(a)->get_value() < isSgLongDoubleVal(b)->get_value();
+  else if(isSgLongIntVal(a) && isSgLongIntVal(b))
+    return isSgLongIntVal(a)->get_value() < isSgLongIntVal(b)->get_value();
+  else if(isSgLongLongIntVal(a) && isSgLongLongIntVal(b))
+    return isSgLongLongIntVal(a)->get_value() < isSgLongLongIntVal(b)->get_value();
+  else if(isSgShortVal(a) && isSgShortVal(b))
+    return isSgShortVal(a)->get_value() < isSgShortVal(b)->get_value();
+  else if(isSgStringVal(a) && isSgStringVal(b))
+    return isSgStringVal(a)->get_value() < isSgStringVal(b)->get_value();
+  else if(isSgUnsignedCharVal(a) && isSgUnsignedCharVal(b))
+    return isSgUnsignedCharVal(a)->get_value() < isSgUnsignedCharVal(b)->get_value();
+  else if(isSgUnsignedIntVal(a) && isSgUnsignedIntVal(b))
+    return isSgUnsignedIntVal(a)->get_value() < isSgUnsignedIntVal(b)->get_value();
+  /*else if(isSgUnsigedLongLongIntVal(a) && isSgUnsigedLongLongIntVal(b))
+    return isSgUnsigedLongLongIntVal(a)->get_value() < isSgUnsigedLongLongIntVal(b)->get_value();*/
+  else if(isSgUnsignedLongVal(a) && isSgUnsignedLongVal(b))
+    return isSgUnsignedLongVal(a)->get_value() < isSgUnsignedLongVal(b)->get_value();
+  else if(isSgUnsignedShortVal(a) && isSgUnsignedShortVal(b))
+    return isSgUnsignedShortVal(a)->get_value() < isSgUnsignedShortVal(b)->get_value();
+  /*else if(isSgUpcMythreadVal(a) && isSgUpcMythreadVal(b))
+    return isSgUpcMythreadVal(a)->get_value() < isSgUpcMythreadVal(b)->get_value();
+  else if(isSgUpcThreadsVal(a) && isSgUpcThreadsVal(b))
+    return isSgUpcThreadsVal(a)->get_value() < isSgUpcThreadsVal(b)->get_value();*/
+  else if(isSgWcharVal(a) && isSgWcharVal(b))
+    return isSgWcharVal(a)->get_value() < isSgWcharVal(b)->get_value();
+  else
+    return false;
+}
+
 // Computes the meet of this and that and saves the result in this.
 // Returns true if this causes this to change and false otherwise.
-bool StxValueObject::meetUpdateV(ValueObjectPtr that_arg, PartEdgePtr pedge)
+bool StxValueObject::meetUpdateAO(ValueObjectPtr that_arg, PartEdgePtr pedge)
 {
   StxValueObjectPtr that = boost::dynamic_pointer_cast <StxValueObject> (that_arg);
   assert(that);
   
   // If the value objects denote different values
-  if(!mustEqualV(that, pedge)) {
+  if(!mustEqualAO(that, pedge)) {
     // Set the value pointer of this object to NULL since we cannot represent their union with a single value
     val = NULL;
     return true;
@@ -1218,10 +1267,10 @@ bool StxValueObject::meetUpdateV(ValueObjectPtr that_arg, PartEdgePtr pedge)
   return false;
 }
 
-bool StxValueObject::isFullV(PartEdgePtr pedge)
+bool StxValueObject::isFullAO(PartEdgePtr pedge)
 { return val == NULL; }
 
-bool StxValueObject::isEmptyV(PartEdgePtr pedge)
+bool StxValueObject::isEmptyAO(PartEdgePtr pedge)
 { return false; }
 
 
@@ -1261,19 +1310,19 @@ std::string StxValueObject::str(std::string indent) const { // pretty print for 
 }
 
 // Allocates a copy of this object and returns a pointer to it
-ValueObjectPtr StxValueObject::copyV() const 
+ValueObjectPtr StxValueObject::copyAOType() const
 { return boost::make_shared<StxValueObject>(*this); }
 
 // Returns a key that uniquely identifies this particular AbstractObject in the 
 // set hierarchy.
-const AbstractObjectHierarchy::hierKeyPtr& StxValueObject::getHierKey() const {
+const AbstractionHierarchy::hierKeyPtr& StxValueObject::getHierKey() const {
   if(!isHierKeyCached) {
     ((StxValueObject*)this)->cachedHierKey = boost::make_shared<AOSHierKey>(((StxValueObject*)this)->shared_from_this());
     
     // The NULL val gets an empty key since it denotes the full set
     if(val==NULL) { }
     else 
-      ((StxValueObject*)this)->cachedHierKey->add(boost::make_shared<comparableSgNode>(val));
+      ((StxValueObject*)this)->cachedHierKey->add(boost::make_shared<comparableSgValueExp>(val));
     
     ((StxValueObject*)this)->isHierKeyCached = true;
   }
@@ -1404,7 +1453,7 @@ std::string StxMemRegionType::MRType2Str(regType type) {
   }
 }
 
-StxMemRegionObject::StxMemRegionObject(SgNode* n): MemRegionObject(n), AbstractObjectHierarchy() {
+StxMemRegionObject::StxMemRegionObject(SgNode* n): MemRegionObject(n)/*, AbstractionHierarchy()*/ {
   // Find the correct kind for this region
 
   // First see if it is a named region
@@ -1418,12 +1467,12 @@ StxMemRegionObject::StxMemRegionObject(SgNode* n): MemRegionObject(n), AbstractO
 }
 
 StxMemRegionObject::StxMemRegionObject(const StxMemRegionObject& that): 
-      MemRegionObject(that), AbstractObjectHierarchy(that), type(that.type)
+      MemRegionObject(that)/*, AbstractionHierarchy(that)*/, type(that.type)
 {}
 
 // Returns whether this object may/must be equal to o within the given Part p
 // These methods are called by composers and should not be called by analyses.
-bool StxMemRegionObject::mayEqualMR(MemRegionObjectPtr o, PartEdgePtr pedge)
+bool StxMemRegionObject::mayEqualAO(MemRegionObjectPtr o, PartEdgePtr pedge)
 {
   StxMemRegionObjectPtr that = boost::dynamic_pointer_cast<StxMemRegionObject>(o); assert(that);
   
@@ -1458,7 +1507,7 @@ bool StxMemRegionObject::mayEqualMR(MemRegionObjectPtr o, PartEdgePtr pedge)
   return type->getUID()==that->type->getUID();
 }
 
-bool StxMemRegionObject::mustEqualMR(MemRegionObjectPtr o, PartEdgePtr pedge)
+bool StxMemRegionObject::mustEqualAO(MemRegionObjectPtr o, PartEdgePtr pedge)
 {
   StxMemRegionObjectPtr that = boost::dynamic_pointer_cast<StxMemRegionObject>(o); assert(that);
   
@@ -1496,7 +1545,7 @@ bool StxMemRegionObject::mustEqualMR(MemRegionObjectPtr o, PartEdgePtr pedge)
   return type->getUID()==that->type->getUID();
 }
 
-bool StxMemRegionObject::equalSetMR(MemRegionObjectPtr o, PartEdgePtr pedge)
+bool StxMemRegionObject::equalSetAO(MemRegionObjectPtr o, PartEdgePtr pedge)
 {
   StxMemRegionObjectPtr that = boost::dynamic_pointer_cast<StxMemRegionObject>(o); assert(that);
 
@@ -1539,7 +1588,7 @@ bool StxMemRegionObject::equalSetMR(MemRegionObjectPtr o, PartEdgePtr pedge)
   return type->getUID()==that->type->getUID();
 }
 
-bool StxMemRegionObject::subSetMR(MemRegionObjectPtr o, PartEdgePtr pedge)
+bool StxMemRegionObject::subSetAO(MemRegionObjectPtr o, PartEdgePtr pedge)
 {
   StxMemRegionObjectPtr that = boost::dynamic_pointer_cast<StxMemRegionObject>(o); assert(that);
   
@@ -1583,16 +1632,16 @@ bool StxMemRegionObject::subSetMR(MemRegionObjectPtr o, PartEdgePtr pedge)
 }
 
 // Returns true if this object is live at the given part and false otherwise
-bool StxMemRegionObject::isLiveMR(PartEdgePtr pedge)
-{ return type->isLiveMR(pedge); }
+bool StxMemRegionObject::isLiveAO(PartEdgePtr pedge)
+{ return type->isLiveAO(pedge); }
 
 // Returns a ValueObject that denotes the size of this memory region
-ValueObjectPtr StxMemRegionObject::getRegionSizeMR(PartEdgePtr pedge)
-{ return type->getRegionSizeMR(pedge); }
+ValueObjectPtr StxMemRegionObject::getRegionSizeAO(PartEdgePtr pedge)
+{ return type->getRegionSizeAO(pedge); }
 
 // Computes the meet of this and that and saves the result in this
 // returns true if this causes this to change and false otherwise
-bool StxMemRegionObject::meetUpdateMR(MemRegionObjectPtr o, PartEdgePtr pedge)
+bool StxMemRegionObject::meetUpdateAO(MemRegionObjectPtr o, PartEdgePtr pedge)
 {
   StxMemRegionObjectPtr that = boost::dynamic_pointer_cast<StxMemRegionObject>(o); assert(that);
   
@@ -1627,20 +1676,20 @@ ValueObjectPtr StxMemRegionObject::getRegionSize(PartEdgePtr pedge) const
 }
 
 // Returns whether this AbstractObject denotes the set of all possible execution prefixes.
-bool StxMemRegionObject::isFullMR(PartEdgePtr pedge)
+bool StxMemRegionObject::isFullAO(PartEdgePtr pedge)
 {
   return getType() == StxMemRegionType::all;
 }
 
 // Returns whether this AbstractObject denotes the empty set.
-bool StxMemRegionObject::isEmptyMR(PartEdgePtr pedge) {
+bool StxMemRegionObject::isEmptyAO(PartEdgePtr pedge) {
   // StxMemRegionObjects are only created for non-empty sets of memory regions
   return false;
 }
        
 
 // Allocates a copy of this object and returns a pointer to it
-MemRegionObjectPtr StxMemRegionObject::copyMR() const {
+MemRegionObjectPtr StxMemRegionObject::copyAOType() const {
   return boost::make_shared<StxMemRegionObject>(*this);
 }
 
@@ -1650,19 +1699,26 @@ std::string StxMemRegionObject::str(std::string indent) const { // pretty print 
 
 // Returns a key that uniquely identifies this particular AbstractObject in the 
 // set hierarchy.
-const AbstractObjectHierarchy::hierKeyPtr& StxMemRegionObject::getHierKey() const {
+const AbstractionHierarchy::hierKeyPtr& StxMemRegionObject::getHierKey() const {
   if(!isHierKeyCached) {
     ((StxMemRegionObject*)this)->cachedHierKey = boost::make_shared<AOSHierKey>(((StxMemRegionObject*)this)->shared_from_this());
     
     // The all object gets an empty key since it contains all the object types
     if(getType()==StxMemRegionType::all) { }
     else {
-      ((StxMemRegionObject*)this)->cachedHierKey->add(boost::make_shared<StxMemRegionType::comparableType>(getType()));
+      // Named objects are a sub-set of storage so prepend an extra storage type to them both
+      if(getType()==StxMemRegionType::named || getType()==StxMemRegionType::storage)
+        ((StxMemRegionObject*)this)->cachedHierKey->add(boost::make_shared<StxMemRegionType::comparableType>(StxMemRegionType::storage));
+      else if(getType()==StxMemRegionType::expr)
+        ((StxMemRegionObject*)this)->cachedHierKey->add(boost::make_shared<StxMemRegionType::comparableType>(StxMemRegionType::expr));
+      //((StxMemRegionObject*)this)->cachedHierKey->add(boost::make_shared<StxMemRegionType::comparableType>(getType()));
+
       type->addHierSubKey(((StxMemRegionObject*)this)->cachedHierKey);
+//std::cout << "key="<<((StxMemRegionObject*)this)->cachedHierKey<<", this="<<str()<<std::endl;
     }
     ((StxMemRegionObject*)this)->isHierKeyCached = true;
   }
-  return cachedHierKey;
+  return ((StxMemRegionObject*)this)->cachedHierKey;
 }
 
 StxExprMemRegionTypePtr NULLStxExprMemRegionType;
@@ -1720,7 +1776,7 @@ bool enc (SgExpression* expr, const CFGNode& n) {
 }
 
 // Returns true if this object is live at the given part and false otherwise
-bool StxExprMemRegionType::isLiveMR(PartEdgePtr pedge) {
+bool StxExprMemRegionType::isLiveAO(PartEdgePtr pedge) {
 //RULE 1: Fails because it doesn't account for the fact that between an operand and its parent
   //        there may be several more nodes from another sub-branch of the expression tree
   // The anchor expression is in scope if it is equal to the current SgNode or is its operand
@@ -1811,7 +1867,7 @@ bool StxExprMemRegionType::isLiveMR(PartEdgePtr pedge) {
 }
 
 // Returns a ValueObject that denotes the size of this memory region
-ValueObjectPtr StxExprMemRegionType::getRegionSizeMR(PartEdgePtr pedge)
+ValueObjectPtr StxExprMemRegionType::getRegionSizeAO(PartEdgePtr pedge)
 {
   return getTypeSize(expr->get_type());
 }
@@ -1859,7 +1915,7 @@ bool matchAnchorPart(SgScopeStatement* scopeStmt, const CFGNode& n) {
 }
 
 // Returns true if this object is live at the given part and false otherwise
-bool StxNamedMemRegionType::isLiveMR(PartEdgePtr pedge) {
+bool StxNamedMemRegionType::isLiveAO(PartEdgePtr pedge) {
   if(iname) {
     // This variable is in-scope if part.getNode() is inside the scope that contains its declaration
     SgScopeStatement* scopeStmt=NULL;
@@ -1890,7 +1946,7 @@ bool StxNamedMemRegionType::isLiveMR(PartEdgePtr pedge) {
   } else
     return true;
 
-  /*scope reg(string("NamedObj::isLiveMR(")+symbol->get_name().getString()+string(")")+string(isSgFunctionSymbol(symbol) |
+  /*scope reg(string("NamedObj::isLiveAO(")+symbol->get_name().getString()+string(")")+string(isSgFunctionSymbol(symbol) |
   dbg << "anchorFD=";
   if(anchorFD) dbg << "["<<anchorFD->unparseToString()<<" | "<<anchorFD->class_name()<<"]"<<endl;
   else         dbg << "SgFunctionSymbol"<<endl;
@@ -1899,7 +1955,7 @@ bool StxNamedMemRegionType::isLiveMR(PartEdgePtr pedge) {
 }
 
 // Returns a ValueObject that denotes the size of this memory region
-ValueObjectPtr StxNamedMemRegionType::getRegionSizeMR(PartEdgePtr pedge)
+ValueObjectPtr StxNamedMemRegionType::getRegionSizeAO(PartEdgePtr pedge)
 {
   return getTypeSize(iname->get_type());
 }
@@ -1914,7 +1970,7 @@ StxStorageMemRegionTypePtr StxStorageMemRegionType::getInstance(SgNode* n) {
 }
 
 // Returns a ValueObject that denotes the size of this memory region
-ValueObjectPtr StxStorageMemRegionType::getRegionSizeMR(PartEdgePtr pedge)
+ValueObjectPtr StxStorageMemRegionType::getRegionSizeAO(PartEdgePtr pedge)
 {
   // Return the Full value
   return boost::make_shared<StxValueObject>((SgNode*)NULL);
@@ -1930,7 +1986,7 @@ StxAllMemRegionTypePtr StxAllMemRegionType::getInstance(SgNode* n) {
 }
 
 // Returns a ValueObject that denotes the size of this memory region
-ValueObjectPtr StxAllMemRegionType::getRegionSizeMR(PartEdgePtr pedge)
+ValueObjectPtr StxAllMemRegionType::getRegionSizeAO(PartEdgePtr pedge)
 {
   // Return the Full value
   return boost::make_shared<StxValueObject>((SgNode*)NULL);
@@ -2222,5 +2278,26 @@ StxValueObjectPtr getTypeSize(SgType* type) {
       //ROSE_ASSERT(0);
   }
 }
+
+/****************************
+ ***** comparableSgValue *****
+ ****************************/
+
+comparableSgValueExp::comparableSgValueExp(SgValueExp* v): v(v) {}
+
+// This == That
+bool comparableSgValueExp::equal(const comparable& that_arg) const {
+  const comparableSgValueExp& that = dynamic_cast<const comparableSgValueExp&>(that_arg);
+  if(v->variantT() != that.v->variantT()) return false;
+  return StxValueObject::equalValExp(v, that.v);
+}
+
+// This < That
+bool comparableSgValueExp::less(const comparable& that_arg) const {
+  const comparableSgValueExp& that = dynamic_cast<const comparableSgValueExp&>(that_arg);
+  if(v->variantT() != that.v->variantT()) return false;
+  return StxValueObject::lessValExp(v, that.v);
+}
+std::string comparableSgValueExp::str(std::string indent) const { return SgNode2Str(v); }
 
 }; // namespace fuse

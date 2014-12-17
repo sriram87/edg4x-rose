@@ -58,7 +58,7 @@ class Composer
   Composer();
     
   // The types of functions we may be interested in calling
-  typedef enum {any, codeloc, val, memloc, memregion, atsGraph} reqType;
+  typedef enum {any, codeloc, val, memloc, memregion, atsGraph, ssaGraph} reqType;
     
   // Abstract interpretation functions that return this analysis' abstractions that 
   // represent the outcome of the given SgExpression at the end of all execution prefixes
@@ -193,8 +193,8 @@ class Composer
   // There may be multiple terminal points in the application (multiple calls to exit(), returns from main(), etc.)
   virtual std::set<PartPtr> GetEndAStates(ComposedAnalysis* client)=0;
 
-  // Return an ATSGraph object that describes the overall structure of the transition system
-  virtual ATSGraph* GetATSGraph(ComposedAnalysis* client)=0;
+  // Return an SSAGraph object that describes the overall structure of the transition system
+  virtual SSAGraph* GetSSAGraph(ComposedAnalysis* client)=0;
  
   // Returns all the edges implemented by the entire composer that refine the given
   // base PartEdge
@@ -263,6 +263,7 @@ class CCQueryServers
   ComposedAnalysis* lastMemLocAnalysis;
   ComposedAnalysis* lastMemRegionAnalysis;
   ComposedAnalysis* lastATSGraphAnalysis;
+  ComposedAnalysis* lastSSAGraphAnalysis;
   
   // The number of ATSGraph analyses that separate the current analysis from the last analysis that
   // can answer a given query type. This is also the number of times we'll call PartEdge->getParent()
@@ -276,80 +277,12 @@ class CCQueryServers
   CCQueryServers() {}
    
   // Initialize this object with the info of the initial analysis at the start of the composition chain
-  CCQueryServers(ComposedAnalysis* startAnalysis) {
-    // Records the last analysis in the composition chain that can answer queries of a given type
-    lastCodeLocAnalysis   = startAnalysis;
-    lastValAnalysis       = startAnalysis;
-    lastMemLocAnalysis    = startAnalysis;
-    lastMemRegionAnalysis = startAnalysis;
-    lastATSGraphAnalysis  = startAnalysis;
-
-    // The number of ATSGraph analyses that separate the current analysis from the last analysis that
-    // can answer a given query type. This is also the number of times we'll call PartEdge->getParent()
-    // to convert the edges of the current analysis to those of the server of the given query type.
-    // There is no counter for ATS Graph queries since it would always be 0.
-    ATSGraphsSinceLastCodeLocAnalysis   = 0;
-    ATSGraphsSinceLastValAnalysis       = 0;
-    ATSGraphsSinceLastMemLocAnalysis    = 0;
-    ATSGraphsSinceLastMemRegionAnalysis = 0;
-  }
+  CCQueryServers(ComposedAnalysis* startAnalysis);
 
   // Given the information from the prior analysis in the composition chain, create a record that 
   // accounts for queries being serviced by nextAnalysis
-  CCQueryServers(const CCQueryServers& info, ComposedAnalysis* nextAnalysis) {
-    /*scope s("CCQueryServers()");
-    
-    dbg << "nextAnalysis="<<nextAnalysis->str()<<std::endl;
-    dbg << "before info="<<const_cast<CCQueryServers&>(info).str()<<std::endl;*/
-    
-    if(nextAnalysis->implementsExpr2CodeLoc())   lastCodeLocAnalysis   = nextAnalysis;
-    else                                         lastCodeLocAnalysis   = info.lastCodeLocAnalysis;
-    if(nextAnalysis->implementsExpr2Val())       lastValAnalysis       = nextAnalysis;
-    else                                         lastValAnalysis       = info.lastValAnalysis;
-    if(nextAnalysis->implementsExpr2MemLoc())    lastMemLocAnalysis    = nextAnalysis;
-    else                                         lastMemLocAnalysis    = info.lastMemLocAnalysis;
-    if(nextAnalysis->implementsExpr2MemRegion()) lastMemRegionAnalysis = nextAnalysis;
-    else                                         lastMemRegionAnalysis = info.lastMemRegionAnalysis;
-    if(nextAnalysis->implementsATSGraph())       lastATSGraphAnalysis  = nextAnalysis;
-    else                                         lastATSGraphAnalysis  = info.lastATSGraphAnalysis;
-    
-    // If nextAnalysis implements a given interface, then the counter for that interface is set to 0
-    //    since subsequent analyses that make calls to this interface will be able to use their PartEdges,
-    //    must must be implemented by nextAnalysis.
-    // If nextAnalysis does not implement the interface, then queries for this interface will need
-    //    to go to its predecessors, meaning that the PartEdges held by the clients will need to be 
-    //    converted from those implemented by nextAnalysis to those implemented by the preceding
-    //    ATSGraph analysis. If nextAnalysis implements the ATS it creates an extra layer of ATS graph
-    //    indirection, forcing us to increment the counter for that API. Otherwise, we leave the counter alone.
-    if(nextAnalysis->implementsExpr2CodeLoc())  ATSGraphsSinceLastCodeLocAnalysis = 0;
-    else if(nextAnalysis->implementsATSGraph()) ATSGraphsSinceLastCodeLocAnalysis = info.ATSGraphsSinceLastCodeLocAnalysis+1;
-    else                                        ATSGraphsSinceLastCodeLocAnalysis = info.ATSGraphsSinceLastCodeLocAnalysis;
-
-    if(nextAnalysis->implementsExpr2Val())      ATSGraphsSinceLastValAnalysis = 0;
-    else if(nextAnalysis->implementsATSGraph()) ATSGraphsSinceLastValAnalysis = info.ATSGraphsSinceLastValAnalysis+1;
-    else                                        ATSGraphsSinceLastValAnalysis = info.ATSGraphsSinceLastValAnalysis;
-    
-    if(nextAnalysis->implementsExpr2MemLoc())   ATSGraphsSinceLastMemLocAnalysis = 0;
-    else if(nextAnalysis->implementsATSGraph()) ATSGraphsSinceLastMemLocAnalysis = info.ATSGraphsSinceLastMemLocAnalysis+1;
-    else                                        ATSGraphsSinceLastMemLocAnalysis = info.ATSGraphsSinceLastMemLocAnalysis;
-    
-    if(nextAnalysis->implementsExpr2MemRegion()) ATSGraphsSinceLastMemRegionAnalysis = 0;
-    else if(nextAnalysis->implementsATSGraph())  ATSGraphsSinceLastMemRegionAnalysis = info.ATSGraphsSinceLastMemRegionAnalysis+1;
-    else                                         ATSGraphsSinceLastMemRegionAnalysis = info.ATSGraphsSinceLastMemRegionAnalysis;
-    
-    //dbg << "after this="<<str()<<std::endl;
-  }
-  
-  std::string str(std::string indent="") const {
-    std::ostringstream oss;
-    oss << "[CCQueryServers:"<<std::endl;
-    oss << indent << "    lastCodeLocAnalysis="  <<lastCodeLocAnalysis->str(indent)  <<": ATSGraphsSinceLastCodeLocAnalysis="  <<ATSGraphsSinceLastCodeLocAnalysis  <<std::endl;
-    oss << indent << "    lastValAnalysis="      <<lastValAnalysis->str(indent)      <<": ATSGraphsSinceLastValAnalysis="      <<ATSGraphsSinceLastValAnalysis      <<std::endl;
-    oss << indent << "    lastMemLocAnalysis="   <<lastMemLocAnalysis->str(indent)   <<": ATSGraphsSinceLastMemLocAnalysis="   <<ATSGraphsSinceLastMemLocAnalysis   <<std::endl;
-    oss << indent << "    lastMemRegionAnalysis="<<lastMemRegionAnalysis->str(indent)<<": ATSGraphsSinceLastMemRegionAnalysis="<<ATSGraphsSinceLastMemRegionAnalysis<<std::endl;
-    oss << indent << "    lastATSGraphAnalysis=" <<lastATSGraphAnalysis->str(indent) <<"]";
-    return oss.str();
-  }
+  CCQueryServers(const CCQueryServers& info, ComposedAnalysis* nextAnalysis);
+  std::string str(std::string indent="") const;
 };
 
 // Simple implementation of a Composer where the analyses form a linear sequence of 
@@ -370,7 +303,7 @@ class ChainComposer : public Composer, public UndirDataflow
   std::map<ComposedAnalysis*, CCQueryServers> queryInfo;
   
   // Maps each analysis that implements the ATS to the ATSGraph that has been generated for it, if any
-  std::map<ComposedAnalysis*, ATSGraph*> ATSGraphCache;
+  std::map<ComposedAnalysis*, SSAGraph*> SSAGraphCache;
 
   public:
   ChainComposer(const std::list<ComposedAnalysis*>& analyses, 
@@ -416,6 +349,8 @@ class ChainComposer : public Composer, public UndirDataflow
            boost::function<ComposedAnalysis::implTightness (ComposedAnalysis*)> checkTightness,
            // Returns a string representation of the result of the operation
            boost::function<std::string (RetType, std::string)> ret2Str,
+           // Returns an object that denotes the intersection of multiple instances of RetType
+           boost::function<RetType (const std::map<ComposedAnalysis*, RetType>&)> createIntersection,
            // The PartEdge at which the operation is being called
            PartEdgePtr pedge, 
            // The client analysis calling the operation
@@ -566,8 +501,8 @@ class ChainComposer : public Composer, public UndirDataflow
   std::set<PartPtr> GetStartAStates(ComposedAnalysis* client);
   std::set<PartPtr> GetEndAStates(ComposedAnalysis* client);
 
-  // Return an ATSGraph object that describes the overall structure of the transition system
-  ATSGraph* GetATSGraph(ComposedAnalysis* client);
+  // Return an SSAGraph object that describes the overall structure of the transition system
+  SSAGraph* GetSSAGraph(ComposedAnalysis* client);
 
   // Returns all the edges implemented by the entire composer that refine the given
   // base PartEdge
@@ -743,8 +678,8 @@ class LooseParallelComposer : public Composer, public UndirDataflow
   std::set<PartPtr> GetStartAStates(ComposedAnalysis* client);
   std::set<PartPtr> GetEndAStates(ComposedAnalysis* client);
   
-  // Return an ATSGraph object that describes the overall structure of the transition system
-  ATSGraph* GetATSGraph(ComposedAnalysis* client);
+  // Return an SSAGraph object that describes the overall structure of the transition system
+  SSAGraph* GetSSAGraph(ComposedAnalysis* client);
 
   // Common functionality for GetStartAStates_Spec() and GetEndAStates_Spec()
   

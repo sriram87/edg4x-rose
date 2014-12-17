@@ -23,7 +23,6 @@ using namespace scc_private;
 #define sparseCPDebugLevel 0
 
 #include "sight.h"
-#include "sight_verbosity.h"
 using namespace sight;
 
 ///////////////////////////////////////////////////////////////////////////////////////

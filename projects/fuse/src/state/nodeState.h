@@ -7,7 +7,7 @@ class NodeFact;
 class NodeState;
 };
 
-#include "lattice.h"
+//#include "lattice.h"
 #include "analysis.h"
 #include <map>
 #include <vector>
@@ -17,6 +17,7 @@ class NodeState;
 namespace fuse {
 class ComposedAnalysis;
 //extern int nodeStateDebugLevel;
+class Lattice;
 
 /************************************************
  ***         NodeFact       ***

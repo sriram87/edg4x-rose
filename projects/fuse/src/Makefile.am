@@ -20,15 +20,15 @@ include_HEADERS =\
 	analysis/analysis.h \
 	analysis/analysis_tester.h \
 	analysis/compose.h \
+	analysis/tight_composer.h \
 	analysis/composed_analysis.h \
 	analysis/comp_shared_ptr.h \
-        analysis/data_structures.h \
+    analysis/data_structures.h \
 	analysis/factor_trans_system.h \
 	analysis/graphIterator.h \
 	analysis/partitions.h \
-	analysis/ats.h \
+	analysis/ssa.h \
 	analysis/stx_analysis.h \
-	analysis/tight_composer.h \
 	cfgUtils/CallGraphTraverse.h \
 	cfgUtils/cfgUtils.h \
 	cfgUtils/DataflowCFG.h \
@@ -45,6 +45,7 @@ include_HEADERS =\
 	simpleAnalyses/saveDotAnalysis.h \
 	simpleAnalyses/taintAnalysis.h \
 	simpleAnalyses/virtualMethodAnalysis.h \
+	simpleAnalyses/dynamicMonitor.h \
 	simpleAnalyses/defsAnalysis.h \
 	simpleAnalyses/VariableStateTransfer.h
 
@@ -88,14 +89,14 @@ fuse_SOURCES = \
 	analysis/analysis.C \
 	analysis/analysis_tester.C \
 	analysis/compose.C \
+	analysis/tight_composer.C \
 	analysis/composed_analysis.C \
 	analysis/factor_trans_system.C \
 	analysis/graphIterator.C \
 	analysis/partitions.C \
-	analysis/partitions_nosight.C \
-	analysis/ats.C \
+	analysis/ssa_nosight.C \
+	analysis/ssa.C \
 	analysis/stx_analysis.C \
-	analysis/tight_composer.C \
 	cfgUtils/CallGraphTraverse.C \
 	cfgUtils/cfgUtils.C \
 	cfgUtils/DataflowCFG.C \
@@ -111,6 +112,7 @@ fuse_SOURCES = \
 	simpleAnalyses/saveDotAnalysis.C \
 	simpleAnalyses/taintAnalysis.C \
 	simpleAnalyses/virtualMethodAnalysis.C \
+	simpleAnalyses/dynamicMonitor.C \
 	simpleAnalyses/defsAnalysis.C \
 	state/nodeState.C \
 	compositionalTestAnalysis.C

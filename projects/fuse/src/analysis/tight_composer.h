@@ -109,7 +109,7 @@ namespace fuse {
     TightCompositionQueryManager tcqm;
     
   public:
-    TightComposer(const std::list<ComposedAnalysis*>& analyses, bool trackBase2RefinedPartEdgeMapping=false);
+    TightComposer(const std::list<ComposedAnalysis*>& analyses, bool trackBase2RefinedPartEdgeMapping, bool useSSA);
     TightComposer(const TightComposer&);
   
     // Returns a shared pointer to a freshly-allocated copy of this ComposedAnalysis object
@@ -274,8 +274,8 @@ namespace fuse {
     std::set<PartPtr> GetStartAStates(ComposedAnalysis* client);
     std::set<PartPtr> GetEndAStates(ComposedAnalysis* client);
 
-    // Return an ATSGraph object that describes the overall structure of the transition system
-    ATSGraph* GetATSGraph(ComposedAnalysis* client);
+    // Return an SSAGraph object that describes the overall structure of the transition system
+    SSAGraph* GetSSAGraph(ComposedAnalysis* client);
 
     // Returns all the edges implemented by the entire composer that refine the given
     // base PartEdge

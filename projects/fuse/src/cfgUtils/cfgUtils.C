@@ -138,6 +138,17 @@ string genUniqueName()
   return name;
 }
 
+// Returns the type of the given node or NULL if none is defined for this node type
+SgType* getType(SgNode* n) {
+  if(SgExpression* expr = isSgExpression(n))
+    return expr->get_type();
+  else if(SgInitializedName* iname = isSgInitializedName(n))
+    return iname->get_type();
+
+  // This SgNode doesn't have a get_type field
+  return NULL;
+}
+
 // returns the SgFunctionDeclaration for the function with the given name
 SgFunctionDeclaration* getFuncDecl(string name)
 {
@@ -206,7 +217,7 @@ std::string SgNode2Str(SgNode* sgn)
 }
 
 // Returns a string representation of this CFG node's key information
-std::string CFGNode2Str(CFGNode n)
+std::string CFGNode2Str(const CFGNode& n)
 {
   ostringstream oss;
   if(isSgClassType(n.getNode()))
@@ -234,7 +245,7 @@ std::string CFGNode2Str(CFGNode n)
 }
 
 // Returns a string representation of this CFG edge's key information
-std::string CFGEdge2Str(CFGEdge e)
+std::string CFGEdge2Str(const CFGEdge& e)
 {
   ostringstream oss;
   oss << "[" << CFGNode2Str(e.source()) << " ==&gt; " << CFGNode2Str(e.target())<<"]";
@@ -242,7 +253,7 @@ std::string CFGEdge2Str(CFGEdge e)
 }
 
 // Returns a string representation of this CFG paths's key information
-std::string CFGPath2Str(CFGPath p)
+std::string CFGPath2Str(const CFGPath& p)
 {
   ostringstream oss;
   const std::vector<CFGEdge>& edges = p.getEdges();
@@ -260,6 +271,10 @@ std::string CFGPath2Str(CFGPath p)
  ***** comparable *****
  **********************/
 bool comparable::operator==(const comparable& that) const {
+  /*scope s("operator==(comparable)");
+  dbg << "this="<<str()<<endl;
+  dbg << "that="<<that.str()<<endl;*/
+
   // First try applying the equal method of this
   try{
     return equal(that);
@@ -270,12 +285,19 @@ bool comparable::operator==(const comparable& that) const {
       return that.equal(*this);
     } catch (std::bad_cast bc) {
       // Neither method could deal with the type incompatibility
+      cerr << "ERROR in comparable::operator==: types of comparable objects are not compatible!"<<endl;
+      cerr << "this="<<str()<<endl;
+      cerr << "that="<<that.str()<<endl;
       ROSE_ASSERT(0);
     }
   }
 }
 
 bool comparable::operator<(const comparable& that) const {
+  /*scope s("operator<(comparable)");
+  dbg << "this="<<str()<<endl;
+  dbg << "that="<<that.str()<<endl;*/
+
   // First try applying the less method of this
   try{
     return less(that);
@@ -287,6 +309,9 @@ bool comparable::operator<(const comparable& that) const {
       return !that.less(*this);
     } catch (std::bad_cast bc) {
       // Neither method could deal with the type incompatibility
+      cerr << "ERROR in comparable::operator<: types of comparable objects are not compatible!"<<endl;
+      cerr << "this="<<str()<<endl;
+      cerr << "that="<<that.str()<<endl;
       ROSE_ASSERT(0);
     }
   }
@@ -302,10 +327,13 @@ bool operator==(const std::list<comparablePtr>& leftKey, const std::list<compara
 }
 
 bool operator<(const std::list<comparablePtr>& leftKey, const std::list<comparablePtr>& rightKey) {
+  /*scope s("operator<(list<comparable>)");
+  dbg << "leftKey: "<<leftKey<<endl;
+  dbg << "rightKey: "<<rightKey<<endl;*/
+
   std::list<comparablePtr>::const_iterator left=leftKey.begin(), right=rightKey.begin();
   for(; left!=leftKey.end() && right!=rightKey.end(); left++, right++) {
     // Less-than
-    if(*left < *right) return true;
     // Greater-than (rephrased since the > implementation calls < redundantly)
     if(*left != *right) return false;
   }
@@ -315,11 +343,43 @@ bool operator<(const std::list<comparablePtr>& leftKey, const std::list<comparab
 
 // Stringification of comparable lists
 std::ostream& operator<<(std::ostream& s, const std::list<comparablePtr>& l) {
-  for(list<comparablePtr>::const_iterator k=l.begin(); k!=l.end(); k++) {
+  /*for(list<comparablePtr>::const_iterator k=l.begin(); k!=l.end(); k++) {
     if(k!=l.begin()) s << ", ";
     s << (*k)->str();
+  }*/
+  s << "<table border=1><tr><td>";
+  for(list<comparablePtr>::const_iterator k=l.begin(); k!=l.end(); k++) {
+    if(k!=l.begin()) s << "</td><td>";
+    s << (*k)->str();
   }
+  s << "</td></tr></table>";
   return s;
 }
-} /* namespace fuse */
 
+/****************************
+ ***** comparableSgNode *****
+ ****************************/
+
+comparableSgNode::comparableSgNode(SgNode* n): n(n) {}
+// This == That
+bool comparableSgNode::equal(const comparable& that_arg) const {
+  //try{
+    const comparableSgNode& that = dynamic_cast<const comparableSgNode&>(that_arg);
+    return n == that.n;
+  /*} catch (std::bad_cast bc) {
+    ROSE_ASSERT(0);
+  }*/
+}
+
+// This < That
+bool comparableSgNode::less(const comparable& that_arg) const {
+  //try{
+    const comparableSgNode& that = dynamic_cast<const comparableSgNode&>(that_arg);
+    return n < that.n;
+  /*} catch (std::bad_cast bc) {
+    ROSE_ASSERT(0);
+  }*/
+}
+std::string comparableSgNode::str(std::string indent) const { return SgNode2Str(n); }
+
+} /* namespace fuse */

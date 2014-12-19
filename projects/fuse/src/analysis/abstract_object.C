@@ -583,9 +583,9 @@ bool AbstractionHierarchy::IntersectMappedHierKey<Key>::isLive(PartEdgePtr pedge
   return true;
 }
 
-/***********************************
+/********************************
  ***** AbstractionHierarchy *****
- ***********************************/
+ ********************************/
 
 AbstractionHierarchy::AOSHierKey::AOSHierKey(AbstractObjectPtr obj,
     bool endOfHierarchy) :
@@ -600,7 +600,9 @@ AbstractionHierarchy::AOSHierKey::AOSHierKey(AbstractObjectPtr obj,
 
 bool AbstractionHierarchy::AOSHierKey::isLive(PartEdgePtr pedge,
     Composer* comp, ComposedAnalysis* analysis) {
-//  cout << "AbstractionHierarchy::AOSHierKey::isLive: "<<obj->isLive(pedge, comp, analysis)<<", obj="<<obj->str()<<endl;
+/*  scope s(txt()<<"AbstractionHierarchy::AOSHierKey::isLive: "<<obj->isLive(pedge, comp, analysis));
+  dbg << "obj="<<obj->str()<<endl;
+  dbg << "pedge="<<pedge->str()<<endl;*/
   return obj->isLive(pedge, comp, analysis);
 }
 
@@ -1187,6 +1189,8 @@ bool MappedAbstractObject<Key, AOSubType, type, MappedAOSubType>::isEmpty(PartEd
 // Returns true if this AbstractObject corresponds to a concrete value that is statically-known
 template<class Key, class AOSubType, AbstractObject::AOType type, class MappedAOSubType>
 bool MappedAbstractObject<Key, AOSubType, type, MappedAOSubType>::isConcrete() {
+  if(nFull>0) return false;
+
   typename map<Key, boost::shared_ptr<AOSubType> >::iterator it;
   for (it = aoMap.begin(); it != aoMap.end(); ++it)
     if (!it->second->isConcrete())
@@ -1322,7 +1326,7 @@ const AbstractionHierarchy::hierKeyPtr& MappedAbstractObject<Key, AOSubType, typ
 
 // Returns whether sets of the given type form a partial order
 template<class Key, class AOSubType, AbstractObject::AOType type, class MappedAOSubType>
-bool MappedAbstractObject<Key, AOSubType, type, MappedAOSubType>::()
+bool MappedAbstractObject<Key, AOSubType, type, MappedAOSubType>::isPartialOrder()
 { return membersIsHierarchy(); }
 
 // If isPartialOrder() returns true, classes must implement the methods below to establish
@@ -1372,7 +1376,7 @@ void MappedAbstractObject<Key, AOSubType, type, MappedAOSubType>::computePartial
 
 // Returns the PartialOrderKey object that defines this Abstraction's location within its partial order
 template<class Key, class AOSubType, AbstractObject::AOType type, class MappedAOSubType>
-PartialOrderKeyPtr MappedAbstractObject<Key, AOSubType, type, MappedAOSubType>::getPOKey() {
+AbstractionPartialOrder::PartialOrderKeyPtr MappedAbstractObject<Key, AOSubType, type, MappedAOSubType>::getPOKey() {
   computePartialOrderKey();
   return partialOrderKey;
 }
@@ -1486,10 +1490,10 @@ template<class Key, class AOSubType, AbstractObject::AOType type, class MappedAO
 void MappedAbstractObject<Key, AOSubType, type, MappedAOSubType>::ConcreteMAOMap::setObjVecJoin
                  (const std::vector<AbstractionPtr>& objs, setMapObjVecJoinMapFunc& f) {
   // Convert objs, which is a set of generic Abstractions into a vector of MappedAbstractObjects and store it in mappedAOs
-  scope s("MappedAbstractObject<Key, AOSubType, type, MappedAOSubType>::ConcreteMAOMap::setObjVecJoin");
+  //scope s("MappedAbstractObject<Key, AOSubType, type, MappedAOSubType>::ConcreteMAOMap::setObjVecJoin");
   vector<boost::shared_ptr<MappedAbstractObject<Key, AOSubType, type, MappedAOSubType> > > mappedAOs;
   for(vector<AbstractionPtr>::const_iterator o=objs.begin(); o!=objs.end(); ++o) {
-    dbg << "o="<<(*o? (*o)->str():"NULL")<<endl;
+    //dbg << "o="<<(*o? (*o)->str():"NULL")<<endl;
     if(*o) {
       boost::shared_ptr<MappedAbstractObject<Key, AOSubType, type, MappedAOSubType> > mappedAO =
           boost::dynamic_pointer_cast<MappedAbstractObject<Key, AOSubType, type, MappedAOSubType> >(*o);
@@ -6262,8 +6266,12 @@ bool MemLocObject::subSet(AbstractObjectPtr that, PartEdgePtr pedge,
 // right PartEdge
 bool MemLocObject::isLive(PartEdgePtr pedge, Composer* comp,
     ComposedAnalysis* analysis)
-//{ return isLiveAO(pedge); }
-    {
+{
+/*  scope s("MemLocObject::isLive");
+  dbg << "getRegion()="<<getRegion()->str()<<", getRegion()->isLive(pedge, comp, analysis)="<<getRegion()->isLive(pedge, comp, analysis)<<endl;
+  if(getIndex())
+    dbg << "getIndex()="<<getIndex()->str()<<", getIndex()->isLive(pedge, comp, analysis)="<<getIndex()->isLive(pedge, comp, analysis)<<endl;
+*/
   return getRegion()->isLive(pedge, comp, analysis)
       && (!getIndex() || getIndex()->isLive(pedge, comp, analysis));
 }
@@ -6342,6 +6350,9 @@ bool MemLocObject::isEmpty(PartEdgePtr pedge, Composer* comp,
 
 // Returns true if this AbstractObject corresponds to a concrete value that is statically-known
 bool MemLocObject::isConcrete() {
+  /*dbg << "MemLocObject::isConcrete()"<<endl;
+  dbg << "getRegion()="<<(getRegion()? getRegion()->str(): "NULL")<<endl;
+  dbg << "getIndex()="<<(getIndex()? getIndex()->str(): "NULL")<<endl;*/
   return getRegion()->isConcrete()
       && (!getIndex() || getIndex()->isConcrete());
 }

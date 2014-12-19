@@ -22,13 +22,22 @@ using namespace SageInterface;
 namespace fuse {
 
 template<typename mapFunctor>
-void mapPath(mapFunctor& f, CFGNode start, CFGNode end) {
+void mapPath(mapFunctor& f, CFGNode start, const std::set<CFGNode>& endNodes, bool includeEndNode) {
   CFGIterator cur = CFGIterator::begin(start);
   while(1){
     f(*cur);
-    if(*cur==end) return;
+    if(isSgGlobal(cur->getNode())) return;
+    if(endNodes.find(*cur)!=endNodes.end()) {
+      if(includeEndNode) f(*cur);
+      return;
+    }
+
     cur++;
-    if(*cur==end) return;
+    if(isSgGlobal(cur->getNode())) return;
+    if(endNodes.find(*cur)!=endNodes.end()) {
+      if(includeEndNode) f(*cur);
+      return;
+    }
   }
 }
 
@@ -42,7 +51,7 @@ class DefsAnalysis {
   DefsAnalysis(Composer* composer, checkDataflowInfoPass* cdip, VariableIdMapping& vIDMap, VariableIdMapping::VariableIdSet& defs) : 
       composer(composer), cdip(cdip), vIDMap(vIDMap), defs(defs) {}
  
-  void addDef(SgExpression* expr, PartEdgePtr pedge);
+  void addDef(SgNode* expr, PartEdgePtr pedge);
   
   void operator()(const CFGNode& n);
 

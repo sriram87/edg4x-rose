@@ -376,7 +376,9 @@ class CallCtxSensML : public MemLocObject
     CallCtxSensML(SgNode* sgn, MemLocObjectPtr baseML, const CallPartContext& context, CallContextSensitivityAnalysis* ccsa);
     CallCtxSensML(const CallCtxSensML& that);
     
-    virtual SgNode* getBase() const { return baseML->getBase(); }
+    virtual MemRegionObjectPtr getRegion() const;
+    virtual ValueObjectPtr     getIndex() const;
+    virtual SgNode* getBase() const;
 
     // pretty print
     //std::string str(std::string indent="") const;

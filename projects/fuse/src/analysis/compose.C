@@ -15,7 +15,7 @@ using namespace sight;
 using namespace boost;
 namespace fuse
 {
-#define composerDebugLevel 1
+#define composerDebugLevel 0
 
 //--------------------
 //----- Composer -----
@@ -545,11 +545,12 @@ RetType ChainComposer::callServerAnalysisFunc(
   // If the current analysis is non-NULL and implements the desired operation tightly, call its implementation
   if(client && checkTightness(client)) {
     //endMeasure(opMeasure);
-    RetType v2 = callOp(pedge, client, type);
+    /*RetType v2 = callOp(pedge, client, type);
     map<ComposedAnalysis*, RetType> both;
     both[server] = v;
     both[client] = v2;
-    v = createIntersection(both);
+    v = createIntersection(both);*/
+    v = callOp(pedge, client, type);
   }
   if(client==NULL && currentAnalysis && checkTightness(currentAnalysis)) {
     //endMeasure(opMeasure);
@@ -1248,10 +1249,10 @@ SSAGraph* ChainComposer::GetSSAGraph(ComposedAnalysis* client) {
 // Returns all the edges implemented by the entire composer that refine the given
 // base PartEdge
 const set<PartEdgePtr>& ChainComposer::getRefinedPartEdges(PartEdgePtr base) const {
-  scope s(txt()<<"ChainComposer::getRefinedPartEdges("<<base->str()<<")");
+  //scope s(txt()<<"ChainComposer::getRefinedPartEdges("<<base->str()<<")");
   // If we don't yet have the edges that refine base in the cache, compute them and add one
   if(base2RefinedPartEdge.find(base) == base2RefinedPartEdge.end()) {
-    dbg << "    not cached. #doneAnalyses="<<doneAnalyses.size()<<endl;
+    //dbg << "    not cached. #doneAnalyses="<<doneAnalyses.size()<<endl;
     boost::shared_ptr<std::set<PartEdgePtr> > baseEdges = boost::make_shared<std::set<PartEdgePtr> >(); 
     baseEdges->insert(base);
 
@@ -1261,19 +1262,19 @@ const set<PartEdgePtr>& ChainComposer::getRefinedPartEdges(PartEdgePtr base) con
         // Given all the base edges in *baseEdges (part of the ATS on which the current
         // analysis ran), get the set edges that refine them gathering them into refinedEdges.
         boost::shared_ptr<std::set<PartEdgePtr> > refinedEdges = boost::make_shared<std::set<PartEdgePtr> >();
-        dbg << "        Analysis "<<(*a)->str()<<" implements the ATS, #baseEdges="<<baseEdges->size()<<endl;
+        //dbg << "        Analysis "<<(*a)->str()<<" implements the ATS, #baseEdges="<<baseEdges->size()<<endl;
         for(std::set<PartEdgePtr>::iterator e=baseEdges->begin(); e!=baseEdges->end(); e++) {
           const std::set<PartEdgePtr>& curRefinedEdges = (*a)->getRefinedPartEdges(*e);
-          dbg << "          refined edge="<<(*e)->str()<<", #curRefinedEdges="<<curRefinedEdges.size()<<endl;
+          //dbg << "          refined edge="<<(*e)->str()<<", #curRefinedEdges="<<curRefinedEdges.size()<<endl;
           refinedEdges->insert(curRefinedEdges.begin(), curRefinedEdges.end());
         }
         // Drop the prior set of edges and replace them with their corresponding refined edges
-        dbg << "#baseEdges="<<baseEdges->size()<<", #refinedEdges="<<refinedEdges->size()<<endl;
+        //dbg << "#baseEdges="<<baseEdges->size()<<", #refinedEdges="<<refinedEdges->size()<<endl;
         baseEdges = refinedEdges;
       }
     }
     // Store the ultimate refined edges in the cache
-    dbg << "    Setting base="<<base->str()<<" to "<<baseEdges->size()<<" edges = "<<baseEdges.get()<<endl;
+    //dbg << "    Setting base="<<base->str()<<" to "<<baseEdges->size()<<" edges = "<<baseEdges.get()<<endl;
     //((std::map<PartEdgePtr, boost::shared_ptr<std::set<PartEdgePtr> > >)base2RefinedPartEdge)[base] = baseEdges;
     ((ChainComposer*)this)->base2RefinedPartEdge[base] = baseEdges;
   }

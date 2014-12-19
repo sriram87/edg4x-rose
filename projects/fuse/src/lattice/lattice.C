@@ -6,7 +6,8 @@
 #include <fstream>
 #include <map>
 using namespace std;
-
+#include "sight.h"
+using namespace sight;
 
 namespace fuse {
   
@@ -58,7 +59,7 @@ AbstractionPtr Lattice::genUnion(boost::shared_ptr<MAOMap> maoMap) {
       LatticePtr curLat = boost::static_pointer_cast<Lattice>(curVal);
       assert(curLat);
       // If this is the first Lattice in maoMap, copy it to accumLat
-      if(!accumLat) accumLat = parent->copySharedPtr();
+      if(!accumLat) accumLat = curLat->copySharedPtr();
       else accumLat->meetUpdate(curLat);
     }
   };
@@ -69,6 +70,7 @@ AbstractionPtr Lattice::genUnion(boost::shared_ptr<MAOMap> maoMap) {
 }
 
 AbstractionPtr Lattice::genIntersection(boost::shared_ptr<MAOMap> maoMap) {
+  //scope s("Lattice::genIntersection");
   // Use intersectUpdate on all the values in maoMap to create a single intersect lattice
   class AOMKindOp: public MAOMap::applyMapFunc {
     Lattice* parent;
@@ -77,10 +79,15 @@ AbstractionPtr Lattice::genIntersection(boost::shared_ptr<MAOMap> maoMap) {
     AOMKindOp(Lattice* parent): parent(parent) {}
     void operator()(boost::shared_ptr<void> curVal) {
       LatticePtr curLat = boost::static_pointer_cast<Lattice>(curVal);
+      //dbg << "curLat="<<curLat->str()<<endl;
       assert(curLat);
+
       // If this is the first Lattice in maoMap, copy it to accumLat
-      if(!accumLat) accumLat = parent->copySharedPtr();
-      else accumLat->intersectUpdate(curLat);
+      if(!accumLat) accumLat = curLat->copySharedPtr();
+      else {
+        accumLat->intersectUpdate(curLat);
+        //dbg << "accumLat="<<accumLat->str()<<endl;
+      }
     }
   };
   AOMKindOp x(this);

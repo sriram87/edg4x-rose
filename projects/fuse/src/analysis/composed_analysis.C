@@ -21,7 +21,7 @@ using namespace sight;
 
 namespace fuse
 {
-#define composedAnalysisDebugLevel 1
+#define composedAnalysisDebugLevel 0
 
 /****************************
  ***** ComposedAnalysis *****

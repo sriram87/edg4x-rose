@@ -34,20 +34,20 @@ namespace fuse {
    *****************/
 
   //! State of any Expr2Any query.
-  //! Maintaining state for query is useful cycles and return Full abstract objects.
+  //! Maintaining state for query is needed to manage cycles and return Full abstract objects when they are detected.
   //! The init state of the query denotes that query has not been forwarded to any analysis.
   //! Query remains in analysis state when it is being forwarded to analysis by the TightComposer.
-  //! Receiving the same query from already queried analysis indicates cycle 
+  //! Receiving the same query from already queried analysis indicates cycle,
   //! at which point TightComposer returns Full abstract objects.
   //! Query is retired to finished state when there are no more analyses to query.
   class Expr2AnyState {
   private:
-    //! Store the last analysis the query was forwarded
+    //! Store the last analysis the query was forwarded to
     ComposedAnalysis* currAnalysis;
   public:
     typedef enum {init=0, anal=1, finished=2} StateT;
 
-    //! State of the current query determind by stateT
+    //! The state of the current query
     StateT state;
 
     Expr2AnyState() : currAnalysis(NULL), state(init) { }
@@ -199,10 +199,6 @@ namespace fuse {
     ValueObjectPtr Expr2Val_ex(std::list<Expr2AnyKey>& queryList, PartEdgePtr pedge, ComposedAnalysis* client);
   
   public:
-    // Variant of Expr2Value that runs the query on the analysis that called the method rather than 
-    // some prior server analysis
-    //  ValueObjectPtr Expr2ValSelf(SgNode* n, PartEdgePtr pedge, ComposedAnalysis* self);
-  
     // Variant of Expr2Val that inquires about the value of the memory location denoted by the operand of the 
     // given node n, where the part denotes the set of prefixes that terminate at SgNode n.
     ValueObjectPtr OperandExpr2Val(SgNode* n, SgNode* operand, PartEdgePtr pedge, ComposedAnalysis* client);

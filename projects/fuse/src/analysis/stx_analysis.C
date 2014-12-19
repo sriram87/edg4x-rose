@@ -1902,10 +1902,10 @@ StxNamedMemRegionTypePtr StxNamedMemRegionType::getInstance(SgNode* n) {
 // Return whether there exists a CFGNode within this part that is inside the function in which the anchor symbol
 // is defined.
 bool matchAnchorPart(SgScopeStatement* scopeStmt, const CFGNode& n) {
-  //scope s("matchAnchorPart");
-  //dbg << "n="<<CFGNode2Str(n)<<endl;
+  /*scope s("matchAnchorPart");
+  dbg << "n="<<CFGNode2Str(n)<<endl;*/
   SgScopeStatement* part_scope = SageInterface::getScope(n.getNode());
-  /*dbg << "part_scope="<<SgNode2Str(part_scope)<<endl;
+/*  dbg << "part_scope="<<SgNode2Str(part_scope)<<endl;
   dbg << "equal="<<(scopeStmt == part_scope)<<", isAncestor="<<SageInterface::isAncestor(scopeStmt, part_scope)<<endl;*/
   assert(part_scope);
   if(scopeStmt == part_scope)
@@ -1916,7 +1916,10 @@ bool matchAnchorPart(SgScopeStatement* scopeStmt, const CFGNode& n) {
 
 // Returns true if this object is live at the given part and false otherwise
 bool StxNamedMemRegionType::isLiveAO(PartEdgePtr pedge) {
+  //scope s(txt()<<"StxNamedMemRegionType::isLiveAO("<<pedge->str()<<")");
+
   if(iname) {
+//    dbg << "iname="<<SgNode2Str(iname)<<endl;
     // This variable is in-scope if part.getNode() is inside the scope that contains its declaration
     SgScopeStatement* scopeStmt=NULL;
     assert(symbol==NULL || isSgVariableSymbol(symbol) || isSgFunctionSymbol(symbol));
@@ -1930,6 +1933,8 @@ bool StxNamedMemRegionType::isLiveAO(PartEdgePtr pedge) {
     dbg << "scopeStmt="<<SgNode2Str(scopeStmt)<<endl;*/
 
     assert(scopeStmt);
+//    dbg << "symbol="<<SgNode2Str(symbol)<<endl;
+//    dbg << "scopeStmt="<<SgNode2Str(scopeStmt)<<endl;
 
     if(symbol!=NULL && isSgFunctionSymbol(symbol)) return true;
     else if(symbol==NULL || isSgVariableSymbol(symbol)) {
@@ -2219,15 +2224,55 @@ bool isOperand(SgNode* n, SgExpression* op) {
 // Given a vector for base VirtualCFG edges, get the corresponding refined edges from
 // this attributes composer and add them to the given set of refined edges
 void collectRefinedEdges(Composer* composer, std::set<PartEdgePtr>& refined, const std::vector<CFGEdge>& base) {
-  dbg << "collectRefinedEdges() #b="<<base.size()<<endl;
+  //dbg << "collectRefinedEdges() #b="<<base.size()<<endl;
   for(std::vector<CFGEdge>::const_iterator b=base.begin(); b!=base.end(); b++) {
-    dbg << "    b="<<CFGEdge2Str(*b)<<endl;
+    //dbg << "    b="<<CFGEdge2Str(*b)<<endl;
+
+    // If either end of the edge is a SgGlobal, skip it
+    if(isSgGlobal(b->source().getNode()) || isSgGlobal(b->target().getNode())) continue;
+    // Edges between a SgFunctionDefinition | 0 and SgParameterList are skipped
+    if(isSgFunctionDefinition(b->source().getNode()) && b->source().getIndex()==0) continue;
+    // Edges after a SgFunctionDefinition | 3 are skipped
+    if(isSgFunctionDefinition(b->source().getNode()) && b->source().getIndex()==3) continue;
+
+    StxPartPtr stxSource = StxPart::create(b->source(), SyntacticAnalysis::instance());
     StxPartEdgePtr stxEdge = StxPartEdge::create(*b, SyntacticAnalysis::instance());
-    const std::set<PartEdgePtr>& refinedEdges = composer->getRefinedPartEdges(stxEdge);
-    dbg << "    #refinedEdges="<<refinedEdges.size()<<endl;
-    refined.insert(refinedEdges.begin(), refinedEdges.end());
+    //dbg << "stxEdge="<<stxEdge->str()<<endl;
+    // Check whether this is a valid edge in the Syntactic ATS and if so, add its refinements to refinedEdges
+    list<StxPartEdgePtr> out = stxSource->outStxEdges();
+    for(list<StxPartEdgePtr>::iterator e=out.begin(); e!=out.end(); ++e) {
+      //dbg << "    curOutEdge(equal="<<(*e == stxEdge)<<")="<<(*e)->str()<<endl;
+      if(*e == stxEdge) {
+        const std::set<PartEdgePtr>& refinedEdges = composer->getRefinedPartEdges(stxEdge);
+        //dbg << "    #refinedEdges="<<refinedEdges.size()<<endl;
+        refined.insert(refinedEdges.begin(), refinedEdges.end());
+        break;
+      }
+    }
   }
   //assert(refined.size()>0);
+}
+
+// Given CFGNode, get the refined edges that correspond to its incoming edges from
+// this attributes composer and add them to the given set of refined edges
+void collectIncomingRefinedEdges(Composer* composer, std::set<PartEdgePtr>& refined, const CFGNode& base) {
+  StxPartPtr stxBase = StxPart::create(base, SyntacticAnalysis::instance());
+  list<PartEdgePtr> stxEdges = stxBase->inEdges();
+  for(list<PartEdgePtr>::iterator e=stxEdges.begin(); e!=stxEdges.end(); ++e) {
+    const std::set<PartEdgePtr>& refinedEdges = composer->getRefinedPartEdges(*e);
+    refined.insert(refinedEdges.begin(), refinedEdges.end());
+  }
+}
+
+// Given CFGNode, get the refined edges that correspond to its outgoing edges from
+// this attributes composer and add them to the given set of refined edges
+void collectOutgoingRefinedEdges(Composer* composer, std::set<PartEdgePtr>& refined, const CFGNode& base) {
+  StxPartPtr stxBase = StxPart::create(base, SyntacticAnalysis::instance());
+  list<PartEdgePtr> stxEdges = stxBase->outEdges();
+  for(list<PartEdgePtr>::iterator e=stxEdges.begin(); e!=stxEdges.end(); ++e) {
+    const std::set<PartEdgePtr>& refinedEdges = composer->getRefinedPartEdges(*e);
+    refined.insert(refinedEdges.begin(), refinedEdges.end());
+  }
 }
 
 // Returns the number of bytes an instance of the given SgType occupies

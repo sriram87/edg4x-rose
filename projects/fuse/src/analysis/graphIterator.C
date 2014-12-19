@@ -1188,11 +1188,12 @@ void GETopoOrderIteratorWorklist<GraphEdgePtr, GraphNodePtr>::add(GraphEdgePtr e
 //dbg << "(i!=edge2Idx.end())="<<(i!=edge2Idx.end())<<endl;
   if(i!=edge2Idx.end()) worklist[i->second].insert(edge);
   else {
-    cout << "ERROR: edge not found: "<<edge->str()<<endl;
-    cout << "edge2Idx:"<<endl;
+    cout << "WARNING: edge not found: "<<edge->str()<<endl;
+    /*cout << "edge2Idx:"<<endl;
     for(typename map<GraphEdgePtr, int>::iterator e=edge2Idx.begin(); e!=edge2Idx.end(); ++e)
       cout << "    "<<e->second<<": "<<e->first->str()<<endl;
-    ROSE_ASSERT(0);
+    ROSE_ASSERT(0);*/
+    worklist[0].insert(edge);
   }
 /*
   typename map<GraphNodePtr, int>::iterator iSrc=node2Idx.find(edge->source());

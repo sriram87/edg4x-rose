@@ -202,6 +202,10 @@ std::string AbstractObjectMap::str(std::string indent) const {
   else if(mapState == empty) return txt()<<"[AbstractObjectMap: EMPTY, pedge = "<<(latPEdge? latPEdge->str(): "NULL")<<"]";
   else {
     ROSE_ASSERT(implementation);
+    /*cout << "AOM(this="<<this<<", latPEdge="<<latPEdge->str()<<")"<<endl;
+    ostringstream s;
+    s << "AOM(this="<<this<<", latPEdge="<<latPEdge->str()<<")"<<endl<<implementation->str(indent);
+    return s.str();*/
     return implementation->str(indent);
   }
 }
@@ -356,7 +360,7 @@ bool AbstractObjectMap::propagateDef2Uses(const std::set<MemLocObjectPtr>& uses,
 // Computes the meet of this and that and saves the result in this
 // Returns true if this causes this to change and false otherwise
 bool AbstractObjectMap::meetUpdate(Lattice* thatL) {
-  SIGHT_VERB_DECL(scope, ("AbstractObjectMap::meetUpdate()", scope::medium), 2, AOMDebugLevel)
+  SIGHT_VERB_DECL(scope, (txt()<<"AbstractObjectMap::meetUpdate() this="<<this, scope::medium), 1, AOMDebugLevel)
   AbstractObjectMap* that = dynamic_cast<AbstractObjectMap*>(thatL);
   ROSE_ASSERT(that);
 
@@ -390,6 +394,10 @@ bool AbstractObjectMap::meetUpdate(Lattice* thatL) {
     }
   }
   
+  scope s("AbstractObjectMap::meetUpdate()");
+  dbg << "this->latPEdge="<<latPEdge->str()<<endl;
+  dbg << "that->latPEdge="<<that->latPEdge->str()<<endl;
+
   ROSE_ASSERT(0);
 }
 
@@ -1207,6 +1215,8 @@ HierarchicalAOM::Node::Node() {
 // and places val at the leaf of this sub-tree
 HierarchicalAOM::Node::Node(comparablePtr myKey, std::list<comparablePtr>::const_iterator subKey, std::list<comparablePtr>::const_iterator keyEnd, 
                             AbstractionHierarchy::hierKeyPtr fullKey, AbstractObjectPtr obj, AbstractionPtr val) {
+  //SIGHT_VERB_DECL(scope, ("HierarchicalAOM::Node::init()", scope::medium), 2, AOMDebugLevel)
+  //SIGHT_VERB(dbg << "obj="<<obj->str(), 2, AOMDebugLevel)
   std::list<comparablePtr>::const_iterator next = subKey; ++next;
   // If this is the last sub-key in the key, place obj and val inside this Node
   if(subKey==keyEnd) {
@@ -1235,7 +1245,8 @@ HierarchicalAOM::Node::Node(Node* that, PartEdgePtr pedge, Composer* comp, Compo
 // does not have a const qualification because we need to modify the source Node object.
 // This change is functionally transparent to users of this object.
 void HierarchicalAOM::Node::init(Node* that, PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis) {
-  SIGHT_VERB_DECL(scope, ("HierarchicalAOM::Node::Node()", scope::medium), 3, AOMDebugLevel)
+  SIGHT_VERB_DECL(scope, ("HierarchicalAOM::Node::init()", scope::medium), 2, AOMDebugLevel)
+  SIGHT_VERB(dbg << "pedge="<<pedge->str()<<endl, 3, AOMDebugLevel)
   SIGHT_VERB(dbg << "that="; that->print(dbg); dbg<<endl, 3, AOMDebugLevel)
   SIGHT_VERB(dbg << "that->key="<<(that->key? that->key->str(): "NULL")<<", that->fullKey="<<(that->fullKey? string(txt()<<that->fullKey): "NULL")<<endl, 3, AOMDebugLevel)
   
@@ -1257,8 +1268,8 @@ void HierarchicalAOM::Node::init(Node* that, PartEdgePtr pedge, Composer* comp, 
   for(map<comparablePtr, NodePtr>::iterator sub=that->subsets.begin(); sub!=that->subsets.end(); sub++) {
     SIGHT_VERB(dbg << "sub="<<sub->second<<endl, 2, AOMDebugLevel)
     if(sub->second->fullKey) {
-      SIGHT_VERB(dbg << "sub->second->fullKey="<<string(txt()<<sub->second->fullKey)<<endl, 3, AOMDebugLevel)
-      SIGHT_VERB(dbg << "live="<<sub->second->fullKey->isLive(pedge, comp, analysis)<<endl, 3, AOMDebugLevel)
+      SIGHT_VERB(dbg << "sub->second->fullKey="<<string(txt()<<sub->second->fullKey)<<endl, 2, AOMDebugLevel)
+      SIGHT_VERB(dbg << "live="<<sub->second->fullKey->isLive(pedge, comp, analysis)<<endl, 2, AOMDebugLevel)
     }
     // Only create sub-keys for live keys
     if(!sub->second->fullKey || sub->second->fullKey->isLive(pedge, comp, analysis)) {
@@ -1364,6 +1375,8 @@ bool HierarchicalAOM::Node::isLive(PartEdgePtr pedge, Composer* comp, ComposedAn
 // Returns whether the set that this node maps its key to is empty.
 // This is the case if all the values in its sub-tree denote the empty set
 bool HierarchicalAOM::Node::isEmptyVal(PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis) const {
+  //scope s("HierarchicalAOM::Node::isEmptyVal");
+  //dbg << "val="<<(val? val->str(): "NULL")<<", val->isEmpty="<<(val?val->isEmpty(pedge, comp, analysis):false)<<", #subsets="<<subsets.size()<<endl;
   // val is empty
   if(!val || val->isEmpty(pedge, comp, analysis)) {
     for(map<comparablePtr, NodePtr>::const_iterator sub=subsets.begin(); sub!=subsets.end(); sub++) {
@@ -1894,6 +1907,7 @@ bool HierarchicalAOM::unionIntersectUpdate(AbstractObjectMapKindPtr that_arg, ui
 
 // Recursive body of unionIntersectUpdate
 bool HierarchicalAOM::unionIntersectUpdate(NodePtr thisST, NodePtr thatST, uiType ui) {
+  SIGHT_VERB_DECL(scope, (txt()<<"HierarchicalAOM::unionIntersectUpdate() parent="<<parent), 1, AOMDebugLevel)
   bool modified = false;
 
   ROSE_ASSERT(thisST->isObjSingleton == thatST->isObjSingleton);
@@ -1940,7 +1954,8 @@ bool HierarchicalAOM::unionIntersectUpdate(NodePtr thisST, NodePtr thatST, uiTyp
   
   // Iterate over the subsets of thatST, unioning their sub-trees into this
   for(map<comparablePtr, NodePtr>::iterator thatSub=thatST->subsets.begin(); thatSub!=thatST->subsets.end(); thatSub++) {
-    SIGHT_VERB(dbg<<"thatSub key="<<thatSub->first->str()<<", found="<<(thisST->subsets.find(thatSub->first)!=thisST->subsets.end())<<", live="<<thatSub->second->isLive(parent->latPEdge, parent->comp, parent->analysis)<<endl, 1, AOMDebugLevel)
+    SIGHT_VERB_DECL(scope, (txt()<<"thatSub key="<<thatSub->first->str()<<", found="<<(thisST->subsets.find(thatSub->first)!=thisST->subsets.end())<<", live="<<thatSub->second->isLive(parent->latPEdge, parent->comp, parent->analysis)), 1, AOMDebugLevel)
+    SIGHT_VERB(dbg << "thatSub Node="<<thatSub->second<<endl, 1, AOMDebugLevel)
     // If the current sub-tree of that exists in this
     map<comparablePtr, NodePtr>::iterator thisSub=thisST->subsets.find(thatSub->first);
     if(thisSub!=thisST->subsets.end()) {
@@ -1952,6 +1967,7 @@ bool HierarchicalAOM::unionIntersectUpdate(NodePtr thisST, NodePtr thatST, uiTyp
       //thisST->subsets[thatSub->first] = boost::make_shared<Node>(thatSub->second);
       if(thatSub->second->isLive(parent->latPEdge, parent->comp, parent->analysis)) {
         NodePtr newNode = boost::make_shared<Node>(thatSub->second, parent->latPEdge, parent->comp, parent->analysis);
+        SIGHT_VERB(dbg << "emptyVal="<<newNode->isEmptyVal(parent->latPEdge, parent->comp, parent->analysis)<<", in newNode="<<newNode<<endl, 1, AOMDebugLevel)
         // If the copied sub-tree didn't end up being empty (due to the keys being out of scope), add it
         if(!newNode->isEmptyVal(parent->latPEdge, parent->comp, parent->analysis)) {
           thisST->subsets[thatSub->first] = newNode;
@@ -1964,6 +1980,7 @@ bool HierarchicalAOM::unionIntersectUpdate(NodePtr thisST, NodePtr thatST, uiTyp
       }
     }
   }
+  SIGHT_VERB(dbg<<"modified = "<<modified<<endl, 1, AOMDebugLevel)
   
   return modified;
 }
@@ -2066,27 +2083,48 @@ MappedAOMKind::MappedAOMKind(boost::shared_ptr<MAOMap> mappedAOMap, AbstractObje
 }*/
 
 MappedAOMKind::MappedAOMKind(const MappedAOMKind& that, bool emptyMap) :
-    AbstractObjectMapKind(that)/*, factory(that.factory)*/, ui(that.ui)
+    AbstractObjectMapKind(that.parent), ui(that.ui)
 {
+  //scope s(txt()<<"MappedAOMKind::MappedAOMKind(emptyMap="<<emptyMap<<")");
   // Copy mappedAOMap's keys but not their values (sub-AOMs)
   mappedAOMap = that.mappedAOMap->create();
 
   if(!emptyMap) {
     // Initialize mappedAOMap's keys with the copies of the values (sub-AOMaps) in that.mappedAOMap
     class AOMKindOp: public MAOMap::setJoinMapFunc {
-      //AbstractObjectMapKindFactoryPtr factory;
       public:
-      //AOMKindOp(AbstractObjectMapKindFactoryPtr factory): factory(factory) {}
       boost::shared_ptr<void> operator()(boost::shared_ptr<void> curVal1, boost::shared_ptr<void> curVal2) {
         AbstractObjectMapKindPtr thatAOMKind = boost::static_pointer_cast<AbstractObjectMapKind>(curVal2);
         assert(thatAOMKind);
-        //return factory->copy(thatAOMKind);
+        //dbg << "thatAOMKind="<<thatAOMKind->str()<<endl;
+        //AbstractObjectMapKindPtr kindCopy = thatAOMKind->copy();
+        //dbg << "kindCopy="<<kindCopy->str()<<endl;
         return thatAOMKind->copy();
       }
     };
-    AOMKindOp x;//(/*factory*/);
+    AOMKindOp x;
     mappedAOMap->setJoin(that.mappedAOMap, x);
   }
+
+  // Update the parent pointers of all the sub-maps
+  setParent(that.parent);
+}
+
+// Variant of setParent that also calls the setParent methods of all the sub-maps
+void MappedAOMKind::setParent(AbstractObjectMap* newParent) {
+  AbstractObjectMapKind::setParent(newParent);
+
+  // Sets the parent of all the sub-maps to newParent
+  class AOMKindOp: public MAOMap::applyMapFunc {
+    AbstractObjectMap* newParent;
+    public:
+    AOMKindOp(AbstractObjectMap* newParent): newParent(newParent) {}
+    void operator()(boost::shared_ptr<void> curVal) {
+      if(curVal) ((AbstractObjectMapKind*)curVal.get())->setParent(newParent);
+    }
+  };
+  AOMKindOp x(newParent);
+  mappedAOMap->apply(x);
 }
 
 // Add a new memory object --> lattice pair to the frontier.
@@ -2131,8 +2169,8 @@ bool MappedAOMKind::remove(AbstractObjectPtr key) {
 
 // Get all x-frontier for a given abstract memory object
 AbstractionPtr MappedAOMKind::get(AbstractObjectPtr key) {
-  scope s(txt()<<"MappedAOMKind::get() ui="<<(ui==Union? "Union": "Intersection"));
-  dbg << "key="<<key->str()<<endl;
+  SIGHT_VERB_DECL(scope, (txt()<<"MappedAOMKind::get() ui="<<(ui==Union? "Union": "Intersection"), scope::medium), 1, AOMDebugLevel)
+  //dbg << "key="<<key->str()<<endl;
   assert(key->isMappedAO());
 
   // Create a fresh map to hold the mapping of the sub-keys inside the MappedAbstractObject key
@@ -2158,6 +2196,7 @@ AbstractionPtr MappedAOMKind::get(AbstractObjectPtr key) {
                                                AbstractObjectPtr curValObj,
                                                boost::shared_ptr<void> curValThat) {
       representativeVal = ((AbstractObjectMapKind*)curValThat.get())->get(curValObj);
+      SIGHT_VERB(dbg << "val="<<representativeVal->str()<<endl, 1, AOMDebugLevel)
       return representativeVal;
     }
   };
@@ -2168,8 +2207,13 @@ AbstractionPtr MappedAOMKind::get(AbstractObjectPtr key) {
   // that correspond to these keys, return their union or intersection, whichever is the mode
   // of this MappedAOMKind.
 
-  if(ui==Union) return x.representativeVal->genUnion(valMAOMap);
-  else          return x.representativeVal->genIntersection(valMAOMap);
+  AbstractionPtr res;
+  if(ui==Union) res = x.representativeVal->genUnion(valMAOMap);
+  else          res = x.representativeVal->genIntersection(valMAOMap);
+
+  SIGHT_VERB(dbg << "result="<<res->str()<<endl, 1, AOMDebugLevel)
+
+  return res;
 }
 
 // Set all the information associated Lattice object with this MemLocObjectPtr to full.
@@ -2225,11 +2269,16 @@ bool MappedAOMKind::isEmpty() {
 }
 
 std::string MappedAOMKind::str(std::string indent) const {
+  /*cout << "MappedAOMKind(this="<<this<<", parent="<<parent<<")"<<endl;
+  cout << "latPEdge="<<parent->latPEdge<<")"<<endl;
+  cout << "latPEdge="<<parent->latPEdge->str()<<")"<<endl;*/
   class AOMKindOp: public MAOMap::applyStrMapFunc {
     public:
     std::ostringstream out;
     std::string indent;
-    AOMKindOp(std::string indent) : indent(indent) {
+    AbstractObjectMap* parent;
+    AOMKindOp(std::string indent, AbstractObjectMap* parent) : indent(indent), parent(parent) {
+      //out << "<table><tr><td border=\"1\" colspan=\"2\"><b>MappedAOMKind(this="<<this<<", parent="<<parent<<", latPEdge="<<parent->latPEdge->str()<<")</b>:</td></tr>"<<endl;
       out << "<table><tr><td border=\"1\" colspan=\"2\"><b>MappedAOMKind</b>:</td></tr>"<<endl;
     }
     void complete() {
@@ -2239,8 +2288,9 @@ std::string MappedAOMKind::str(std::string indent) const {
       out << "<tr><td>"<<keyStr << "</td><td>"<<((AbstractObjectMapKind*)curVal.get())->str()<<"</td><tr>"<<endl;
     }
   };
-  AOMKindOp x(indent);
+  AOMKindOp x(indent, parent);
   mappedAOMap->applyStr(x);
+  x.complete();
   return x.out.str();
 }
 
@@ -2275,7 +2325,7 @@ void MappedAOMKind::initialize() {}
 
 // returns a copy of this AbstractObjectMapKind
 AbstractObjectMapKindPtr MappedAOMKind::copy() const {
-  return boost::make_shared<MappedAOMKind>(*this);
+  return boost::make_shared<MappedAOMKind>(*this, /*emptyMap*/ false);
 }
 
 // overwrites the state of this Lattice with that of that Lattice
@@ -2291,18 +2341,22 @@ void MappedAOMKind::copy(AbstractObjectMapKindPtr that_arg) {
 
   // Initialize mappedAOMap's keys with the copies of the values (sub-AOMaps) in that.mappedAOMap
   class AOMKindOp: public MAOMap::setJoinMapFunc {
-    //AbstractObjectMapKindFactoryPtr factory;
     public:
-    //AOMKindOp(AbstractObjectMapKindFactoryPtr factory): factory(factory) {}
     boost::shared_ptr<void> operator()(boost::shared_ptr<void> curVal1, boost::shared_ptr<void> curVal2) {
       AbstractObjectMapKindPtr thatAOMKind = boost::static_pointer_cast<AbstractObjectMapKind>(curVal2);
       assert(thatAOMKind);
-      //return factory->copy(thatAOMKind);
       return thatAOMKind->copy();
     }
   };
-  AOMKindOp x;//(/*factory*/);
+  AOMKindOp x;
   mappedAOMap->setJoin(that->mappedAOMap, x);
+
+  // Set the parent of all the sub-maps
+  setParent(parent);
+
+  /*scope s("MappedAOMKind::copy()");
+  dbg << "this->latPEdge="<<parent->latPEdge->str()<<endl;
+  dbg << "that->latPEdge="<<that->parent->latPEdge->str()<<endl;*/
 }
 
 // Called by analyses to transfer this lattice's contents from across function scopes from a caller function
@@ -2319,7 +2373,7 @@ void MappedAOMKind::copy(AbstractObjectMapKindPtr that_arg) {
 //    by getPartEdge().
 // remapML must return a freshly-allocated object.
 AbstractObjectMapKindPtr MappedAOMKind::remapML(const std::set<MLMapping>& ml2ml, PartEdgePtr fromPEdge) {
-  scope s(txt()<<"MappedAOMKind::remapML() #ml2ml="<<ml2ml.size());
+  //scope s(txt()<<"MappedAOMKind::remapML() #ml2ml="<<ml2ml.size());
   // The MemLocs in the ml2ml mapping are MappedAbstractObjects. To call the remapML method
   // of the AOMKinds within this MappedAOMKind it is necessary to slice them into a separate
   // ml2ml mapping for each sub-key within them. Each sub-ml2ml mapping maps just the ml2 mapped
@@ -2336,8 +2390,8 @@ AbstractObjectMapKindPtr MappedAOMKind::remapML(const std::set<MLMapping>& ml2ml
     vector<AbstractionPtr> objs;
     objs.push_back(i->from);
     objs.push_back(i->to);
-    dbg << "i->from="<<i->from->str()<<endl;
-    dbg << "i->to="<<(i->to?i->to->str():"NULL")<<endl;
+    //dbg << "i->from="<<i->from->str()<<endl;
+    //dbg << "i->to="<<(i->to?i->to->str():"NULL")<<endl;
 
     class AOMKindOp: public MAOMap::setMapObjVecJoinMapFunc {
       const MLMapping& origMLMapping;
@@ -2346,7 +2400,7 @@ AbstractObjectMapKindPtr MappedAOMKind::remapML(const std::set<MLMapping>& ml2ml
       boost::shared_ptr<void> operator()(boost::shared_ptr<void> curMapVal,
                                          const std::vector<AbstractObjectPtr>& curObjVals) {
         assert(curObjVals.size()==2);
-        scope s("AOMKindOp()");
+        //scope s("AOMKindOp()");
         boost::shared_ptr<set<MLMapping> > subML2ML;
         // If we're at the first mapping, initialize subML2ML to be a new set of MLMappings
         if(!curMapVal) subML2ML = boost::make_shared<set<MLMapping> >();
@@ -2354,10 +2408,10 @@ AbstractObjectMapKindPtr MappedAOMKind::remapML(const std::set<MLMapping>& ml2ml
         else           subML2ML = boost::static_pointer_cast<set<MLMapping> >(curMapVal);
 
         MemLocObjectPtr from = boost::dynamic_pointer_cast<MemLocObject>(curObjVals[0]);
-        dbg << "curObjVals[0]="<<curObjVals[0]->str()<<endl;
+        //dbg << "curObjVals[0]="<<curObjVals[0]->str()<<endl;
         assert(from);
         MemLocObjectPtr to   = boost::dynamic_pointer_cast<MemLocObject>(curObjVals[1]);
-        dbg << "curObjVals[1]="<<(curObjVals[1]?curObjVals[1]->str():"NULL")<<endl;
+        //dbg << "curObjVals[1]="<<(curObjVals[1]?curObjVals[1]->str():"NULL")<<endl;
 
         subML2ML->insert(MLMapping(from, to, origMLMapping.replaceMapping));
 
@@ -2388,6 +2442,12 @@ AbstractObjectMapKindPtr MappedAOMKind::remapML(const std::set<MLMapping>& ml2ml
   };
   AOMKindOp2 y(ml2ml, fromPEdge);
   newK->mappedAOMap->set3MapJoin(mappedAOMap, subml2ml, y);
+
+  /*scope s2("MappedAOMKind::remapML()");
+  dbg << "this->parent="<<parent<<endl;
+  dbg << "this->latPEdge="<<parent->latPEdge->str()<<endl;
+  dbg << "newK->latPEdge="<<newK->parent->latPEdge->str()<<endl;*/
+
   return newK;
 }
 
@@ -2424,6 +2484,7 @@ bool MappedAOMKind::meetUpdate(AbstractObjectMapKindPtr that) {
   };
   AOMKindOp x;
   mappedAOMap->applyJoin(thatMappedAOM->mappedAOMap, x);
+  //dbg << "MappedAOMKind::meetUpdate() modified="<<x.modified<<endl;
   return x.modified;
 }
 

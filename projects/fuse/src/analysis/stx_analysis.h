@@ -717,7 +717,7 @@ class StxStorageMemRegionType : public StxMemRegionType
   // this MemRegion
   void addHierSubKey(const AbstractionHierarchy::hierKeyPtr& key) {
     key->reachedEndOfHierarchy();
-    std::cout << "addHierSubKey() key="<<key<<std::endl;
+    //std::cout << "addHierSubKey() key="<<key<<std::endl;
   }
   
   std::string str(std::string indent) const; // pretty print for the object
@@ -775,6 +775,14 @@ class StxAllMemRegionType : public StxMemRegionType
 // Given a vector for base VirtualCFG edges, get the corresponding refined edges from
 // this attributes composer and add them to the given set of refined edges
 void collectRefinedEdges(Composer* composer, std::set<PartEdgePtr>& refined, const std::vector<CFGEdge>& base);
+
+// Given CFGNode, get the refined edges that correspond to its incoming edges from
+// this attributes composer and add them to the given set of refined edges
+void collectIncomingRefinedEdges(Composer* composer, std::set<PartEdgePtr>& refined, const CFGNode& base);
+
+// Given CFGNode, get the refined edges that correspond to its outgoing edges from
+// this attributes composer and add them to the given set of refined edges
+void collectOutgoingRefinedEdges(Composer* composer, std::set<PartEdgePtr>& refined, const CFGNode& base);
 
 // Returns the number of bytes an instance of the given SgType occupies
 StxValueObjectPtr getTypeSize(SgType* type);

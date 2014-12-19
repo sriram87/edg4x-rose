@@ -173,6 +173,8 @@ struct output_nested_results
 #include "stx_analysis.h"
 VariableIdMapping vIDMap;
 
+#define valAttrDebugLevel 0
+
 class ValueASTAttribute: public CPAstAttributeInterface {
   protected:
   std::set<PartEdgePtr> refinedEdges;
@@ -214,31 +216,38 @@ class ValueASTAttribute: public CPAstAttributeInterface {
 
   ValueASTAttribute(SgNode* n, Composer* composer, checkDataflowInfoPass* cdip, dirT dir, std::string label): 
         composer(composer), cdip(cdip), dir(dir), label(label) {
-    scope s(txt()<<"ValueASTAttribute("<<SgNode2Str(n)<<")");
+    SIGHT_VERB_DECL(scope, (txt()<<"ValueASTAttribute("<<SgNode2Str(n)<<")"), 1, valAttrDebugLevel)
+
+    if(isSgFunctionDefinition(n)) return;
  
     // NOTE: this is a temporary hack where we assume the appropriate index for the CFGNode
     //       that represents SgNode n. In the future we should change Expr2* to accept CFGNodes
     if(isSgInitializedName(n)) cn = CFGNode(n, 1);
-    else if(isSgBinaryOp(n)) cn = CFGNode(n, 2);
+    else if(isSgBinaryOp(n))   cn = CFGNode(n, 2);
     else if(isSgUnaryOp(n)) {
-      if(isSgCastExp(n)) cn = CFGNode(n, 0);
+      if(isSgCastExp(n))       cn = CFGNode(n, 0);
       else if(isSgAddressOfOp(n) || isSgPointerDerefExp(n) || isSgPlusPlusOp(n) || isSgMinusMinusOp(n)) cn = CFGNode(n, 1);
-      else                   cn = CFGNode(n, 2);
+      else                     cn = CFGNode(n, 2);
     }
-    else if(isSgValueExp(n))    cn = CFGNode(n, 1);
-    else                        cn = CFGNode(n, 0);
+    else if(isSgValueExp(n))   cn = CFGNode(n, 1);
+    else if(isSgFunctionCallExp(n)) cn = CFGNode(n, 2);
+    else if(isSgWhileStmt(n))  cn = CFGNode(n, 1);
+    else                       cn = CFGNode(n, 0);
+
  
     // Collect the PartEdges (computed by the given composer) that refine the incoming or
     // outgoing edges of the given SgNode
-    collectRefinedEdges(composer, refinedEdges, (dir==above? cn.inEdges(): cn.outEdges()));
+    //collectRefinedEdges(composer, refinedEdges, (dir==above? cn.inEdges(): cn.outEdges()));
+    if(dir==above) collectIncomingRefinedEdges(composer, refinedEdges, cn);
+    else           collectOutgoingRefinedEdges(composer, refinedEdges, cn);
 
     allInScopeVars = getAllVarSymbols(n);
-    { scope s("allInScopeVars");
+    SIGHT_VERB_IF(1, valAttrDebugLevel)
+      scope s("allInScopeVars");
       for(std::list<SgVariableSymbol *>::iterator v=allInScopeVars.begin(); v!=allInScopeVars.end(); ++v) {
         dbg << SgNode2Str(*v)<<endl;
       }
-    }
-
+    SIGHT_VERB_FI()
   }
  
   // Apply Expr2Value for the given expression to all the edges in refinedEdges and return
@@ -246,23 +255,24 @@ class ValueASTAttribute: public CPAstAttributeInterface {
   ValueObjectPtr Expr2Val(SgExpression* expr) { 
     ValueObjectPtr val;
 
-    dbg << "Expr2Val("<<SgNode2Str(expr)<<") #refinedEdges="<<refinedEdges.size()<<endl;
+    SIGHT_VERB(dbg << "Expr2Val("<<SgNode2Str(expr)<<") #refinedEdges="<<refinedEdges.size()<<endl, 1, valAttrDebugLevel)
     for(std::set<PartEdgePtr>::iterator r=refinedEdges.begin(); r!=refinedEdges.end(); r++) {
+      SIGHT_VERB(dbg << "    edge="<<(*r)->str()<<endl, 1, valAttrDebugLevel)
       ValueObjectPtr edgeVal = composer->Expr2Val(expr, *r, cdip);
       if(val==NULLValueObject) val = edgeVal;
       else                     val->meetUpdate(edgeVal, *r, composer, NULL);
     }
-    dbg << "Expr2Val returning val="<<val.get()<<endl;
+    SIGHT_VERB(dbg << "Expr2Val returning val="<<val.get()<<endl, 1, valAttrDebugLevel)
 
     return val;
   }
 
   bool isConstantInteger(SgVarRefExp* ref) {
-    scope s(txt()<<"isConstantInteger(ref="<<SgNode2Str(ref)<<")");
+    SIGHT_VERB_DECL(scope, (txt()<<"isConstantInteger(ref="<<SgNode2Str(ref)<<")"), 1, valAttrDebugLevel)
     ValueObjectPtr val = Expr2Val(ref);
-    dbg << "isConstantInteger() val="<<val.get()<<endl;
+    SIGHT_VERB(dbg << "isConstantInteger() val="<<val.get()<<endl, 1, valAttrDebugLevel)
     if(!val) return false;
-    dbg << "isConstantInteger() val="<<val->str()<<endl;
+    SIGHT_VERB(dbg << "isConstantInteger() val="<<val->str()<<endl, 1, valAttrDebugLevel)
     if(val->isConcrete() && isStrictIntegerType(val->getConcreteType())) {
       std::set<boost::shared_ptr<SgValueExp> > cVals = val->getConcreteValue();
       if(cVals.size()==1) return true;
@@ -271,11 +281,11 @@ class ValueASTAttribute: public CPAstAttributeInterface {
   }
   
   bool isConstantInteger(VariableId varId) {
-    scope s(txt()<<"isConstantInteger(varID="<<SgNode2Str(vIDMap.getSymbol(varId))<<")");
+    SIGHT_VERB_DECL(scope, (txt()<<"isConstantInteger(varID="<<SgNode2Str(vIDMap.getSymbol(varId))<<")"), 1, valAttrDebugLevel)
     ValueObjectPtr val = Expr2Val(buildVarRefExp(isSgVariableSymbol(vIDMap.getSymbol(varId))));
-    dbg << "isConstantInteger() val="<<val.get()<<endl;
+    SIGHT_VERB(dbg << "isConstantInteger() val="<<val.get()<<endl, 1, valAttrDebugLevel)
     if(!val) return false;
-    dbg << "isConstantInteger() val="<<val->str()<<endl;
+    SIGHT_VERB(dbg << "isConstantInteger() val(concrete="<<val->isConcrete()<<")="<<val->str()<<endl, 1, valAttrDebugLevel)
     if(val->isConcrete() && isStrictIntegerType(val->getConcreteType())) {
       std::set<boost::shared_ptr<SgValueExp> > cVals = val->getConcreteValue();
       if(cVals.size()==1) return true;
@@ -284,11 +294,11 @@ class ValueASTAttribute: public CPAstAttributeInterface {
   }
   
   ConstantInteger getConstantInteger(SgVarRefExp* ref) {
-    dbg << "getConstantInteger("<<SgNode2Str(ref)<<")"<<endl;
+    SIGHT_VERB(dbg << "getConstantInteger("<<SgNode2Str(ref)<<")"<<endl, 1, valAttrDebugLevel)
     ValueObjectPtr val = Expr2Val(ref);
     assert(val);
     if(val->isConcrete() && isStrictIntegerType(val->getConcreteType())) {
-      dbg << "val="<<val->str()<<endl;
+      SIGHT_VERB(dbg << "val="<<val->str()<<endl, 1, valAttrDebugLevel)
       std::set<boost::shared_ptr<SgValueExp> > cVals = val->getConcreteValue();
       if(cVals.size()==1) return getIntegerConstantValue((*cVals.begin()).get());
     }
@@ -307,6 +317,8 @@ class ValueASTAttribute: public CPAstAttributeInterface {
   ~ValueASTAttribute() {}
 
   string toString() {
+    if(cn.getNode()==NULL) return "";
+
     if(isSgExprStatement(cn.getNode())) {
       ValueASTAttribute exprLabel(isSgExprStatement(cn.getNode())->get_expression(), composer, cdip, dir, label);
       return exprLabel.toString();
@@ -330,25 +342,33 @@ class ValueASTAttribute: public CPAstAttributeInterface {
     }
     
     ostringstream s;
+    {
+    SIGHT_VERB_DECL(scope, (txt()<<"ValueASTAttribute::toString("<<CFGNode2Str(cn)<<")"), 1, valAttrDebugLevel)
     s << "["<<label<<" : "<<SgNode2Str(cn.getNode())<<": ";
     //cout << CFGNode2Str(cn) << ": "<<endl;;
     int numConstants=0;
     for(list<SgVariableSymbol *>::iterator v=allInScopeVars.begin(); v!=allInScopeVars.end(); v++) {
+      if(v!=allInScopeVars.begin()) { s << ", "; }
+
       SgVarRefExp* ref = buildVarRefExp(*v);
-      //cout << "    "<<ref->unparseToString() << ":";
-      //s << ref->unparseToString()<<"=";
+      SIGHT_VERB(dbg << "    "<<ref->unparseToString() << " = ", 1, valAttrDebugLevel)
+      s << ref->unparseToString()<<"=";
       if(isConstantInteger(ref)) {
-        if(numConstants>0) { s << ", "; }
-        s << ref->unparseToString() << "=" << getConstantInteger(ref);
+        //if(numConstants>0) { s << ", "; }
+        s << getConstantInteger(ref);
+        SIGHT_VERB(dbg << getConstantInteger(ref)<<endl, 1, valAttrDebugLevel)
         //s << getConstantInteger(ref);
         //cout << "        "<<ref->unparseToString() << "=" << getConstantInteger(ref)<<endl;;
         numConstants++;
-      }/* else 
-        s << "?";*/
+      } else {
+        SIGHT_VERB(dbg << "?"<<endl, 1, valAttrDebugLevel)
+        s << "?";
+      }
       
-      //delete ref;
+      delete ref;
     }
     s << "]";
+    }
     //cout << endl;
     return s.str();
   }
@@ -567,6 +587,7 @@ int main(int argc, char** argv)
 //      labeler.createLabels(getProject());
       ValueASTAttribute::placeLabeler(rootComposer, cdip, labeler);
       FuseRDAstAttribute::placeLabeler(rootComposer, cdip, vIDMap, labeler);
+
       AstAnnotator ara(&labeler);
       ara.annotateAstAttributesAsCommentsBeforeStatements(getProject(), "fuse_cp_below");
       ara.annotateAstAttributesAsCommentsBeforeStatements(getProject(), "fuse_rd");

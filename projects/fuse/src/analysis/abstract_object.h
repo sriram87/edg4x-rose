@@ -242,7 +242,7 @@ class AbstractionPartialOrder {
   virtual bool isPartialOrder() { return false; }
 
   // Key that identifies this Abstraction's location within the partial order
-  class PartialOrderKey
+  class PartialOrderKey;
   typedef boost::shared_ptr<PartialOrderKey> PartialOrderKeyPtr;
   class PartialOrderKey {
     // If isPartialOrder() returns true, classes must implement the methods below to establish
@@ -916,14 +916,14 @@ public:
   protected:
   // Maps the keys of this object to the hierarchical keys that describe its sub-objects
   // (in the case where they're all hierarhical)
-  class MappedPartialOrderKey {
+  class MappedPartialOrderKey: public AbstractionPartialOrder::PartialOrderKey {
     public:
     std::map<Key, typename AOSubType::hierKeyPtr> key;
 
     // If isPartialOrder() returns true, classes must implement the methods below to establish
     // the partial order relationship among class instances.
-    bool isPOLessThan(const PartialOrderKey& that);
-    bool isPOEqual(const PartialOrderKey& that);
+    bool isPOLessThan(const AbstractionPartialOrder::PartialOrderKey& that);
+    bool isPOEqual(const AbstractionPartialOrder::PartialOrderKey& that);
   }; // class MappedPartialOrderKey
 
   boost::shared_ptr<MappedPartialOrderKey> partialOrderKey;
@@ -938,7 +938,7 @@ public:
   void computePartialOrderKey();
 
   // Returns the PartialOrderKey object that defines this Abstraction's location within its partial order
-  PartialOrderKeyPtr getPOKey();
+  AbstractionPartialOrder::PartialOrderKeyPtr getPOKey();
 
   // Concrete implementation that uses a specific key type
   class ConcreteMAOMap : public MAOMap {

@@ -698,6 +698,11 @@ CallCtxSensML::CallCtxSensML(const CallCtxSensML& that) : MemLocObject(that)
   context = that.context;
   ccsa    = that.ccsa;
 }
+
+MemRegionObjectPtr CallCtxSensML::getRegion() const { return baseML->getRegion(); }
+ValueObjectPtr     CallCtxSensML::getIndex() const { return baseML->getIndex(); }
+SgNode* CallCtxSensML::getBase() const { return baseML->getBase(); }
+
 // pretty print
 string CallCtxSensML::str(string indent) const {
   ostringstream oss;

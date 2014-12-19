@@ -825,9 +825,13 @@ void NodeState::copyLatticesOW(map<PartEdgePtr, vector<Lattice*> >& dfInfoTo,
   }
   dfInfoTo.clear();
   
+  //scope s("copyLatticesOW");
   for(map<PartEdgePtr, vector<Lattice*> >::const_iterator eFrom=dfInfoFrom.begin(); eFrom!=dfInfoFrom.end(); eFrom++) {
     for(vector<Lattice*>::const_iterator lFrom=eFrom->second.begin(); lFrom!=eFrom->second.end(); lFrom++) {
+      //dbg << "lFrom="<<(*lFrom)->str()<<endl;
       Lattice *lTo = (*lFrom)->copy();
+      //dbg << "lTo="<<lTo->str()<<endl;
+      //dbg << "lFrom="<<(*lFrom)->str()<<endl;
       dfInfoTo[eFrom->first].push_back(lTo);
     }
   }

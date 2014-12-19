@@ -14,7 +14,7 @@ using namespace SageInterface;
 
 #include <cwchar>
 
-#define constantPropagationAnalysisDebugLevel 1
+#define constantPropagationAnalysisDebugLevel 0
 
 // Define type conversions for lambda operators that are not supported by Boost::Lambda
 namespace boost { 
@@ -1279,37 +1279,103 @@ bool isIntegralVal(SgValueExp* v) {
 bool isFloatVal(SgValueExp* v)
 { return !isIntegralVal(v); }
 
+//! Calculate the number of dimensions of an array type
+size_t getArrayDimCount(SgArrayType* t, SgPntrArrRefExp* ref)
+{
+  ROSE_ASSERT(t);
+  SgExpression * indexExp =  t->get_index();
+
+//strip off THREADS for UPC array with a dimension like dim*THREADS
+  if (isUpcArrayWithThreads(t))
+  {
+    SgMultiplyOp* multiply = isSgMultiplyOp(indexExp);
+    ROSE_ASSERT(multiply);
+    indexExp = multiply->get_lhs_operand();
+  }
+
+  /*cout << "t="<<SgNode2Str(t)<<endl;
+  cout << "indexExp="<<(indexExp? SgNode2Str(indexExp): "NULL")<<endl;*/
+
+  // If the dimension is not specified in the type, (e.g. array[])
+  if (indexExp == NULL || isSgNullExpression(indexExp)) {
+    // Look at the array's declaration to see if its size was specified via an SgAggregateInitializer
+    if(SgVarRefExp* vref=isSgVarRefExp(ref->get_lhs_operand())) {
+      if(SgAggregateInitializer* init = isSgAggregateInitializer(vref->get_symbol()->get_declaration()->get_initializer())) {
+        return init->get_initializers()->get_expressions().size();
+      } else {
+        cerr << "ERROR: cannot count the number of elements in array "<<SgNode2Str(ref->get_lhs_operand())<<" since SgAggregateInitializer could not be found!"<<endl;
+        assert(0);
+      }
+    } else {
+      cerr << "ERROR: cannot count the number of elements in array reference "<<SgNode2Str(ref->get_lhs_operand())<<" since it is not a SgVarRefExp!"<<endl;
+      assert(0);
+    }
+  } else {
+    //Take advantage of the fact that the value expression is always SgUnsignedLongVal in AST
+    SgUnsignedLongVal * valExp = isSgUnsignedLongVal(indexExp);
+    SgIntVal * valExpInt = isSgIntVal(indexExp);
+    ROSE_ASSERT(valExp || valExpInt); // TODO: return -1 is better ?
+    if (valExp)
+      return valExp->get_value();
+    else
+      return valExpInt->get_value();
+  }
+
+  assert(0);
+}
+
+//! Calculate the number of elements of an array type
+size_t getArrayElementCount_GB(SgArrayType* t, SgPntrArrRefExp* ref)
+{
+  ROSE_ASSERT(t);
+
+  size_t result = getArrayDimCount(t, ref);
+
+  // consider multi dimensional case
+  SgArrayType* arraybase = isSgArrayType(t->get_base_type());
+  if (arraybase)
+    result = result * getArrayElementCount_GB(arraybase, isSgPntrArrRefExp(ref->get_rhs_operand()));
+
+  return result;
+} // getArrayElementCount()
+
+
 // Returns the offset of the given SgPntrArrRefExp relative to the starting point of its parent expression,
 // which may be a SgVarRefExp, SgDotExp, SgPntrArrRefExp or other expressions
 long long getPntrArrRefOffset(SgPntrArrRefExp* ref, CPConcreteKindPtr that) {
   //scope s(txt()<<"getPntrArrRefOffset("<<SgNode2Str(ref));
-  cout << "----------------------------------"<<endl;
+  /*cout << "----------------------------------"<<endl;
   cout << "getPntrArrRefOffset("<<SgNode2Str(ref)<<endl;
   cout << "rhs="<<SgNode2Str(ref->get_rhs_operand())<<endl;
   cout << "lhs="<<SgNode2Str(ref->get_lhs_operand())<<endl;
-  cout << "lhs type="<<SgNode2Str(ref->get_lhs_operand()->get_type())<<endl;
+  if(isSgVarRefExp(ref->get_lhs_operand())) {
+    cout << "decl="<<SgNode2Str(isSgVarRefExp(ref->get_lhs_operand())->get_symbol()->get_declaration())<<endl;
+    cout << "initializer="<<SgNode2Str(isSgVarRefExp(ref->get_lhs_operand())->get_symbol()->get_declaration()->get_initializer())<<endl;
+  }
+  cout << "lhs type="<<SgNode2Str(ref->get_lhs_operand()->get_type())<<endl;*/
 
   unsigned long long subArraySize;
   if(SgArrayType* arrType = isSgArrayType(ref->get_lhs_operand()->get_type())) {
-    cout << "   index="<<SgNode2Str(arrType->get_index())<<endl;
+    /*cout << "   index="<<SgNode2Str(arrType->get_index())<<endl;
     cout << "   dim="<<SgNode2Str(arrType->get_dim_info())<<"="<<arrType->get_dim_info()<<endl;
     cout << "   rank="<<arrType->get_rank()<<endl;
-    cout << "   eltCount="<<SageInterface::getArrayElementCount(arrType)<<endl;
-    cout << " that="<<that->str()<<endl;
+    cout << "   eltCount="<<getArrayElementCount_GB(arrType, ref)<<endl;
+    cout << " that="<<that->str()<<endl;*/
 
     // Compute the number of entries in the array of the current sub-level in the SgArrayType by
     // dividing the number of total entries in the current SgArrayType by the number of sub-arrays
     // in the next dimension.
-    assert(isSgValueExp(arrType->get_index()));
+    /*assert(isSgValueExp(arrType->get_index()));
     long long sTypeIdx;
     unsigned long long usTypeIdx;
     if(IsSignedConstInt(isSgValueExp(arrType->get_index()), sTypeIdx))
-      subArraySize = SageInterface::getArrayElementCount(arrType) / sTypeIdx;
+      subArraySize = getArrayElementCount_GB(arrType, ref) / sTypeIdx;
     else if(IsUnsignedConstInt(isSgValueExp(arrType->get_index()), usTypeIdx))
-      subArraySize = SageInterface::getArrayElementCount(arrType) / usTypeIdx;
+      subArraySize = getArrayElementCount_GB(arrType, ref) / usTypeIdx;
     else
       // The index in the array's type must be an integer of some sort
-      assert(0);
+      assert(0);*/
+    subArraySize = getArrayElementCount_GB(arrType, ref) / getArrayDimCount(arrType, ref);
   } else if(SgPointerType* paType = isSgPointerType(ref->get_lhs_operand()->get_type())) {
     subArraySize = 1;
   }
@@ -2436,7 +2502,9 @@ pair<bool, CPValueKindPtr> CPConcreteKind::meetUpdateAO(CPValueKindPtr that)
 // Computes the intersection of this and that and returns the resulting kind
 pair<bool, CPValueKindPtr> CPConcreteKind::intersectUpdateAO(CPValueKindPtr that)
 {
-  //scope s("CPConcreteKind::intersectUpdateV");
+  /*scope s("CPConcreteKind::intersectUpdateV");
+  dbg << "this="<<str()<<endl;
+  dbg << "that="<<that->str()<<endl;*/
   // Concrete Intersection Unknown => Concrete
   if(that->getKind() == CPValueKind::unknown) {
     //dbg << "that=>uninitialized"<<endl;
@@ -3915,7 +3983,7 @@ CPMemLocObjectPtr ConstantPropagationAnalysis::createBasicCPML(SgNode* n, PartEd
 void ConstantPropagationAnalysis::genInitLattice(PartPtr part, PartEdgePtr pedge, 
                                                  vector<Lattice*>& initLattices)
 {
-  SIGHT_VERB_DECL(scope, ("genInitLattice", scope::medium), 1, constantPropagationAnalysisDebugLevel)
+  //SIGHT_VERB_DECL(scope, ("genInitLattice", scope::medium), 1, constantPropagationAnalysisDebugLevel)
   
   AbstractObjectMap* ml2val = new AbstractObjectMap(boost::make_shared<CPValueLattice>(pedge),
                                                     pedge,
@@ -4001,7 +4069,7 @@ ValueObjectPtr ConstantPropagationAnalysis::Expr2Val(SgNode* n, PartEdgePtr pedg
     if(cpMap == NULL) {
       Lattice* l = useSSA? state->getLatticeBelow(this, NULLPartEdge, 0) :
                                 state->getLatticeBelow(this, pedge,        0);
-      SIGHT_VERB(dbg << "l="<<l->str()<<endl, 1, constantPropagationAnalysisDebugLevel)
+      SIGHT_VERB(dbg << "l="<<(l?l->str():"NULL")<<endl, 1, constantPropagationAnalysisDebugLevel)
     }
     assert(cpMap);
     

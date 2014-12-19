@@ -15,7 +15,7 @@ using namespace boost;
 
 namespace fuse {
 
-#define atsDebugLevel 0
+#define atsDebugLevel 1
 #define moduleProfile false
 
 /* ###########################
@@ -634,7 +634,7 @@ void SSAGraph::showDefsUses() {
 
 // Finds all the Parts where phi nodes should be placed and identifies the MemLocs they must define
 /*void SSAGraph::placePhiNodes() {
-  SIGHT_VERB_DECL(scope, ("placePhiNodes"), 1, atsDebugLevel)
+  SIGHT_VERB_DECL(scope, ("placePhiNodes"), 2, atsDebugLevel)
 
     { scope s2("def2use");
       for(map<SSAMemLocObjectPtr, set<SSAMemLocObjectPtr>  >::iterator i=def2use.begin(); i!=def2use.end(); i++) {
@@ -646,16 +646,16 @@ void SSAGraph::showDefsUses() {
 
   // Iterate over all the parts that are on the dominance frontier of some other parts
   for(map<PartPtr, set<PartPtr> >::iterator i=domFrontierOf.begin(); i!=domFrontierOf.end(); i++) {
-    SIGHT_VERB_DECL(scope, (txt()<<"Part "<<i->first->str()), 1, atsDebugLevel)
+    SIGHT_VERB_DECL(scope, (txt()<<"Part "<<i->first->str()), 2, atsDebugLevel)
     // We will place a Phi node at i->first that re-defines all the MemLocs defined at the nodes
     // that have i->first on their dominance frontier
 
     // Iterate over all the Parts that have i->first on their dominance frontiers
     for(set<PartPtr>::const_iterator j=i->second.begin(); j!=i->second.end(); j++) {
-      SIGHT_VERB_DECL(scope, (txt()<<"Frontier "<<(*j)->str()<<" #"<<defs[*j].size()), 1, atsDebugLevel)
+      SIGHT_VERB_DECL(scope, (txt()<<"Frontier "<<(*j)->str()<<" #"<<defs[*j].size()), 2, atsDebugLevel)
       // Iterate over all the MemLocs defined at Part j
       for(set<SSAMemLocObjectPtr>::iterator d=defs[*j].begin(); d!=defs[*j].end(); d++) {
-        SIGHT_VERB(dbg << "Live="<<(((*d)->baseML->isLive(i->first.get()->inEdgeFromAny(), comp, analysis)))<<" def="<<(*d)->str()<<endl, 1, atsDebugLevel)
+        SIGHT_VERB(dbg << "Live="<<(((*d)->baseML->isLive(i->first.get()->inEdgeFromAny(), comp, analysis)))<<" def="<<(*d)->str()<<endl, 2, atsDebugLevel)
         // If this def is live at i->first, add it as a phi definition at that Part
         if(((*d)->baseML->isLive(i->first.get()->inEdgeFromAny(), comp, analysis))) {
           // Insert into phiMLs[i->first] if no other node in the set denotes the same set as *d
@@ -848,19 +848,19 @@ int SSAGraph::getPhiNodeID(PartPtr part) {
 
 // Returns whether the given def terminates at the given phi node
 bool SSAGraph::defTerminatesAtPhiNode(PartPtr phiPart, SSAMemLocObjectPtr def) const {
-  SIGHT_VERB_DECL(scope, (txt()<<"defTerminatesAtPhiNode()"), 2, atsDebugLevel)
+  SIGHT_VERB_DECL(scope, (txt()<<"defTerminatesAtPhiNode()"), 3, atsDebugLevel)
 
   map<PartPtr, map<SSAMemLocObjectPtr, set<SSAMemLocObjectPtr> > >::const_iterator node=phiDefs.find(phiPart);
 
-  SIGHT_VERB(dbg << "phiPart(found="<<(node != phiDefs.end())<<")="<<phiPart->str()<<endl, 2, atsDebugLevel)
-  SIGHT_VERB(dbg << "def="<<def<<endl, 2, atsDebugLevel)
+  SIGHT_VERB(dbg << "phiPart(found="<<(node != phiDefs.end())<<")="<<phiPart->str()<<endl, 3, atsDebugLevel)
+  SIGHT_VERB(dbg << "def="<<def<<endl, 3, atsDebugLevel)
 
   // If this is not a phi node, def cannot terminate at it
   if(node == phiDefs.end()) return false;
 
   for(map<SSAMemLocObjectPtr, set<SSAMemLocObjectPtr> >::const_iterator group=node->second.begin(); group!=node->second.end(); ++group) {
     BOOST_FOREACH(const SSAMemLocObjectPtr& phiDef,  group->second) {
-      SIGHT_VERB(dbg << "def(equal="<<(def==phiDef)<<")="<<phiDef->str()<<endl, 2, atsDebugLevel);
+      SIGHT_VERB(dbg << "def(equal="<<(def==phiDef)<<")="<<phiDef->str()<<endl, 3, atsDebugLevel);
       // Return true if def matches the current def that terminates at this phi node
       if(def==phiDef) return true;
     }
@@ -967,7 +967,7 @@ bool SSAGraph::matchUseToDef(PartEdgePtr pedge, SSAMemLocObjectPtr use, SSAMemLo
   if(def->baseML->mustEqual(use->baseML, pedge, comp, analysis)) {
     // Connect the use of u to this def
     addDefUseLink(use, def);
-    SIGHT_VERB_IF(1, atsDebugLevel)
+    SIGHT_VERB_IF(2, atsDebugLevel)
     dbg << "must phi definition"<<endl;
     SIGHT_VERB_FI()
 
@@ -979,7 +979,7 @@ bool SSAGraph::matchUseToDef(PartEdgePtr pedge, SSAMemLocObjectPtr use, SSAMemLo
   } else if(def->baseML->mayEqual(use->baseML, pedge, comp, analysis)) {
     // Connect the use of u to this def
     addDefUseLink(use, def);
-    SIGHT_VERB_IF(1, atsDebugLevel)
+    SIGHT_VERB_IF(2, atsDebugLevel)
     dbg << "may phi definition"<<endl;
     SIGHT_VERB_FI()
 
@@ -1108,7 +1108,7 @@ void SSAGraph::assignDefAfterLiveDefs(list<pair<MemLocObjectPtr, set<SSAMemLocOb
 bool SSAGraph::mergeLiveDefs(list<pair<MemLocObjectPtr, set<SSAMemLocObjectPtr> > >& toLiveDefs,
                              list<pair<MemLocObjectPtr, set<SSAMemLocObjectPtr> > >& fromLiveDefs,
                              PartEdgePtr pedge) {
-  SIGHT_VERB_DECL(scope, ("mergeLiveDefs"), 2, atsDebugLevel)
+  SIGHT_VERB_DECL(scope, ("mergeLiveDefs"), 3, atsDebugLevel)
   bool modified = false;
   for(list<pair<MemLocObjectPtr, set<SSAMemLocObjectPtr> > >::iterator from=fromLiveDefs.begin(); from!=fromLiveDefs.end(); ++from) {
 /*    // Merge may only be called when propagating liveDefs to successor Parts at the end of a transfer
@@ -1123,7 +1123,7 @@ bool SSAGraph::mergeLiveDefs(list<pair<MemLocObjectPtr, set<SSAMemLocObjectPtr> 
     ROSE_ASSERT(from->second.size()==1);*/
 
     //SSAMemLocObjectPtr fromDef = *from->second.begin();
-    //SIGHT_VERB_DECL(scope, (txt()<<"fromDef="<<fromDef->str()), 2, atsDebugLevel)
+    //SIGHT_VERB_DECL(scope, (txt()<<"fromDef="<<fromDef->str()), 3, atsDebugLevel)
 
     // Find the groups in toLiveDefs that from overlaps. Since there may be multiple,
     // we collect them all into matchingDefs
@@ -1133,19 +1133,19 @@ bool SSAGraph::mergeLiveDefs(list<pair<MemLocObjectPtr, set<SSAMemLocObjectPtr> 
         matchingToLiveDefs.push_back(liveDef);
       }
     }
-    SIGHT_VERB(dbg << "#matchingToLiveDefs="<<matchingToLiveDefs.size()<<endl, 2, atsDebugLevel)
+    SIGHT_VERB(dbg << "#matchingToLiveDefs="<<matchingToLiveDefs.size()<<endl, 3, atsDebugLevel)
 
     // If this group in fromLiveDefs matches no groups in toLiveDefs, add a new one
     if(matchingToLiveDefs.size()==0) {
       toLiveDefs.push_back(make_pair(from->first->copyAOType(), from->second));
-      SIGHT_VERB(dbg << "Adding new group "<<from->first->str(), 2, atsDebugLevel)
+      SIGHT_VERB(dbg << "Adding new group "<<from->first->str(), 3, atsDebugLevel)
       modified = true;
 
     // Otherwise, if this group in fromLiveDefs matches exactly one group in toLiveDefs, add its SSAMemLocObjects to it
     } else if(matchingToLiveDefs.size()==1) {
-      SIGHT_VERB(dbg << "Adding reaching defs to existing group "<<from->first->str(), 2, atsDebugLevel)
+      SIGHT_VERB(dbg << "Adding reaching defs to existing group "<<from->first->str(), 3, atsDebugLevel)
 
-      SIGHT_VERB_IF(2, atsDebugLevel)
+      SIGHT_VERB_IF(3, atsDebugLevel)
       scope s("matchingToLiveDefs Before");
       for(set<SSAMemLocObjectPtr>::iterator match=(*matchingToLiveDefs.begin())->second.begin(); match!=(*matchingToLiveDefs.begin())->second.end(); ++match) {
         dbg << (*match)->str()<<endl;
@@ -1162,7 +1162,7 @@ bool SSAGraph::mergeLiveDefs(list<pair<MemLocObjectPtr, set<SSAMemLocObjectPtr> 
         // If the current match terminates at from
         if(fromDef->getAccess()==SSAMemLocObject::phiDef &&
            defTerminatesAtPhiNode(fromDef->loc, *match)) {
-          SIGHT_VERB(dbg << "    Current match terminated at fromDef match="<<(*match)->str()<<endl, 2, atsDebugLevel)
+          SIGHT_VERB(dbg << "    Current match terminated at fromDef match="<<(*match)->str()<<endl, 3, atsDebugLevel)
 
           // We'll replace match with from in (*matchingToLiveDefs.begin())->second, so remove match and advance
           (*matchingToLiveDefs.begin())->second.erase(match++);
@@ -1173,7 +1173,7 @@ bool SSAGraph::mergeLiveDefs(list<pair<MemLocObjectPtr, set<SSAMemLocObjectPtr> 
           ++match;
       }
 
-      SIGHT_VERB_IF(2, atsDebugLevel)
+      SIGHT_VERB_IF(3, atsDebugLevel)
       scope s("matchingToLiveDefs After");
       for(set<SSAMemLocObjectPtr>::iterator match=(*matchingToLiveDefs.begin())->second.begin(); match!=(*matchingToLiveDefs.begin())->second.end();  ++match) {
         dbg << (*match)->str()<<endl;
@@ -1186,12 +1186,12 @@ bool SSAGraph::mergeLiveDefs(list<pair<MemLocObjectPtr, set<SSAMemLocObjectPtr> 
         (*matchingToLiveDefs.begin())->second.insert(fromDef);
       }
       modified = modified || (origSize!=(*matchingToLiveDefs.begin())->second.size());
-      SIGHT_VERB(dbg << "    modified="<<modified<<", origSize="<<origSize<<", (*matchingToLiveDefs.begin())->second.size()="<<(*matchingToLiveDefs.begin())->second.size(), 2, atsDebugLevel)
+      SIGHT_VERB(dbg << "    modified="<<modified<<", origSize="<<origSize<<", (*matchingToLiveDefs.begin())->second.size()="<<(*matchingToLiveDefs.begin())->second.size(), 3, atsDebugLevel)
 
     // Otherwise, if this group in fromLiveDefs matches multiple groups in toLiveDefs, merge the groups in toLiveDefs
     // and add the from group to the merged group
     } else {
-      SIGHT_VERB(dbg << "Merging multiple to groups", 2, atsDebugLevel)
+      SIGHT_VERB(dbg << "Merging multiple to groups", 3, atsDebugLevel)
       // Points to the element of curLiveDefs into which the others will be merged
       list<list<pair<MemLocObjectPtr, set<SSAMemLocObjectPtr> > >::iterator>::iterator target = matchingToLiveDefs.begin();
       list<list<pair<MemLocObjectPtr, set<SSAMemLocObjectPtr> > >::iterator>::iterator m=target; ++m;
@@ -1217,7 +1217,7 @@ bool SSAGraph::mergeLiveDefs(list<pair<MemLocObjectPtr, set<SSAMemLocObjectPtr> 
 }
 
 void printLiveDefs(std::string label, const list<pair<MemLocObjectPtr, set<SSAMemLocObjectPtr> > >& curLiveDefs) {
-  SIGHT_VERB_IF(1, atsDebugLevel)
+  SIGHT_VERB_IF(2, atsDebugLevel)
   { scope s(label);
   for(list<pair<MemLocObjectPtr, set<SSAMemLocObjectPtr> > >::const_iterator group=curLiveDefs.begin(); group!=curLiveDefs.end(); ++group) {
     scope s(txt()<<"Group "<<group->first->str());
@@ -1232,26 +1232,26 @@ void printLiveDefs(std::string label, const list<pair<MemLocObjectPtr, set<SSAMe
 bool SSAGraph::equalLiveDefs(const list<pair<MemLocObjectPtr, set<SSAMemLocObjectPtr> > >& aLD,
                              const list<pair<MemLocObjectPtr, set<SSAMemLocObjectPtr> > >& bLD)
 {
-  if(aLD.size() != bLD.size()) { SIGHT_VERB(dbg << "different sizes;"<<endl, 2, atsDebugLevel) return false; }
+  if(aLD.size() != bLD.size()) { SIGHT_VERB(dbg << "different sizes;"<<endl, 3, atsDebugLevel) return false; }
 
   list<pair<MemLocObjectPtr, set<SSAMemLocObjectPtr> > >::const_iterator a=aLD.begin(), b=bLD.begin();
   for(; a!=aLD.end(); ++a, ++b) {
-    if(a->second.size() != b->second.size()) { SIGHT_VERB(dbg << "different sub-size in a->first="<<a->first->str()<<endl, 2, atsDebugLevel) return false; }
+    if(a->second.size() != b->second.size()) { SIGHT_VERB(dbg << "different sub-size in a->first="<<a->first->str()<<endl, 3, atsDebugLevel) return false; }
 
     set<SSAMemLocObjectPtr>::const_iterator aDef=a->second.begin(), bDef=b->second.begin();
     for(; aDef!=a->second.end(); ++aDef, ++bDef) {
-      if(*aDef != *bDef) { SIGHT_VERB(dbg << "different SSAML aDef="<<(*aDef)->str()<<", bDef="<<(*bDef)->str()<<endl, 2, atsDebugLevel) return false; }
+      if(*aDef != *bDef) { SIGHT_VERB(dbg << "different SSAML aDef="<<(*aDef)->str()<<", bDef="<<(*bDef)->str()<<endl, 3, atsDebugLevel) return false; }
     }
   }
 
-  SIGHT_VERB(dbg << "equal"<<endl, 2, atsDebugLevel)
+  SIGHT_VERB(dbg << "equal"<<endl, 3, atsDebugLevel)
   return true;
 }
 
 // Computes the mapping from MemLoc uses to their defs
 void SSAGraph::computeUse2Def() {
   SIGHT_DECL(module, (instance("computeUse2Def", 0, 0)), moduleProfile)
-  SIGHT_VERB_DECL(scope, ("computeUse2Def"), 2, atsDebugLevel)
+  SIGHT_VERB_DECL(scope, ("computeUse2Def"), 3, atsDebugLevel)
 
   // Maps each Part to set of MemLocs that were defined earlier than the Part and that
   // we're keeping track of to identify their definition points. The MemLocs are organized
@@ -1291,7 +1291,7 @@ void SSAGraph::computeUse2Def() {
     set<CFGNode> cfgNodes = part->CFGNodes();
     ROSE_ASSERT(cfgNodes.size()==1);
     CFGNode cn = *cfgNodes.begin();
-    SIGHT_VERB_DECL(scope, (txt()<<"part "<<part->str()), 2, atsDebugLevel)
+    SIGHT_VERB_DECL(scope, (txt()<<"part "<<part->str()), 3, atsDebugLevel)
 
 
     module* iterMod;
@@ -1320,7 +1320,7 @@ void SSAGraph::computeUse2Def() {
                                                 "label", label)))),
                    iterMod, moduleProfile)
 
-    SIGHT_VERB(printLiveDefs("inLiveDefs", inLiveDefs[part]), 2, atsDebugLevel)
+    SIGHT_VERB(printLiveDefs("inLiveDefs", inLiveDefs[part]), 3, atsDebugLevel)
 
     // The liveDefs set we'll propagate to this part's successors
     // Initialize outLiveDefs from inLiveDefs
@@ -1340,20 +1340,20 @@ void SSAGraph::computeUse2Def() {
     // --------------------------------------
     // If any grouping of defs in curLiveDefs contains more than one SSAMemLoc, there is ambiguity about
     // the definitions reaching this ATS node. We therefore place a phi node immediately before it.
-    { SIGHT_VERB_DECL(scope, ("Phi Node Detection"), 2, atsDebugLevel)
+    { SIGHT_VERB_DECL(scope, ("Phi Node Detection"), 3, atsDebugLevel)
     // Collects iterators to all the def groups that are ambiguous
     list<list<pair<MemLocObjectPtr, set<SSAMemLocObjectPtr> > >::iterator> ambiguousMemLocs;
     for(list<pair<MemLocObjectPtr, set<SSAMemLocObjectPtr> > >::iterator liveD=curLiveDefs.begin(); liveD!=curLiveDefs.end(); ++liveD) {
       if(liveD->second.size()>1) ambiguousMemLocs.push_back(liveD);
     }
-    SIGHT_VERB(dbg << "#ambiguousMemLocs="<<ambiguousMemLocs.size()<<endl, 2, atsDebugLevel)
+    SIGHT_VERB(dbg << "#ambiguousMemLocs="<<ambiguousMemLocs.size()<<endl, 3, atsDebugLevel)
 
     // For each ambiguous grouping
     for(list<list<pair<MemLocObjectPtr, set<SSAMemLocObjectPtr> > >::iterator>::iterator aml=ambiguousMemLocs.begin(); aml!=ambiguousMemLocs.end(); ++aml) {
-      SIGHT_VERB_DECL(scope, (txt()<<"Ambiguous: "<<(*aml)->first->str()), 2, atsDebugLevel)
+      SIGHT_VERB_DECL(scope, (txt()<<"Ambiguous: "<<(*aml)->first->str()), 3, atsDebugLevel)
       // Create a phiDef at this ATS node
       SSAMemLocObjectPtr phiDef = makePtr<SSAMemLocObject>((*aml)->first, part, (SgNode*)NULL, SSAMemLocObject::phiDef, phiDefs[part].size());
-      SIGHT_VERB(dbg << "phiDef="<<phiDef->str()<<endl, 2, atsDebugLevel)
+      SIGHT_VERB(dbg << "phiDef="<<phiDef->str()<<endl, 3, atsDebugLevel)
       phiDefs[part][phiDef] = (*aml)->second;
 
       // Replace the grouping in curLiveDefs with the MemLoc defined at this phiNode
@@ -1363,7 +1363,7 @@ void SSAGraph::computeUse2Def() {
     SIGHT(iterMod->setInCtxt(1, context("numAmbiguousMLs", (int)ambiguousMemLocs.size(),
                                         "numPhiDefs",      (int)phiDefs[part].size())),
           moduleProfile)
-    SIGHT_VERB(dbg << "#phiDefs[part]="<<phiDefs[part].size()<<endl, 2, atsDebugLevel)
+    SIGHT_VERB(dbg << "#phiDefs[part]="<<phiDefs[part].size()<<endl, 3, atsDebugLevel)
     }
 
     // NOTE: We place phi nodes based on ambiguity about reaching defs and not based on control ambiguity.
@@ -1380,13 +1380,13 @@ void SSAGraph::computeUse2Def() {
     // --------------------------------------
 
     // Find any uses at the current part that overlap the defs in curLiveDefs and match them to each other
-    { SIGHT_VERB_DECL(scope, ("Matching uses to defs"), 2, atsDebugLevel)
+    { SIGHT_VERB_DECL(scope, ("Matching uses to defs"), 3, atsDebugLevel)
     if(uses.find(part)!=uses.end()) {
       int numUsesConnected=0;
       for(set<SSAMemLocObjectPtr>::iterator u=uses[part].begin(); u!=uses[part].end(); u++) {
-        SIGHT_VERB(dbg << "use="<<(*u)->str()<<endl, 2, atsDebugLevel)
+        SIGHT_VERB(dbg << "use="<<(*u)->str()<<endl, 3, atsDebugLevel)
         for(list<pair<MemLocObjectPtr, set<SSAMemLocObjectPtr> > >::iterator group=curLiveDefs.begin(); group!=curLiveDefs.end(); ++group) {
-          SIGHT_VERB_DECL(scope, (txt()<<"Def group"<<group->first->str(), scope::low), 2, atsDebugLevel)
+          SIGHT_VERB_DECL(scope, (txt()<<"Def group"<<group->first->str(), scope::low), 3, atsDebugLevel)
           if(group->first->mayEqual((*u)->baseML, pedge, comp, analysis)) {
             // We've processed any ambiguity at the phi def code above, so there should only be 1 SSAMemLocObject at each group
             ROSE_ASSERT(group->second.size()==1);
@@ -1395,7 +1395,7 @@ void SSAGraph::computeUse2Def() {
             //addDefUseLink(*u, *group->second.begin());
             use2def[*u].insert(*group->second.begin());
             SIGHT(++numUsesConnected, moduleProfile)
-            SIGHT_VERB(dbg << "Use Matched"<<endl, 2, atsDebugLevel)
+            SIGHT_VERB(dbg << "Use Matched"<<endl, 3, atsDebugLevel)
           }
         }
       }
@@ -1416,7 +1416,7 @@ void SSAGraph::computeUse2Def() {
         ROSE_ASSERT(group->second.size()==1);
 
         if(!(group->first->isLive(pedge, comp, analysis))) {
-          SIGHT_VERB(dbg << "erasing dead "<<group->first->str()<<endl, 2, atsDebugLevel)
+          SIGHT_VERB(dbg << "erasing dead "<<group->first->str()<<endl, 3, atsDebugLevel)
           curLiveDefs.erase(group++);
           SIGHT(++numDeadErased, moduleProfile)
         } else
@@ -1438,7 +1438,7 @@ void SSAGraph::computeUse2Def() {
     // Pass curLiveDefs to all of this part's successors
     list<PartEdgePtr> out = part->outEdges();
     if(part->mustOutgoingFuncCall()) {
-      SIGHT_VERB_DECL(scope, ("Matching incoming call"), 2, atsDebugLevel)
+      SIGHT_VERB_DECL(scope, ("Matching incoming call"), 3, atsDebugLevel)
       set<PartPtr> inCall = part->matchingCallParts();
       for(set<PartPtr>::iterator in=inCall.begin(); in!=inCall.end(); in++)
         out.push_back((*in)->inEdgeFromAny());
@@ -1446,9 +1446,9 @@ void SSAGraph::computeUse2Def() {
     SIGHT(iterMod->setInCtxt(4, context("numOutEdges", (int)out.size())),
           moduleProfile)
 
-    { SIGHT_VERB_DECL(scope, ("Successors"), 2, atsDebugLevel)
+    { SIGHT_VERB_DECL(scope, ("Successors"), 3, atsDebugLevel)
     for(list<PartEdgePtr>::iterator e=out.begin(); e!=out.end(); e++) {
-      SIGHT_VERB(dbg << "succ "<<(*e)->target()->str()<<endl, 2, atsDebugLevel)
+      SIGHT_VERB(dbg << "succ "<<(*e)->target()->str()<<endl, 3, atsDebugLevel)
 
       // Propagate curLiveDefs to one of the incoming edges of the current successor
       edgeLiveDefs[*e] = curLiveDefs;
@@ -1458,8 +1458,8 @@ void SSAGraph::computeUse2Def() {
       succIn.push_back((*e)->target()->inEdgeFromAny());
       list<pair<MemLocObjectPtr, set<SSAMemLocObjectPtr> > > newInLiveDefs;
       for(list<PartEdgePtr>::iterator inE=succIn.begin(); inE!=succIn.end(); ++inE) {
-        SIGHT_VERB(dbg << "inE="<<(*inE)->str()<<endl, 2, atsDebugLevel)
-        SIGHT_VERB(printLiveDefs(txt()<<"edgeLiveDefs[*inE]", edgeLiveDefs[*inE]), 2, atsDebugLevel)
+        SIGHT_VERB(dbg << "inE="<<(*inE)->str()<<endl, 3, atsDebugLevel)
+        SIGHT_VERB(printLiveDefs(txt()<<"edgeLiveDefs[*inE]", edgeLiveDefs[*inE]), 3, atsDebugLevel)
 
         if(inE==succIn.begin()) newInLiveDefs = edgeLiveDefs[*inE];
         else mergeLiveDefs(newInLiveDefs, edgeLiveDefs[*inE], *inE);
@@ -1470,7 +1470,7 @@ void SSAGraph::computeUse2Def() {
       bool modified = !equalLiveDefs(inLiveDefs[(*e)->target()], newInLiveDefs);
       inLiveDefs[(*e)->target()] = newInLiveDefs;
 
-      SIGHT_VERB(dbg << "modified="<<modified<<endl, 2, atsDebugLevel)
+      SIGHT_VERB(dbg << "modified="<<modified<<endl, 3, atsDebugLevel)
 
       //bool modified = mergeLiveDefs(inLiveDefs[(*e)->target()], curLiveDefs, pedge);
 
@@ -1484,10 +1484,10 @@ void SSAGraph::computeUse2Def() {
     }
 
     /*if(part->mustOutgoingFuncCall()) {
-      SIGHT_VERB_DECL(scope, ("Matching incoming call"), 2, atsDebugLevel)
+      SIGHT_VERB_DECL(scope, ("Matching incoming call"), 3, atsDebugLevel)
       set<PartPtr> inCall = part->matchingCallParts();
       for(set<PartPtr>::iterator in=inCall.begin(); in!=inCall.end(); in++) {
-        SIGHT_VERB(dbg << "in "<<in->str()<<endl, 2, atsDebugLevel)
+        SIGHT_VERB(dbg << "in "<<in->str()<<endl, 3, atsDebugLevel)
 
         bool modified = mergeLiveDefs(inLiveDefs[*in], curLiveDefs, pedge);
 
@@ -1509,7 +1509,7 @@ void SSAGraph::computeUse2Def() {
 
 /*// Computes the mapping from MemLoc uses to their defs
 void SSAGraph::computeUse2Def() {
-  SIGHT_VERB_DECL(scope, ("computeUse2Def"), 1, atsDebugLevel)
+  SIGHT_VERB_DECL(scope, ("computeUse2Def"), 2, atsDebugLevel)
 
   // Maps each Part to set of MemLocs that were used later than the Part and that
   // we're keeping track of to identify their definition points.
@@ -1532,7 +1532,7 @@ void SSAGraph::computeUse2Def() {
     set<CFGNode> cfgNodes = part->CFGNodes();
     ROSE_ASSERT(cfgNodes.size()==1);
     CFGNode cn = *cfgNodes.begin();
-    SIGHT_VERB_DECL(scope, (txt()<<"part "<<part->str()), 1, atsDebugLevel)
+    SIGHT_VERB_DECL(scope, (txt()<<"part "<<part->str()), 2, atsDebugLevel)
 
     // The liveUses set we'll propagate to this part's predecessors
     set<SSAMemLocObjectPtr> predLiveUses;
@@ -1545,33 +1545,33 @@ void SSAGraph::computeUse2Def() {
     }
 
     // Remove from liveUses any that have been defined at the current part
-    SIGHT_VERB(dbg << "Removing def-ed uses"<<endl, 1, atsDebugLevel)
+    SIGHT_VERB(dbg << "Removing def-ed uses"<<endl, 2, atsDebugLevel)
     for(set<SSAMemLocObjectPtr>::iterator u=predLiveUses.begin(); u!=predLiveUses.end(); ) {
       set<SSAMemLocObjectPtr>::iterator nextU=u; ++nextU;
 
-      SIGHT_VERB_DECL(scope, (txt()<<"Use "<<(*u)->str(), scope::low), 1, atsDebugLevel)
+      SIGHT_VERB_DECL(scope, (txt()<<"Use "<<(*u)->str(), scope::low), 2, atsDebugLevel)
       bool curErased=false;
       if(defs.find(part)!=defs.end()) {
         for(set<SSAMemLocObjectPtr>::iterator d=defs[part].begin(); d!=defs[part].end(); d++) {
-          SIGHT_VERB(dbg << "def="<<(*d)->str()<<endl, 1, atsDebugLevel)
+          SIGHT_VERB(dbg << "def="<<(*d)->str()<<endl, 2, atsDebugLevel)
           curErased = matchUseToDef(state.getPartEdge(), *u, *d, predLiveUses);
           if(curErased) goto U_OVERWRITTEN;
         }
       }
 
       if(phiMLs.find(part)!=phiMLs.end()) {
-        SIGHT_VERB(dbg << "Phi Node"<<endl, 1, atsDebugLevel)
+        SIGHT_VERB(dbg << "Phi Node"<<endl, 2, atsDebugLevel)
         for(set<SSAMemLocObjectPtr>::iterator ml=phiMLs[part].begin(); ml!=phiMLs[part].end(); ml++) {
-          SIGHT_VERB(dbg << "phiAccess="<<(*ml)->str()<<endl, 1, atsDebugLevel)
+          SIGHT_VERB(dbg << "phiAccess="<<(*ml)->str()<<endl, 2, atsDebugLevel)
           curErased = matchUseToDef(state.getPartEdge(), *u, *ml, predLiveUses);
           if(curErased) goto U_OVERWRITTEN;
         }
       }
 
       if(funcArgDefs.find(part)!=funcArgDefs.end()) {
-        SIGHT_VERB(dbg << "Func Argument Defs"<<endl, 1, atsDebugLevel)
+        SIGHT_VERB(dbg << "Func Argument Defs"<<endl, 2, atsDebugLevel)
         for(list<SSAMemLocObjectPtr>::iterator d=funcArgDefs[part].begin(); d!=funcArgDefs[part].end(); d++) {
-          SIGHT_VERB(dbg << "argument="<<(*d)->str()<<endl, 1, atsDebugLevel)
+          SIGHT_VERB(dbg << "argument="<<(*d)->str()<<endl, 2, atsDebugLevel)
           curErased = matchUseToDef(state.getPartEdge(), *u, *d, predLiveUses);
           if(curErased) goto U_OVERWRITTEN;
         }
@@ -1601,7 +1601,7 @@ void SSAGraph::computeUse2Def() {
     // Remove from predLiveUses all the MemLocs that are dead at this Part
     for(set<SSAMemLocObjectPtr>::iterator u=predLiveUses.begin(); u!=predLiveUses.end(); ) {
       if(!((*u)->baseML->isLive(state.getPartEdge(), comp, analysis))) {
-        SIGHT_VERB(dbg << "erasing dead "<<(*u)->str()<<endl, 1, atsDebugLevel)
+        SIGHT_VERB(dbg << "erasing dead "<<(*u)->str()<<endl, 2, atsDebugLevel)
         predLiveUses.erase(u++);
       } else
         ++u;
@@ -1656,7 +1656,7 @@ void SSAGraph::computeUse2Def() {
     }
 
 
-    SIGHT_VERB_IF(1, atsDebugLevel)
+    SIGHT_VERB_IF(2, atsDebugLevel)
     { scope s("predLiveUses");
     for(set<SSAMemLocObjectPtr>::iterator u=predLiveUses.begin(); u!=predLiveUses.end(); ++u) {
       dbg << (*u)->str()<<endl;
@@ -1665,9 +1665,9 @@ void SSAGraph::computeUse2Def() {
 
     // Pass predLiveUses and exitedFParamsUses to all of this part's predecessors
     list<PartEdgePtr> in = part->inEdges();
-    { SIGHT_VERB_DECL(scope, ("predecessors"), 1, atsDebugLevel)
+    { SIGHT_VERB_DECL(scope, ("predecessors"), 2, atsDebugLevel)
     for(list<PartEdgePtr>::iterator e=in.begin(); e!=in.end(); e++) {
-      SIGHT_VERB(dbg << "pred "<<(*e)->source()->str()<<endl, 1, atsDebugLevel)
+      SIGHT_VERB(dbg << "pred "<<(*e)->source()->str()<<endl, 2, atsDebugLevel)
       liveUses[(*e)->source()] = predLiveUses;
       exitedFParamsUses[(*e)->source()] = exitedFParamsUses[part];
     }
@@ -1680,6 +1680,7 @@ void SSAGraph::computeUse2Def() {
 void SSAGraph::showUse2Def() {
   ostringstream dot;
 
+  SIGHT_VERB_IF(2, atsDebugLevel)
   { scope s1("use2def");
   for(map<SSAMemLocObjectPtr, set<SSAMemLocObjectPtr>  >::iterator i=use2def.begin(); i!=use2def.end(); i++) {
     scope s(i->first->str());
@@ -1694,6 +1695,7 @@ void SSAGraph::showUse2Def() {
     for(set<SSAMemLocObjectPtr>::iterator j=i->second.begin(); j!=i->second.end(); j++)
       dbg << "    "<<(*j)->str()<<endl;
   } }
+  SIGHT_VERB_FI()
 
   dot << "digraph Use2Def {"<<endl;
 
@@ -1773,28 +1775,28 @@ void SSAGraph::buildSSA() {
   {
   SIGHT_DECL(module, (instance("buildSSA", 0, 0)), moduleProfile)
 
-  SIGHT_VERB_DECL(scope, ("buildSSA", scope::high), 1, atsDebugLevel)
+  SIGHT_VERB_DECL(scope, ("buildSSA", scope::high), 2, atsDebugLevel)
 
   /*getDominatorTree();
-  SIGHT_VERB_IF(1, atsDebugLevel)
+  SIGHT_VERB_IF(2, atsDebugLevel)
   scope s("Dominator Tree");
   showDominatorTree();
   SIGHT_VERB_FI()
 
   calculateDominanceFrontiers();
-  SIGHT_VERB_IF(1, atsDebugLevel)
+  SIGHT_VERB_IF(2, atsDebugLevel)
   scope s("Dominance Frontier");
   showDominanceFrontier();
   SIGHT_VERB_FI()*/
 
   collectDefsUses();
-  SIGHT_VERB_IF(1, atsDebugLevel)
+  SIGHT_VERB_IF(2, atsDebugLevel)
   scope s("DefsUses");
   showDefsUses();
   SIGHT_VERB_FI()
 
   /*placePhiNodes();
-  SIGHT_VERB_IF(1, atsDebugLevel)
+  SIGHT_VERB_IF(2, atsDebugLevel)
   scope s("Phi Nodes");
   showPhiNodes();
   SIGHT_VERB_FI()*/

@@ -49,80 +49,6 @@ bool AbstractObject::isMappedAO()
   return false;
 }
 
-/*
- // Simple equality test that just checks whether the two objects correspond to the same expression
- bool AbstractObject::mustEqualExpr(AbstractObjectPtr o, PartEdgePtr pedge)
- {
- // GREG: I'm not sure if this is actually valid since the same expression can denote different sets at different loop iterations
-
- // If both AbstractObjects have non-NULL bases, we can tell that they're must-equal by simply confirming
- // that their bases are equal
- if(base && o->base && base==o->base) {
- dbg << "AbstractObject::mustEqualExpr() base="<<SgNode2Str(base)<<" o->base="<<SgNode2Str(o->base)<<endl;
- return true;
- // Otherwise, we don't know and must answer conservatively
- } else return false;
- }*/
-
-// General versions of equalSet() that accounts for framework details before routing the call to the 
-// derived class' equalSet() check. Specifically, it routes the call through the composer to make 
-// sure the equalSet() call gets the right PartEdge.
-/*bool AbstractObject::equalSet(AbstractObjectPtr that, PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis)
- {
- / * GB 2013-09-16 - No longer checking for equality to FuncResultMemLocObject since the FuncResultMemRegionObject
- *                 checks for this correctly on its own. We may return this code if we discover that checking this
- *                 early before we propagate the query through the composer is an important performance gain.
- * // If either this or that are FuncResultMemLocObject, they denote the same set if they both are
- if(isMemLocObject() && that->isMemLocObject()) {
- MemLocObject*   thisML = dynamic_cast<MemLocObject*>(this);
- MemLocObjectPtr thatML = boost::dynamic_pointer_cast<MemLocObject*>(that);
-
- FuncResultMemRegionObject* frmlcoThis  = dynamic_cast<FuncResultMemLocObject*>(thisML->getRegion());
- FuncResultMemRegionObjectPtr frmlcoThat = boost::dynamic_pointer_cast<FuncResultMemLocObject>(thatML->getRegion());
- if(frmlcoThis) return frmlcoThat;
- else if(frmlcoThat) return false;
-
- } else if(isMemRegionObject() && that->isMemRegionObject()) {
- MemRegionObject*   thisMR = dynamic_cast<MemRegionObject*>(this);
- MemRegionObjectPtr thatMR = boost::dynamic_pointer_cast<MemRegionObject*>(that);
-
- // If either this or that are FuncResultMemLocObject, they denote the same set if they both are
- FuncResultMemRegionObject* frmlcoThis  = dynamic_cast<FuncResultMemLocObject*>(thisMR);
- FuncResultMemRegionObjectPtr frmlcoThat = boost::dynamic_pointer_cast<FuncResultMemLocObject>(thatMR);
- if(frmlcoThis) return frmlcoThat;
- else if(frmlcoThat) return false;
- }* /
-
- return comp->equalSet(shared_from_this(), that, pedge, analysis);
- }*/
-
-// General versions of equalSet() that accounts for framework details before routing the call to the 
-// derived class' subSet() check. Specifically, it routes the call through the composer to make 
-// sure the subSet() call gets the right PartEdge.
-/*bool AbstractObject::subSet(AbstractObjectPtr that, PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis)
- {
- / * GB 2013-09-16 - No longer checking for equality to FuncResultMemLocObject since the FuncResultMemRegionObject
- *                 checks for this correctly on its own. We may return this code if we discover that checking this
- *                 early before we propagate the query through the composer is an important performance gain.
- if(isMemLocObject() && that->isMemLocObject()) {
- // If either this or that are FuncResultMemLocObject, they denote the same set if they both are
- FuncResultMemLocObject* frmlcoThis  = dynamic_cast<FuncResultMemLocObject*>(this);
- FuncResultMemLocObjectPtr frmlcoThat = boost::dynamic_pointer_cast<FuncResultMemLocObject>(that);
- if(frmlcoThis) return frmlcoThat;
- else if(frmlcoThat) return false;
- }* /
- return comp->subSet(shared_from_this(), that, pedge, analysis);
- }*/
-
-/*// General versions of isFull() and isEmpty that account for framework details before routing the call to the
- // derived class' isFull() and isEmpty()  check. Specifically, it routes the call through the composer to make
- // sure the isFull(PartEdgePtr) and isEmpty(PartEdgePtr) call gets the right PartEdge.
- bool AbstractObject::isFull(PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis)
- { return comp->isFull(shared_from_this(), pedge, analysis); }
-
- bool AbstractObject::isEmpty(PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis)
- { return comp->isEmpty(shared_from_this(), pedge, analysis); }*/
-
 /*******************
  ***** hierKey *****
  *******************/
@@ -1286,8 +1212,12 @@ bool MappedAbstractObject<Key, AOSubType, type, MappedAOSubType>::membersIsHiera
 // set hierarchy.
 template<class Key, class AOSubType, AbstractObject::AOType type, class MappedAOSubType>
 const AbstractionHierarchy::hierKeyPtr& MappedAbstractObject<Key, AOSubType, type, MappedAOSubType>::getHierKey() const {
+  assert(aoMap.size()==1);
+  scope s("MappedAbstractObject<Key, AOSubType, type, MappedAOSubType>::getHierKey()");
+  dbg << "aoMap.begin()->second="<<aoMap.begin()->second->str()<<endl;
+  assert(aoMap.begin()->second->isHierarchy());
+
   if(aoMap.size()==1 && aoMap.begin()->second->isHierarchy()) return aoMap.begin()->second->getHierKey();
-  else assert(0);
 }
 //  // The intersection of multiple objects is just a filtering process from the full
 //  // set of objects to the exact one, with each key in the hierarchy further filtering
@@ -2223,558 +2153,9 @@ string FullCodeLocObject::str(string indent) const {
 //  exampleCombinedCodeLocObjects(cl, cls);
 //}
 
-/* ###############################
-     ##### MappedCodeLocObject   #####
-     ############################### */
-
-//  template<class Key>
-//  SgNode* MappedCodeLocObject<Key>::getBase() const {
-//    // Returns the base SgNode shared by all the MemLocs in this object or NULL, if the base SgNodes are different
-//    SgNode* base = NULL;
-//    for (typename map<Key, CodeLocObjectPtr>::const_iterator it =
-//        aoMap.begin(); it != aoMap.end(); ++it) {
-//      if (it == aoMap.begin())
-//        base = it->second->getBase();
-//      else if (base != it->second->getBase())
-//        return NULL;
-//    }
-//
-//    return base;
-//  }
-//
-//  template<class Key>
-//  void MappedCodeLocObject<Key>::add(Key key,
-//      CodeLocObjectPtr cl_p, PartEdgePtr pedge, Composer* comp,
-//      ComposedAnalysis* analysis) {
-//    // If the object is already full don't add anything
-//    if (isUnion() && isFullAO(pedge))
-//      return;
-//
-//    // If the cl_p is not full add/update the map
-//    if (!cl_p->isFullAO(pedge)) {
-//      aoMap[key] = cl_p;
-//    } else {
-//      nFull++;
-//      if (isUnion())
-//        setCLToFull();
-//    }
-//  }
-//
-//  template<class Key>
-//  bool MappedCodeLocObject<Key>::mayEqualCLWithKey(Key key,
-//      const map<Key, CodeLocObjectPtr>& thatCLMap, PartEdgePtr pedge) {
-//    typename map<Key, CodeLocObjectPtr>::const_iterator s_it;
-//    s_it = thatCLMap.find(key);
-//    if (s_it == thatCLMap.end())
-//      return true;
-//    return aoMap[key]->mayEqualAO(s_it->second, pedge);
-//  }
-//
-////! Two CL objects are may equals if there is atleast one execution or sub-exectuion
-////! in which they represent the same code location.
-////! Analyses are conservative as they start with full set of executions.
-////! Dataflow facts (predicates) shrink the set of sub-executions.
-////! We do not explicity store set of sub-executions and they are described 
-////! by the abstract objects computed from dataflow fact exported by the analysis.
-////! Unless the analyses discover otherwise, the conservative answer for mayEqualCL is true.
-////! Mapped CLs are keyed using either ComposedAnalysis* or PartEdgePtr.
-////! Each keyed CL object correspond to some dataflow facts computed by Key=Analysis* or 
-////! computed at Key=PartEdgePtrthat describes some sets of executions.
-////! MayEquality check on mapped CL is performed on intersection of sub-executions
-////! or union of sub-executions over the keyed CL objects.
-//  template<class Key>
-//  bool MappedCodeLocObject<Key>::mayEqualAO(
-//      CodeLocObjectPtr thatCL, PartEdgePtr pedge) {
-//    boost::shared_ptr<MappedCodeLocObject<Key> > thatCL_p =
-//        boost::dynamic_pointer_cast<MappedCodeLocObject<Key> >(
-//            thatCL);
-//    assert(thatCL_p);
-//
-//    // This object denotes full set of CL (full set of executions)
-//    if (isFullAO(pedge))
-//      return true;
-//
-//    // denotes empty set
-//    if (isEmptyAO(pedge))
-//      return false;
-//
-//    // presence of one more full objects will result in full set over union
-//    if (isUnion() && nFull > 0)
-//      return true;
-//
-//    // Two cases reach here [1] isUnion()=true && nFull_CL=0 [2] intersect=true && nFullCL=0 or nFull_CL!=0.
-//    // For both cases iterate on the CL map and discharge the mayEqualCL query to individual objects
-//    // which are answered based on its set of sub-executions (or its dataflow facts) computed by the corresponding analysis.
-//    const map<Key, CodeLocObjectPtr> thatCLMap = thatCL_p->getCodeLocsMap();
-//    typename map<Key, CodeLocObjectPtr>::iterator it;
-//    for (it = aoMap.begin(); it != aoMap.end(); ++it) {
-//      // discharge query
-//      bool isMayEq = mayEqualCLWithKey(it->first, thatCLMap, pedge);
-//
-//      // 1. Union of sub-executions and the object does not contain any full objects.
-//      // If the discharged query comes back as true for this case then we have found atleast one execution
-//      // under which the two objects are same and the set can only grow and the result of this query is not going
-//      // to change due to union.
-//      // If false we iterate further as any CL can add more executions under which the objects are may equals.
-//      if (isUnion() && isMayEq == true)
-//        return true;
-//
-//      // 2. Intersection of sub-executions and the object may contain full objects (nFull != 0).
-//      // The sub-executions are intersected and therefore it does not matter if we have full objects.
-//      // If the discharged query returns false then return false.
-//      // We did not find one execution in which the two objects are may equals.
-//      // Note that set of executions are contained over keyed objects (analyses are conservative).
-//      // This set only shrinks during intersection and it is not going to affect the result of this query.
-//      // If it returns true iterate further as some executions corresponding to true may be dropped.
-//      else if (isIntersection() && isMayEq == false)
-//        return false;
-//    }
-//
-//    // All the keyed objects returned false for the discharged query under union.
-//    // We haven't found a single execution under which the two objects are may equals.
-//    if (isUnion())
-//      return false;
-//    // All the keyed objects returned true for the discharged query under intersection.
-//    // We have atleast one execution in common in which the two objects are may equals.
-//    else if (isIntersection())
-//      return true;
-//    else
-//      assert(0);
-//  }
-//
-//  template<class Key>
-//  bool MappedCodeLocObject<Key>::mustEqualCLWithKey(Key key,
-//      const map<Key, CodeLocObjectPtr>& thatCLMap, PartEdgePtr pedge) {
-//    typename map<Key, CodeLocObjectPtr>::const_iterator s_it;
-//    s_it = thatCLMap.find(key);
-//    if (s_it == thatCLMap.end())
-//      return false;
-//    return aoMap[key]->mustEqualAO(s_it->second, pedge);
-//  }
-//
-////! Two CL objects are must equals if they represent the same code
-////! location on all executions.
-////! Analyses are conservative as they start with full set of executions.
-////! Dataflow facts (predicates) shrink the set of sub-executions.
-////! We do not explicity store set of sub-executions and they are described
-////! by the abstract objects computed from dataflow fact exported by the analysis.
-////! Unless the analyses discover otherwise conservative answer for mustEqualCL is false.
-////! Mapped CLs are keyed using either ComposedAnalysis* or PartEdgePtr.
-////! Each keyed CL object correspond to some dataflow facts computed by Key=Analysis* or
-////! computed at Key=PartEdgePtrthat describes some sets of executions.
-////! MustEquality check on mapped CL is performed on intersection (mostAccurate=true) of sub-executions
-////! or union (mostAccurate=false) of sub-executions over the keyed CL objects.
-//  template<class Key>
-//  bool MappedCodeLocObject<Key>::mustEqualAO(
-//      CodeLocObjectPtr thatCL, PartEdgePtr pedge) {
-//    boost::shared_ptr<MappedCodeLocObject<Key> > thatCL_p =
-//        boost::dynamic_pointer_cast<MappedCodeLocObject<Key> >(
-//            thatCL);
-//    assert(thatCL_p);
-//
-//    // This object denotes full set of CL (full set of executions)
-//    if (isFullAO(pedge))
-//      return false;
-//
-//    // denotes empty set
-//    if (isEmptyAO(pedge))
-//      return false;
-//
-//    // presence of one more full objects will result in full set over union
-//    if (isUnion() && nFull > 0)
-//      return true;
-//
-//    // Two cases reach here [1] isUnion()=true && nFull_CL=0 [2] intersect=true && nFullCL=0 or nFull_CL!=0.
-//    // For both cases iterate on the CL map and discharge the mayEqualCL query to individual objects
-//    // which are answered based on its set of sub-executions (or its dataflow facts) computed by the corresponding analysis.
-//    const map<Key, CodeLocObjectPtr> thatCLMap = thatCL_p->getCodeLocsMap();
-//    typename map<Key, CodeLocObjectPtr>::iterator it;
-//    for (it = aoMap.begin(); it != aoMap.end(); ++it) {
-//      // discharge query
-//      bool isMustEq = mustEqualCLWithKey(it->first, thatCLMap, pedge);
-//
-//      // 1. Union of sub-executions and the object does not contain any full objects
-//      // If the discharged query comes back as false for this case then we have found atleast one execution
-//      // under which the two objects are not same and the set can only grow and the result of this query is not going
-//      // to change due to union.
-//      // If it returns true we iterate further as any CL can add more executions under which the objects are not must equals.
-//      if (isUnion() && isMustEq == false)
-//        return false;
-//
-//      // 2. Intersection of sub-executions and the object may contain full objects (nFull != 0).
-//      // The sub-executions are intersected and therefore it does not matter if we have full objects.
-//      // If the discharged query returns true then return true.
-//      // Under all sub-executions (corresponding to the CL) the two objects must equal.
-//      // Note that set of executions are contained over keyed objects as the analyses are conservative.
-//      // This set only shrinks during intersection and it is not going to affect the result of this query.
-//      // If it returns false iterate further as some executions corresponding to false may be dropped.
-//      else if (isIntersection() && isMustEq == true)
-//        return true;
-//    }
-//
-//    // All the keyed objects returned true for the discharged query under union.
-//    // We haven't found a single execution under which the two objects are not equal.
-//    if (isUnion())
-//      return true;
-//    // All the keyed objects returned false for the discharged query under intersection.
-//    // We have atleast one execution in common in which the two objects are not equal.
-//    else if (isIntersection())
-//      return false;
-//    else
-//      assert(0);
-//  }
-//
-////! Discharge the query to the corresponding CL
-////! If key not found in thatCLMap return false
-//  template<class Key>
-//  bool MappedCodeLocObject<Key>::equalSetCLWithKey(Key key,
-//      const map<Key, CodeLocObjectPtr>& thatCLMap, PartEdgePtr pedge) {
-//    typename map<Key, CodeLocObjectPtr>::const_iterator s_it;
-//    s_it = thatCLMap.find(key);
-//    if (s_it == thatCLMap.end())
-//      return false;
-//    return aoMap[key]->equalSetAO(s_it->second, pedge);
-//  }
-//
-////! Two objects are equal sets if they denote the same set of memory locations
-////! The boolean parameter mostAccurate is not releveant as this query is not
-////! answered based on union or intersection of sub-executions.
-////! Simply discharge the queries to all keyed CodeLoc objects
-////! If all the discharged queries come back equal then the two objects are equal otherwise not.
-//  template<class Key>
-//  bool MappedCodeLocObject<Key>::equalSetAO(
-//      CodeLocObjectPtr thatCL, PartEdgePtr pedge) {
-//    boost::shared_ptr<MappedCodeLocObject<Key> > thatCL_p =
-//        boost::dynamic_pointer_cast<MappedCodeLocObject<Key> >(
-//            thatCL);
-//    assert(thatCL_p);
-//
-//    // This object denotes full set of CL (full set of executions)
-//    if (isFullAO(pedge))
-//      return thatCL_p->isFullAO(pedge);
-//
-//    // denotes empty set
-//    if (isEmptyAO(pedge))
-//      return thatCL_p->isEmptyAO(pedge);
-//
-//    const map<Key, CodeLocObjectPtr> thatCLMap = thatCL_p->getCodeLocsMap();
-//    typename map<Key, CodeLocObjectPtr>::iterator it;
-//    for (it = aoMap.begin(); it != aoMap.end(); ++it) {
-//      // discharge query
-//      // break even if one of them returns false
-//      if (equalSetCLWithKey(it->first, thatCLMap, pedge) == false)
-//        return false;
-//    }
-//
-//    return true;
-//  }
-//
-////! Discharge the query to the corresponding CL
-////! If key not found in thatCLMap return true as the
-////! keyed object on thatCLMap denotes full set
-//  template<class Key>
-//  bool MappedCodeLocObject<Key>::subSetCLWithKey(Key key,
-//      const map<Key, CodeLocObjectPtr>& thatCLMap, PartEdgePtr pedge) {
-//    typename map<Key, CodeLocObjectPtr>::const_iterator s_it;
-//    s_it = thatCLMap.find(key);
-//    if (s_it == thatCLMap.end())
-//      return true;
-//    return aoMap[key]->equalSetAO(s_it->second, pedge);
-//  }
-//
-////! This object is a non-strict subset of the other if the set of memory locations denoted by this
-////! is a subset of the set of memory locations denoted by that.
-////! The boolean parameter mostAccurate is not releveant as this query is not
-////! answered based on union or intersection of sub-executions.
-////! Simply discharge the queries to all keyed CodeLoc objects
-////! If all the discharged queries come back true then this is a subset of that otherwise not.
-//  template<class Key>
-//  bool MappedCodeLocObject<Key>::subSetAO(CodeLocObjectPtr thatCL,
-//      PartEdgePtr pedge) {
-//    boost::shared_ptr<MappedCodeLocObject<Key> > thatCL_p =
-//        boost::dynamic_pointer_cast<MappedCodeLocObject<Key> >(
-//            thatCL);
-//    assert(thatCL_p);
-//
-//    // This object denotes full set of CL (full set of executions)
-//    if (isFullAO(pedge))
-//      return thatCL_p->isFullAO(pedge);
-//
-//    // denotes empty set
-//    // thatCL could be empty or non-empty eitherway this will be a non-strict subset of that.
-//    if (isEmptyAO(pedge))
-//      return true;
-//
-//    // If both objects have the same keys discharge
-//    // If this object has a key and that does not then
-//    // the keyed object is subset of that (return true) implemented by subsetCLWithKey
-//    // If any of the discharged query return false then return false.
-//    const map<Key, CodeLocObjectPtr> thatCLMap = thatCL_p->getCodeLocsMap();
-//    typename map<Key, CodeLocObjectPtr>::iterator it;
-//    for (it = aoMap.begin(); it != aoMap.end(); ++it) {
-//      // discharge query
-//      // break even if one of them returns false
-//      if (subSetCLWithKey(it->first, thatCLMap, pedge) == false)
-//        return false;
-//    }
-//
-//    // If this object doesn't have the key and that object has the key then
-//    // return false as this object has full object mapped to the key
-//    typename map<Key, CodeLocObjectPtr>::const_iterator c_it;
-//    for (c_it = thatCLMap.begin(); c_it != thatCLMap.end() && (nFull != 0);
-//        ++c_it) {
-//      if (aoMap.find(c_it->first) == aoMap.end())
-//        return false;
-//    }
-//
-//    return true;
-//  }
-//
-////! Mapped object liveness is determined based on finding executions
-////! in which it may be live.
-////! It can be answered based on union (mostAccurate=false) or intersection
-////! (mostAccurate=true) of executions
-////! The conservative answer is to assume that the object is live
-//  template<class Key>
-//  bool MappedCodeLocObject<Key>::isLiveAO(PartEdgePtr pedge) {
-//    // If this object is full return the conservative answer
-//    if (isFullAO(pedge))
-//      return true;
-//
-//    // If it has one or more full objects added to it
-//    // and if the object has mostAccurate=false then return true (weakest answer)
-//    if (nFull > 0 && isUnion())
-//      return true;
-//
-//    // 1. This object may have have one or more full objects under intersection
-//    // 2. This object doesnt have any full objects added to it under union
-//    // Under both cases the answer is based on how individual analysis respond to the query
-//    typename map<Key, CodeLocObjectPtr>::iterator it = aoMap.begin();
-//    for (; it != aoMap.end(); ++it) {
-//      bool isLive = it->second->isLiveAO(pedge);
-//      if (isUnion() && isLive == true)
-//        return true;
-//      else if (isIntersection() && isLive == false)
-//        return false;
-//    }
-//
-//    // leftover cases
-//    if (isUnion())
-//      return false;
-//    else if (isIntersection())
-//      return true;
-//    else
-//      assert(0);
-//  }
-//
-////! meetUpdateCL performs the join operation of abstractions of two mls
-//  template<class Key>
-//  bool MappedCodeLocObject<Key>::meetUpdateAO(
-//      CodeLocObjectPtr that, PartEdgePtr pedge) {
-//    boost::shared_ptr<MappedCodeLocObject<Key> > thatCL_p =
-//        boost::dynamic_pointer_cast<MappedCodeLocObject<Key> >(
-//            that);
-//    assert(thatCL_p);
-//
-//    // if this object is already full
-//    if (isFullAO(pedge))
-//      return false;
-//
-//    // If that object is full set this object to full
-//    if (thatCL_p->isFullAO(pedge)) {
-//      nFull++;
-//      setCLToFull();
-//      return true;
-//    }
-//
-//    // Both objects are not full
-//    const map<Key, CodeLocObjectPtr> thatCLMap = thatCL_p->getCodeLocsMap();
-//
-//    typename map<Key, CodeLocObjectPtr>::iterator it = aoMap.begin();
-//    typename map<Key, CodeLocObjectPtr>::const_iterator s_it; // search iterator for thatCLMap
-//
-//    bool modified = false;
-//    while (it != aoMap.end()) {
-//      s_it = thatCLMap.find(it->first);
-//      // If two objects have the same key then discharge meetUpdate to the corresponding keyed CL objects
-//      if (s_it != thatCLMap.end()) {
-//        modified = (it->second)->meetUpdateAO(s_it->second, pedge) || modified;
-//      }
-//
-//      // Remove the current CL object (current iterator it) from the map if the mapepd object is full.
-//      // Two cases under which the current CL object can be full.
-//      // (1) If current key is not found in thatCLMap then the mapped object
-//      // in thatCLMap is full and the meetUpdate of the current CL with that is also full.
-//      // (2) meetUpdateCL above of the two keyed objects resulted in this mapped object being full.
-//      // Under both cases remove the mapped ml from this map
-//      if (s_it == thatCLMap.end() || (it->second)->isFullAO(pedge)) {
-//        // Current mapped CL has become full as a result of (1) or (2).
-//        // Remove the item from the map.
-//        // Note that post-increment which increments the iterator and returns the old value for deletion.
-//        aoMap.erase(it++);
-//        nFull++;
-//        modified = true;
-//
-//        // If mostAccurate=false then set this entire object to full and return
-//        if (isUnion()) {
-//          setCLToFull();
-//          return true;
-//        }
-//      } else
-//        ++it;
-//    }
-//    return modified;
-//  }
-//
-////! Method that sets this mapped object to full
-//  template<class Key>
-//  void MappedCodeLocObject<Key>::setCLToFull() {
-//    assert(nFull > 0);
-//    if (aoMap.size() > 0)
-//      aoMap.clear();
-//  }
-//
-//  template<class Key>
-//  bool MappedCodeLocObject<Key>::isFullAO(PartEdgePtr pedge) {
-//    if (nFull > 0 && aoMap.size() == 0)
-//      return true;
-//    return false;
-//  }
-//
-//  template<class Key>
-//  bool MappedCodeLocObject<Key>::isEmptyAO(PartEdgePtr pedge) {
-//    if (nFull == 0 && aoMap.size() == 0)
-//      return true;
-//    return false;
-//  }
-//
-//// Returns true if this AbstractObject corresponds to a concrete value that is statically-known
-//  template<class Key>
-//  bool MappedCodeLocObject<Key>::isConcrete() {
-//    typename map<Key, CodeLocObjectPtr>::iterator it;
-//    for (it = aoMap.begin(); it != aoMap.end(); ++it)
-//      if (!it->second->isConcrete())
-//        return false;
-//    return true;
-//  }
-//
-//// Returns the number of concrete values in this set
-//  template<class Key>
-//  int MappedCodeLocObject<Key>::concreteSetSize() {
-//    // This is an over-approximation of the set size that assumes that all the concrete sets of
-//    // the sub-CodeLocs are disjoint
-//    int size = 0;
-//    typename map<Key, CodeLocObjectPtr>::iterator it;
-//    for (it = aoMap.begin(); it != aoMap.end(); ++it)
-//      size += it->second->concreteSetSize();
-//    return size;
-//  }
-//
-//  template<class Key>
-//  CodeLocObjectPtr MappedCodeLocObject<Key>::copyAO() const {
-//    return boost::make_shared<MappedCodeLocObject<Key> >(*this);
-//  }
-//
-//  template<class Key>
-//  string MappedCodeLocObject<Key>::str(string indent) const {
-//    ostringstream oss;
-//    oss << "<table border=\"1\">";
-//    oss << "<tr>";
-//    oss << "<th>"
-//        << (isUnion() ?
-//            "UnionMappedCodeLocObject:" : "IntersectMappedCodeLocObject:")
-//        << "</th>";
-//    if (nFull > 0 && aoMap.size() == 0)
-//      oss << "<th> Full </th> </tr>";
-//    else if (nFull == 0 && aoMap.size() == 0)
-//      oss << "<th> Empty </th> </tr>";
-//    else {
-//      oss << "</tr>";
-//      typename map<Key, CodeLocObjectPtr>::const_iterator it =
-//          aoMap.begin();
-//      for (; it != aoMap.end(); ++it) {
-//        oss << "<tr>";
-//        oss << "<td>" << (it->first)->str(indent) << "</td>";
-//        oss << "<td>" << (it->second)->str(indent) << "</td>";
-//        oss << "</tr>";
-//      }
-//    }
-//    oss << "</table>";
-//    return oss.str();
-//  }
-//
-//// Returns whether all instances of this class form a hierarchy. Every instance of the same
-//// class created by the same analysis must return the same value from this method!
-//  template<class Key>
-//  bool MappedCodeLocObject<Key>::isHierarchy() const {
-//    // Combined CodeLocs form hierarchy if:
-//    // - All the sub-CodeLocs form hierarchies of their own, AND
-//    // - The combination is an intersection.
-//    //   If the combination is a union then consider the following:
-//    //            MLa     MLb
-//    //   comb1 = {a,b}, {w, x}
-//    //   comb2 = {a,b}, {y, z}
-//    //   Note that MLs from analyses a and b are either identical sets or disjoint
-//    //   However, comb1 U comb2 = {a, b, w, x, y, z}, for which this property does
-//    //   not hold unless we work out a new hierarchy for MLb.
-//
-//    // Unions are not hierarchical unless they're singletons
-//    if (isUnion()) {
-//      if (aoMap.size() == 1)
-//        return aoMap.begin()->second->isHierarchy();
-//      else
-//        return false;
-//    }
-//
-//    typename map<Key, CodeLocObjectPtr>::const_iterator it;
-//    for (it = aoMap.begin(); it != aoMap.end(); ++it)
-//      if (!it->second->isHierarchy())
-//        return false;
-//    return true;
-//  }
-//
-//// Returns a key that uniquely identifies this particular AbstractObject in the
-//// set hierarchy.
-//  template<class Key>
-//  const AbstractionHierarchy::hierKeyPtr& MappedCodeLocObject<Key>::getHierKey() const {
-//    // The intersection of multiple objects is just a filtering process from the full
-//    // set of objects to the exact one, with each key in the hierarchy further filtering
-//    // the set down. As such, a hierarchical key for the intersection of multiple objects
-//    // is just the concatenation of the keys of all the individual objects.
-//    if (!isHierKeyCached) {
-//      /*((MappedCodeLocObject<Key>*) this)->cachedHierKey =
-//       boost::make_shared<AOSHierKey>(
-//       ((MappedCodeLocObject<Key>*) this)->shared_from_this());
-//
-//       typename map<Key, CodeLocObjectPtr>::const_iterator it;
-//       for (it = aoMap.begin(); it != aoMap.end(); ++it) {
-//       AbstractionHierarchyPtr hierIt = boost::dynamic_pointer_cast<
-//       AbstractionHierarchy>(it->second);
-//       ROSE_ASSERT(hierIt);
-//
-//       ((MappedCodeLocObject<Key>*) this)->cachedHierKey->add(
-//       hierIt->getHierKey()->begin(), hierIt->getHierKey()->end());
-//       }*/
-//
-//      map<Key, hierKeyPtr> subHierKeys;
-//      for(typename map<Key, CodeLocObjectPtr>::const_iterator it = aoMap.begin();
-//          it != aoMap.end(); ++it) {
-//        AbstractionHierarchyPtr hierIt = boost::dynamic_pointer_cast<AbstractionHierarchy>(it->second);
-//        ROSE_ASSERT(hierIt);
-//        subHierKeys[it->first] = hierIt->getHierKey();
-//      }
-//
-//      ((MappedCodeLocObject<Key>*) this)->cachedHierKey =
-//          boost::make_shared<IntersectMappedHierKey<Key> >(subHierKeys);
-//
-//      ((MappedCodeLocObject<Key>*) this)->isHierKeyCached = true;
-//    }
-//    return cachedHierKey;
-//  }
-
-/* ############################
- # PartEdgeUnionCodeLocObject #
-   ############################ */
+/* ##############################
+   # PartEdgeUnionCodeLocObject #
+   ############################## */
 
 PartEdgeUnionCodeLocObject::PartEdgeUnionCodeLocObject() :
     CodeLocObject(NULL) {
@@ -2782,7 +2163,7 @@ PartEdgeUnionCodeLocObject::PartEdgeUnionCodeLocObject() :
 
 PartEdgeUnionCodeLocObject::PartEdgeUnionCodeLocObject(
     const PartEdgeUnionCodeLocObject& thatCL) :
-    CodeLocObject(thatCL), unionCL_p(thatCL.copyAOType()) {
+    CodeLocObject(thatCL), unionCL_p(thatCL.unionCL_p->copyAOType()) {
 }
 
 SgNode* PartEdgeUnionCodeLocObject::getBase() const {
@@ -3196,1040 +2577,39 @@ std::string FullValueObject::str(std::string indent) const {
   return "[FullValueObject]";
 }
 
-/* ################################
+/* ###############################
    ##### CombinedValueObject #####
-   ################################ * /
-
-/ *template <bool defaultMayEq>
- CombinedValueObject<defaultMayEq>::CombinedValueObject(ValueObjectPtr val) : ValueObject(NULL) {
- vals.push_back(val);
- }* /
-
-/ *template <bool defaultMayEq>
- CombinedValueObject<defaultMayEq>::CombinedValueObject(const list<ValueObjectPtr>& vals) : ValueObject(NULL), vals(vals) {}* /
-
-template<bool defaultMayEq>
-SgNode* CombinedValueObject<defaultMayEq>::getBase() const {
-  // Returns the base SgNode shared by all the MemLocs in this object or NULL, if the base SgNodes are different
-  SgNode* base = NULL;
-  for (list<ValueObjectPtr>::const_iterator it = vals.begin();
-      it != vals.end(); it++) {
-    if (it == vals.begin())
-      base = (*it)->getBase();
-    else if (base != (*it)->getBase())
-      return NULL;
-  }
-
-  return base;
-}
-
-template<bool defaultMayEq>
-void CombinedValueObject<defaultMayEq>::add(ValueObjectPtr val) {
-  vals.push_back(val);
-}
-
-// Returns whether this object may/must be equal to o within the given Part p
-// These methods are private to prevent analyses from calling them directly.
-template<bool defaultMayEq>
-bool CombinedValueObject<defaultMayEq>::mayEqualAO(ValueObjectPtr o,
-    PartEdgePtr pedge) {
-  boost::shared_ptr<CombinedValueObject<defaultMayEq> > that =
-      boost::dynamic_pointer_cast<CombinedValueObject<defaultMayEq> >(o);
-  // If the two combination objects include different numbers of ValueObjects, say that they may be equal since
-  // we can't be sure either way.
-  if (vals.size() != that->vals.size())
-    return true;
-
-  // Compare all the pairs of ValueObjects in vals and that.vals, returning defaultMayEq if any pair
-  // returns defaultMayEq since we're looking for the tightest (if defaultMayEq=false) / loosest (if defaultMayEq=true)
-  // answer that any ValueObject in vals can give
-  for (list<ValueObjectPtr>::iterator thisIt = vals.begin(), thatIt =
-      that->vals.begin(); thisIt != vals.end(); thisIt++, thatIt++) {
-    if ((*thisIt)->mayEqualAO(*thatIt, pedge) == defaultMayEq)
-      return defaultMayEq;
-  }
-
-  return !defaultMayEq;
-}
-
-template<bool defaultMayEq>
-bool CombinedValueObject<defaultMayEq>::mustEqualAO(ValueObjectPtr o,
-    PartEdgePtr pedge) {
-  boost::shared_ptr<CombinedValueObject<defaultMayEq> > that =
-      boost::dynamic_pointer_cast<CombinedValueObject<defaultMayEq> >(o);
-  // If the two combination  objects include different numbers of ValueObjects, say that they are not must equal since
-  // we can't be sure either way.
-  if (vals.size() != that->vals.size())
-    return false;
-
-  // Compare all the pairs of ValueObjects in vals and that.vals, returning !defaultMayEq if any pair
-  // returns !defaultMayEqual since we're looking for the tightest answer that any ValueObject in vals can give
-  for (list<ValueObjectPtr>::iterator thisIt = vals.begin(), thatIt =
-      that->vals.begin(); thisIt != vals.end(); thisIt++, thatIt++) {
-    if ((*thisIt)->mustEqualAO(*thatIt, pedge) == !defaultMayEq)
-      return !defaultMayEq;
-  }
-
-  return defaultMayEq;
-}
-
-// Returns whether the two abstract objects denote the same set of concrete objects
-template<bool defaultMayEq>
-bool CombinedValueObject<defaultMayEq>::equalSetAO(ValueObjectPtr o,
-    PartEdgePtr pedge) {
-  boost::shared_ptr<CombinedValueObject<defaultMayEq> > that =
-      boost::dynamic_pointer_cast<CombinedValueObject<defaultMayEq> >(o);
-  assert(that);
-  assert(vals.size() == that->vals.size());
-
-  // Two unions and intersections denote the same set of their components individually denote the same set
-  // (we can get a more precise answer if we could check set containment relations as well)
-  list<ValueObjectPtr>::const_iterator vThis = vals.begin();
-  list<ValueObjectPtr>::const_iterator vThat = that->vals.begin();
-  for (; vThis != vals.end(); vThis++, vThat++)
-    if (!(*vThis)->equalSetAO(*vThat, pedge))
-      return false;
-  return true;
-}
-
-// Returns whether this abstract object denotes a non-strict subset (the sets may be equal) of the set denoted
-// by the given abstract object.
-template<bool defaultMayEq>
-bool CombinedValueObject<defaultMayEq>::subSetAO(ValueObjectPtr o,
-    PartEdgePtr pedge) {
-  boost::shared_ptr<CombinedValueObject<defaultMayEq> > that =
-      boost::dynamic_pointer_cast<CombinedValueObject<defaultMayEq> >(o);
-  assert(that);
-  assert(vals.size() == that->vals.size());
-
-  // Compare all the pairs of ValueObjects in memLocs and that.memLocs, returning defaultMayEq if any pair
-  // returns defaultMayEq since we're looking for the tightest (if defaultMayEq=false) / loosest (if defaultMayEq=true)
-  // answer that any ValueObject in memLocs can give
-
-  // Two unions and intersections denote the same set of their components individually denote the same set
-  // (we can get a more precise answer if we could check set containment relations as well)
-  for (list<ValueObjectPtr>::iterator thisIt = vals.begin(), thatIt =
-      that->vals.begin(); thisIt != vals.end(); thisIt++, thatIt++) {
-    if ((*thisIt)->subSetAO(*thatIt, pedge) == defaultMayEq)
-      return defaultMayEq;
-  }
-  return !defaultMayEq;
-}
-
-// Computes the meet of this and that and saves the result in this
-// returns true if this causes this to change and false otherwise
-template<bool defaultMayEq>
-bool CombinedValueObject<defaultMayEq>::meetUpdateAO(ValueObjectPtr o,
-    PartEdgePtr pedge) {
-  boost::shared_ptr<CombinedValueObject<defaultMayEq> > that =
-      boost::dynamic_pointer_cast<CombinedValueObject<defaultMayEq> >(o);
-  assert(that);
-  assert(vals.size() == that->vals.size());
-  bool modified = false;
-
-  // Perform the meetUpdate operation on all member Values
-  list<ValueObjectPtr>::const_iterator vThis = vals.begin();
-  list<ValueObjectPtr>::const_iterator vThat = that->vals.begin();
-  for (; vThis != vals.end(); vThis++, vThat++)
-    modified = (*vThis)->meetUpdateAO(*vThat, pedge) || modified;
-  return modified;
-}
-
-// Returns whether this AbstractObject denotes the set of all possible execution prefixes.
-template<bool defaultMayEq>
-bool CombinedValueObject<defaultMayEq>::isFullAO(PartEdgePtr pedge) {
-  // If this is a union type (defaultMayEq=true), an object is full if any of its components are full (weakest constraint)
-  // If this is an intersection type (defaultMayEq=false), an object is not full if any of its components are not full (strongest constraint)
-  for (list<ValueObjectPtr>::const_iterator v = vals.begin(); v != vals.end();
-      v++)
-    if ((*v)->isFullAO(pedge) == defaultMayEq)
-      return defaultMayEq;
-
-  return !defaultMayEq;
-}
-
-// Returns whether this AbstractObject denotes the empty set.
-template<bool defaultMayEq>
-bool CombinedValueObject<defaultMayEq>::isEmptyAO(PartEdgePtr pedge) {
-  // If this is a union type (defaultMayEq=true), an object is not empty if any of its components are not empty (weakest constraint)
-  // If this is an intersection type (defaultMayEq=false), an object is empty if any of its components are empty (strongest constraint)
-  for (list<ValueObjectPtr>::const_iterator v = vals.begin(); v != vals.end();
-      v++)
-    if ((*v)->isEmptyAO(pedge) != defaultMayEq)
-      return !defaultMayEq;
-
-  return defaultMayEq;
-}
-
-// Returns true if this ValueObject corresponds to a concrete value that is statically-known
-template<bool defaultMayEq>
-bool CombinedValueObject<defaultMayEq>::isConcrete() {
-  // The combined object is concrete if
-  // intersect (defaultMayEq=false) : any sub-value is concrete
-  // union (defaultMayEq=true) : all the sub-values are concrete and have the same type and value
-
-  // Intersection
-  if (defaultMayEq == false) {
-    for (list<ValueObjectPtr>::iterator v = vals.begin(); v != vals.end();
-        v++) {
-      if ((*v)->isConcrete())
-        return true;
-    }
-    return false;
-    // Union
-  } else {
-    assert(vals.size() > 0);
-    list<ValueObjectPtr>::iterator firstI = vals.begin();
-    ValueObjectPtr first = *firstI;
-
-    // The union is not concrete if
-    for (list<ValueObjectPtr>::iterator v = vals.begin(); v != vals.end();
-        v++) {
-      // Any sub-value is not concrete, OR
-      if (!(*v)->isConcrete())/ * ||
-       // Any pair of sub-values have different types, OR
-       (*v)->getConcreteType()->variantT() != first->getConcreteType()->variantT() ||
-       // Any pair of sub-values have different values
-       !ValueObject::equalValueExp((*v)->getConcreteValue().get(), first->getConcreteValue().get())) {* /
-        return false;
-      //}
-    }
-    return true;
-  }
-}
-
-// Returns the number of concrete values in this set
-template<bool defaultMayEq>
-int CombinedValueObject<defaultMayEq>::concreteSetSize() {
-  assert(isConcrete());
-  return getConcreteValue().size();
-}
-
-// Returns the type of the concrete value (if there is one)
-template<bool defaultMayEq>
-SgType* CombinedValueObject<defaultMayEq>::getConcreteType() {
-  assert(isConcrete());
-
-  return (*vals.begin())->getConcreteType();
-}
-
-// Returns the concrete value (if there is one) as an SgValueExp, which allows callers to use
-// the normal ROSE mechanisms to decode it
-template<bool defaultMayEq>
-std::set<boost::shared_ptr<SgValueExp> > CombinedValueObject<defaultMayEq>::getConcreteValue() {
-  assert(isConcrete());
-
-  // If this is a union type (defaultMayEq=true), the result is the Union of the sets returned by getConcreteValue() on all the vals.
-  // If this is an intersection type (defaultMayEq=false), an object is their Intersection.
-
-  // Maps each concrete value to the number of elements in vals for which it was returned
-  std::map<boost::shared_ptr<SgValueExp>, size_t> concreteVals;
-  for (list<ValueObjectPtr>::iterator v = vals.begin(); v != vals.end();
-      v++) {
-    // Iterate through the current sub-ValueObject's concrete values and increment each
-    // concrete value's counter in concreteVals.
-    std::set<boost::shared_ptr<SgValueExp> > curConcr =
-        (*v)->getConcreteValue();
-    for (std::set<boost::shared_ptr<SgValueExp> >::iterator i1 =
-        curConcr.begin(); i1 != curConcr.end(); i1++) {
-      // Find the key in concrete vals with an equivalent SgValueExp to *i1
-      std::map<boost::shared_ptr<SgValueExp>, size_t>::iterator i2 =
-          concreteVals.begin();
-      for (; i2 != concreteVals.end(); i2++) {
-        if (ValueObject::equalValueExp(i1->get(), i2->first.get()))
-          ++i2->second;
-      }
-
-      // If the current concrete value *i1 does not appear in concreteVals, add it
-      if (i2 == concreteVals.end())
-        concreteVals[*i1] = 1;
-    }
-  }
-
-  // Collect the union or intersection of all results from concreteVals as a set
-  std::set<boost::shared_ptr<SgValueExp> > ret;
-  for (std::map<boost::shared_ptr<SgValueExp>, size_t>::iterator i =
-      concreteVals.begin(); i != concreteVals.end(); i++) {
-    // Union: add every key in concreteVals to ret
-    if (defaultMayEq)
-      ret.insert(i->first);
-    // Intersection: only add the keys that appear in every ValueObject in vals
-    else if (!defaultMayEq && i->second == vals.size())
-      ret.insert(i->first);
-  }
-
-  return ret;
-}
-
-// Allocates a copy of this object and returns a pointer to it
-template<bool defaultMayEq>
-ValueObjectPtr CombinedValueObject<defaultMayEq>::copyAOType() const {
-  return boost::make_shared<CombinedValueObject>(vals);
-}
-
-template<bool defaultMayEq>
-std::string CombinedValueObject<defaultMayEq>::str(std::string indent) const {
-  ostringstream oss;
-  if (vals.size() > 1)
-    oss << "[" << (defaultMayEq ? "UnionV" : "IntersectV") << ": ";
-  if (vals.size() > 1)
-    oss << endl;
-  for (list<ValueObjectPtr>::const_iterator v = vals.begin(); v != vals.end();
-      ) {
-    if (v != vals.begin())
-      oss << indent << "&nbsp;&nbsp;&nbsp;&nbsp;";
-    oss << (*v)->str(indent + "&nbsp;&nbsp;&nbsp;&nbsp;");
-    v++;
-    if (v != vals.end())
-      oss << endl;
-  }
-  if (vals.size() > 1)
-    oss << "]";
-
-  return oss.str();
-}
-
-// GREG: Since Sriram's fix to explicitly declare templated Combined*Objects, we don't need the code below
-/ *
- // Create a function that uses examples of combined objects to force the compiler to generate these classes
- static void exampleCombinedValueObjects2(ValueObjectPtr val, std::list<ValueObjectPtr> vals, IntersectValueObject& i, UnionValueObject& u, IntersectValueObject& i2, UnionValueObject& u2);
- static void exampleCombinedValueObjects(ValueObjectPtr val, std::list<ValueObjectPtr> vals)
- {
- IntersectValueObject exampleIntersectObject(val);
- UnionValueObject     exampleUnionObject(val);
- IntersectValueObject exampleIntersectObject2(vals);
- UnionValueObject     exampleUnionObject2(vals);
- exampleCombinedValueObjects2(val, vals, exampleIntersectObject, exampleUnionObject, exampleIntersectObject2, exampleUnionObject2);
- }
- static void exampleCombinedValueObjects2(ValueObjectPtr val, std::list<ValueObjectPtr> vals, IntersectValueObject& i, UnionValueObject& u, IntersectValueObject& i2, UnionValueObject& u2)
- {
- exampleCombinedValueObjects(val, vals);
- }
- * /
-
-// Returns whether all instances of this class form a hierarchy. Every instance of the same
-// class created by the same analysis must return the same value from this method!
-template<bool defaultMayEq>
-bool CombinedValueObject<defaultMayEq>::isHierarchy() const {
-  // Combined Values form hierarchy if:
-  // - All the sub-Values form hierarchies of their own, AND
-  // - The combination is an intersection.
-  //   If the combination is a union then consider the following:
-  //            MLa     MLb
-  //   comb1 = {a,b}, {w, x}
-  //   comb2 = {a,b}, {y, z}
-  //   Note that MLs from analyses a and b are either identical sets or disjoint
-  //   However, comb1 U comb2 = {a, b, w, x, y, z}, for which this property does
-  //   not hold unless we work out a new hierarchy for MLb.
-
-  // Unions are not hierarchical unless they're singletons
-  if (defaultMayEq) {
-    if (vals.size() == 1)
-      return (*vals.begin())->isHierarchy();
-    else
-      return false;
-  }
-
-  for (list<ValueObjectPtr>::const_iterator ml = vals.begin();
-      ml != vals.end(); ml++)
-    if (!(*ml)->isHierarchy())
-      return false;
-  return true;
-}
-
-// Returns a key that uniquely identifies this particular AbstractObject in the
-// set hierarchy.
-template<bool defaultMayEq>
-const AbstractionHierarchy::hierKeyPtr& CombinedValueObject<defaultMayEq>::getHierKey() const {
-  // The intersection of multiple objects is just a filtering process from the full
-  // set of objects to the exact one, with each key in the hierarchy further filtering
-  // the set down. As such, a hierarchical key for the intersection of multiple objects
-  // is just the concatenation of the keys of all the individual objects.
-  //dbg << "CombinedValueObject<defaultMayEq>::getHierKey() isHierKeyCached="<<isHierKeyCached<<endl;
-  if (!isHierKeyCached) {
-    / *((CombinedValueObject<defaultMayEq>*) this)->cachedHierKey =
-     boost::make_shared<AOSHierKey>(
-     ((CombinedValueObject<defaultMayEq>*) this)->shared_from_this());
-
-     for (list<ValueObjectPtr>::const_iterator i = vals.begin();
-     i != vals.end(); i++) {
-     AbstractionHierarchyPtr hierIt = boost::dynamic_pointer_cast<
-     AbstractionHierarchy>(*i);
-     ROSE_ASSERT(hierIt);
-
-     ((CombinedValueObject<defaultMayEq>*) this)->cachedHierKey->add(
-     hierIt->getHierKey()->begin(), hierIt->getHierKey()->end());
-
-     //dbg << "CombinedValueObject<defaultMayEq>::getHierKey() ((CombinedValueObject<defaultMayEq>*)this)->cachedHierKey="<<((CombinedValueObject<defaultMayEq>*)this)->cachedHierKey<<endl;
-     }* /
-    list<hierKeyPtr> subHierKeys;
-    for (list<ValueObjectPtr>::const_iterator i = vals.begin(); i != vals.end(); i++) {
-      AbstractionHierarchyPtr hierIt = boost::dynamic_pointer_cast<AbstractionHierarchy>(*i);
-      ROSE_ASSERT(hierIt);
-      subHierKeys.push_back(hierIt->getHierKey());
-    }
-
-    ((CombinedValueObject<defaultMayEq>*) this)->cachedHierKey = boost::make_shared<IntersectHierKey>(subHierKeys);
-
-    ((CombinedValueObject<defaultMayEq>*) this)->isHierKeyCached = true;
-  }
-  return cachedHierKey;
-}*/
+   ############################### */
 
 /* ###########################
- #### MappedValueObject ####
+   #### MappedValueObject ####
    ########################### */
 
-//  template<class Key>
-//  SgNode* MappedValueObject<Key>::getBase() const {
-//    // Returns the base SgNode shared by all the MemLocs in this object or NULL, if the base SgNodes are different
-//    SgNode* base = NULL;
-//    for (typename map<Key, ValueObjectPtr>::const_iterator it =
-//        aoMap.begin(); it != aoMap.end(); ++it) {
-//      if (it == aoMap.begin())
-//        base = it->second->getBase();
-//      else if (base != it->second->getBase())
-//        return NULL;
-//    }
-//
-//    return base;
-//  }
-//
-////! Method to add values to the map.
-////! Vs that are full are never added to the map.
-////! If v_p is FullV or v_p->isFullV=true then mapped V is set to full only if mostAccurate=false.
-//  template<class Key>
-//  void MappedValueObject<Key>::add(Key key, ValueObjectPtr v_p,
-//      PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis) {
-//    // If the object is already full don't add anything
-//    if (isUnion() && isFullAO(pedge))
-//      return;
-//
-//    // If the v_p is not full add/update the map
-//    if (!v_p->isFullAO(pedge)) {
-//      aoMap[key] = v_p;
-//    } else {
-//      nFull++;
-//      if (isUnion())
-//        setVToFull();
-//    }
-//  }
-//
-//  template<class Key>
-//  bool MappedValueObject<Key>::mayEqualVWithKey(Key key,
-//      const map<Key, ValueObjectPtr>& thatVMap, PartEdgePtr pedge) {
-//    typename map<Key, ValueObjectPtr>::const_iterator s_it;
-//    s_it = thatVMap.find(key);
-//    if (s_it == thatVMap.end())
-//      return true;
-//    return aoMap[key]->mayEqualAO(s_it->second, pedge);
-//  }
-//
-////! Two Value objects are may equals if there is atleast one execution or sub-exectuion
-////! in which they represent the same value.
-////! Analyses are conservative as they start with full set of executions.
-////! Dataflow facts (predicates) shrink the set of sub-executions.
-////! We do not explicity store set of sub-executions and they are described
-////! by the abstract objects computed from dataflow fact exported by the analysis.
-////! Unless the analyses discover otherwise, the conservative answer for mayEqualV is true.
-////! Mapped Values are keyed using either ComposedAnalysis* or PartEdgePtr.
-////! Each keyed Value object correspond to some dataflow facts computed by Key=Analysis* or
-////! computed at Key=PartEdgePtrthat describes some sets of executions.
-////! MayEquality check on mapped Value is performed on intersection of sub-executions
-////! or union of sub-executions over the keyed Value objects.
-//  template<class Key>
-//  bool MappedValueObject<Key>::mayEqualAO(ValueObjectPtr thatV,
-//      PartEdgePtr pedge) {
-//    boost::shared_ptr<MappedValueObject<Key> > thatV_p =
-//        boost::dynamic_pointer_cast<MappedValueObject<Key> >(
-//            thatV);
-//    assert(thatV_p);
-//
-//    // This object denotes full set of Values (full set of executions)
-//    if (isFullAO(pedge))
-//      return true;
-//
-//    // denotes empty set
-//    if (isEmptyAO(pedge))
-//      return false;
-//
-//    // presence of one more full objects will result in full set over union
-//    if (isUnion() && nFull > 0)
-//      return true;
-//
-//    // Two cases reach here [1] isUnion()=true && nFull_V=0 [2] intersect=true && nFullV=0 or nFull_V!=0.
-//    // For both cases iterate on the Value map and discharge the mayEqualV query to individual objects
-//    // which are answered based on its set of sub-executions (or its dataflow facts) computed by the corresponding analysis.
-//    const map<Key, ValueObjectPtr> thatVMap = thatV_p->getValuesMap();
-//    typename map<Key, ValueObjectPtr>::iterator it;
-//    for (it = aoMap.begin(); it != aoMap.end(); ++it) {
-//      // discharge query
-//      bool isMayEq = mayEqualVWithKey(it->first, thatVMap, pedge);
-//
-//      // 1. Union of sub-executions and the object does not contain any full objects.
-//      // If the discharged query comes back as true for this case then we have found atleast one execution
-//      // under which the two objects are same and the set can only grow and the result of this query is not going
-//      // to change due to union.
-//      // If false we iterate further as any Value can add more executions under which the objects are may equals.
-//      if (isUnion() && isMayEq == true)
-//        return true;
-//
-//      // 2. Intersection of sub-executions and the object may contain full objects (nFull != 0).
-//      // The sub-executions are intersected and therefore it does not matter if we have full objects.
-//      // If the discharged query returns false then return false.
-//      // We did not find one execution in which the two objects are may equals.
-//      // Note that set of executions are contained over keyed objects (analyses are conservative).
-//      // This set only shrinks during intersection and it is not going to affect the result of this query.
-//      // If it returns true iterate further as some executions corresponding to true may be dropped.
-//      else if (isIntersection() && isMayEq == false)
-//        return false;
-//    }
-//
-//    // All the keyed objects returned false for the discharged query under union.
-//    // We haven't found a single execution under which the two objects are may equals.
-//    if (isUnion())
-//      return false;
-//    // All the keyed objects returned true for the discharged query under intersection.
-//    // We have atleast one execution in common in which the two objects are may equals.
-//    else if (isIntersection())
-//      return true;
-//    else
-//      assert(0);
-//  }
-//
-//  template<class Key>
-//  bool MappedValueObject<Key>::mustEqualVWithKey(Key key,
-//      const map<Key, ValueObjectPtr>& thatVMap, PartEdgePtr pedge) {
-//    typename map<Key, ValueObjectPtr>::const_iterator s_it;
-//    s_it = thatVMap.find(key);
-//    if (s_it == thatVMap.end())
-//      return false;
-//    return aoMap[key]->mustEqualAO(s_it->second, pedge);
-//  }
-//
-////! Two Value objects are must equals if they represent the same value
-////! on all executions.
-////! Analyses are conservative as they start with full set of executions.
-////! Dataflow facts (predicates) shrink the set of sub-executions.
-////! We do not explicity store set of sub-executions and they are described
-////! by the abstract objects computed from dataflow fact exported by the analysis.
-////! Unless the analyses discover otherwise conservative answer for mustEqualV is false.
-////! Mapped Values are keyed using either ComposedAnalysis* or PartEdgePtr.
-////! Each keyed Value object correspond to some dataflow facts computed by Key=Analysis* or
-////! computed at Key=PartEdgePtrthat describes some sets of executions.
-////! MustEquality check on mapped Value is performed on intersection (mostAccurate=true) of sub-executions
-////! or union (mostAccurate=false) of sub-executions over the keyed Value objects.
-//  template<class Key>
-//  bool MappedValueObject<Key>::mustEqualAO(ValueObjectPtr thatV,
-//      PartEdgePtr pedge) {
-//    boost::shared_ptr<MappedValueObject<Key> > thatV_p =
-//        boost::dynamic_pointer_cast<MappedValueObject<Key> >(
-//            thatV);
-//    assert(thatV_p);
-//
-//    // This object denotes full set of Value (full set of executions)
-//    if (isFullAO(pedge))
-//      return false;
-//
-//    // denotes empty set
-//    if (isEmptyAO(pedge))
-//      return false;
-//
-//    // presence of one more full objects will result in full set over union
-//    if (isUnion() && nFull > 0)
-//      return true;
-//
-//    // Two cases reach here [1] isUnion()=true && nFull_V=0 [2] intersect=true && nFullV=0 or nFull_V!=0.
-//    // For both cases iterate on the Value map and discharge the mayEqualV query to individual objects
-//    // which are answered based on its set of sub-executions (or its dataflow facts) computed by the corresponding analysis.
-//    const map<Key, ValueObjectPtr> thatVMap = thatV_p->getValuesMap();
-//    typename map<Key, ValueObjectPtr>::iterator it;
-//    for (it = aoMap.begin(); it != aoMap.end(); ++it) {
-//      // discharge query
-//      bool isMustEq = mustEqualVWithKey(it->first, thatVMap, pedge);
-//
-//      // 1. Union of sub-executions and the object does not contain any full objects
-//      // If the discharged query comes back as false for this case then we have found atleast one execution
-//      // under which the two objects are not same and the set can only grow and the result of this query is not going
-//      // to change due to union.
-//      // If it returns true we iterate further as any Value can add more executions under which the objects are not must equals.
-//      if (isUnion() && isMustEq == false)
-//        return false;
-//
-//      // 2. Intersection of sub-executions and the object may contain full objects (nFull != 0).
-//      // The sub-executions are intersected and therefore it does not matter if we have full objects.
-//      // If the discharged query returns true then return true.
-//      // Under all sub-executions (corresponding to the Value) the two objects must equal.
-//      // Note that set of executions are contained over keyed objects as the analyses are conservative.
-//      // This set only shrinks during intersection and it is not going to affect the result of this query.
-//      // If it returns false iterate further as some executions corresponding to false may be dropped.
-//      else if (isIntersection() && isMustEq == true)
-//        return true;
-//    }
-//
-//    // All the keyed objects returned true for the discharged query under union.
-//    // We haven't found a single execution under which the two objects are not equal.
-//    if (isUnion())
-//      return true;
-//    // All the keyed objects returned false for the discharged query under intersection.
-//    // We have atleast one execution in common in which the two objects are not equal.
-//    else if (isIntersection())
-//      return false;
-//    else
-//      assert(0);
-//  }
-//
-////! Discharge the query to the corresponding VO
-////! If key not found in thatVMap return false
-//  template<class Key>
-//  bool MappedValueObject<Key>::equalSetVWithKey(Key key,
-//      const map<Key, ValueObjectPtr>& thatVMap, PartEdgePtr pedge) {
-//    typename map<Key, ValueObjectPtr>::const_iterator s_it;
-//    s_it = thatVMap.find(key);
-//    if (s_it == thatVMap.end())
-//      return false;
-//    return aoMap[key]->equalSetAO(s_it->second, pedge);
-//  }
-//
-////! Two objects are equal sets if they denote the same set of values.
-////! The boolean parameter mostAccurate is not releveant as this query is not
-////! answered based on union or intersection of sub-executions.
-////! Simply discharge the queries to all keyed Value objects
-////! If all the discharged queries come back equal then the two objects are equal otherwise not.
-//  template<class Key>
-//  bool MappedValueObject<Key>::equalSetAO(ValueObjectPtr thatV,
-//      PartEdgePtr pedge) {
-//    boost::shared_ptr<MappedValueObject<Key> > thatV_p =
-//        boost::dynamic_pointer_cast<MappedValueObject<Key> >(
-//            thatV);
-//    assert(thatV_p);
-//
-//    // This object denotes full set of Values (full set of executions)
-//    if (isFullAO(pedge))
-//      return thatV_p->isFullAO(pedge);
-//
-//    // denotes empty set
-//    if (isEmptyAO(pedge))
-//      return thatV_p->isEmptyAO(pedge);
-//
-//    const map<Key, ValueObjectPtr> thatVMap = thatV_p->getValuesMap();
-//    typename map<Key, ValueObjectPtr>::iterator it;
-//    for (it = aoMap.begin(); it != aoMap.end(); ++it) {
-//      // discharge query
-//      // break even if one of them returns false
-//      if (equalSetVWithKey(it->first, thatVMap, pedge) == false)
-//        return false;
-//    }
-//
-//    return true;
-//  }
-//
-////! Discharge the query to the corresponding VO
-////! If key not found in thatVMap return true as the
-////! keyed object on thatVMap denotes full set
-//  template<class Key>
-//  bool MappedValueObject<Key>::subSetVWithKey(Key key,
-//      const map<Key, ValueObjectPtr>& thatVMap, PartEdgePtr pedge) {
-//    typename map<Key, ValueObjectPtr>::const_iterator s_it;
-//    s_it = thatVMap.find(key);
-//    if (s_it == thatVMap.end())
-//      return true;
-//    return aoMap[key]->subSetAO(s_it->second, pedge);
-//  }
-//
-////! This object is a non-strict subset of the other if the set of values denoted by this
-////! is a subset of the set of values denoted by that.
-////! The boolean parameter mostAccurate is not releveant as this query is not
-////! answered based on union or intersection of sub-executions.
-////! Simply discharge the queries to all keyed Value objects
-////! If all the discharged queries come back true then this is a subset of that otherwise not.
-//  template<class Key>
-//  bool MappedValueObject<Key>::subSetAO(ValueObjectPtr thatV,
-//      PartEdgePtr pedge) {
-//    boost::shared_ptr<MappedValueObject<Key> > thatV_p =
-//        boost::dynamic_pointer_cast<MappedValueObject<Key> >(
-//            thatV);
-//    assert(thatV_p);
-//
-//    // This object denotes full set of Values (full set of executions)
-//    if (isFullAO(pedge))
-//      return thatV_p->isFullAO(pedge);
-//
-//    // denotes empty set
-//    // thatV could be empty or non-empty eitherway this will be a non-strict subset of that.
-//    if (isEmptyAO(pedge))
-//      return true;
-//
-//    // If both objects have the same keys discharge
-//    // If this object has a key and that does not then
-//    // the keyed object is subset of that (return true) implemented by subsetVWithKey
-//    // If any of the discharged query return false then return false.
-//    const map<Key, ValueObjectPtr> thatVMap = thatV_p->getValuesMap();
-//    typename map<Key, ValueObjectPtr>::iterator it;
-//    for (it = aoMap.begin(); it != aoMap.end(); ++it) {
-//      // discharge query
-//      // break even if one of them returns false
-//      if (subSetVWithKey(it->first, thatVMap, pedge) == false)
-//        return false;
-//    }
-//
-//    // If this object doesn't have the key and that object has the key then
-//    // return false as this object has full object mapped to the key
-//    typename map<Key, ValueObjectPtr>::const_iterator c_it;
-//    for (c_it = thatVMap.begin(); c_it != thatVMap.end() && (nFull != 0);
-//        ++c_it) {
-//      if (aoMap.find(c_it->first) == aoMap.end())
-//        return false;
-//    }
-//
-//    return true;
-//  }
-//
-//  template<class Key>
-//  bool MappedValueObject<Key>::isLiveAO(PartEdgePtr pedge) {
-//    // If this object is full return the conservative answer
-//    if (isFullAO(pedge))
-//      return true;
-//
-//    // If it has one or more full objects added to it
-//    // and if the object has mostAccurate=false then return true (weakest answer)
-//    if (nFull > 0 && isUnion())
-//      return true;
-//
-//    // 1. This object may have have one or more full objects under intersection
-//    // 2. This object doesnt have any full objects added to it under union
-//    // Under both cases the answer is based on how individual analysis respond to the query
-//    typename map<Key, ValueObjectPtr>::iterator it = aoMap.begin();
-//    for (; it != aoMap.end(); ++it) {
-//      bool isLive = it->second->isLiveAO(pedge);
-//      if (isUnion() && isLive == true)
-//        return true;
-//      else if (isIntersection() && isLive == false)
-//        return false;
-//    }
-//
-//    // leftover cases
-//    if (isUnion())
-//      return false;
-//    else if (isIntersection())
-//      return true;
-//    else
-//      assert(0);
-//  }
-//
-////! meetUpdateV performs the join operation of abstractions of two value objects
-//  template<class Key>
-//  bool MappedValueObject<Key>::meetUpdateAO(ValueObjectPtr that,
-//      PartEdgePtr pedge) {
-//    boost::shared_ptr<MappedValueObject<Key> > thatV_p =
-//        boost::dynamic_pointer_cast<MappedValueObject<Key> >(
-//            that);
-//    assert(thatV_p);
-//
-//    // if this object is already full
-//    if (isFullAO(pedge))
-//      return false;
-//
-//    // If that object is full set this object to full
-//    if (thatV_p->isFullAO(pedge)) {
-//      nFull++;
-//      setVToFull();
-//      return true;
-//    }
-//
-//    // Both objects are not full
-//    const map<Key, ValueObjectPtr> thatVMap = thatV_p->getValuesMap();
-//
-//    typename map<Key, ValueObjectPtr>::iterator it = aoMap.begin();
-//    typename map<Key, ValueObjectPtr>::const_iterator s_it; // search iterator for thatVMap
-//
-//    bool modified = false;
-//    while (it != aoMap.end()) {
-//      s_it = thatVMap.find(it->first);
-//      // If two objects have the same key then discharge meetUpdate to the corresponding keyed Value objects
-//      if (s_it != thatVMap.end()) {
-//        modified = (it->second)->meetUpdateAO(s_it->second, pedge) || modified;
-//      }
-//
-//      // Remove the current Value object (current iterator it) from the map if the mapepd object is full.
-//      // Two cases under which the current Value object can be full.
-//      // (1) If current key is not found in thatVMap then the mapped object
-//      // in thatVMap is full and the meetUpdate of the current V with that is also full.
-//      // (2) meetUpdateV above of the two keyed objects resulted in this mapped object being full.
-//      // Under both cases remove the mapped ml from this map
-//      if (s_it == thatVMap.end() || (it->second)->isFullAO(pedge)) {
-//        // Current mapped Value object has become full as a result of (1) or (2).
-//        // Remove the item from the map.
-//        // Note that post-increment which increments the iterator and returns the old value for deletion.
-//        aoMap.erase(it++);
-//        nFull++;
-//        modified = true;
-//
-//        // If union then set this entire object to full and return
-//        if (isUnion()) {
-//          setVToFull();
-//          return true;
-//        }
-//      } else
-//        ++it;
-//    }
-//    return modified;
-//  }
-//
-////! Method that sets this mapped object to full
-//  template<class Key>
-//  void MappedValueObject<Key>::setVToFull() {
-//    assert(nFull > 0);
-//    if (aoMap.size() > 0)
-//      aoMap.clear();
-//  }
-//
-//  template<class Key>
-//  bool MappedValueObject<Key>::isFullAO() {
-//    if (nFull > 0 && aoMap.size() == 0)
-//      return true;
-//    return false;
-//  }
-//
-//  template<class Key>
-//  bool MappedValueObject<Key>::isFullAO(PartEdgePtr pedge) {
-//    return isFullAO();
-//  }
-//
-//  template<class Key>
-//  bool MappedValueObject<Key>::isEmptyAO() {
-//    if (nFull == 0 && aoMap.size() == 0)
-//      return true;
-//    return false;
-//  }
-//
-//  template<class Key>
-//  bool MappedValueObject<Key>::isEmptyAO(PartEdgePtr pedge) {
-//    return isEmptyAO();
-//  }
-//
-//  template<class Key>
-//  bool MappedValueObject<Key>::isConcrete() {
-//
-//    if (isFullAO())
-//      return false;
-//    if (isEmptyAO())
-//      return false;
-//    if (isUnion() && nFull > 0)
-//      return false;
-//
-//    typename map<Key, ValueObjectPtr>::iterator it = aoMap.begin();
-//    for (; it != aoMap.end(); ++it) {
-//      bool isConc = it->second->isConcrete();
-//      // we have atleast one that is not concrete under union
-//      if (isUnion() && !isConc)
-//        return false;
-//      // we have atleast one that is concrete under intersection
-//      else if (isIntersection() && isConc)
-//        return true;
-//    }
-//
-//    // All the objects are concrete (return true above) union
-//    if (isUnion())
-//      return true;
-//    // All the objects not concrete (return false above) under intersection
-//    else if (isIntersection())
-//      return false;
-//    else
-//      assert(0);
-//  }
-//
-//// Returns the number of concrete values in this set
-//  template<class Key>
-//  int MappedValueObject<Key>::concreteSetSize() {
-//    assert(isConcrete());
-//    return getConcreteValue().size();
-//  }
-//
-//  template<class Key>
-//  SgType* MappedValueObject<Key>::getConcreteType() {
-//    assert(isConcrete());
-//    typename map<Key, ValueObjectPtr>::iterator it = aoMap.begin();
-//    SgType* c_type = it->second->getConcreteType();
-//    // assert that all other objects have the same type
-//    for (++it; it != aoMap.end(); ++it) {
-//      SgType* votype = it->second->getConcreteType();
-//      assert(c_type == votype);
-//    }
-//    return c_type;
-//  }
-//
-//  template<class Key>
-//  set<boost::shared_ptr<SgValueExp> > MappedValueObject<Key>::getConcreteValue() {
-//    assert(isConcrete());
-//    // If this is a union type (defaultMayEq=true), the result is the Union of the sets returned by getConcrete() on all the memRegions.
-//    // If this is an intersection type (defaultMayEq=false), an object is their Intersection.
-//
-//    // Maps each concrete value to the number of elements in aoMap for which it was returned
-//    std::map<boost::shared_ptr<SgValueExp>, size_t> concreteVals;
-//    for (typename map<Key, ValueObjectPtr>::iterator v_it = aoMap.begin();
-//        v_it != aoMap.end(); ++v_it) {
-//      // Iterate through the current sub-MemRegion's concrete values and increment each
-//      // concrete value's counter in concreteMRs.
-//      std::set<boost::shared_ptr<SgValueExp> > c_valueSet =
-//          v_it->second->getConcreteValue();
-//      for (std::set<boost::shared_ptr<SgValueExp> >::iterator s_it =
-//          c_valueSet.begin(); s_it != c_valueSet.end(); ++s_it) {
-//        map<boost::shared_ptr<SgValueExp>, size_t>::iterator c_it =
-//            concreteVals.begin();
-//        for (; c_it != concreteVals.end(); ++c_it) {
-//          // If we've found the same value, increment its counter
-//          if (ValueObject::equalValueExp(c_it->first.get(), (*s_it).get())) {
-//            c_it->second++;
-//            break;
-//          }
-//        }
-//
-//        // If we did not find the value, add it to concreteVals;
-//        if (c_it == concreteVals.end())
-//          concreteVals[*s_it] = 1;
-//      }
-//    }
-//
-//    // Collect the union or intersection of all results from concreteMRs as a set
-//    std::set<boost::shared_ptr<SgValueExp> > ret;
-//    for (std::map<boost::shared_ptr<SgValueExp>, size_t>::iterator i =
-//        concreteVals.begin(); i != concreteVals.end(); i++) {
-//      // Union: add every key in concreteMRs to ret
-//      if (isUnion())
-//        ret.insert(i->first);
-//      // Intersection: only add the keys that appear in every MemRegion in memRegions
-//      else if (isIntersection() && i->second == aoMap.size())
-//        ret.insert(i->first);
-//    }
-//
-//    return ret;
-//  }
-//
-//  template<class Key>
-//  ValueObjectPtr MappedValueObject<Key>::copyAO() const {
-//    return boost::make_shared<MappedValueObject<Key> >(*this);
-//  }
-//
-//  template<class Key>
-//  string MappedValueObject<Key>::str(string indent) const {
-//    ostringstream oss;
-//    oss << "<table border=\"1\">";
-//    oss << "<tr>";
-//    oss << "<th>"
-//        << (isUnion() ? "UnionMappedValueObject:" : "IntersectMappedValueObject:")
-//        << "</th>";
-//    if (nFull > 0 && aoMap.size() == 0)
-//      oss << "<th> Full </th> </tr>";
-//    else if (nFull == 0 && aoMap.size() == 0)
-//      oss << "<th> Empty </th> </tr>";
-//    else {
-//      oss << "</tr>";
-//      typename map<Key, ValueObjectPtr>::const_iterator it = aoMap.begin();
-//      for (; it != aoMap.end(); ++it) {
-//        oss << "<tr>";
-//        oss << "<td>" << (it->first)->str(indent) << "</td>";
-//        oss << "<td>" << (it->second)->str(indent) << "</td>";
-//        oss << "</tr>";
-//      }
-//    }
-//    oss << "</table>";
-//    return oss.str();
-//  }
-//
-//// Returns whether all instances of this class form a hierarchy. Every instance of the same
-//// class created by the same analysis must return the same value from this method!
-//  template<class Key>
-//  bool MappedValueObject<Key>::isHierarchy() const {
-//    // Combined Values form hierarchy if:
-//    // - All the sub-Values form hierarchies of their own, AND
-//    // - The combination is an intersection.
-//    //   If the combination is a union then consider the following:
-//    //            MLa     MLb
-//    //   comb1 = {a,b}, {w, x}
-//    //   comb2 = {a,b}, {y, z}
-//    //   Note that MLs from analyses a and b are either identical sets or disjoint
-//    //   However, comb1 U comb2 = {a, b, w, x, y, z}, for which this property does
-//    //   not hold unless we work out a new hierarchy for MLb.
-//
-//    // Unions are not hierarchical unless they're singletons
-//    if (isUnion()) {
-//      if (aoMap.size() == 1)
-//        return aoMap.begin()->second->isHierarchy();
-//      else
-//        return false;
-//    }
-//
-//    typename map<Key, ValueObjectPtr>::const_iterator it;
-//    for (it = aoMap.begin(); it != aoMap.end(); ++it)
-//      if (!it->second->isHierarchy())
-//        return false;
-//    return true;
-//  }
-//
-//// Returns a key that uniquely identifies this particular AbstractObject in the
-//// set hierarchy.
-//  template<class Key>
-//  const AbstractionHierarchy::hierKeyPtr& MappedValueObject<Key>::getHierKey() const {
-//    // The intersection of multiple objects is just a filtering process from the full
-//    // set of objects to the exact one, with each key in the hierarchy further filtering
-//    // the set down. As such, a hierarchical key for the intersection of multiple objects
-//    // is just the concatenation of the keys of all the individual objects.
-//    if (!isHierKeyCached) {
-//      /*((MappedValueObject<Key>*) this)->cachedHierKey =
-//       boost::make_shared<AOSHierKey>(
-//       ((MappedValueObject<Key>*) this)->shared_from_this());
-//
-//       typename map<Key, ValueObjectPtr>::const_iterator it;
-//       for (it = aoMap.begin(); it != aoMap.end(); ++it) {
-//       AbstractionHierarchyPtr hierIt = boost::dynamic_pointer_cast<
-//       AbstractionHierarchy>(it->second);
-//       ROSE_ASSERT(hierIt);
-//
-//       ((MappedValueObject<Key>*) this)->cachedHierKey->add(
-//       hierIt->getHierKey()->begin(), hierIt->getHierKey()->end());
-//       }*/
-//      map<Key, hierKeyPtr> subHierKeys;
-//      for(typename map<Key, ValueObjectPtr>::const_iterator it = aoMap.begin();
-//          it != aoMap.end(); ++it) {
-//        AbstractionHierarchyPtr hierIt = boost::dynamic_pointer_cast<AbstractionHierarchy>(it->second);
-//        ROSE_ASSERT(hierIt);
-//        subHierKeys[it->first] = hierIt->getHierKey();
-//      }
-//
-//      ((MappedValueObject<Key>*) this)->cachedHierKey =
-//          boost::make_shared<IntersectMappedHierKey<Key> >(subHierKeys);
-//
-//      ((MappedValueObject<Key>*) this)->isHierKeyCached = true;
-//    }
-//    return cachedHierKey;
-//  }
-
-template<class Key>
-SgType* MappedValueObject<Key>::getConcreteType() {
-  assert(MappedValueObject<Key>::isConcrete());
+template<class Key, class MappedAOSubType>
+SgType* MappedValueObject<Key, MappedAOSubType>::getConcreteType() {
+  if(!MappedValueObject<Key, MappedAOSubType>::isConcrete()) assert(0);
   typename map<Key, ValueObjectPtr>::iterator it =
-      MappedAbstractObject<Key, ValueObject, AbstractObject::Value, MappedValueObject<Key> >::aoMap.begin();
+      MappedAbstractObject<Key, ValueObject, AbstractObject::Value, MappedAOSubType>::aoMap.begin();
   SgType* c_type = it->second->getConcreteType();
   // assert that all other objects have the same type
-  for (++it; it != MappedAbstractObject<Key, ValueObject, AbstractObject::Value, MappedValueObject<Key> >::aoMap.end(); ++it) {
+  for (++it; it != MappedAbstractObject<Key, ValueObject, AbstractObject::Value, MappedAOSubType>::aoMap.end(); ++it) {
     SgType* votype = it->second->getConcreteType();
     assert(c_type == votype);
   }
   return c_type;
 }
 
-template<class Key>
-set<boost::shared_ptr<SgValueExp> > MappedValueObject<Key>::getConcreteValue() {
-  if(!MappedAbstractObject<Key, ValueObject, AbstractObject::Value, MappedValueObject<Key> >::isConcrete()) assert(0);
+template<class Key, class MappedAOSubType>
+set<boost::shared_ptr<SgValueExp> > MappedValueObject<Key, MappedAOSubType>::getConcreteValue() {
+  if(!MappedAbstractObject<Key, ValueObject, AbstractObject::Value, MappedAOSubType>::isConcrete()) assert(0);
   // If this is a union type (defaultMayEq=true), the result is the Union of the sets returned by getConcrete() on all the memRegions.
   // If this is an intersection type (defaultMayEq=false), an object is their Intersection.
 
   // Maps each concrete value to the number of elements in aoMap for which it was returned
   std::map<boost::shared_ptr<SgValueExp>, size_t> concreteVals;
   for(typename map<Key, ValueObjectPtr>::iterator v_it =
-      MappedAbstractObject<Key, ValueObject, AbstractObject::Value, MappedValueObject<Key> >::aoMap.begin();
-      v_it != MappedAbstractObject<Key, ValueObject, AbstractObject::Value, MappedValueObject<Key> >::aoMap.end(); ++v_it) {
+      MappedAbstractObject<Key, ValueObject, AbstractObject::Value, MappedAOSubType>::aoMap.begin();
+      v_it != MappedAbstractObject<Key, ValueObject, AbstractObject::Value, MappedAOSubType>::aoMap.end(); ++v_it) {
     // Iterate through the current sub-MemRegion's concrete values and increment each
     // concrete value's counter in concreteMRs.
     std::set<boost::shared_ptr<SgValueExp> > c_valueSet =
@@ -4257,11 +2637,11 @@ set<boost::shared_ptr<SgValueExp> > MappedValueObject<Key>::getConcreteValue() {
   for (std::map<boost::shared_ptr<SgValueExp>, size_t>::iterator i =
       concreteVals.begin(); i != concreteVals.end(); i++) {
     // Union: add every key in concreteMRs to ret
-    if (MappedAbstractObject<Key, ValueObject, AbstractObject::Value, MappedValueObject<Key> >::isUnion())
+    if (MappedAbstractObject<Key, ValueObject, AbstractObject::Value, MappedAOSubType>::isUnion())
       ret.insert(i->first);
     // Intersection: only add the keys that appear in every MemRegion in memRegions
-    else if (MappedAbstractObject<Key, ValueObject, AbstractObject::Value, MappedValueObject<Key> >::isIntersection() &&
-             i->second == MappedAbstractObject<Key, ValueObject, AbstractObject::Value, MappedValueObject<Key> >::aoMap.size())
+    else if (MappedAbstractObject<Key, ValueObject, AbstractObject::Value, MappedAOSubType>::isIntersection() &&
+             i->second == MappedAbstractObject<Key, ValueObject, AbstractObject::Value, MappedAOSubType>::aoMap.size())
       ret.insert(i->first);
   }
 
@@ -4278,7 +2658,7 @@ PartEdgeUnionValueObject::PartEdgeUnionValueObject() :
 
 PartEdgeUnionValueObject::PartEdgeUnionValueObject(
     const PartEdgeUnionValueObject& thatV) :
-    ValueObject(thatV), unionV_p(thatV.copyAOType()) {
+    ValueObject(thatV), unionV_p(thatV.unionV_p->copyAOType()) {
 }
 
 SgNode* PartEdgeUnionValueObject::getBase() const {
@@ -4377,7 +2757,7 @@ set<boost::shared_ptr<SgValueExp> > PartEdgeUnionValueObject::getConcreteValue()
 
 string PartEdgeUnionValueObject::str(string indent) const {
   ostringstream oss;
-  oss << "[UnionV=" << unionV_p->str(indent) << "]";
+  oss << "[UnionV=" << (unionV_p? unionV_p->str(indent): "NULL") << "]";
   return oss.str();
 }
 
@@ -4387,21 +2767,26 @@ string PartEdgeUnionValueObject::str(string indent) const {
 
 MemRegionObjectPtr NULLMemRegionObject;
 
+// Returns the relationship between the given AbstractObjects, considering whether either
+// or both are FuncResultMemRegionObjects and if they refer to the same function
+FuncResultRelationType MemRegionObject::getFuncResultRel(AbstractObject* one, AbstractObjectPtr two, PartEdgePtr pedge) {
+  // If either this or that are FuncResultMemRegionObject, they mayEqual iff they correspond to the same function
+  FuncResultMemRegionObject* frmlcoOne = dynamic_cast<FuncResultMemRegionObject*>(one);
+  FuncResultMemRegionObjectPtr frmlcoTwo = boost::dynamic_pointer_cast<FuncResultMemRegionObject>(two);
+  if (frmlcoOne) {
+    if(frmlcoOne->mustEqualAO(frmlcoTwo, pedge)) return FuncResultSameFunc;
+    else                                         return FuncResultUnequal;
+  } else if (frmlcoTwo)
+    return FuncResultUnequal;
+  else
+    return NeitherFuncResult;
+}
+
 // General version of mayEqual and mustEqual that accounts for framework details before routing the call to the
 // derived class' may/mustEqual check. Specifically, it checks may/must equality with respect to ExprObj and routes
 // the call through the composer to make sure the may/mustEqual call gets the right PartEdge
 bool MemRegionObject::mayEqual(MemRegionObjectPtr that, PartEdgePtr pedge,
     Composer* comp, ComposedAnalysis* analysis) {
-  // If either this or that are FuncResultMemRegionObject, they mayEqual iff they correspond to the same function
-  FuncResultMemRegionObject* frmlcoThis =
-      dynamic_cast<FuncResultMemRegionObject*>(this);
-  FuncResultMemRegionObjectPtr frmlcoThat = boost::dynamic_pointer_cast<
-      FuncResultMemRegionObject>(that);
-  if (frmlcoThis)
-    return frmlcoThis->mayEqualAO(frmlcoThat, pedge);
-  else if (frmlcoThat)
-    return false;
-
   // If both this and that are both expression objects or both not expression objects, use the
   // derived class' equality check
   //dbg << "MemRegionObject::mayEqual() dynamic_cast<const ExprObj*>(this)="<<dynamic_cast<const ExprObj*>(this)<<" dynamic_cast<const ExprObj*>(o.get())="<<dynamic_cast<const ExprObj*>(o.get())<<endl;
@@ -4424,15 +2809,6 @@ bool MemRegionObject::mayEqual(MemRegionObjectPtr that, PartEdgePtr pedge,
 // the call through the composer to make sure the may/mustEqual call gets the right PartEdge
 bool MemRegionObject::mustEqual(MemRegionObjectPtr that, PartEdgePtr pedge,
     Composer* comp, ComposedAnalysis* analysis) {
-  // If either this or that are FuncResultMemRegionObject, they mustEqual iff they both are
-  FuncResultMemRegionObject* frmlcoThis =
-      dynamic_cast<FuncResultMemRegionObject*>(this);
-  FuncResultMemRegionObjectPtr frmlcoThat = boost::dynamic_pointer_cast<
-      FuncResultMemRegionObject>(that);
-  if (frmlcoThis)
-    return frmlcoThat->mustEqualAO(frmlcoThat, pedge);
-  else if (frmlcoThat)
-    return frmlcoThis;
 
   // Efficiently compute must equality for simple cases where the two MemRegionObjects correspond to the same SgNode
   //if(AbstractObject::mustEqualExpr(boost::static_pointer_cast<AbstractObject>(that), pedge)) return true;
@@ -4458,37 +2834,45 @@ bool MemRegionObject::mustEqual(MemRegionObjectPtr that, PartEdgePtr pedge,
 // Check whether that is a MemRegionObject and if so, call the version of mayEqual specific to MemRegionObjects
 bool MemRegionObject::mayEqual(AbstractObjectPtr that, PartEdgePtr pedge,
     Composer* comp, ComposedAnalysis* analysis) {
+  // Identical FuncResultMemRegionObject denote the same set and different ones denote disjoint sets
+  FuncResultRelationType rel = getFuncResultRel(this, that, pedge);
+  switch(rel) {
+    case FuncResultSameFunc: return true;
+    case FuncResultUnequal: return false;
+    case NeitherFuncResult: break;
+  }
+  // If either this or that is a FullMemRegionObject, the two objects only overlap if either is full.
+  // We do this check early because casting to FullMemRegionObject is more efficient than calling isFull.
+  if (boost::dynamic_pointer_cast<FullMemRegionObject>(that)) return true;
+  if (dynamic_cast<FullMemRegionObject*>(this))               return true;
+
   MemRegionObjectPtr mo = boost::dynamic_pointer_cast<MemRegionObject>(that);
-  if (mo)
-    return mayEqual(mo, pedge, comp, analysis);
-  else
-    return false;
+  if (mo) return mayEqual(mo, pedge, comp, analysis);
+  else    return false;
 }
 
 // Check whether that is a MemRegionObject and if so, call the version of mustEqual specific to MemRegionObjects
 bool MemRegionObject::mustEqual(AbstractObjectPtr that, PartEdgePtr pedge,
     Composer* comp, ComposedAnalysis* analysis) {
-  //if(AbstractObject::mustEqualExpr(that, pedge)) return true;
+  // Identical FuncResultMemRegionObject denote the same set and different ones denote disjoint sets
+  FuncResultRelationType rel = getFuncResultRel(this, that, pedge);
+  switch(rel) {
+    case FuncResultSameFunc: return true;
+    case FuncResultUnequal: return false;
+    case NeitherFuncResult: break;
+  }
+  // If either this or that is a FullMemRegionObject, the two objects only must-equal if neither is full.
+  // We do this check early because casting to FullMemRegionObject is more efficient than calling isFull.
+  if (boost::dynamic_pointer_cast<FullMemRegionObject>(that)) return false;
+  if (dynamic_cast<FullMemRegionObject*>(this))               return false;
 
   MemRegionObjectPtr mo = boost::dynamic_pointer_cast<MemRegionObject>(that);
-  if (mo)
-    return mustEqual(mo, pedge, comp, analysis);
-  else
-    return false;
+  if (mo) return mustEqual(mo, pedge, comp, analysis);
+  else    return false;
 }
 
 bool MemRegionObject::equalSet(MemRegionObjectPtr that, PartEdgePtr pedge,
     Composer* comp, ComposedAnalysis* analysis) {
-  // If either this or that are FuncResultMemRegionObject, they denote equal sets iff they correspond to the same function
-  FuncResultMemRegionObject* frmlcoThis =
-      dynamic_cast<FuncResultMemRegionObject*>(this);
-  FuncResultMemRegionObjectPtr frmlcoThat = boost::dynamic_pointer_cast<
-      FuncResultMemRegionObject>(that);
-  if (frmlcoThis)
-    return frmlcoThis->equalSetAO(frmlcoThat, pedge);
-  else if (frmlcoThat)
-    return false;
-
   /*if(equalSetCache.find(that) == equalSetCache.end())
    equalSetCache[that] = comp->equalSetAO(shared_from_this(), that, pedge, analysis);
    return equalSetCache[that];*/
@@ -4497,38 +2881,45 @@ bool MemRegionObject::equalSet(MemRegionObjectPtr that, PartEdgePtr pedge,
 
 bool MemRegionObject::subSet(MemRegionObjectPtr that, PartEdgePtr pedge,
     Composer* comp, ComposedAnalysis* analysis) {
-  // If either this or that are FuncResultMemRegionObject, they denote equal sets iff they correspond to the same function
-  FuncResultMemRegionObject* frmlcoThis =
-      dynamic_cast<FuncResultMemRegionObject*>(this);
-  FuncResultMemRegionObjectPtr frmlcoThat = boost::dynamic_pointer_cast<
-      FuncResultMemRegionObject>(that);
-  if (frmlcoThis)
-    return frmlcoThis->subSetAO(frmlcoThat, pedge);
-  else if (frmlcoThat)
-    return false;
-
-  /*if(subSetCache.find(that) == subSetCache.end())
-   subSetCache[that] = comp->subSetAO(shared_from_this(), that, pedge, analysis);
-   return subSetCache[that];*/
   return comp->subSetMR(shared_from_this(), that, pedge, analysis);
 }
 
-bool MemRegionObject::equalSet(AbstractObjectPtr o, PartEdgePtr pedge,
+bool MemRegionObject::equalSet(AbstractObjectPtr that, PartEdgePtr pedge,
     Composer* comp, ComposedAnalysis* analysis) {
-  MemRegionObjectPtr co = boost::dynamic_pointer_cast<MemRegionObject>(o);
-  if (co)
-    return equalSet(co, pedge, comp, analysis);
-  else
-    return false;
+  // Identical FuncResultMemRegionObject denote the same set and different ones denote disjoint sets
+  FuncResultRelationType rel = getFuncResultRel(this, that, pedge);
+  switch(rel) {
+    case FuncResultSameFunc: return true;
+    case FuncResultUnequal: return false;
+    case NeitherFuncResult: break;
+  }
+  // If either this or that is a FullMemRegionObject, the two objects only equal only if they're both full.
+  // We do this check early because casting to FullMemRegionObject is more efficient than calling isFull.
+  if (boost::dynamic_pointer_cast<FullMemRegionObject>(that)) return isFull(pedge, comp, analysis);
+  if (dynamic_cast<FullMemRegionObject*>(this))               return that->isFull(pedge, comp, analysis);
+
+  MemRegionObjectPtr co = boost::dynamic_pointer_cast<MemRegionObject>(that);
+  if (co) return equalSet(co, pedge, comp, analysis);
+  else    return false;
 }
 
-bool MemRegionObject::subSet(AbstractObjectPtr o, PartEdgePtr pedge,
+bool MemRegionObject::subSet(AbstractObjectPtr that, PartEdgePtr pedge,
     Composer* comp, ComposedAnalysis* analysis) {
-  MemRegionObjectPtr co = boost::dynamic_pointer_cast<MemRegionObject>(o);
-  if (co)
-    return subSet(co, pedge, comp, analysis);
-  else
-    return false;
+  // Identical FuncResultMemRegionObject denote the same set and different ones denote disjoint sets
+  FuncResultRelationType rel = getFuncResultRel(this, that, pedge);
+  switch(rel) {
+    case FuncResultSameFunc: return true;
+    case FuncResultUnequal: return false;
+    case NeitherFuncResult: break;
+  }
+  // If either this or that is a FullMemRegionObject, this is a subset of that if they're equal or of that is full.
+  // We do this check early because casting to FullMemRegionObject is more efficient than calling isFull.
+  if (boost::dynamic_pointer_cast<FullMemRegionObject>(that)) return true;
+  if (dynamic_cast<FullMemRegionObject*>(this))               return that->isFull(pedge, comp, analysis);
+
+  MemRegionObjectPtr co = boost::dynamic_pointer_cast<MemRegionObject>(that);
+  if (co) return subSet(co, pedge, comp, analysis);
+  else    return false;
 }
 
 // General version of isLive that accounts for framework details before routing the call to the derived class'
@@ -4549,6 +2940,17 @@ bool MemRegionObject::meetUpdate(MemRegionObjectPtr that, PartEdgePtr pedge,
 
 bool MemRegionObject::meetUpdate(AbstractObjectPtr that, PartEdgePtr pedge,
     Composer* comp, ComposedAnalysis* analysis) {
+  // Identical FuncResultMemRegionObject denote the same set and different ones denote disjoint sets
+  FuncResultRelationType rel = getFuncResultRel(this, that, pedge);
+  switch(rel) {
+    case FuncResultSameFunc: return false;
+    case FuncResultUnequal: return setToFull(pedge, comp, analysis);
+    case NeitherFuncResult: break;
+  }
+  // If that is a FullMemRegionObject but this is not, we'll need to make this object full
+  if (boost::dynamic_pointer_cast<FullMemRegionObject>(that) && !isFull(pedge, comp, analysis))
+    return setToFull(pedge, comp, analysis);
+
   MemRegionObjectPtr mr = boost::dynamic_pointer_cast<MemRegionObject>(that);
   assert(mr);
   return meetUpdate(mr, pedge, comp, analysis);
@@ -4669,7 +3071,7 @@ MemRegionObjectPtr FuncResultMemRegionObject::copyAOType() const {
   return boost::make_shared<FuncResultMemRegionObject>(func);
 }
 
-// Returns a key that uniquely identifies this particular AbstractObject in the 
+// Returns a key that uniquely identifies this particular AbstractObject in the
 // set hierarchy.
 const AbstractionHierarchy::hierKeyPtr& FuncResultMemRegionObject::getHierKey() const {
   if (!isHierKeyCached) {
@@ -4746,924 +3148,32 @@ string FullMemRegionObject::str(string indent) const {
 }
 
 /* ###################################
-   ##### CombinedMemRegionObject   #####
-   ################################### * /
+   ##### CombinedMemRegionObject #####
+   ################################### */
 
-/*
- // Creates a new CombinedMemRegionObject instance of the generic CombinedMemRegionObject class.
- template <bool defaultMayEq>
- boost::shared_ptr<CombinedMemRegionObject<defaultMayEq> > CombinedMemRegionObject<defaultMayEq>::create(MemRegionObjectPtr memReg)
- {
- list<MemRegionObjectPtr> memRegions; memRegions.push_back(memReg);
- return boost::make_shared<CombinedMemRegionObject<defaultMayEq> >(memRegions);
-
- // dbg << "<font color=\"$#ff0000\">"<<memLoc->str()<<"</font>"<<endl;
- }
-
- // Sriram: gcc 4.1.2 complains of undefined references to unused to template functions
- // fix: explicit template instantiation
- template boost::shared_ptr<CombinedMemRegionObject<true> > CombinedMemRegionObject<true>::create(MemRegionObjectPtr memReg);
- template boost::shared_ptr<CombinedMemRegionObject<false> > CombinedMemRegionObject<false>::create(MemRegionObjectPtr memReg);
-
- template <bool defaultMayEq>
- boost::shared_ptr<CombinedMemRegionObject<defaultMayEq> > CombinedMemRegionObject<defaultMayEq>::create(const std::list<MemRegionObjectPtr>& memRegions)
- {
- //dbg << "CombinedMemRegionObject<"<<defaultMayEq<<">::create() generic "<< endl;
- return boost::make_shared<CombinedMemRegionObject<defaultMayEq> >(memRegions);
- }
-
- // Sriram: gcc 4.1.2 complains of undefined references to unused to template functions
- // fix: explicit template instantiation
- template boost::shared_ptr<CombinedMemRegionObject<true> > CombinedMemRegionObject<true>::create(const std::list<MemRegionObjectPtr>& memRegions);
- template boost::shared_ptr<CombinedMemRegionObject<false> > CombinedMemRegionObject<false>::create(const std::list<MemRegionObjectPtr>& memRegions);
- * /
-
-template<bool defaultMayEq>
-SgNode* CombinedMemRegionObject<defaultMayEq>::getBase() const {
-  // Returns the base SgNode shared by all the MemLocs in this object or NULL, if the base SgNodes are different
-  SgNode* base = NULL;
-  for (list<MemRegionObjectPtr>::const_iterator it = memRegions.begin();
-      it != memRegions.end(); it++) {
-    if (it == memRegions.begin())
-      base = (*it)->getBase();
-    else if (base != (*it)->getBase())
-      return NULL;
-  }
-
-  return base;
-}
-
-template<bool defaultMayEq>
-void CombinedMemRegionObject<defaultMayEq>::add(MemRegionObjectPtr memReg) {
-  memRegions.push_back(memReg);
-}
-
-// Returns whether this object may/must be equal to o within the given Part p
-template<bool defaultMayEq>
-bool CombinedMemRegionObject<defaultMayEq>::mayEqualAO(MemRegionObjectPtr o,
-    PartEdgePtr pedge) {
-  //dbg << "Comparing " << this->str("    ") << "with " << o->str("    ") << endl;
-
-  boost::shared_ptr<CombinedMemRegionObject<defaultMayEq> > that =
-      boost::dynamic_pointer_cast<CombinedMemRegionObject<defaultMayEq> >(o);
-  assert(that);
-
-  // If the two combination objects include different numbers of MemRegionObjects, say that they may be equal since
-  // we can't be sure either way.
-  if (memRegions.size() != that->memRegions.size())
-    return true;
-
-  assert(memRegions.size() > 0);
-
-  // Compare all the pairs of MemRegionObjects in memLocs and that.memLocs, returning defaultMayEq if any pair
-  // returns defaultMayEq since we're looking for the tightest (if defaultMayEq=false) / loosest (if defaultMayEq=true)
-  // answer that any MemRegionObject in memLocs can give
-  for (list<MemRegionObjectPtr>::iterator thisIt = memRegions.begin(),
-      thatIt = that->memRegions.begin(); thisIt != memRegions.end();
-      thisIt++, thatIt++) {
-    if ((*thisIt)->mayEqualAO(*thatIt, pedge) == defaultMayEq)
-      return defaultMayEq;
-  }
-
-  return !defaultMayEq;
-}
-
-template<bool defaultMayEq>
-bool CombinedMemRegionObject<defaultMayEq>::mustEqualAO(MemRegionObjectPtr o,
-    PartEdgePtr pedge) {
-  boost::shared_ptr<CombinedMemRegionObject<defaultMayEq> > that =
-      boost::dynamic_pointer_cast<CombinedMemRegionObject<defaultMayEq> >(o);
-  assert(that);
-
-  // If the two combination  objects include different numbers of MemRegionObjects, say that they are not must equal since
-  // we can't be sure either way.
-  if (memRegions.size() != that->memRegions.size())
-    return false;
-
-  assert(memRegions.size() > 0);
-
-  // Compare all the pairs of MemRegionObjects in memLocs and that.memLocs, returning !defaultMayEq if any pair
-  // returns !defaultMayEqual since we're looking for the tightest answer that any MemRegionObject in memLocs can give
-  for (list<MemRegionObjectPtr>::iterator thisIt = memRegions.begin(),
-      thatIt = that->memRegions.begin(); thisIt != memRegions.end();
-      thisIt++, thatIt++) {
-    if ((*thisIt)->mustEqualAO(*thatIt, pedge) == !defaultMayEq)
-      return !defaultMayEq;
-  }
-
-  return defaultMayEq;
-}
-
-// Returns whether the two abstract objects denote the same set of concrete objects
-template<bool defaultMayEq>
-bool CombinedMemRegionObject<defaultMayEq>::equalSetAO(MemRegionObjectPtr o,
-    PartEdgePtr pedge) {
-  boost::shared_ptr<CombinedMemRegionObject<defaultMayEq> > that =
-      boost::dynamic_pointer_cast<CombinedMemRegionObject<defaultMayEq> >(o);
-  assert(that);
-  assert(memRegions.size() == that->memRegions.size());
-  assert(memRegions.size() > 0);
-
-  // Two unions and intersections denote the same set of their components individually denote the same set
-  // (we can get a more precise answer if we could check set containment relations as well)
-  list<MemRegionObjectPtr>::const_iterator mrThis = memRegions.begin();
-  list<MemRegionObjectPtr>::const_iterator mrThat = that->memRegions.begin();
-  for (; mrThis != memRegions.end(); mrThis++, mrThat++)
-    if (!(*mrThis)->equalSetAO(*mrThat, pedge))
-      return false;
-  return true;
-}
-
-// Returns whether this abstract object denotes a non-strict subset (the sets may be equal) of the set denoted
-// by the given abstract object.
-template<bool defaultMayEq>
-bool CombinedMemRegionObject<defaultMayEq>::subSetAO(MemRegionObjectPtr o,
-    PartEdgePtr pedge) {
-  boost::shared_ptr<CombinedMemRegionObject<defaultMayEq> > that =
-      boost::dynamic_pointer_cast<CombinedMemRegionObject<defaultMayEq> >(o);
-  assert(that);
-  assert(memRegions.size() == that->memRegions.size());
-  assert(memRegions.size() > 0);
-
-  // Compare all the pairs of MemRegionObjects in memLocs and that.memLocs, returning defaultMayEq if any pair
-  // returns defaultMayEq since we're looking for the tightest (if defaultMayEq=false) / loosest (if defaultMayEq=true)
-  // answer that any MemRegionObject in memLocs can give
-  for (list<MemRegionObjectPtr>::iterator thisIt = memRegions.begin(),
-      thatIt = that->memRegions.begin(); thisIt != memRegions.end();
-      thisIt++, thatIt++) {
-    if ((*thisIt)->subSetAO(*thatIt, pedge) == defaultMayEq)
-      return defaultMayEq;
-  }
-  return !defaultMayEq;
-}
-
-// Allocates a copy of this object and returns a pointer to it
-template<bool defaultMayEq>
-MemRegionObjectPtr CombinedMemRegionObject<defaultMayEq>::copyAOType() const {
-  return boost::make_shared<CombinedMemRegionObject>(memRegions);
-}
-
-// Returns true if this object is live at the given part and false otherwise
-template<bool defaultMayEq>
-bool CombinedMemRegionObject<defaultMayEq>::isLiveAO(PartEdgePtr pedge) {
-  assert(memRegions.size() > 0);
-//cout << "CombinedMemRegionObject<defaultMayEq>::isLiveMR"<<endl;
-  // If this is a union type (defaultMayEq=true), an object is live if any of its components are live (weakest constraint)
-  // If this is an intersection type (defaultMayEq=false), an object is dead if any of its components are dead (strongest constraint)
-  for (list<MemRegionObjectPtr>::const_iterator mr = memRegions.begin();
-      mr != memRegions.end(); mr++)
-    if ((*mr)->isLiveAO(pedge) == defaultMayEq)
-      return defaultMayEq;
-
-  return !defaultMayEq;
-}
-
-// Computes the meet of this and that and saves the result in this
-// returns true if this causes this to change and false otherwise
-template<bool defaultMayEq>
-bool CombinedMemRegionObject<defaultMayEq>::meetUpdateAO(MemRegionObjectPtr o,
-    PartEdgePtr pedge) {
-  boost::shared_ptr<CombinedMemRegionObject<defaultMayEq> > that =
-      boost::dynamic_pointer_cast<CombinedMemRegionObject<defaultMayEq> >(o);
-  assert(that);
-  assert(memRegions.size() == that->memRegions.size());
-  assert(memRegions.size() > 0);
-  bool modified = false;
-
-  // Perform the meetUpdate operation on all member MemLocs
-  list<MemRegionObjectPtr>::const_iterator mrThis = memRegions.begin();
-  list<MemRegionObjectPtr>::const_iterator mrThat = that->memRegions.begin();
-  for (; mrThis != memRegions.end(); mrThis++, mrThat++)
-    modified = (*mrThis)->meetUpdateAO(*mrThat, pedge) || modified;
-  return modified;
-}
-
-// Returns whether this AbstractObject denotes the set of all possible execution prefixes.
-template<bool defaultMayEq>
-bool CombinedMemRegionObject<defaultMayEq>::isFullAO(PartEdgePtr pedge) {
-  assert(memRegions.size() > 0);
-
-  // If this is a union type (defaultMayEq=true), an object is full if any of its components are full (weakest constraint)
-  // If this is an intersection type (defaultMayEq=false), an object is not full if any of its components are not full (strongest constraint)
-  for (list<MemRegionObjectPtr>::const_iterator mr = memRegions.begin();
-      mr != memRegions.end(); mr++)
-    if ((*mr)->isFullAO(pedge) == defaultMayEq)
-      return defaultMayEq;
-
-  return !defaultMayEq;
-}
-
-// Returns whether this AbstractObject denotes the empty set.
-template<bool defaultMayEq>
-bool CombinedMemRegionObject<defaultMayEq>::isEmptyAO(PartEdgePtr pedge) {
-  assert(memRegions.size() > 0);
-
-  // If this is a union type (defaultMayEq=true), an object is not empty if any of its components are not empty (weakest constraint)
-  // If this is an intersection type (defaultMayEq=false), an object is empty if any of its components are empty (strongest constraint)
-  for (list<MemRegionObjectPtr>::const_iterator mr = memRegions.begin();
-      mr != memRegions.end(); mr++)
-    if ((*mr)->isEmptyAO(pedge) != defaultMayEq)
-      return !defaultMayEq;
-
-  return defaultMayEq;
-}
-
-// Returns true if this MemRegionObject denotes a finite set of concrete regions
-template<bool defaultMayEq>
-bool CombinedMemRegionObject<defaultMayEq>::isConcrete() {
-  SgType* commonType = NULL;
-
-  // If this is a union type (defaultMayEq=true), an object is concrete if all of its components are concrete weakest constraint).
-  // If this is an intersection type (defaultMayEq=false), an object is concrete if any of its components are concrete (strongest constraint)
-  // Further, in both cases an MR is not concrete if there is disagreement about its type
-  for (list<MemRegionObjectPtr>::const_iterator mr = memRegions.begin();
-      mr != memRegions.end(); mr++) {
-    if ((*mr)->isConcrete() != defaultMayEq)
-      return !defaultMayEq;
-
-    if (commonType == NULL)
-      commonType = (*mr)->getConcreteType();
-    else if (commonType != (*mr)->getConcreteType())
-      return false;
-  }
-
-  return defaultMayEq;
-}
-
-// Returns the number of concrete values in this set
-template<bool defaultMayEq>
-int CombinedMemRegionObject<defaultMayEq>::concreteSetSize() {
-  assert(isConcrete());
-  return getConcrete().size();
-}
-
-// Returns the type of the concrete regions (if there is one)
-template<bool defaultMayEq>
-SgType* CombinedMemRegionObject<defaultMayEq>::getConcreteType() {
-  SgType* commonType = NULL;
-  for (list<MemRegionObjectPtr>::const_iterator mr = memRegions.begin();
-      mr != memRegions.end(); mr++) {
-    if (commonType == NULL)
-      commonType = (*mr)->getConcreteType();
-    else if (commonType != (*mr)->getConcreteType())
-      return NULL;
-  }
-  assert(commonType);
-  return commonType;
-}
-
-// Returns the set of concrete memory regions as SgExpressions, which allows callers to use
-// the normal ROSE mechanisms to decode it
-template<bool defaultMayEq>
-std::set<SgNode*> CombinedMemRegionObject<defaultMayEq>::getConcrete() {
-  assert(isConcrete());
-
-  // If this is a union type (defaultMayEq=true), the result is the Union of the sets returned by getConcrete() on all the memRegions.
-  // If this is an intersection type (defaultMayEq=false), an object is their Intersection.
-
-  // Maps each concrete value to the number of elements in memRegions for which it was returned
-  std::map<SgNode*, size_t> concreteMRs;
-  for (list<MemRegionObjectPtr>::iterator mr = memRegions.begin();
-      mr != memRegions.end(); mr++) {
-    // Iterate through the current sub-MemRegion's concrete values and increment each
-    // concrete value's counter in concreteMRs.
-    std::set<SgNode*> curConcr = (*mr)->getConcrete();
-    for (std::set<SgNode*>::iterator i1 = curConcr.begin();
-        i1 != curConcr.end(); i1++) {
-      // Find the key in concrete memRegions with an equivalent SgExpression to *i1
-      std::map<SgNode*, size_t>::iterator i2 = concreteMRs.find(*i1);
-      if (i2 != concreteMRs.end())
-        ++i2->second;
-
-      // If the current concrete value *i1 does not appear in concreteMRs, add it
-      if (i2 == concreteMRs.end())
-        concreteMRs[*i1] = 1;
-    }
-  }
-
-  // Collect the union or intersection of all results from concreteMRs as a set
-  std::set<SgNode*> ret;
-  for (std::map<SgNode*, size_t>::iterator i = concreteMRs.begin();
-      i != concreteMRs.end(); i++) {
-    // Union: add every key in concreteMRs to ret
-    if (defaultMayEq)
-      ret.insert(i->first);
-    // Intersection: only add the keys that appear in every MemRegion in memRegions
-    else if (!defaultMayEq && i->second == memRegions.size())
-      ret.insert(i->first);
-  }
-
-  return ret;
-}
-
-// Returns a ValueObject that denotes the size of this memory region
-template<bool defaultMayEq>
-ValueObjectPtr CombinedMemRegionObject<defaultMayEq>::getRegionSizeAO(
-    PartEdgePtr pedge) {
-  assert(memRegions.size() > 0);
-
-  ValueObjectPtr res;
-  // Merge the ValueObjects returned by calls to gerRegionSize on all sub-regions
-  for (list<MemRegionObjectPtr>::const_iterator mr = memRegions.begin();
-      mr != memRegions.end(); mr++) {
-    if (mr == memRegions.begin())
-      res = (*mr)->getRegionSizeAO(pedge)->copyAOType();
-    else
-      // !!! GB 2012-09-16 : this is not quite right. We should be calling meetUpdate() to make sure
-      //        the call gets routed through the generic ValueObject machinery, if any, before being
-      //        forwarded to the meetUpdateAO() method.
-      // SA 2014/6/13: This will probably break if the ValueObjects stored in this collection are different
-      res->meetUpdateAO((*mr)->getRegionSizeAO(pedge), pedge);
-  }
-  return res;
-}
-
-template<bool defaultMayEq>
-std::string CombinedMemRegionObject<defaultMayEq>::str(
-    std::string indent) const {
-  ostringstream oss;
-  if (memRegions.size() > 1)
-    oss << "[" << (defaultMayEq ? "UnionMR" : "IntersectMR") << ": ";
-  if (memRegions.size() > 1)
-    oss << endl;
-  for (list<MemRegionObjectPtr>::const_iterator mr = memRegions.begin();
-      mr != memRegions.end();) {
-    if (mr != memRegions.begin())
-      oss << indent << "&nbsp;&nbsp;&nbsp;&nbsp;";
-    oss << (*mr)->str(indent + "&nbsp;&nbsp;&nbsp;&nbsp;");
-    mr++;
-    if (mr != memRegions.end())
-      oss << endl;
-  }
-  if (memRegions.size() > 1)
-    oss << "]";
-
-  return oss.str();
-}
-
-// Returns whether all instances of this class form a hierarchy. Every instance of the same
-// class created by the same analysis must return the same value from this method!
-template<bool defaultMayEq>
-bool CombinedMemRegionObject<defaultMayEq>::isHierarchy() const {
-  // Combined MemRegions form hierarchy if:
-  // - All the sub-MemRegions form hierarchies of their own, AND
-  // - The combination is an intersection.
-  //   If the combination is a union then consider the following:
-  //            MLa     MLb
-  //   comb1 = {a,b}, {w, x}
-  //   comb2 = {a,b}, {y, z}
-  //   Note that MLs from analyses a and b are either identical sets or disjoint
-  //   However, comb1 U comb2 = {a, b, w, x, y, z}, for which this property does
-  //   not hold unless we work out a new hierarchy for MLb.
-
-  // Unions are not hierarchical unless they're singletons
-  if (defaultMayEq) {
-    if (memRegions.size() == 1)
-      return (*memRegions.begin())->isHierarchy();
-    else
-      return false;
-  }
-
-  for (list<MemRegionObjectPtr>::const_iterator ml = memRegions.begin(); ml != memRegions.end(); ml++)
-    if (!(*ml)->isHierarchy())
-      return false;
-  return true;
-}
-
-// Returns a key that uniquely identifies this particular AbstractObject in the
-// set hierarchy.
-template<bool defaultMayEq>
-const AbstractionHierarchy::hierKeyPtr& CombinedMemRegionObject<defaultMayEq>::getHierKey() const {
-  // The intersection of multiple objects is just a filtering process from the full
-  // set of objects to the exact one, with each key in the hierarchy further filtering
-  // the set down. As such, a hierarchical key for the intersection of multiple objects
-  // is just the concatenation of the keys of all the individual objects.
-  if (!isHierKeyCached) {
-    /*((CombinedMemRegionObject<defaultMayEq>*) this)->cachedHierKey =
-     boost::make_shared<AOSHierKey>(
-     ((CombinedMemRegionObject<defaultMayEq>*) this)->shared_from_this());
-
-     for (list<MemRegionObjectPtr>::const_iterator i = memRegions.begin();
-     i != memRegions.end(); i++) {
-     AbstractionHierarchyPtr hierIt = boost::dynamic_pointer_cast<
-     AbstractionHierarchy>(*i);
-     ROSE_ASSERT(hierIt);
-
-     ((CombinedMemRegionObject<defaultMayEq>*) this)->cachedHierKey->add(
-     hierIt->getHierKey()->begin(), hierIt->getHierKey()->end());
-     }* /
-    list<hierKeyPtr> subHierKeys;
-    for (list<MemRegionObjectPtr>::const_iterator i = memRegions.begin(); i != memRegions.end(); i++) {
-      AbstractionHierarchyPtr hierIt = boost::dynamic_pointer_cast<AbstractionHierarchy>(*i);
-      ROSE_ASSERT(hierIt);
-      subHierKeys.push_back(hierIt->getHierKey());
-    }
-
-    ((CombinedMemRegionObject<defaultMayEq>*) this)->cachedHierKey = boost::make_shared<IntersectHierKey>(subHierKeys);
-
-    ((CombinedMemRegionObject<defaultMayEq>*) this)->isHierKeyCached = true;
-  }
-  return cachedHierKey;
-}*/
-
-/* #################################
-   ##### MappedMemRegionObject   #####
-   ################################# */
-
-//  template<class Key>
-//  SgNode* MappedMemRegionObject<Key>::getBase() const {
-//    // Returns the base SgNode shared by all the MemLocs in this object or NULL, if the base SgNodes are different
-//    SgNode* base = NULL;
-//    for (typename map<Key, MemRegionObjectPtr>::const_iterator it =
-//        aoMap.begin(); it != aoMap.end(); ++it) {
-//      if (it == aoMap.begin())
-//        base = it->second->getBase();
-//      else if (base != it->second->getBase())
-//        return NULL;
-//    }
-//
-//    return base;
-//  }
-//
-////! Method to add mrs to the map.
-////! MRs that are full are never added to the map.
-////! If mr_p is FullMR or mr_p->isFullMR=true then mapped MR is set to full only if mostAccurate=false.
-//  template<class Key>
-//  void MappedMemRegionObject<Key>::add(Key key,
-//      MemRegionObjectPtr mr_p, PartEdgePtr pedge, Composer* comp,
-//      ComposedAnalysis* analysis) {
-//    // If the object is already full don't add anything
-//    if (isUnion() && isFullAO(pedge))
-//      return;
-//
-//    // If the mr_p is not full add/update the map
-//    if (!mr_p->isFullAO(pedge)) {
-//      aoMap[key] = mr_p;
-//    } else {
-//      nFull++;
-//      if (isUnion())
-//        setMRToFull();
-//    }
-//  }
-//
-//  template<class Key>
-//  bool MappedMemRegionObject<Key>::mayEqualMRWithKey(Key key,
-//      const map<Key, MemRegionObjectPtr>& thatMRMap, PartEdgePtr pedge) {
-//    typename map<Key, MemRegionObjectPtr>::const_iterator s_it;
-//    s_it = thatMRMap.find(key);
-//    if (s_it == thatMRMap.end())
-//      return true;
-//    return aoMap[key]->mayEqualAO(s_it->second, pedge);
-//  }
-//
-////! Two MR objects are may equals if there is atleast one execution or sub-exectuion
-////! in which they represent the same memory location.
-////! Analyses are conservative as they start with full set of executions.
-////! Dataflow facts (predicates) shrink the set of sub-executions.
-////! We do not explicity store set of sub-executions and they are described
-////! by the abstract objects computed from dataflow fact exported by the analysis.
-////! Unless the analyses discover otherwise, the conservative answer for mayEqualMR is true.
-////! Mapped MRs are keyed using either ComposedAnalysis* or PartEdgePtr.
-////! Each keyed MR object correspond to some dataflow facts computed by Key=Analysis* or
-////! computed at Key=PartEdgePtrthat describes some sets of executions.
-////! MayEquality check on mapped MR is performed on intersection of sub-executions
-////! or union of sub-executions over the keyed MR objects.
-//  template<class Key>
-//  bool MappedMemRegionObject<Key>::mayEqualAO(
-//      MemRegionObjectPtr thatMR, PartEdgePtr pedge) {
-//    boost::shared_ptr<MappedMemRegionObject<Key> > thatMR_p =
-//        boost::dynamic_pointer_cast<MappedMemRegionObject<Key> >(
-//            thatMR);
-//    assert(thatMR_p);
-//
-//    // This object denotes full set of MR (full set of executions)
-//    if (isFullAO(pedge))
-//      return true;
-//
-//    // denotes empty set
-//    if (isEmptyAO(pedge))
-//      return false;
-//
-//    // presence of one more full objects will result in full set over union
-//    if (isUnion() && nFull > 0)
-//      return true;
-//
-//    // Two cases reach here [1] isUnion()=true && nFull_MR=0 [2] intersect=true && nFullMR=0 or nFull_MR!=0.
-//    // For both cases iterate on the MR map and discharge the mayEqualMR query to individual objects
-//    // which are answered based on its set of sub-executions (or its dataflow facts) computed by the corresponding analysis.
-//    const map<Key, MemRegionObjectPtr> thatMRMap = thatMR_p->getMemRegionsMap();
-//    typename map<Key, MemRegionObjectPtr>::iterator it;
-//    for (it = aoMap.begin(); it != aoMap.end(); ++it) {
-//      // discharge query
-//      bool isMayEq = mayEqualMRWithKey(it->first, thatMRMap, pedge);
-//
-//      // 1. Union of sub-executions and the object does not contain any full objects.
-//      // If the discharged query comes back as true for this case then we have found atleast one execution
-//      // under which the two objects are same and the set can only grow and the result of this query is not going
-//      // to change due to union.
-//      // If false we iterate further as any MR can add more executions under which the objects are may equals.
-//      if (isUnion() && isMayEq == true)
-//        return true;
-//
-//      // 2. Intersection of sub-executions and the object may contain full objects (nFull != 0).
-//      // The sub-executions are intersected and therefore it does not matter if we have full objects.
-//      // If the discharged query returns false then return false.
-//      // We did not find one execution in which the two objects are may equals.
-//      // Note that set of executions are contained over keyed objects (analyses are conservative).
-//      // This set only shrinks during intersection and it is not going to affect the result of this query.
-//      // If it returns true iterate further as some executions corresponding to true may be dropped.
-//      else if (isIntersection() && isMayEq == false)
-//        return false;
-//    }
-//
-//    // All the keyed objects returned false for the discharged query under union.
-//    // We haven't found a single execution under which the two objects are may equals.
-//    if (isUnion())
-//      return false;
-//    // All the keyed objects returned true for the discharged query under intersection.
-//    // We have atleast one execution in common in which the two objects are may equals.
-//    else if (isIntersection())
-//      return true;
-//    else
-//      assert(0);
-//  }
-//
-//  template<class Key>
-//  bool MappedMemRegionObject<Key>::mustEqualMRWithKey(Key key,
-//      const map<Key, MemRegionObjectPtr>& thatMRMap, PartEdgePtr pedge) {
-//    typename map<Key, MemRegionObjectPtr>::const_iterator s_it;
-//    s_it = thatMRMap.find(key);
-//    if (s_it == thatMRMap.end())
-//      return false;
-//    return aoMap[key]->mustEqualAO(s_it->second, pedge);
-//  }
-//
-////! Two MR objects are must equals if they represent the same single memory
-////! location on all executions.
-////! Analyses are conservative as they start with full set of executions.
-////! Dataflow facts (predicates) shrink the set of sub-executions.
-////! We do not explicity store set of sub-executions and they are described
-////! by the abstract objects computed from dataflow fact exported by the analysis.
-////! Unless the analyses discover otherwise conservative answer for mustEqualMR is false.
-////! Mapped MRs are keyed using either ComposedAnalysis* or PartEdgePtr.
-////! Each keyed MR object correspond to some dataflow facts computed by Key=Analysis* or
-////! computed at Key=PartEdgePtrthat describes some sets of executions.
-////! MustEquality check on mapped MR is performed on intersection (mostAccurate=true) of sub-executions
-////! or union (mostAccurate=false) of sub-executions over the keyed MR objects.
-//  template<class Key>
-//  bool MappedMemRegionObject<Key>::mustEqualAO(
-//      MemRegionObjectPtr thatMR, PartEdgePtr pedge) {
-//    boost::shared_ptr<MappedMemRegionObject<Key> > thatMR_p =
-//        boost::dynamic_pointer_cast<MappedMemRegionObject<Key> >(
-//            thatMR);
-//    assert(thatMR_p);
-//
-//    // This object denotes full set of MR (full set of executions)
-//    if (isFullAO(pedge))
-//      return false;
-//
-//    // denotes empty set
-//    if (isEmptyAO(pedge))
-//      return false;
-//
-//    // presence of one more full objects will result in full set over union
-//    if (isUnion() && nFull > 0)
-//      return true;
-//
-//    // Two cases reach here [1] isUnion()=true && nFull_MR=0 [2] intersect=true && nFullMR=0 or nFull_MR!=0.
-//    // For both cases iterate on the MR map and discharge the mayEqualMR query to individual objects
-//    // which are answered based on its set of sub-executions (or its dataflow facts) computed by the corresponding analysis.
-//    const map<Key, MemRegionObjectPtr> thatMRMap = thatMR_p->getMemRegionsMap();
-//    typename map<Key, MemRegionObjectPtr>::iterator it;
-//    for (it = aoMap.begin(); it != aoMap.end(); ++it) {
-//      // discharge query
-//      bool isMustEq = mustEqualMRWithKey(it->first, thatMRMap, pedge);
-//
-//      // 1. Union of sub-executions and the object does not contain any full objects
-//      // If the discharged query comes back as false for this case then we have found atleast one execution
-//      // under which the two objects are not same and the set can only grow and the result of this query is not going
-//      // to change due to union.
-//      // If it returns true we iterate further as any MR can add more executions under which the objects are not must equals.
-//      if (isUnion() && isMustEq == false)
-//        return false;
-//
-//      // 2. Intersection of sub-executions and the object may contain full objects (nFull != 0).
-//      // The sub-executions are intersected and therefore it does not matter if we have full objects.
-//      // If the discharged query returns true then return true.
-//      // Under all sub-executions (corresponding to the MR) the two objects must equal.
-//      // Note that set of executions are contained over keyed objects as the analyses are conservative.
-//      // This set only shrinks during intersection and it is not going to affect the result of this query.
-//      // If it returns false iterate further as some executions corresponding to false may be dropped.
-//      else if (isIntersection() && isMustEq == true)
-//        return true;
-//    }
-//
-//    // All the keyed objects returned true for the discharged query under union.
-//    // We haven't found a single execution under which the two objects are not equal.
-//    if (isUnion())
-//      return true;
-//    // All the keyed objects returned false for the discharged query under intersection.
-//    // We have atleast one execution in common in which the two objects are not equal.
-//    else if (isIntersection())
-//      return false;
-//    else
-//      assert(0);
-//  }
-//
-////! Discharge the query to the corresponding MR
-////! If key not found in thatMRMap return false
-//  template<class Key>
-//  bool MappedMemRegionObject<Key>::equalSetMRWithKey(Key key,
-//      const map<Key, MemRegionObjectPtr>& thatMRMap, PartEdgePtr pedge) {
-//    typename map<Key, MemRegionObjectPtr>::const_iterator s_it;
-//    s_it = thatMRMap.find(key);
-//    if (s_it == thatMRMap.end())
-//      return false;
-//    return aoMap[key]->equalSetAO(s_it->second, pedge);
-//  }
-//
-////! Two objects are equal sets if they denote the same set of memory locations
-////! The boolean parameter mostAccurate is not releveant as this query is not
-////! answered based on union or intersection of sub-executions.
-////! Simply discharge the queries to all keyed MemRegion objects
-////! If all the discharged queries come back equal then the two objects are equal otherwise not.
-//  template<class Key>
-//  bool MappedMemRegionObject<Key>::equalSetAO(
-//      MemRegionObjectPtr thatMR, PartEdgePtr pedge) {
-//    boost::shared_ptr<MappedMemRegionObject<Key> > thatMR_p =
-//        boost::dynamic_pointer_cast<MappedMemRegionObject<Key> >(
-//            thatMR);
-//    assert(thatMR_p);
-//
-//    // This object denotes full set of MR (full set of executions)
-//    if (isFullAO(pedge))
-//      return thatMR_p->isFullAO(pedge);
-//
-//    // denotes empty set
-//    if (isEmptyAO(pedge))
-//      return thatMR_p->isEmptyAO(pedge);
-//
-//    const map<Key, MemRegionObjectPtr> thatMRMap = thatMR_p->getMemRegionsMap();
-//    typename map<Key, MemRegionObjectPtr>::iterator it;
-//    for (it = aoMap.begin(); it != aoMap.end(); ++it) {
-//      // discharge query
-//      // break even if one of them returns false
-//      if (equalSetMRWithKey(it->first, thatMRMap, pedge) == false)
-//        return false;
-//    }
-//
-//    return true;
-//  }
-//
-////! Discharge the query to the corresponding MR
-////! If key not found in thatMRMap return true as the
-////! keyed object on thatMRMap denotes full set
-//  template<class Key>
-//  bool MappedMemRegionObject<Key>::subSetMRWithKey(Key key,
-//      const map<Key, MemRegionObjectPtr>& thatMRMap, PartEdgePtr pedge) {
-//    typename map<Key, MemRegionObjectPtr>::const_iterator s_it;
-//    s_it = thatMRMap.find(key);
-//    if (s_it == thatMRMap.end())
-//      return true;
-//    return aoMap[key]->subSetAO(s_it->second, pedge);
-//  }
-//
-////! This object is a non-strict subset of the other if the set of memory locations denoted by this
-////! is a subset of the set of memory locations denoted by that.
-////! The boolean parameter mostAccurate is not releveant as this query is not
-////! answered based on union or intersection of sub-executions.
-////! Simply discharge the queries to all keyed MemRegion objects
-////! If all the discharged queries come back true then this is a subset of that otherwise not.
-//  template<class Key>
-//  bool MappedMemRegionObject<Key>::subSetAO(
-//      MemRegionObjectPtr thatMR, PartEdgePtr pedge) {
-//    boost::shared_ptr<MappedMemRegionObject<Key> > thatMR_p =
-//        boost::dynamic_pointer_cast<MappedMemRegionObject<Key> >(
-//            thatMR);
-//    assert(thatMR_p);
-//
-//    // This object denotes full set of MR (full set of executions)
-//    if (isFullAO(pedge))
-//      return thatMR_p->isFullAO(pedge);
-//
-//    // denotes empty set
-//    // thatMR could be empty or non-empty eitherway this will be a non-strict subset of that.
-//    if (isEmptyAO(pedge))
-//      return true;
-//
-//    // If both objects have the same keys discharge
-//    // If this object has a key and that does not then
-//    // the keyed object is subset of that (return true) implemented by subsetMRWithKey
-//    // If any of the discharged query return false then return false.
-//    const map<Key, MemRegionObjectPtr> thatMRMap = thatMR_p->getMemRegionsMap();
-//    typename map<Key, MemRegionObjectPtr>::iterator it;
-//    for (it = aoMap.begin(); it != aoMap.end(); ++it) {
-//      // discharge query
-//      // break even if one of them returns false
-//      if (subSetMRWithKey(it->first, thatMRMap, pedge) == false)
-//        return false;
-//    }
-//
-//    // If this object doesn't have the key and that object has the key then
-//    // return false as this object has full object mapped to the key
-//    typename map<Key, MemRegionObjectPtr>::const_iterator c_it;
-//    for (c_it = thatMRMap.begin(); c_it != thatMRMap.end() && (nFull != 0);
-//        ++c_it) {
-//      if (aoMap.find(c_it->first) == aoMap.end())
-//        return false;
-//    }
-//
-//    return true;
-//  }
-//
-////! Mapped object liveness is determined based on finding executions
-////! in which it may be live.
-////! It can be answered based on union (mostAccurate=false) or intersection
-////! (mostAccurate=true) of executions
-////! The conservative answer is to assume that the object is live
-//  template<class Key>
-//  bool MappedMemRegionObject<Key>::isLiveAO(PartEdgePtr pedge) {
-//    // If this object is full return the conservative answer
-//    if (isFullAO(pedge))
-//      return true;
-//
-//    // If it has one or more full objects added to it
-//    // and if the object has mostAccurate=false then return true (weakest answer)
-//    if (nFull > 0 && isUnion())
-//      return true;
-//
-//    // 1. This object may have have one or more full objects under intersection
-//    // 2. This object doesnt have any full objects added to it under union
-//    // Under both cases the answer is based on how individual analysis respond to the query
-//    typename map<Key, MemRegionObjectPtr>::iterator it = aoMap.begin();
-//    for (; it != aoMap.end(); ++it) {
-//      bool isLive = it->second->isLiveAO(pedge);
-//      if (isUnion() && isLive == true)
-//        return true;
-//      else if (isIntersection() && isLive == false)
-//        return false;
-//    }
-//
-//    // leftover cases
-//    if (isUnion())
-//      return false;
-//    else if (isIntersection())
-//      return true;
-//    else
-//      assert(0);
-//  }
-//
-////! meetUpdateMR performs the join operation of abstractions of two mls
-//  template<class Key>
-//  bool MappedMemRegionObject<Key>::meetUpdateAO(
-//      MemRegionObjectPtr that, PartEdgePtr pedge) {
-//    boost::shared_ptr<MappedMemRegionObject<Key> > thatMR_p =
-//        boost::dynamic_pointer_cast<MappedMemRegionObject<Key> >(
-//            that);
-//    assert(thatMR_p);
-//
-//    // if this object is already full
-//    if (isFullAO(pedge))
-//      return false;
-//
-//    // If that object is full set this object to full
-//    if (thatMR_p->isFullAO(pedge)) {
-//      nFull++;
-//      setMRToFull();
-//      return true;
-//    }
-//
-//    // Both objects are not full
-//    const map<Key, MemRegionObjectPtr> thatMRMap = thatMR_p->getMemRegionsMap();
-//
-//    typename map<Key, MemRegionObjectPtr>::iterator it = aoMap.begin();
-//    typename map<Key, MemRegionObjectPtr>::const_iterator s_it; // search iterator for thatMRMap
-//
-//    bool modified = false;
-//    while (it != aoMap.end()) {
-//      s_it = thatMRMap.find(it->first);
-//      // If two objects have the same key then discharge meetUpdate to the corresponding keyed MR objects
-//      if (s_it != thatMRMap.end()) {
-//        modified = (it->second)->meetUpdateAO(s_it->second, pedge) || modified;
-//      }
-//
-//      // Remove the current MR object (current iterator it) from the map if the mapepd object is full.
-//      // Two cases under which the current MR object can be full.
-//      // (1) If current key is not found in thatMRMap then the mapped object
-//      // in thatMRMap is full and the meetUpdate of the current MR with that is also full.
-//      // (2) meetUpdateMR above of the two keyed objects resulted in this mapped object being full.
-//      // Under both cases remove the mapped ml from this map
-//      if (s_it == thatMRMap.end() || (it->second)->isFullAO(pedge)) {
-//        // Current mapped MR has become full as a result of (1) or (2).
-//        // Remove the item from the map.
-//        // Note that post-increment which increments the iterator and returns the old value for deletion.
-//        aoMap.erase(it++);
-//        nFull++;
-//        modified = true;
-//
-//        // If union then set this entire object to full and return
-//        if (isUnion()) {
-//          setMRToFull();
-//          return true;
-//        }
-//      } else
-//        ++it;
-//    }
-//    return modified;
-//  }
-//
-////! Method that sets this mapped object to full
-//  template<class Key>
-//  void MappedMemRegionObject<Key>::setMRToFull() {
-//    assert(nFull > 0);
-//    if (aoMap.size() > 0)
-//      aoMap.clear();
-//  }
-//
-//  template<class Key>
-//  bool MappedMemRegionObject<Key>::isFullAO(PartEdgePtr pedge) {
-//    return isFullAO();
-//  }
-//
-//  template<class Key>
-//  bool MappedMemRegionObject<Key>::isEmptyAO(PartEdgePtr pedge) {
-//    return isEmptyAO();
-//  }
-//
-//  template<class Key>
-//  bool MappedMemRegionObject<Key>::isFullAO() {
-//    if (nFull > 0 && aoMap.size() == 0)
-//      return true;
-//    return false;
-//  }
-//
-//  template<class Key>
-//  bool MappedMemRegionObject<Key>::isEmptyAO() {
-//    if (nFull == 0 && aoMap.size() == 0)
-//      return true;
-//    return false;
-//  }
-//
-//  template<class Key>
-//  bool MappedMemRegionObject<Key>::isConcrete() {
-//    if (isFullAO())
-//      return false;
-//    if (isEmptyAO())
-//      return false;
-//    if (isUnion() && nFull > 0)
-//      return false;
-//
-//    typename map<Key, MemRegionObjectPtr>::iterator it = aoMap.begin();
-//    for (; it != aoMap.end(); ++it) {
-//      bool isConc = it->second->isConcrete();
-//      // we have atleast one that is not concrete under union
-//      if (isUnion() && !isConc)
-//        return false;
-//      // we have atleast one that is concrete under intersection
-//      else if (isIntersection() && isConc)
-//        return true;
-//    }
-//
-//    // All the objects are concrete (return true above) union
-//    if (isUnion())
-//      return true;
-//    // All the objects not concrete (return false above) under intersection
-//    else if (isIntersection())
-//      return false;
-//    else
-//      assert(0);
-//  }
-//
-//// Returns the number of concrete values in this set
-//  template<class Key>
-//  int MappedMemRegionObject<Key>::concreteSetSize() {
-//    assert(isConcrete());
-//    return getConcrete().size();
-//  }
-//
-template<class Key>
-SgType* MappedMemRegionObject<Key>::getConcreteType() {
-  assert(MappedMemRegionObject<Key>::isConcrete());
-  typename map<Key, MemRegionObjectPtr>::iterator it = MappedMemRegionObject<Key>::aoMap.begin();
+template<class Key, class MappedAOSubType, class MappedAOValueType>
+SgType* MappedMemRegionObject<Key, MappedAOSubType, MappedAOValueType>::getConcreteType() {
+  if(!MappedMemRegionObject<Key, MappedAOSubType, MappedAOValueType>::isConcrete()) assert(0);
+  typename map<Key, MemRegionObjectPtr>::iterator it = MappedAbstractObject<Key, MemRegionObject, AbstractObject::MemRegion, MappedAOSubType>::aoMap.begin();
   SgType* c_type = it->second->getConcreteType();
   // assert that all other objects have the same type
-  for (++it; it != MappedMemRegionObject<Key>::aoMap.end(); ++it) {
+  for (++it; it != MappedAbstractObject<Key, MemRegionObject, AbstractObject::MemRegion, MappedAOSubType>::aoMap.end(); ++it) {
     SgType* votype = it->second->getConcreteType();
     assert(c_type == votype);
   }
   return c_type;
 }
 
-template<class Key>
-set<SgNode*> MappedMemRegionObject<Key>::getConcrete() {
-  assert(MappedMemRegionObject<Key>::isConcrete());
+template<class Key, class MappedAOSubType, class MappedAOValueType>
+set<SgNode*> MappedMemRegionObject<Key, MappedAOSubType, MappedAOValueType>::getConcrete() {
+  if(!MappedMemRegionObject<Key, MappedAOSubType, MappedAOValueType>::isConcrete()) assert(0);
   // If this is a union type (defaultMayEq=true), the result is the Union of the sets returned by getConcrete() on all the memRegions.
   // If this is an intersection type (defaultMayEq=false), an object is their Intersection.
 
   // Maps each concrete value to the number of elements in memRegions for which it was returned
   std::map<SgNode*, size_t> concreteMRs;
-  for (typename map<Key, MemRegionObjectPtr>::iterator mr_it = MappedMemRegionObject<Key>::aoMap.begin();
-       mr_it != MappedMemRegionObject<Key>::aoMap.end(); ++mr_it) {
+  for (typename map<Key, MemRegionObjectPtr>::iterator mr_it = MappedAbstractObject<Key, MemRegionObject, AbstractObject::MemRegion, MappedAOSubType>::aoMap.begin();
+       mr_it != MappedAbstractObject<Key, MemRegionObject, AbstractObject::MemRegion, MappedAOSubType>::aoMap.end(); ++mr_it) {
     // Iterate through the current sub-MemRegion's concrete values and increment each
     // concrete value's counter in concreteMRs.
     std::set<SgNode*> c_memregionSet = mr_it->second->getConcrete();
@@ -5684,161 +3194,35 @@ set<SgNode*> MappedMemRegionObject<Key>::getConcrete() {
   for (std::map<SgNode*, size_t>::iterator i = concreteMRs.begin();
       i != concreteMRs.end(); i++) {
     // Union: add every key in concreteMRs to ret
-    if (MappedMemRegionObject<Key>::isUnion())
+    if (MappedMemRegionObject<Key, MappedAOSubType, MappedAOValueType>::isUnion())
       ret.insert(i->first);
     // Intersection: only add the keys that appear in every MemRegion in memRegions
-    else if (MappedMemRegionObject<Key>::isIntersection() &&
-             i->second == MappedMemRegionObject<Key>::aoMap.size())
+    else if (MappedMemRegionObject<Key, MappedAOSubType, MappedAOValueType>::isIntersection() &&
+             i->second == MappedAbstractObject<Key, MemRegionObject, AbstractObject::MemRegion, MappedAOSubType>::aoMap.size())
       ret.insert(i->first);
   }
 
   return ret;
 }
-//
-////! Size of the memory region denoted by this memory object represented by a ValueObject
-////! Useful only if the object is not full
-//  template<class Key>
-//  ValueObjectPtr MappedMemRegionObject<Key>::getRegionSizeAO(
-//      PartEdgePtr pedge) {
-//    // Assert for atleast one element in the map
-//    // Should we handle full MR by returning FullValueObject?
-//    assert(aoMap.size() > 0);
-//
-//    // getRegionSize on each object returns different ValueObject for each key
-//    // We cannot do meetUpdate as the objects are from different analysis
-//    // Return a MappedValueObject based on those objects and the corresponding key
-//    boost::shared_ptr<MappedValueObject<Key> > mvo_p =
-//        boost::make_shared<MappedValueObject<Key> >(type);
-//    typename map<Key, MemRegionObjectPtr>::const_iterator it =
-//        aoMap.begin();
-//    for (; it != aoMap.end(); ++it) {
-//      ValueObjectPtr vo_p = it->second->getRegionSizeAO(pedge);
-//      Key k = it->first;
-//      mvo_p->add(k, vo_p, pedge, /*comp, analysis*/NULL, NULL);
-//    }
-//
-//    return mvo_p;
-//  }
-//
-//  template<class Key>
-//  MemRegionObjectPtr MappedMemRegionObject<Key>::copyAO() const {
-//    return boost::make_shared<MappedMemRegionObject<Key> >(*this);
-//  }
-//
-//  template<class Key>
-//  string MappedMemRegionObject<Key>::str(string indent) const {
-//    ostringstream oss;
-//    oss << "<table border=\"1\">";
-//    oss << "<tr>";
-//    oss << "<th>"
-//        << (isUnion() ?
-//            "UnionMappedMemRegionObject:" : "IntersectMappedMemRegionObject:")
-//        << "</th>";
-//    if (nFull > 0 && aoMap.size() == 0)
-//      oss << "<th> Full </th> </tr>";
-//    else if (nFull == 0 && aoMap.size() == 0)
-//      oss << "<th> Empty </th> </tr>";
-//    else {
-//      oss << "</tr>";
-//      typename map<Key, MemRegionObjectPtr>::const_iterator it =
-//          aoMap.begin();
-//      for (; it != aoMap.end(); ++it) {
-//        oss << "<tr>";
-//        oss << "<td>" << (it->first)->str(indent) << "</td>";
-//        oss << "<td>" << (it->second)->str(indent) << "</td>";
-//        oss << "</tr>";
-//      }
-//    }
-//    oss << "</table>";
-//    return oss.str();
-//  }
-//
-//// Returns whether all instances of this class form a hierarchy. Every instance of the same
-//// class created by the same analysis must return the same value from this method!
-//  template<class Key>
-//  bool MappedMemRegionObject<Key>::isHierarchy() const {
-//    // Combined MemRegions form hierarchy if:
-//    // - All the sub-MemRegions form hierarchies of their own, AND
-//    // - The combination is an intersection.
-//    //   If the combination is a union then consider the following:
-//    //            MLa     MLb
-//    //   comb1 = {a,b}, {w, x}
-//    //   comb2 = {a,b}, {y, z}
-//    //   Note that MLs from analyses a and b are either identical sets or disjoint
-//    //   However, comb1 U comb2 = {a, b, w, x, y, z}, for which this property does
-//    //   not hold unless we work out a new hierarchy for MLb.
-//
-//    // Unions are not hierarchical unless they're singletons
-//    if (isUnion()) {
-//      if (aoMap.size() == 1)
-//        return aoMap.begin()->second->isHierarchy();
-//      else
-//        return false;
-//    }
-//
-//    typename map<Key, MemRegionObjectPtr>::const_iterator it;
-//    for (it = aoMap.begin(); it != aoMap.end(); ++it)
-//      if (!it->second->isHierarchy())
-//        return false;
-//    return true;
-//  }
-//
-//// Returns a key that uniquely identifies this particular AbstractObject in the
-//// set hierarchy.
-//  template<class Key>
-//  const AbstractionHierarchy::hierKeyPtr& MappedMemRegionObject<Key>::getHierKey() const {
-//    // The intersection of multiple objects is just a filtering process from the full
-//    // set of objects to the exact one, with each key in the hierarchy further filtering
-//    // the set down. As such, a hierarchical key for the intersection of multiple objects
-//    // is just the concatenation of the keys of all the individual objects.
-//    if (!isHierKeyCached) {
-//      /*((MappedMemRegionObject<Key>*) this)->cachedHierKey =
-//       boost::make_shared<AOSHierKey>(
-//       ((MappedMemRegionObject<Key>*) this)->shared_from_this());
-//
-//       typename map<Key, MemRegionObjectPtr>::const_iterator it;
-//       for (it = aoMap.begin(); it != aoMap.end(); ++it) {
-//       AbstractionHierarchyPtr hierIt = boost::dynamic_pointer_cast<
-//       AbstractionHierarchy>(it->second);
-//       ROSE_ASSERT(hierIt);
-//
-//       ((MappedMemRegionObject<Key>*) this)->cachedHierKey->add(
-//       hierIt->getHierKey()->begin(), hierIt->getHierKey()->end());
-//       }*/
-//
-//      map<Key, hierKeyPtr> subHierKeys;
-//      for(typename map<Key, MemRegionObjectPtr>::const_iterator it = aoMap.begin();
-//          it != aoMap.end(); ++it) {
-//        AbstractionHierarchyPtr hierIt = boost::dynamic_pointer_cast<AbstractionHierarchy>(it->second);
-//        ROSE_ASSERT(hierIt);
-//        subHierKeys[it->first] = hierIt->getHierKey();
-//      }
-//
-//      ((MappedMemRegionObject<Key>*) this)->cachedHierKey =
-//          boost::make_shared<IntersectMappedHierKey<Key> >(subHierKeys);
-//
-//      ((MappedMemRegionObject<Key>*) this)->isHierKeyCached = true;
-//    }
-//    return cachedHierKey;
-//  }
 
 //! Size of the memory region denoted by this memory object represented by a ValueObject
 //! Useful only if the object is not full
-template<class Key>
-ValueObjectPtr MappedMemRegionObject<Key>::getRegionSizeAO(
+template<class Key, class MappedAOSubType, class MappedAOValueType>
+ValueObjectPtr MappedMemRegionObject<Key, MappedAOSubType, MappedAOValueType>::getRegionSizeAO(
     PartEdgePtr pedge) {
   // Assert for atleast one element in the map
   // Should we handle full MR by returning FullValueObject?
-  if(!MappedAbstractObject<Key, MemRegionObject, AbstractObject::MemRegion, MappedMemRegionObject<Key> >::aoMap.size() > 0) assert(0);
+  if(!MappedAbstractObject<Key, MemRegionObject, AbstractObject::MemRegion, MappedAOSubType>::aoMap.size() > 0) assert(0);
 
   // getRegionSize on each object returns different ValueObject for each key
   // We cannot do meetUpdate as the objects are from different analysis
   // Return a MappedValueObject based on those objects and the corresponding key
-  boost::shared_ptr<MappedValueObject<Key> > mvo_p =
-      boost::make_shared<MappedValueObject<Key> >(MappedMemRegionObject<Key>::ui, MappedMemRegionObject<Key>::analysis);
+  boost::shared_ptr<MappedValueObject<Key, MappedAOValueType> > mvo_p =
+      boost::make_shared<MappedValueObject<Key, MappedAOValueType> >(MappedMemRegionObject<Key, MappedAOSubType, MappedAOValueType>::ui,
+                                                                     MappedMemRegionObject<Key, MappedAOSubType, MappedAOValueType>::analysis);
   typename map<Key, MemRegionObjectPtr>::const_iterator it =
-      MappedAbstractObject<Key, MemRegionObject, AbstractObject::MemRegion, MappedMemRegionObject<Key> >::aoMap.begin();
-  for (; it != MappedAbstractObject<Key, MemRegionObject, AbstractObject::MemRegion, MappedMemRegionObject<Key> >::aoMap.end(); ++it) {
+      MappedAbstractObject<Key, MemRegionObject, AbstractObject::MemRegion, MappedAOSubType>::aoMap.begin();
+  for (; it != MappedAbstractObject<Key, MemRegionObject, AbstractObject::MemRegion, MappedAOSubType>::aoMap.end(); ++it) {
     ValueObjectPtr vo_p = it->second->getRegionSizeAO(pedge);
     Key k = it->first;
     mvo_p->add(k, vo_p, pedge, /*comp, analysis*/NULL, NULL);
@@ -5847,41 +3231,106 @@ ValueObjectPtr MappedMemRegionObject<Key>::getRegionSizeAO(
   return mvo_p;
 }
 
-/*template<class Key>
-MemRegionObjectPtr MappedMemRegionObject<Key>::copyAO() const {
-  return boost::make_shared<MappedMemRegionObject<Key> >(*this);
+// Check whether that is a MemRegionObject and if so, call the version of mayEqual specific to MemRegionObjects
+template<class Key, class MappedAOSubType, class MappedAOValueType>
+bool MappedMemRegionObject<Key, MappedAOSubType, MappedAOValueType>::mayEqual
+                  (AbstractObjectPtr that, PartEdgePtr pedge,Composer* comp, ComposedAnalysis* analysis) {
+  // Identical FuncResultMemRegionObject denote the same set and different ones denote disjoint sets
+  FuncResultRelationType rel = getFuncResultRel(this, that, pedge);
+  switch(rel) {
+    case FuncResultSameFunc: return true;
+    case FuncResultUnequal: return false;
+    case NeitherFuncResult: break;
+  }
+  // If either this or that is a FullMemRegionObject, the two objects only overlap if either is full.
+  // We do this check early because casting to FullMemRegionObject is more efficient than calling isFull.
+  if (boost::dynamic_pointer_cast<FullMemRegionObject>(that)) return true;
+  if (dynamic_cast<FullMemRegionObject*>(this))               return true;
+
+  return MappedAbstractObject<Key, MemRegionObject, AbstractObject::MemRegion, MappedAOSubType>::mayEqual(that, pedge, comp, analysis);
 }
 
-template<class Key>
-string MappedMemRegionObject<Key>::str(string indent) const {
-  ostringstream oss;
-  oss << "<table border=\"1\">";
-  oss << "<tr>";
-  oss << "<th>"
-      << (isUnion() ?
-          "UnionMappedMemRegionObject:" : "IntersectMappedMemRegionObject:")
-      << "</th>";
-  if (nFull > 0 && aoMap.size() == 0)
-    oss << "<th> Full </th> </tr>";
-  else if (nFull == 0 && aoMap.size() == 0)
-    oss << "<th> Empty </th> </tr>";
-  else {
-    oss << "</tr>";
-    typename map<Key, MemRegionObjectPtr>::const_iterator it =
-        aoMap.begin();
-    for (; it != aoMap.end(); ++it) {
-      oss << "<tr>";
-      oss << "<td>" << (it->first)->str(indent) << "</td>";
-      oss << "<td>" << (it->second)->str(indent) << "</td>";
-      oss << "</tr>";
-    }
+// Check whether that is a MemRegionObject and if so, call the version of mustEqual specific to MemRegionObjects
+template<class Key, class MappedAOSubType, class MappedAOValueType>
+bool MappedMemRegionObject<Key, MappedAOSubType, MappedAOValueType>::mustEqual
+                  (AbstractObjectPtr that, PartEdgePtr pedge,Composer* comp, ComposedAnalysis* analysis) {
+  // Identical FuncResultMemRegionObject denote the same set and different ones denote disjoint sets
+  FuncResultRelationType rel = getFuncResultRel(this, that, pedge);
+  switch(rel) {
+    case FuncResultSameFunc: return true;
+    case FuncResultUnequal: return false;
+    case NeitherFuncResult: break;
   }
-  oss << "</table>";
-  return oss.str();
-}*/
+  // If either this or that is a FullMemRegionObject, the two objects only must-equal if neither is full.
+  // We do this check early because casting to FullMemRegionObject is more efficient than calling isFull.
+  if (boost::dynamic_pointer_cast<FullMemRegionObject>(that)) return false;
+  if (dynamic_cast<FullMemRegionObject*>(this))               return false;
+
+  return MappedAbstractObject<Key, MemRegionObject, AbstractObject::MemRegion, MappedAOSubType>::mustEqual(that, pedge, comp, analysis);
+}
+
+// Returns whether the two abstract objects denote the same set of concrete objects
+template<class Key, class MappedAOSubType, class MappedAOValueType>
+bool MappedMemRegionObject<Key, MappedAOSubType, MappedAOValueType>::equalSet
+                  (AbstractObjectPtr that, PartEdgePtr pedge,Composer* comp, ComposedAnalysis* analysis) {
+  // Identical FuncResultMemRegionObject denote the same set and different ones denote disjoint sets
+  FuncResultRelationType rel = getFuncResultRel(this, that, pedge);
+  switch(rel) {
+    case FuncResultSameFunc: return true;
+    case FuncResultUnequal: return false;
+    case NeitherFuncResult: break;
+  }
+  // If either this or that is a FullMemRegionObject, the two objects only equal only if they're both full.
+  // We do this check early because casting to FullMemRegionObject is more efficient than calling isFull.
+  if (boost::dynamic_pointer_cast<FullMemRegionObject>(that)) return MappedAbstractObject<Key, MemRegionObject, AbstractObject::MemRegion, MappedAOSubType>::isFull(pedge, comp, analysis);
+  if (dynamic_cast<FullMemRegionObject*>(this))               return that->isFull(pedge, comp, analysis);
+
+  return MappedAbstractObject<Key, MemRegionObject, AbstractObject::MemRegion, MappedAOSubType>::equalSet(that, pedge, comp, analysis);
+}
+
+// Returns whether this abstract object denotes a non-strict subset (the sets may be equal) of the set denoted
+// by the given abstract object.
+template<class Key, class MappedAOSubType, class MappedAOValueType>
+bool MappedMemRegionObject<Key, MappedAOSubType, MappedAOValueType>::subSet
+                  (AbstractObjectPtr that, PartEdgePtr pedge,Composer* comp, ComposedAnalysis* analysis) {
+  // Identical FuncResultMemRegionObject denote the same set and different ones denote disjoint sets
+  FuncResultRelationType rel = getFuncResultRel(this, that, pedge);
+  switch(rel) {
+    case FuncResultSameFunc: return true;
+    case FuncResultUnequal: return false;
+    case NeitherFuncResult: break;
+  }
+  // If either this or that is a FullMemRegionObject, this is a subset of that if they're equal or of that is full.
+  // We do this check early because casting to FullMemRegionObject is more efficient than calling isFull.
+  if (boost::dynamic_pointer_cast<FullMemRegionObject>(that)) return true;
+  if (dynamic_cast<FullMemRegionObject*>(this))               return that->isFull(pedge, comp, analysis);
+
+  return MappedAbstractObject<Key, MemRegionObject, AbstractObject::MemRegion, MappedAOSubType>::subSet(that, pedge, comp, analysis);
+}
+
+// General version of meetUpdate() that accounts for framework details before routing the call to the derived class'
+// meetUpdateML check. Specifically, it routes the call through the composer to make sure the meetUpdateML
+// call gets the right PartEdge
+template<class Key, class MappedAOSubType, class MappedAOValueType>
+bool MappedMemRegionObject<Key, MappedAOSubType, MappedAOValueType>::meetUpdate
+                  (AbstractObjectPtr that, PartEdgePtr pedge,Composer* comp, ComposedAnalysis* analysis) {
+  // Identical FuncResultMemRegionObject denote the same set and different ones denote disjoint sets
+  FuncResultRelationType rel = getFuncResultRel(this, that, pedge);
+  switch(rel) {
+    case FuncResultSameFunc: return false;
+    case FuncResultUnequal: return this->setToFull(pedge, comp, analysis);
+    case NeitherFuncResult: break;
+  }
+  // If that is a FullMemRegionObject but this is not, we'll need to make this object full
+  if (boost::dynamic_pointer_cast<FullMemRegionObject>(that) &&
+      !MappedAbstractObject<Key, MemRegionObject, AbstractObject::MemRegion, MappedAOSubType>::isFull(pedge, comp, analysis))
+    return this->setToFull(pedge, comp, analysis);
+
+  return MappedAbstractObject<Key, MemRegionObject, AbstractObject::MemRegion, MappedAOSubType>::meetUpdate(that, pedge, comp, analysis);
+}
 
 /* ################################
- # PartEdgeUnionMemRegionObject #
+   # PartEdgeUnionMemRegionObject #
    ################################ */
 
 PartEdgeUnionMemRegionObject::PartEdgeUnionMemRegionObject() :
@@ -5890,7 +3339,7 @@ PartEdgeUnionMemRegionObject::PartEdgeUnionMemRegionObject() :
 
 PartEdgeUnionMemRegionObject::PartEdgeUnionMemRegionObject(
     const PartEdgeUnionMemRegionObject& thatMR) :
-    MemRegionObject(thatMR), unionMR_p(thatMR.copyAOType()) {
+    MemRegionObject(thatMR), unionMR_p(thatMR.unionMR_p->copyAOType()) {
 }
 
 SgNode* PartEdgeUnionMemRegionObject::getBase() const {
@@ -6018,32 +3467,25 @@ MemLocObject::MemLocObject(const MemLocObject& that) :
 MemRegionObjectPtr MemLocObject::getRegion() const { /*cout << "MemLocObject::getRegion("<<this<<") region="<<(region==NULLMemRegionObject?"NULL":region->str())<<endl; */
   return region;
 }
+
 ValueObjectPtr MemLocObject::getIndex() const { /*cout << "MemLocObject::getIndex("<<this<<") index="<<(index==NULLValueObject?"NULL":index->str())<<endl; */
   return index;
 }
 
-//// Returns whether this object may/must be equal to o within the given Part p
-//// These methods are called by composers and should not be called by analyses.
-//bool MemLocObject::mayEqualAO(MemLocObjectPtr that, PartEdgePtr pedge) {
-//  /*scope s("MemLocObject::mayEqualML");
-//  dbg << "this="<<str()<<endl;
-//  dbg << "that="<<that->str()<<endl;
-//
-//  dbg << "eqRegion="<<(region->mayEqualAO(that->getRegion(), pedge))<<endl;
-//  if(index && that->index) dbg << "eqIndex="<<(index->mayEqualAO(that->getIndex(), pedge))<<endl;*/
-//
-//  return region && region->mayEqualAO(that->getRegion(), pedge) &&
-//         ((!index && !that->index) || index->mayEqualAO(that->getIndex(), pedge));
-//}
-//
-//bool MemLocObject::mustEqualAO(MemLocObjectPtr that, PartEdgePtr pedge) {
-//  /*scope s("MemLocObject::mustEqualML");
-//  dbg << "eqRegion="<<(region->mustEqualAO(that->getRegion(), pedge))<<endl;
-//  if(index && that->index) dbg << "eqIndex="<<(index->mustEqualAO(that->getIndex(), pedge))<<endl;*/
-//
-//  return region->mustEqualAO(that->getRegion(), pedge) &&
-//         ((!index && !that->index) || index->mustEqualAO(that->getIndex(), pedge));
-//}
+// Returns the relationship between the given AbstractObjects, considering whether either
+// or both are FuncResultMemLocObjects and if they refer to the same function
+FuncResultRelationType MemLocObject::getFuncResultRel(AbstractObject* one, AbstractObjectPtr two, PartEdgePtr pedge) {
+  // If either this or that are FuncResultMemLocObject, they mayEqual iff they correspond to the same function
+  FuncResultMemLocObject* frmlcoOne = dynamic_cast<FuncResultMemLocObject*>(one);
+  FuncResultMemLocObjectPtr frmlcoTwo = boost::dynamic_pointer_cast<FuncResultMemLocObject>(two);
+  if (frmlcoOne) {
+    if(frmlcoOne->mustEqualAO(frmlcoTwo, pedge)) return FuncResultSameFunc;
+    else                                         return FuncResultUnequal;
+  } else if (frmlcoTwo)
+    return FuncResultUnequal;
+  else
+    return NeitherFuncResult;
+}
 
 // General version of mayEqual and mustEqual that accounts for framework details before routing the call to the
 // derived class' may/mustEqual check. Specifically, it checks may/must equality with respect to ExprObj and routes
@@ -6082,7 +3524,6 @@ bool MemLocObject::mayEqual(MemLocObjectPtr that, PartEdgePtr pedge,
 bool MemLocObject::mustEqual(MemLocObjectPtr that, PartEdgePtr pedge,
     Composer* comp, ComposedAnalysis* analysis) {
   // Returns true only if both this region and this index denot the same set as that region and index, respectively
-
   // If this region denotes the same set as that region in all executions
   if (getRegion()->mustEqual(that->getRegion(), pedge, comp, analysis)) {
     if (getIndex() == NULLValueObject) {
@@ -6108,13 +3549,18 @@ bool MemLocObject::mustEqual(MemLocObjectPtr that, PartEdgePtr pedge,
 // Check whether that is a MemLocObject and if so, call the version of mayEqual specific to MemLocObjects
 bool MemLocObject::mayEqual(AbstractObjectPtr that, PartEdgePtr pedge,
     Composer* comp, ComposedAnalysis* analysis) {
-  // If this is a FuncResultMemLocObject and that is not or vice versa, they're not may-equal
-  if ((dynamic_cast<FuncResultMemLocObject*>(this) == NULL)
-      != (boost::dynamic_pointer_cast<FuncResultMemLocObject>(that) == NULL))
-    return false;
-  // If that is a FullMemLocObject, it overlaps with this
-  if (boost::dynamic_pointer_cast<FullMemLocObject>(that))
-    return true;
+
+  // Identical FuncResultMemLocObject denote the same set and different ones denote disjoint sets
+  FuncResultRelationType rel = getFuncResultRel(this, that, pedge);
+  switch(rel) {
+    case FuncResultSameFunc: return true;
+    case FuncResultUnequal: return false;
+    case NeitherFuncResult: break;
+  }
+  // If either this or that is a FullMemLocObject, the two objects only overlap if either is full.
+  // We do this check early because casting to FullMemLocObject is more efficient than calling isFull.
+  if (boost::dynamic_pointer_cast<FullMemLocObject>(that)) return true;
+  if (dynamic_cast<FullMemLocObject*>(this))               return true;
 
   MemLocObjectPtr mo = boost::dynamic_pointer_cast<MemLocObject>(that);
   if (mo)
@@ -6126,13 +3572,17 @@ bool MemLocObject::mayEqual(AbstractObjectPtr that, PartEdgePtr pedge,
 // Check whether that is a MemLocObject and if so, call the version of mustEqual specific to MemLocObjects
 bool MemLocObject::mustEqual(AbstractObjectPtr that, PartEdgePtr pedge,
     Composer* comp, ComposedAnalysis* analysis) {
-  // If this is a FuncResultMemLocObject and that is not or vice versa, they're not must-equal
-  if ((dynamic_cast<FuncResultMemLocObject*>(this) == NULL)
-      != (boost::dynamic_pointer_cast<FuncResultMemLocObject>(that) == NULL))
-    return false;
-  // If that is a FullMemLocObject, it is not must-equal to anything
-  if (boost::dynamic_pointer_cast<FullMemLocObject>(that))
-    return false;
+  // Identical FuncResultMemLocObject denote the same set and different ones denote disjoint sets
+  FuncResultRelationType rel = getFuncResultRel(this, that, pedge);
+  switch(rel) {
+    case FuncResultSameFunc: return true;
+    case FuncResultUnequal: return false;
+    case NeitherFuncResult: break;
+  }
+  // If either this or that is a FullMemLocObject, the two objects only must-equal if neither is full.
+  // We do this check early because casting to FullMemLocObject is more efficient than calling isFull.
+  if (boost::dynamic_pointer_cast<FullMemLocObject>(that)) return false;
+  if (dynamic_cast<FullMemLocObject*>(this))               return false;
 
   MemLocObjectPtr mo = boost::dynamic_pointer_cast<MemLocObject>(that);
   if (mo)
@@ -6141,24 +3591,12 @@ bool MemLocObject::mustEqual(AbstractObjectPtr that, PartEdgePtr pedge,
     return false;
 }
 
-//// Returns whether the two abstract objects denote the same set of concrete objects
-//// These methods are called by composers and should not be called by analyses.
-//bool MemLocObject::equalSetAO(MemLocObjectPtr that, PartEdgePtr pedge) {
-//  return region->equalSetAO(that->getRegion(), pedge) &&
-//         ((!index && !that->index) || index->equalSetAO(that->getIndex(), pedge));
-//}
-//// Returns whether this abstract object denotes a non-strict subset (the sets may be equal) of the set denoted
-//// by the given abstract object.
-//// These methods are called by composers and should not be called by analyses.
-//bool MemLocObject::subSetAO(MemLocObjectPtr that, PartEdgePtr pedge) {
-//  return region->subSetAO(that->getRegion(), pedge) &&
-//         ((!index && !that->index) || index->subSetAO(that->getIndex(), pedge));
-//}
-
 // Returns whether the two abstract objects denote the same set of concrete objects
 bool MemLocObject::equalSet(MemLocObjectPtr that, PartEdgePtr pedge,
     Composer* comp, ComposedAnalysis* analysis) {
-  // Returns true only if both this region and this index denot the same set as that region and index, respectively
+  // That is known to be a generic MemLocObject
+
+  // Returns true only if both this region and this index denote the same set as that region and index, respectively
 
   /*cout << "getRegion()="<<(region?region->str():"NULL")<<endl;
    cout << "getRegion="<<(getRegion()?getRegion()->str():"NULL")<<endl;
@@ -6195,6 +3633,7 @@ bool MemLocObject::equalSet(MemLocObjectPtr that, PartEdgePtr pedge,
 // by the given abstract object.
 bool MemLocObject::subSet(MemLocObjectPtr that, PartEdgePtr pedge,
     Composer* comp, ComposedAnalysis* analysis) {
+
   // Returns true only if both this region and this index are a subset of that region and index, respectively
 
   // If this region is a subset of that region
@@ -6221,14 +3660,17 @@ bool MemLocObject::subSet(MemLocObjectPtr that, PartEdgePtr pedge,
 
 bool MemLocObject::equalSet(AbstractObjectPtr that, PartEdgePtr pedge,
     Composer* comp, ComposedAnalysis* analysis) {
-  // If this is a FuncResultMemLocObject and that is not or vice versa, one is not a subset of the other
-  if ((dynamic_cast<FuncResultMemLocObject*>(this) == NULL)
-      != (boost::dynamic_pointer_cast<FuncResultMemLocObject>(that) == NULL))
-    return false;
-  // If this is a FullMemLocObject and that is not or vice versa, the Full set contains the non-Full set
-  if ((dynamic_cast<FullMemLocObject*>(this) == NULL)
-      != (boost::dynamic_pointer_cast<FullMemLocObject>(that) == NULL))
-    return boost::dynamic_pointer_cast<FullMemLocObject>(that) != NULL;
+  // Identical FuncResultMemLocObject denote the same set and different ones denote disjoint sets
+  FuncResultRelationType rel = getFuncResultRel(this, that, pedge);
+  switch(rel) {
+    case FuncResultSameFunc: return true;
+    case FuncResultUnequal: return false;
+    case NeitherFuncResult: break;
+  }
+  // If either this or that is a FullMemLocObject, the two objects only equal only if they're both full.
+  // We do this check early because casting to FullMemLocObject is more efficient than calling isFull.
+  if (boost::dynamic_pointer_cast<FullMemLocObject>(that)) return isFull(pedge, comp, analysis);
+  if (dynamic_cast<FullMemLocObject*>(this))               return that->isFull(pedge, comp, analysis);
 
   MemLocObjectPtr co = boost::dynamic_pointer_cast<MemLocObject>(that);
   if (co)
@@ -6239,14 +3681,17 @@ bool MemLocObject::equalSet(AbstractObjectPtr that, PartEdgePtr pedge,
 
 bool MemLocObject::subSet(AbstractObjectPtr that, PartEdgePtr pedge,
     Composer* comp, ComposedAnalysis* analysis) {
-  // If this is a FuncResultMemLocObject and that is not or vice versa, the sets they denote are not equal
-  if ((dynamic_cast<FuncResultMemLocObject*>(this) == NULL)
-      != (boost::dynamic_pointer_cast<FuncResultMemLocObject>(that) == NULL))
-    return false;
-  // If this is a FullMemLocObject and that is not or vice versa, the sets they denote are not equal
-  if ((dynamic_cast<FullMemLocObject*>(this) == NULL)
-      != (boost::dynamic_pointer_cast<FullMemLocObject>(that) == NULL))
-    return false;
+  // Identical FuncResultMemLocObject denote the same set and different ones denote disjoint sets
+  FuncResultRelationType rel = getFuncResultRel(this, that, pedge);
+  switch(rel) {
+    case FuncResultSameFunc: return true;
+    case FuncResultUnequal: return false;
+    case NeitherFuncResult: break;
+  }
+  // If either this or that is a FullMemLocObject, this is a subset of that if they're equal or of that is full.
+  // We do this check early because casting to FullMemLocObject is more efficient than calling isFull.
+  if (boost::dynamic_pointer_cast<FullMemLocObject>(that)) return true;
+  if (dynamic_cast<FullMemLocObject*>(this))               return that->isFull(pedge, comp, analysis);
 
   MemLocObjectPtr co = boost::dynamic_pointer_cast<MemLocObject>(that);
   if (co)
@@ -6254,12 +3699,6 @@ bool MemLocObject::subSet(AbstractObjectPtr that, PartEdgePtr pedge,
   else
     return false;
 }
-
-//// Returns true if this object is live at the given part and false otherwise
-//bool MemLocObject::isLiveAO(PartEdgePtr pedge) {
-////cout << "MemLocObject::isLiveAO(), region="<<region->str()<<endl;
-//  return region->isLiveAO(pedge);
-//}
 
 // General version of isLive that accounts for framework details before routing the call to the derived class'
 // isLiveML check. Specifically, it routes the call through the composer to make sure the isLiveML call gets the
@@ -6276,14 +3715,6 @@ bool MemLocObject::isLive(PartEdgePtr pedge, Composer* comp,
       && (!getIndex() || getIndex()->isLive(pedge, comp, analysis));
 }
 
-//// Computes the meet of this and that and saves the result in this
-//// returns true if this causes this to change and false otherwise
-//bool MemLocObject::meetUpdateAO(MemLocObjectPtr that, PartEdgePtr pedge) {
-//  bool modified = false;
-//  modified = region->meetUpdateAO(that->getRegion(), pedge) || modified;
-//  if(index) modified = index->meetUpdateAO(that->getIndex(), pedge) || modified;
-//  return modified;
-//}
 
 // General version of meetUpdate() that accounts for framework details before routing the call to the derived class'
 // meetUpdateML check. Specifically, it routes the call through the composer to make sure the meetUpdateML
@@ -6301,49 +3732,40 @@ bool MemLocObject::meetUpdate(MemLocObjectPtr that, PartEdgePtr pedge,
 
 bool MemLocObject::meetUpdate(AbstractObjectPtr that, PartEdgePtr pedge,
     Composer* comp, ComposedAnalysis* analysis) {
-  // If this is a FuncResultMemLocObject and that is not or vice versa, we'll need to make this object full
-  if ((dynamic_cast<FuncResultMemLocObject*>(this) == NULL)
-      != (boost::dynamic_pointer_cast<FuncResultMemLocObject>(that) == NULL))
-    assert(0);
-  // If this is a FullMemLocObject and that is not or vice versa, we'll need to make this object full
-  if ((dynamic_cast<FullMemLocObject*>(this) == NULL)
-      != (boost::dynamic_pointer_cast<FullMemLocObject>(that) == NULL))
-    assert(0);
+  // Identical FuncResultMemLocObject denote the same set and different ones denote disjoint sets
+  FuncResultRelationType rel = getFuncResultRel(this, that, pedge);
+  switch(rel) {
+    case FuncResultSameFunc: return false;
+    case FuncResultUnequal: return setToFull(pedge, comp, analysis);
+    case NeitherFuncResult: break;
+  }
+  // If that is a FullMemLocObject but this is not, we'll need to make this object full
+  if (boost::dynamic_pointer_cast<FullMemLocObject>(that) && !isFull(pedge, comp, analysis))
+    return setToFull(pedge, comp, analysis);
 
   MemLocObjectPtr ml = boost::dynamic_pointer_cast<MemLocObject>(that);
   assert(ml);
   return meetUpdate(ml, pedge, comp, analysis);
 }
 
-//// Returns whether this AbstractObject denotes the set of all possible execution prefixes.
-//bool MemLocObject::isFullAO(PartEdgePtr pedge) {
-// return region->isFullAO(pedge) && (!index || index->isFullAO(pedge));
-//}
-//
-//// Returns whether this AbstractObject denotes the empty set.
-//bool MemLocObject::isEmptyAO(PartEdgePtr pedge) {
-//  return region->isEmptyAO(pedge) && (!index || index->isEmptyAO(pedge));
-//}
 
 // General versions of isFull() and isEmpty that account for framework details before routing the call to the
 // derived class' isFull() and isEmpty()  check. Specifically, it routes the call through the composer to make
 // sure the isFull(PartEdgePtr) and isEmpty(PartEdgePtr) call gets the right PartEdge.
 // These functions are just aliases for the real implementations in AbstractObject
-bool MemLocObject::isFull(PartEdgePtr pedge, Composer* comp,
-    ComposedAnalysis* analysis)
-//{ return isFullAO(pedge); }
+bool MemLocObject::isFull(PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis)
 // This MemLocObject is full if is region is Full and its index is either NULL or says its Full
-    {
+{
+  assert(getRegion());
   return getRegion()->isFull(pedge, comp, analysis)
       && (!getIndex() || getIndex()->isFull(pedge, comp, analysis));
 }
 
-bool MemLocObject::isEmpty(PartEdgePtr pedge, Composer* comp,
-    ComposedAnalysis* analysis)
-//{ return isEmptyAO(pedge); }
+bool MemLocObject::isEmpty(PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis)
 // This MemLocObject is Empty if either its region is empty or its index is empty,
 // with a NULL index considered to denote the full set
-    {
+{
+  assert(getRegion());
   return getRegion()->isEmpty(pedge, comp, analysis)
       || (!getIndex() && getIndex()->isEmpty(pedge, comp, analysis));
 }
@@ -6418,7 +3840,7 @@ const AbstractionHierarchy::hierKeyPtr& MemLocObject::getHierKey() const {
 }
 
 /* ##################################
-   ##### FuncResultMemLocObject   #####
+   ##### FuncResultMemLocObject #####
    ################################## */
 
 // Special MemLocObject used internally by the framework to associate with the return value of a function
@@ -6437,6 +3859,15 @@ MemLocObjectPtr FuncResultMemLocObject::copyAOType() const {
   return boost::make_shared<FuncResultMemLocObject>(*this);
 }
 
+bool FuncResultMemLocObject::mustEqualAO(MemLocObjectPtr that_arg, PartEdgePtr pedge) {
+  //The two objects denote the same set iff they're both FuncResultMemLocObjects with
+  // FuncResultMemRegioObject that correspond to the same function
+  FuncResultMemLocObjectPtr that = boost::dynamic_pointer_cast<FuncResultMemLocObject>(that_arg);
+  assert(getRegion());
+  assert(that->getRegion());
+  return getRegion()->mustEqualAO(that->getRegion(), pedge);
+}
+
 // Returns a key that uniquely identifies this particular AbstractObject in the
 // set hierarchy.
 const AbstractionHierarchy::hierKeyPtr& FuncResultMemLocObject::getHierKey() const {
@@ -6447,7 +3878,7 @@ const AbstractionHierarchy::hierKeyPtr& FuncResultMemLocObject::getHierKey() con
 }
 
 /* ##########################
- #### FullMemLocObject ####
+   #### FullMemLocObject ####
    ########################## */
 
 bool FullMemLocObject::mayEqualAO(MemLocObjectPtr o, PartEdgePtr pedge) {
@@ -6501,408 +3932,157 @@ string FullMemLocObject::str(string indent) const {
 }
 
 /* ################################
-   ##### CombinedMemLocObject   #####
-   ################################ * /
+   ##### CombinedMemLocObject #####
+   ################################ */
 
-/*template <bool defaultMayEq>
- boost::shared_ptr<CombinedMemLocObject<defaultMayEq> > CombinedMemLocObject<defaultMayEq>::create(const std::list<MemLocObjectPtr>& memLocs)
- {
- //dbg << "CombinedMemLocObject<"<<defaultMayEq<<">::create() generic "<< endl;
- return boost::make_shared<CombinedMemLocObject<defaultMayEq> >(memLocs);
- }
 
- // Sriram: gcc 4.1.2 complains of undefined references to unused to template functions
- // fix: explicit template instantiation
- template boost::shared_ptr<CombinedMemLocObject<true> > CombinedMemLocObject<true>::create(const std::list<MemLocObjectPtr>& memLocs);
- template boost::shared_ptr<CombinedMemLocObject<false> > CombinedMemLocObject<false>::create(const std::list<MemLocObjectPtr>& memLocs);
- * /
 
-template<bool defaultMayEq>
-SgNode* CombinedMemLocObject<defaultMayEq>::getBase() const {
-  // Returns the base SgNode shared by all the MemLocs in this object or NULL, if the base SgNodes are different
-  SgNode* base = NULL;
-  for (list<MemLocObjectPtr>::const_iterator ml = memLocs.begin();
-      ml != memLocs.end(); ml++) {
-    if (ml == memLocs.begin())
-      base = (*ml)->getBase();
-    else if (base != (*ml)->getBase())
-      return NULL;
-  }
+/* ##############################
+   ##### MappedMemLocObject #####
+   ############################## */
 
-  return base;
-}
-
-template<bool defaultMayEq>
-MemRegionObjectPtr CombinedMemLocObject<defaultMayEq>::getRegion() const {
-  //cout << "CombinedMemLocObject::getRegion("<<this<<")"<<endl;
-  if (region == NULLMemRegionObject) {
+template<class Key, class MappedAOSubType, class MappedAOValueType, class MappedAOMemRegionType>
+MemRegionObjectPtr MappedMemLocObject<Key, MappedAOSubType, MappedAOValueType, MappedAOMemRegionType>::getRegion() const {
+  if (MappedMemLocObject<Key, MappedAOSubType, MappedAOValueType, MappedAOMemRegionType>::region == NULLMemRegionObject) {
     // Collect all the memRegions of the memLocs in this object and create a CombinedMemRegionObject out of them
-    std::list<MemRegionObjectPtr> memRegions;
-    for (list<MemLocObjectPtr>::const_iterator ml = memLocs.begin();
-        ml != memLocs.end(); ml++)
-      memRegions.push_back((*ml)->getRegion());
+    map<Key, MemRegionObjectPtr> memRegions;
+    for (typename map<Key, MemLocObjectPtr>::const_iterator it = MappedMemLocObject<Key, MappedAOSubType, MappedAOValueType, MappedAOMemRegionType>::aoMap.begin();
+         it != MappedMemLocObject<Key, MappedAOSubType, MappedAOValueType, MappedAOMemRegionType>::aoMap.end(); ++it) {
+      memRegions[it->first] = it->second->getRegion();
+    }
 
-    ((CombinedMemLocObject<defaultMayEq>*) this)->region = boost::make_shared<
-        CombinedMemRegionObject<defaultMayEq> >(memRegions);
+    ((MappedMemLocObject<Key, MappedAOSubType, MappedAOValueType, MappedAOMemRegionType>*) this)->region =
+        boost::make_shared<MappedMemRegionObject<Key, MappedAOMemRegionType, MappedAOValueType> >(
+            MappedMemLocObject<Key, MappedAOSubType, MappedAOValueType, MappedAOMemRegionType>::ui,
+            MappedMemLocObject<Key, MappedAOSubType, MappedAOValueType, MappedAOMemRegionType>::analysis,
+            memRegions);
   }
-  return region;
+  return MappedMemLocObject<Key, MappedAOSubType, MappedAOValueType, MappedAOMemRegionType>::region;
 }
 
-template<bool defaultMayEq>
-ValueObjectPtr CombinedMemLocObject<defaultMayEq>::getIndex() const {
-  if (index == NULLValueObject) {
-    // Collect all the indexes of the memLocs in this object and create a CombinedValueObject out of them
-    std::list<ValueObjectPtr> indexes;
-    for (list<MemLocObjectPtr>::const_iterator ml = memLocs.begin();
-        ml != memLocs.end(); ml++)
-      indexes.push_back((*ml)->getIndex());
+template<class Key, class MappedAOSubType, class MappedAOValueType, class MappedAOMemRegionType>
+ValueObjectPtr MappedMemLocObject<Key, MappedAOSubType, MappedAOValueType, MappedAOMemRegionType>::getIndex() const {
+  if (MappedMemLocObject<Key, MappedAOSubType, MappedAOValueType, MappedAOMemRegionType>::index == NULLValueObject) {
+    // Collect all the indexes of the memlocs in aoMap and create a CombinedValueObject out of them
+    map<Key, ValueObjectPtr> indexes;
+    for (typename map<Key, MemLocObjectPtr>::const_iterator it = MappedMemLocObject<Key, MappedAOSubType, MappedAOValueType, MappedAOMemRegionType>::aoMap.begin();
+         it != MappedMemLocObject<Key, MappedAOSubType, MappedAOValueType, MappedAOMemRegionType>::aoMap.end(); ++it) {
+      indexes[it->first] = it->second->getIndex();
+    }
 
-    ((CombinedMemLocObject<defaultMayEq>*) this)->index = boost::make_shared<
-        CombinedValueObject<defaultMayEq> >(indexes);
+    ((MappedMemLocObject<Key, MappedAOSubType, MappedAOValueType, MappedAOMemRegionType>*) this)->index =
+        boost::make_shared<MappedValueObject<Key, MappedAOValueType> >(
+            MappedMemLocObject<Key, MappedAOSubType, MappedAOValueType, MappedAOMemRegionType>::ui,
+            MappedMemLocObject<Key, MappedAOSubType, MappedAOValueType, MappedAOMemRegionType>::analysis,
+            indexes);
   }
-  return index;
+  return MappedMemLocObject<Key, MappedAOSubType, MappedAOValueType, MappedAOMemRegionType>::index;
 }
 
-template<bool defaultMayEq>
-void CombinedMemLocObject<defaultMayEq>::add(MemLocObjectPtr memLoc) {
-  memLocs.push_back(memLoc);
+// Check whether that is a MemLocObject and if so, call the version of mayEqual specific to MemLocObjects
+template<class Key, class MappedAOSubType, class MappedAOValueType, class MappedAOMemRegionType>
+bool MappedMemLocObject<Key, MappedAOSubType, MappedAOValueType, MappedAOMemRegionType>::mayEqual
+                  (AbstractObjectPtr that, PartEdgePtr pedge,Composer* comp, ComposedAnalysis* analysis) {
+  // Identical FuncResultMemLocObject denote the same set and different ones denote disjoint sets
+  FuncResultRelationType rel = getFuncResultRel(this, that, pedge);
+  switch(rel) {
+    case FuncResultSameFunc: return true;
+    case FuncResultUnequal: return false;
+    case NeitherFuncResult: break;
+  }
+  // If either this or that is a FullMemLocObject, the two objects only overlap if either is full.
+  // We do this check early because casting to FullMemLocObject is more efficient than calling isFull.
+  if (boost::dynamic_pointer_cast<FullMemLocObject>(that)) return true;
+  if (dynamic_cast<FullMemLocObject*>(this))               return true;
+
+  return MappedAbstractObject<Key, MemLocObject, AbstractObject::MemLoc, MappedAOSubType>::mayEqual(that, pedge, comp, analysis);
 }
 
-// Returns whether this object may/must be equal to o within the given Part p
-template<bool defaultMayEq>
-bool CombinedMemLocObject<defaultMayEq>::mayEqual(MemLocObjectPtr o,
-    PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis) {
-  boost::shared_ptr<CombinedMemLocObject<defaultMayEq> > that =
-      boost::dynamic_pointer_cast<CombinedMemLocObject<defaultMayEq> >(o);
-  assert(that);
-
-  // If the two combination objects include different numbers of MemLocObjects, say that they may be equal since
-  // we can't be sure either way.
-  if (memLocs.size() != that->memLocs.size())
-    return true;
-
-  // Compare all the pairs of MemLocObjects in memLocs and that.memLocs, returning defaultMayEq if any pair
-  // returns defaultMayEq since we're looking for the tightest (if defaultMayEq=false) / loosest (if defaultMayEq=true)
-  // answer that any MemLocObject in memLocs can give
-  for (list<MemLocObjectPtr>::iterator thisIt = memLocs.begin(), thatIt =
-      that->memLocs.begin(); thisIt != memLocs.end(); thisIt++, thatIt++) {
-    //if((*thisIt)->mayEqualAO(*thatIt, pedge) == defaultMayEq) return defaultMayEq;
-    if ((*thisIt)->mayEqual(*thatIt, pedge, comp, analysis) == defaultMayEq)
-      return defaultMayEq;
+// Check whether that is a MemLocObject and if so, call the version of mustEqual specific to MemLocObjects
+template<class Key, class MappedAOSubType, class MappedAOValueType, class MappedAOMemRegionType>
+bool MappedMemLocObject<Key, MappedAOSubType, MappedAOValueType, MappedAOMemRegionType>::mustEqual
+                  (AbstractObjectPtr that, PartEdgePtr pedge,Composer* comp, ComposedAnalysis* analysis) {
+  // Identical FuncResultMemLocObject denote the same set and different ones denote disjoint sets
+  FuncResultRelationType rel = getFuncResultRel(this, that, pedge);
+  switch(rel) {
+    case FuncResultSameFunc: return true;
+    case FuncResultUnequal: return false;
+    case NeitherFuncResult: break;
   }
+  // If either this or that is a FullMemLocObject, the two objects only must-equal if neither is full.
+  // We do this check early because casting to FullMemLocObject is more efficient than calling isFull.
+  if (boost::dynamic_pointer_cast<FullMemLocObject>(that)) return false;
+  if (dynamic_cast<FullMemLocObject*>(this))               return false;
 
-  return !defaultMayEq;
-}
-
-template<bool defaultMayEq>
-bool CombinedMemLocObject<defaultMayEq>::mustEqual(MemLocObjectPtr o,
-    PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis) {
-  boost::shared_ptr<CombinedMemLocObject<defaultMayEq> > that =
-      boost::dynamic_pointer_cast<CombinedMemLocObject<defaultMayEq> >(o);
-  assert(that);
-
-  // If the two combination  objects include different numbers of MemLocObjects, say that they are not must equal since
-  // we can't be sure either way.
-  if (memLocs.size() != that->memLocs.size())
-    return false;
-
-  // Compare all the pairs of MemLocObjects in memLocs and that.memLocs, returning !defaultMayEq if any pair
-  // returns !defaultMayEqual since we're looking for the tightest answer that any MemLocObject in memLocs can give
-  for (list<MemLocObjectPtr>::iterator thisIt = memLocs.begin(), thatIt =
-      that->memLocs.begin(); thisIt != memLocs.end(); thisIt++, thatIt++) {
-    //if((*thisIt)->mustEqualAO(*thatIt, pedge) == !defaultMayEq) return !defaultMayEq;
-    if ((*thisIt)->mustEqual(*thatIt, pedge, comp, analysis) == !defaultMayEq)
-      return !defaultMayEq;
-  }
-
-  return defaultMayEq;
+  return MappedAbstractObject<Key, MemLocObject, AbstractObject::MemLoc, MappedAOSubType>::mustEqual(that, pedge, comp, analysis);
 }
 
 // Returns whether the two abstract objects denote the same set of concrete objects
-template<bool defaultMayEq>
-bool CombinedMemLocObject<defaultMayEq>::equalSet(MemLocObjectPtr o,
-    PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis) {
-  boost::shared_ptr<CombinedMemLocObject<defaultMayEq> > that =
-      boost::dynamic_pointer_cast<CombinedMemLocObject<defaultMayEq> >(o);
-  assert(that);
-  assert(memLocs.size() == that->memLocs.size());
+template<class Key, class MappedAOSubType, class MappedAOValueType, class MappedAOMemRegionType>
+bool MappedMemLocObject<Key, MappedAOSubType, MappedAOValueType, MappedAOMemRegionType>::equalSet
+                  (AbstractObjectPtr that, PartEdgePtr pedge,Composer* comp, ComposedAnalysis* analysis) {
+  // Identical FuncResultMemLocObject denote the same set and different ones denote disjoint sets
+  FuncResultRelationType rel = getFuncResultRel(this, that, pedge);
+  switch(rel) {
+    case FuncResultSameFunc: return true;
+    case FuncResultUnequal: return false;
+    case NeitherFuncResult: break;
+  }
+  // If either this or that is a FullMemLocObject, the two objects only equal only if they're both full.
+  // We do this check early because casting to FullMemLocObject is more efficient than calling isFull.
+  if (boost::dynamic_pointer_cast<FullMemLocObject>(that)) return this->isFull(pedge, comp, analysis);
+  if (dynamic_cast<FullMemLocObject*>(this))               return that->isFull(pedge, comp, analysis);
 
-  // Two unions and intersections denote the same set of their components individually denote the same set
-  // (we can get a more precise answer if we could check set containment relations as well)
-  list<MemLocObjectPtr>::const_iterator mlThis = memLocs.begin();
-  list<MemLocObjectPtr>::const_iterator mlThat = that->memLocs.begin();
-  for (; mlThis != memLocs.end(); mlThis++, mlThat++)
-    //if(!(*mlThis)->equalSetAO(*mlThat, pedge)) return false;
-    if (!(*mlThis)->equalSet(*mlThat, pedge, comp, analysis))
-      return false;
-  return true;
+  return MappedAbstractObject<Key, MemLocObject, AbstractObject::MemLoc, MappedAOSubType>::equalSet(that, pedge, comp, analysis);
 }
 
 // Returns whether this abstract object denotes a non-strict subset (the sets may be equal) of the set denoted
 // by the given abstract object.
-template<bool defaultMayEq>
-bool CombinedMemLocObject<defaultMayEq>::subSet(MemLocObjectPtr o,
-    PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis) {
-  boost::shared_ptr<CombinedMemLocObject<defaultMayEq> > that =
-      boost::dynamic_pointer_cast<CombinedMemLocObject<defaultMayEq> >(o);
-  assert(that);
-  assert(memLocs.size() == that->memLocs.size());
-
-  // Compare all the pairs of MemLocObjects in memLocs and that.memLocs, returning defaultMayEq if any pair
-  // returns defaultMayEq since we're looking for the tightest (if defaultMayEq=false) / loosest (if defaultMayEq=true)
-  // answer that any MemLocObject in memLocs can give
-  for (list<MemLocObjectPtr>::iterator thisIt = memLocs.begin(), thatIt =
-      that->memLocs.begin(); thisIt != memLocs.end(); thisIt++, thatIt++) {
-    //if((*thisIt)->subSetAO(*thatIt, pedge) == defaultMayEq) return defaultMayEq;
-    if ((*thisIt)->subSet(*thatIt, pedge, comp, analysis) == defaultMayEq)
-      return defaultMayEq;
+template<class Key, class MappedAOSubType, class MappedAOValueType, class MappedAOMemRegionType>
+bool MappedMemLocObject<Key, MappedAOSubType, MappedAOValueType, MappedAOMemRegionType>::subSet
+                  (AbstractObjectPtr that, PartEdgePtr pedge,Composer* comp, ComposedAnalysis* analysis) {
+  // Identical FuncResultMemLocObject denote the same set and different ones denote disjoint sets
+  FuncResultRelationType rel = getFuncResultRel(this, that, pedge);
+  switch(rel) {
+    case FuncResultSameFunc: return true;
+    case FuncResultUnequal: return false;
+    case NeitherFuncResult: break;
   }
-  return !defaultMayEq;
+  // If either this or that is a FullMemLocObject, this is a subset of that if they're equal or of that is full.
+  // We do this check early because casting to FullMemLocObject is more efficient than calling isFull.
+  if (boost::dynamic_pointer_cast<FullMemLocObject>(that)) return true;
+  if (dynamic_cast<FullMemLocObject*>(this))               return that->isFull(pedge, comp, analysis);
+
+  return MappedAbstractObject<Key, MemLocObject, AbstractObject::MemLoc, MappedAOSubType>::subSet(that, pedge, comp, analysis);
 }
 
-// Returns true if this object is live at the given part and false otherwise
-template<bool defaultMayEq>
-// General version of isLive that accounts for framework details before routing the call to the derived class'
-// isLiveML check. Specifically, it routes the call through the composer to make sure the isLiveML call gets the
-// right PartEdge
-bool CombinedMemLocObject<defaultMayEq>::isLive(PartEdgePtr pedge,
-    Composer* comp, ComposedAnalysis* analysis) {
-//cout << "CombinedMemLocObject<defaultMayEq>::isLiveML union="<<defaultMayEq<<", #memLocs="<<memLocs.size()<<endl;
-  // If this is a union type (defaultMayEq=true), an object is live if any of its components are live (weakest constraint)
-  // If this is an intersection type (defaultMayEq=false), an object is dead if any of its components are dead (strongest constraint)
-  for (list<MemLocObjectPtr>::const_iterator ml = memLocs.begin();
-      ml != memLocs.end(); ml++) {
-//    cout << "  ml="<<(*ml)->str()<<endl;
-    //if((*ml)->isLiveAO(pedge) == defaultMayEq) { / *cout << "    LIVE"<<endl; * /return defaultMayEq; }
-    if ((*ml)->isLive(pedge, comp, analysis) == defaultMayEq) { / *cout << "    LIVE"<<endl; * /
-      return defaultMayEq;
-    }
+// General version of meetUpdate() that accounts for framework details before routing the call to the derived class'
+// meetUpdateML check. Specifically, it routes the call through the composer to make sure the meetUpdateML
+// call gets the right PartEdge
+template<class Key, class MappedAOSubType, class MappedAOValueType, class MappedAOMemRegionType>
+bool MappedMemLocObject<Key, MappedAOSubType, MappedAOValueType, MappedAOMemRegionType>::meetUpdate
+                  (AbstractObjectPtr that, PartEdgePtr pedge,Composer* comp, ComposedAnalysis* analysis) {
+  // Identical FuncResultMemLocObject denote the same set and different ones denote disjoint sets
+  FuncResultRelationType rel = getFuncResultRel(this, that, pedge);
+  switch(rel) {
+    case FuncResultSameFunc: return false;
+    case FuncResultUnequal: return this->setToFull(pedge, comp, analysis);
+    case NeitherFuncResult: break;
   }
+  // If that is a FullMemLocObject but this is not, we'll need to make this object full
+  if (boost::dynamic_pointer_cast<FullMemLocObject>(that) && !this->isFull(pedge, comp, analysis))
+    return this->setToFull(pedge, comp, analysis);
 
-  return !defaultMayEq;
+  return MappedAbstractObject<Key, MemLocObject, AbstractObject::MemLoc, MappedAOSubType>::meetUpdate(that, pedge, comp, analysis);
 }
 
-// Computes the meet of this and that and saves the result in this
-// returns true if this causes this to change and false otherwise
-template<bool defaultMayEq>
-bool CombinedMemLocObject<defaultMayEq>::meetUpdate(MemLocObjectPtr o,
-    PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis) {
-  boost::shared_ptr<CombinedMemLocObject<defaultMayEq> > that =
-      boost::dynamic_pointer_cast<CombinedMemLocObject<defaultMayEq> >(o);
-  assert(that);
-  assert(memLocs.size() == that->memLocs.size());
-  bool modified = false;
 
-  // Perform the meetUpdate operation on all member MemLocs
-  list<MemLocObjectPtr>::const_iterator mlThis = memLocs.begin();
-  list<MemLocObjectPtr>::const_iterator mlThat = that->memLocs.begin();
-  for (; mlThis != memLocs.end(); mlThis++, mlThat++)
-    //modified = (*mlThis)->meetUpdateAO(*mlThat, pedge) || modified;
-    modified = (*mlThis)->meetUpdate(*mlThat, pedge, comp, analysis)
-        || modified;
-  return modified;
-}
-
-// Returns whether this AbstractObject denotes the set of all possible execution prefixes.
-template<bool defaultMayEq>
-bool CombinedMemLocObject<defaultMayEq>::isFull(PartEdgePtr pedge,
-    Composer* comp, ComposedAnalysis* analysis) {
-  // If this is a union type (defaultMayEq=true), an object is full if any of its components are full (weakest constraint)
-  // If this is an intersection type (defaultMayEq=false), an object is not full if any of its components are not full (strongest constraint)
-  for (list<MemLocObjectPtr>::const_iterator ml = memLocs.begin();
-      ml != memLocs.end(); ml++)
-    //if((*ml)->isFullAO(pedge) == defaultMayEq) return defaultMayEq;
-    if ((*ml)->isFull(pedge, comp, analysis) == defaultMayEq)
-      return defaultMayEq;
-
-  return !defaultMayEq;
-}
-
-// Returns whether this AbstractObject denotes the empty set.
-template<bool defaultMayEq>
-bool CombinedMemLocObject<defaultMayEq>::isEmpty(PartEdgePtr pedge,
-    Composer* comp, ComposedAnalysis* analysis) {
-  // If this is a union type (defaultMayEq=true), an object is not empty if any of its components are not empty (weakest constraint)
-  // If this is an intersection type (defaultMayEq=false), an object is empty if any of its components are empty (strongest constraint)
-  for (list<MemLocObjectPtr>::const_iterator ml = memLocs.begin();
-      ml != memLocs.end(); ml++)
-    //if((*ml)->isEmptyAO(pedge) != defaultMayEq) return !defaultMayEq;
-    if ((*ml)->isEmpty(pedge, comp, analysis) != defaultMayEq)
-      return !defaultMayEq;
-
-  return defaultMayEq;
-}
-
-// Returns true if this AbstractObject corresponds to a concrete value that is statically-known
-template<bool defaultMayEq>
-bool CombinedMemLocObject<defaultMayEq>::isConcrete() {
-  for (list<MemLocObjectPtr>::const_iterator ml = memLocs.begin();
-      ml != memLocs.end(); ml++)
-    if (!(*ml)->isConcrete())
-      return false;
-  return true;
-}
-
-// Returns the number of concrete values in this set
-template<bool defaultMayEq>
-int CombinedMemLocObject<defaultMayEq>::concreteSetSize() {
-  // This is an over-approximation of the set size that assumes that all the concrete sets of
-  // the sub-MemLocs are disjoint
-  int size = 0;
-  for (list<MemLocObjectPtr>::const_iterator ml = memLocs.begin();
-      ml != memLocs.end(); ml++)
-    size += (*ml)->concreteSetSize();
-  return size;
-}
-
-// Allocates a copy of this object and returns a pointer to it
-template<bool defaultMayEq>
-MemLocObjectPtr CombinedMemLocObject<defaultMayEq>::copyAOType() const {
-  return boost::make_shared<CombinedMemLocObject>(memLocs);
-}
-
-template<bool defaultMayEq>
-std::string CombinedMemLocObject<defaultMayEq>::str(
-    std::string indent) const {
-  ostringstream oss;
-  if (memLocs.size() > 1)
-    oss << "[" << (defaultMayEq ? "UnionML" : "IntersectML") << ": ";
-  if (memLocs.size() > 1)
-    oss << endl;
-  for (list<MemLocObjectPtr>::const_iterator ml = memLocs.begin();
-      ml != memLocs.end();) {
-    if (ml != memLocs.begin())
-      oss << indent << "&nbsp;&nbsp;&nbsp;&nbsp;";
-    oss << (*ml)->str(indent + "&nbsp;&nbsp;&nbsp;&nbsp;");
-    ml++;
-    if (ml != memLocs.end())
-      oss << endl;
-  }
-  if (memLocs.size() > 1)
-    oss << "]";
-
-  return oss.str();
-}
-
-// Returns whether all instances of this class form a hierarchy. Every instance of the same
-// class created by the same analysis must return the same value from this method!
-template<bool defaultMayEq>
-bool CombinedMemLocObject<defaultMayEq>::isHierarchy() const {
-  // Combined MemLocs form hierarchy if:
-  // - All the sub-MemLocs form hierarchies of their own, AND
-  // - The combination is an intersection.
-  //   If the combination is a union then consider the following:
-  //            MLa     MLb
-  //   comb1 = {a,b}, {w, x}
-  //   comb2 = {a,b}, {y, z}
-  //   Note that MLs from analyses a and b are either identical sets or disjoint
-  //   However, comb1 U comb2 = {a, b, w, x, y, z}, for which this property does
-  //   not hold unless we work out a new hierarchy for MLb.
-
-  // Unions are not hierarchical unless they're singletons
-  if (defaultMayEq) {
-    if (memLocs.size() == 1)
-      return (*memLocs.begin())->isHierarchy();
-    else
-      return false;
-  }
-
-  for (list<MemLocObjectPtr>::const_iterator ml = memLocs.begin();
-      ml != memLocs.end(); ml++)
-    if (!(*ml)->isHierarchy())
-      return false;
-  return true;
-}
-
-// Returns a key that uniquely identifies this particular AbstractObject in the
-// set hierarchy.
-template<bool defaultMayEq>
-const AbstractionHierarchy::hierKeyPtr& CombinedMemLocObject<defaultMayEq>::getHierKey() const {
-  // The intersection of multiple objects is just a filtering process from the full
-  // set of objects to the exact one, with each key in the hierarchy further filtering
-  // the set down. As such, a hierarchical key for the intersection of multiple objects
-  // is just the concatenation of the keys of all the individual objects.
-  //dbg << "CombinedMemLocObject<defaultMayEq>::getHierKey() isHierKeyCached="<<isHierKeyCached<<", #memLocs="<<memLocs.size()<<endl;
-  //cout << "CombinedMemLocObject<defaultMayEq>::getHierKey() isHierKeyCached="<<isHierKeyCached<<", #memLocs="<<memLocs.size()<<endl;
-  if (!isHierKeyCached) {
-    / *    ((CombinedMemLocObject<defaultMayEq>*)this)->cachedHierKey = boost::make_shared<AOSHierKey>(((CombinedMemLocObject<defaultMayEq>*)this)->shared_from_this());
-
-     // Records whether endOfHierarchy was set on any of the key
-     bool endOfHierarchyAny=false;
-     for(list<MemLocObjectPtr>::const_iterator ml=memLocs.begin(); ml!=memLocs.end(); ml++) {
-     //dbg << "cur Key="<<(*ml)->getHierKey()<<endl;
-     ((CombinedMemLocObject<defaultMayEq>*)this)->cachedHierKey->add((*ml)->getHierKey()->begin(), (*ml)->getHierKey()->end());
-     }* /
-    list<hierKeyPtr> subHierKeys;
-    for (list<MemLocObjectPtr>::const_iterator i = memLocs.begin(); i != memLocs.end(); i++) {
-      subHierKeys.push_back((*i)->getHierKey());
-    }
-
-    ((CombinedMemLocObject<defaultMayEq>*) this)->cachedHierKey = boost::make_shared<IntersectHierKey>(subHierKeys);
-
-    ((CombinedMemLocObject<defaultMayEq>*) this)->isHierKeyCached = true;
-  }
-  //dbg << "cachedHierKey="<<cachedHierKey<<endl;
-  //cout << ">>> isHierKeyCached=" << isHierKeyCached << "   cachedHierKey="<< cachedHierKey << endl;
-  return cachedHierKey;
-}*/
-
-/* ##############################
-   ##### MappedMemLocObject   #####
-   ############################## */
-
-//  template<class Key>
-//  SgNode* MappedMemLocObject<Key>::getBase() const {
-//    // Returns the base SgNode shared by all the MemLocs in this object or NULL, if the base SgNodes are different
-//    SgNode* base = NULL;
-//    for (typename map<Key, MemLocObjectPtr>::const_iterator it =
-//        aoMap.begin(); it != aoMap.end(); ++it) {
-//      if (it == aoMap.begin())
-//        base = it->second->getBase();
-//      else if (base != it->second->getBase())
-//        return NULL;
-//    }
-//
-//    return base;
-//  }
-//
-template<class Key>
-MemRegionObjectPtr MappedMemLocObject<Key>::getRegion() const {
-  if (MappedMemLocObject<Key>::region == NULLMemRegionObject) {
-    // Collect all the memRegions of the memLocs in this object and create a CombinedMemRegionObject out of them
-    map<Key, MemRegionObjectPtr> memRegions;
-    for (typename map<Key, MemLocObjectPtr>::const_iterator it = MappedMemLocObject<Key>::aoMap.begin();
-         it != MappedMemLocObject<Key>::aoMap.end(); ++it) {
-      memRegions[it->first] = it->second->getRegion();
-    }
-
-    ((MappedMemLocObject<Key>*) this)->region =
-        boost::make_shared<MappedMemRegionObject<Key> >(MappedMemLocObject<Key>::ui, MappedMemLocObject<Key>::analysis, memRegions);
-  }
-  return MappedMemLocObject<Key>::region;
-}
-
-template<class Key>
-ValueObjectPtr MappedMemLocObject<Key>::getIndex() const {
-  if (MappedMemLocObject<Key>::index == NULLValueObject) {
-    // Collect all the indexes of the memlocs in aoMap and create a CombinedValueObject out of them
-    map<Key, ValueObjectPtr> indexes;
-    for (typename map<Key, MemLocObjectPtr>::const_iterator it = MappedMemLocObject<Key>::aoMap.begin();
-         it != MappedMemLocObject<Key>::aoMap.end(); ++it) {
-      indexes[it->first] = it->second->getIndex();
-    }
-
-    ((MappedMemLocObject<Key>*) this)->index =
-        boost::make_shared<MappedValueObject<Key> >(MappedMemLocObject<Key>::ui, MappedMemLocObject<Key>::analysis, indexes);
-  }
-  return MappedMemLocObject<Key>::index;
-}
 //
 ////! Method to add mls to the map.
 ////! MLs that are full are never added to the map.
 ////! If ml_p is FullML or ml_p->isFullML=true then mapped ML is set to full only if mostAccurate=false.
-//  template<class Key>
-//  void MappedMemLocObject<Key>::add(Key key, MemLocObjectPtr ml_p,
+//  template<class Key, class MappedAOSubType>
+//  void MappedMemLocObject<Key, MappedAOSubType>::add(Key key, MemLocObjectPtr ml_p,
 //      PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis) {
 //    // If the object is already full don't add anything
 //    //if(isUnion() && isFullAO(pedge)) return;
@@ -6920,8 +4100,8 @@ ValueObjectPtr MappedMemLocObject<Key>::getIndex() const {
 //    }
 //  }
 //
-//  template<class Key>
-//  bool MappedMemLocObject<Key>::mayEqualMLWithKey(Key key,
+//  template<class Key, class MappedAOSubType>
+//  bool MappedMemLocObject<Key, MappedAOSubType>::mayEqualMLWithKey(Key key,
 //      const map<Key, MemLocObjectPtr>& thatMLMap, PartEdgePtr pedge,
 //      Composer* comp, ComposedAnalysis* analysis) {
 //    typename map<Key, MemLocObjectPtr>::const_iterator s_it;
@@ -6944,535 +4124,9 @@ ValueObjectPtr MappedMemLocObject<Key>::getIndex() const {
 ////! computed at Key=PartEdgePtrthat describes some sets of executions.
 ////! MayEquality check on mapped ML is performed on intersection of sub-executions
 ////! or union of sub-executions over the keyed ML objects.
-//  template<class Key>
-////bool MappedMemLocObject<Key>::mayEqualAO(MemLocObjectPtr thatML, PartEdgePtr pedge) {
-//  bool MappedMemLocObject<Key>::mayEqual(MemLocObjectPtr thatML,
-//      PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis) {
-//    // scope s(txt()<<"MappedMemLocObject::mayEqualML", scope::medium);
-//    boost::shared_ptr<MappedMemLocObject<Key> > thatML_p =
-//        boost::dynamic_pointer_cast<MappedMemLocObject<Key> >(
-//            thatML);
-//    assert(thatML_p);
-//
-//    // dbg << "thisML=" << str() << endl;
-//    // dbg << "thatML=" << thatML_p->str() << endl;
-//
-//    // This object denotes full set of ML (full set of executions)
-//    //if(isFullAO(pedge)) return true;
-//    if (isFull(pedge, comp, analysis))
-//      return true;
-//
-//    // denotes empty set
-//    //if(isEmptyAO(pedge)) return false;
-//    if (isEmpty(pedge, comp, analysis))
-//      return false;
-//
-//    // presence of one more full objects will result in full set over union
-//    if (isUnion() && nFull > 0)
-//      return true;
-//
-//    // Two cases reach here [1] isUnion()=true && nFull_ML=0 [2] intersect=true && nFullML=0 or nFull_ML!=0.
-//    // For both cases iterate on the ML map and discharge the mayEqualML query to individual objects
-//    // which are answered based on its set of sub-executions (or its dataflow facts) computed by the corresponding analysis.
-//    const map<Key, MemLocObjectPtr> thatMLMap = thatML_p->getMemLocsMap();
-//    typename map<Key, MemLocObjectPtr>::iterator it;
-//    for (it = aoMap.begin(); it != aoMap.end(); ++it) {
-//      // discharge query
-//      bool isMayEq = mayEqualMLWithKey(it->first, thatMLMap, pedge, comp,
-//          analysis);
-//
-//      // dbg << "key=" << (it->first)->str() << ", isMayEq=" << isMayEq << endl;
-//
-//      // 1. Union of sub-executions and the object does not contain any full objects.
-//      // If the discharged query comes back as true for this case then we have found atleast one execution
-//      // under which the two objects are same and the set can only grow and the result of this query is not going
-//      // to change due to union.
-//      // If false we iterate further as any ML can add more executions under which the objects are may equals.
-//      if (isUnion() && isMayEq == true)
-//        return true;
-//
-//      // 2. Intersection of sub-executions and the object may contain full objects (nFull != 0).
-//      // The sub-executions are intersected and therefore it does not matter if we have full objects.
-//      // If the discharged query returns false then return false.
-//      // We did not find one execution in which the two objects are may equals.
-//      // Note that set of executions are contained over keyed objects (analyses are conservative).
-//      // This set only shrinks during intersection and it is not going to affect the result of this query.
-//      // If it returns true iterate further as some executions corresponding to true may be dropped.
-//      else if (isIntersection() && isMayEq == false)
-//        return false;
-//    }
-//
-//    // All the keyed objects returned false for the discharged query under union.
-//    // We haven't found a single execution under which the two objects are may equals.
-//    if (isUnion())
-//      return false;
-//    // All the keyed objects returned true for the discharged query under intersection.
-//    // We have atleast one execution in common in which the two objects are may equals.
-//    else if (isIntersection())
-//      return true;
-//    else
-//      assert(0);
-//  }
-//
-//  template<class Key>
-//  bool MappedMemLocObject<Key>::mustEqualMLWithKey(Key key,
-//      const map<Key, MemLocObjectPtr>& thatMLMap, PartEdgePtr pedge,
-//      Composer* comp, ComposedAnalysis* analysis) {
-//    typename map<Key, MemLocObjectPtr>::const_iterator s_it;
-//    s_it = thatMLMap.find(key);
-//    if (s_it == thatMLMap.end())
-//      return false;
-//    //return aoMap[key]->mustEqualAO(s_it->second, pedge);
-//    return aoMap[key]->mustEqual(s_it->second, pedge, comp, analysis);
-//  }
-//
-////! Two ML objects are must equals if they represent the same single memory
-////! location on all executions.
-////! Analyses are conservative as they start with full set of executions.
-////! Dataflow facts (predicates) shrink the set of sub-executions.
-////! We do not explicity store set of sub-executions and they are described 
-////! by the abstract objects computed from dataflow fact exported by the analysis.
-////! Unless the analyses discover otherwise conservative answer for mustEqualML is false.
-////! Mapped MLs are keyed using either ComposedAnalysis* or PartEdgePtr.
-////! Each keyed ML object correspond to some dataflow facts computed by Key=Analysis* or 
-////! computed at Key=PartEdgePtrthat describes some sets of executions.
-////! MustEquality check on mapped ML is performed on intersection (mostAccurate=true) of sub-executions
-////! or union (mostAccurate=false) of sub-executions over the keyed ML objects.
-//  template<class Key>
-////bool MappedMemLocObject<Key>::mustEqualAO(MemLocObjectPtr thatML, PartEdgePtr pedge) {
-//  bool MappedMemLocObject<Key>::mustEqual(MemLocObjectPtr thatML,
-//      PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis) {
-//    boost::shared_ptr<MappedMemLocObject<Key> > thatML_p =
-//        boost::dynamic_pointer_cast<MappedMemLocObject<Key> >(
-//            thatML);
-//    assert(thatML_p);
-//
-//    // This object denotes full set of ML (full set of executions)
-//    //if(isFullAO(pedge)) return false;
-//    if (isFull(pedge, comp, analysis))
-//      return false;
-//
-//    // denotes empty set
-//    //if(isEmptyAO(pedge)) return false;
-//    if (isEmpty(pedge, comp, analysis))
-//      return false;
-//
-//    // presence of one more full objects will result in full set over union
-//    if (isUnion() && nFull > 0)
-//      return true;
-//
-//    // Two cases reach here [1] isUnion()=true && nFull_ML=0 [2] intersect=true && nFullML=0 or nFull_ML!=0.
-//    // For both cases iterate on the ML map and discharge the mayEqualML query to individual objects
-//    // which are answered based on its set of sub-executions (or its dataflow facts) computed by the corresponding analysis.
-//    const map<Key, MemLocObjectPtr> thatMLMap = thatML_p->getMemLocsMap();
-//    typename map<Key, MemLocObjectPtr>::iterator it;
-//    for (it = aoMap.begin(); it != aoMap.end(); ++it) {
-//      // discharge query
-//      bool isMustEq = mustEqualMLWithKey(it->first, thatMLMap, pedge, comp,
-//          analysis);
-//
-//      // 1. Union of sub-executions and the object does not contain any full objects
-//      // If the discharged query comes back as false for this case then we have found atleast one execution
-//      // under which the two objects are not same and the set can only grow and the result of this query is not going
-//      // to change due to union.
-//      // If it returns true we iterate further as any ML can add more executions under which the objects are not must equals.
-//      if (isUnion() && isMustEq == false)
-//        return false;
-//
-//      // 2. Intersection of sub-executions and the object may contain full objects (nFull != 0).
-//      // The sub-executions are intersected and therefore it does not matter if we have full objects.
-//      // If the discharged query returns true then return true.
-//      // Under all sub-executions (corresponding to the ML) the two objects must equal.
-//      // Note that set of executions are contained over keyed objects as the analyses are conservative.
-//      // This set only shrinks during intersection and it is not going to affect the result of this query.
-//      // If it returns false iterate further as some executions corresponding to false may be dropped.
-//      else if (isIntersection() && isMustEq == true)
-//        return true;
-//    }
-//
-//    // All the keyed objects returned true for the discharged query under union.
-//    // We haven't found a single execution under which the two objects are not equal.
-//    if (isUnion())
-//      return true;
-//    // All the keyed objects returned false for the discharged query under intersection.
-//    // We have atleast one execution in common in which the two objects are not equal.
-//    else if (isIntersection())
-//      return false;
-//    else
-//      assert(0);
-//  }
-//
-////! Discharge the query to the corresponding ML
-////! If key not found in thatMLMap return false
-//  template<class Key>
-//  bool MappedMemLocObject<Key>::equalSetMLWithKey(Key key,
-//      const map<Key, MemLocObjectPtr>& thatMLMap, PartEdgePtr pedge,
-//      Composer* comp, ComposedAnalysis* analysis) {
-//    typename map<Key, MemLocObjectPtr>::const_iterator s_it;
-//    s_it = thatMLMap.find(key);
-//    if (s_it == thatMLMap.end())
-//      return false;
-//    //return aoMap[key]->equalSetAO(s_it->second, pedge);
-//    return aoMap[key]->equalSet(s_it->second, pedge, comp, analysis);
-//  }
-//
-////! Two objects are equal sets if they denote the same set of memory locations
-////! The boolean parameter mostAccurate is not releveant as this query is not
-////! answered based on union or intersection of sub-executions.
-////! Simply discharge the queries to all keyed MemLoc objects
-////! If all the discharged queries come back equal then the two objects are equal otherwise not.
-//  template<class Key>
-////bool MappedMemLocObject<Key>::equalSetAO(MemLocObjectPtr thatML, PartEdgePtr pedge) {
-//  bool MappedMemLocObject<Key>::equalSet(MemLocObjectPtr thatML,
-//      PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis) {
-//    boost::shared_ptr<MappedMemLocObject<Key> > thatML_p =
-//        boost::dynamic_pointer_cast<MappedMemLocObject<Key> >(
-//            thatML);
-//    assert(thatML_p);
-//
-//    // This object denotes full set of ML (full set of executions)
-//    //if(isFullAO(pedge)) return thatML_p->isFullAO(pedge);
-//    if (isFull(pedge, comp, analysis))
-//      return thatML_p->isFull(pedge, comp, analysis);
-//
-//    // denotes empty set
-//    //if(isEmptyAO(pedge)) return thatML_p->isEmptyAO(pedge);
-//    if (isEmpty(pedge, comp, analysis))
-//      return thatML_p->isEmpty(pedge, comp, analysis);
-//
-//    const map<Key, MemLocObjectPtr> thatMLMap = thatML_p->getMemLocsMap();
-//    typename map<Key, MemLocObjectPtr>::iterator it;
-//    for (it = aoMap.begin(); it != aoMap.end(); ++it) {
-//      // discharge query
-//      // break even if one of them returns false
-//      if (equalSetMLWithKey(it->first, thatMLMap, pedge, comp, analysis)
-//          == false)
-//        return false;
-//    }
-//
-//    return true;
-//  }
-//
-////! Discharge the query to the corresponding ML
-////! If key not found in thatMLMap return true as the
-////! keyed object on thatMLMap denotes full set
-//  template<class Key>
-//  bool MappedMemLocObject<Key>::subSetMLWithKey(Key key,
-//      const map<Key, MemLocObjectPtr>& thatMLMap, PartEdgePtr pedge,
-//      Composer* comp, ComposedAnalysis* analysis) {
-//    typename map<Key, MemLocObjectPtr>::const_iterator s_it;
-//    s_it = thatMLMap.find(key);
-//    if (s_it == thatMLMap.end())
-//      return true;
-//    //return aoMap[key]->subSetAO(s_it->second, pedge);
-//    return aoMap[key]->subSet(s_it->second, pedge, comp, analysis);
-//  }
-//
-////! This object is a non-strict subset of the other if the set of memory locations denoted by this
-////! is a subset of the set of memory locations denoted by that.
-////! The boolean parameter mostAccurate is not releveant as this query is not
-////! answered based on union or intersection of sub-executions.
-////! Simply discharge the queries to all keyed MemLoc objects
-////! If all the discharged queries come back true then this is a subset of that otherwise not.
-//  template<class Key>
-////bool MappedMemLocObject<Key>::subSetAO(MemLocObjectPtr thatML, PartEdgePtr pedge) {
-//  bool MappedMemLocObject<Key>::subSet(MemLocObjectPtr thatML,
-//      PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis) {
-//    boost::shared_ptr<MappedMemLocObject<Key> > thatML_p =
-//        boost::dynamic_pointer_cast<MappedMemLocObject<Key> >(
-//            thatML);
-//    assert(thatML_p);
-//
-//    // This object denotes full set of ML (full set of executions)
-//    //if(isFullAO(pedge)) return thatML_p->isFullAO(pedge);
-//    if (isFull(pedge, comp, analysis))
-//      return thatML_p->isFull(pedge, comp, analysis);
-//
-//    // denotes empty set
-//    // thatML could be empty or non-empty eitherway this will be a non-strict subset of that.
-//    //if(isEmpty(pedge)) return true;
-//    if (isEmpty(pedge, comp, analysis))
-//      return true;
-//
-//    // If both objects have the same keys discharge
-//    // If this object has a key and that does not then
-//    // the keyed object is subset of that (return true) implemented by subsetMLWithKey
-//    // If any of the discharged query return false then return false.
-//    const map<Key, MemLocObjectPtr> thatMLMap = thatML_p->getMemLocsMap();
-//    typename map<Key, MemLocObjectPtr>::iterator it;
-//    for (it = aoMap.begin(); it != aoMap.end(); ++it) {
-//      // discharge query
-//      // break even if one of them returns false
-//      if (subSetMLWithKey(it->first, thatMLMap, pedge, comp, analysis) == false)
-//        return false;
-//    }
-//
-//    // If this object doesn't have the key and that object has the key then
-//    // return false as this object has full object mapped to the key
-//    typename map<Key, MemLocObjectPtr>::const_iterator c_it;
-//    for (c_it = thatMLMap.begin(); c_it != thatMLMap.end() && (nFull != 0);
-//        ++c_it) {
-//      if (aoMap.find(c_it->first) == aoMap.end())
-//        return false;
-//    }
-//
-//    return true;
-//  }
-//
-////! Mapped object liveness is determined based on finding executions
-////! in which it may be live.
-////! It can be answered based on union (mostAccurate=false) or intersection
-////! (mostAccurate=true) of executions
-////! The conservative answer is to assume that the object is live
-//  template<class Key>
-////bool MappedMemLocObject<Key>::isLiveAO(PartEdgePtr pedge) {
-//// General version of isLive that accounts for framework details before routing the call to the derived class'
-//// isLiveML check. Specifically, it routes the call through the composer to make sure the isLiveML call gets the
-//// right PartEdge
-//  bool MappedMemLocObject<Key>::isLive(PartEdgePtr pedge,
-//      Composer* comp, ComposedAnalysis* analysis) {
-//    // If this object is full return the conservative answer
-////  if(isFullAO(pedge)) return true;
-//    if (isFull(pedge, comp, analysis))
-//      return true;
-//
-//    // If it has one or more full objects added to it
-//    // and if the object has mostAccurate=false then return true (weakest answer)
-//    if (nFull > 0 && isUnion())
-//      return true;
-//
-//    // 1. This object may have have one or more full objects under intersection
-//    // 2. This object doesnt have any full objects added to it under union
-//    // Under both cases the answer is based on how individual analysis respond to the query
-//    typename map<Key, MemLocObjectPtr>::iterator it = aoMap.begin();
-//    for (; it != aoMap.end(); ++it) {
-//      //bool isLive = it->second->isLiveAO(pedge);
-//      bool isLive = it->second->isLive(pedge, comp, analysis);
-//      if (isUnion() && isLive == true)
-//        return true;
-//      else if (isIntersection() && isLive == false)
-//        return false;
-//    }
-//
-//    // leftover cases
-//    if (isUnion())
-//      return false;
-//    else if (isIntersection())
-//      return true;
-//    else
-//      assert(0);
-//  }
-//
-////! meetUpdateML performs the join operation of abstractions of two mls
-//  template<class Key>
-////bool MappedMemLocObject<Key>::meetUpdateAO(MemLocObjectPtr that, PartEdgePtr pedge) {
-//  bool MappedMemLocObject<Key>::meetUpdate(MemLocObjectPtr that,
-//      PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis) {
-//    boost::shared_ptr<MappedMemLocObject<Key> > thatML_p =
-//        boost::dynamic_pointer_cast<MappedMemLocObject<Key> >(
-//            that);
-//    assert(thatML_p);
-//
-//    // if this object is already full
-////  if(isFullAO(pedge)) return false;
-//    if (isFull(pedge, comp, analysis))
-//      return false;
-//
-//    // If that object is full set this object to full
-////  if(thatML_p->isFullAO(pedge)) {
-//    if (thatML_p->isFull(pedge, comp, analysis)) {
-//      nFull++;
-//      setMLToFull();
-//      return true;
-//    }
-//
-//    // Both objects are not full
-//    const map<Key, MemLocObjectPtr> thatMLMap = thatML_p->getMemLocsMap();
-//
-//    typename map<Key, MemLocObjectPtr>::iterator it = aoMap.begin();
-//    typename map<Key, MemLocObjectPtr>::const_iterator s_it; // search iterator for thatMLMap
-//
-//    bool modified = false;
-//    while (it != aoMap.end()) {
-//      s_it = thatMLMap.find(it->first);
-//      // If two objects have the same key then discharge meetUpdate to the corresponding keyed ML objects
-//      if (s_it != thatMLMap.end()) {
-////      modified = (it->second)->meetUpdateAO(s_it->second, pedge) || modified;
-//        modified = (it->second)->meetUpdate(s_it->second, pedge, comp, analysis)
-//            || modified;
-//      }
-//
-//      // Remove the current ML object (current iterator it) from the map if the mapepd object is full.
-//      // Two cases under which the current ML object can be full.
-//      // (1) If current key is not found in thatMLMap then the mapped object
-//      // in thatMLMap is full and the meetUpdate of the current ML with that is also full.
-//      // (2) meetUpdateML above of the two keyed objects resulted in this mapped object being full.
-//      // Under both cases remove the mapped ml from this map
-////    if(s_it == thatMLMap.end() || (it->second)->isFullAO(pedge)) {
-//      if (s_it == thatMLMap.end()
-//          || (it->second)->isFull(pedge, comp, analysis)) {
-//        // Current mapped ML has become full as a result of (1) or (2).
-//        // Remove the item from the map.
-//        // Note that post-increment which increments the iterator and returns the old value for deletion.
-//        aoMap.erase(it++);
-//        nFull++;
-//        modified = true;
-//
-//        // If union then set this entire object to full and return
-//        if (isUnion()) {
-//          setMLToFull();
-//          return true;
-//        }
-//      } else
-//        ++it;
-//    }
-//    return modified;
-//  }
-//
-////! Method that sets this mapped object to full
-//  template<class Key>
-//  void MappedMemLocObject<Key>::setMLToFull() {
-//    assert(nFull > 0);
-//    if (aoMap.size() > 0)
-//      aoMap.clear();
-//  }
-//
-//  template<class Key>
-////bool MappedMemLocObject<Key>::isFullAO(PartEdgePtr pedge) {
-//  bool MappedMemLocObject<Key>::isFull(PartEdgePtr pedge,
-//      Composer* comp, ComposedAnalysis* analysis) {
-//    if (nFull > 0 && aoMap.size() == 0)
-//      return true;
-//    return false;
-//  }
-//
-//  template<class Key>
-////bool MappedMemLocObject<Key>::isEmptyAO(PartEdgePtr pedge) {
-//  bool MappedMemLocObject<Key>::isEmpty(PartEdgePtr pedge,
-//      Composer* comp, ComposedAnalysis* analysis) {
-//    if (nFull == 0 && aoMap.size() == 0)
-//      return true;
-//    return false;
-//  }
-//
-//// Returns true if this AbstractObject corresponds to a concrete value that is statically-known
-//  template<class Key>
-//  bool MappedMemLocObject<Key>::isConcrete() {
-//    typename map<Key, MemLocObjectPtr>::iterator it;
-//    for (it = aoMap.begin(); it != aoMap.end(); ++it)
-//      if (!it->second->isConcrete())
-//        return false;
-//    return true;
-//  }
-//
-//// Returns the number of concrete values in this set
-//  template<class Key>
-//  int MappedMemLocObject<Key>::concreteSetSize() {
-//    // This is an over-approximation of the set size that assumes that all the concrete sets of
-//    // the sub-MemLocs are disjoint
-//    int size = 0;
-//    typename map<Key, MemLocObjectPtr>::iterator it;
-//    for (it = aoMap.begin(); it != aoMap.end(); ++it)
-//      size += it->second->concreteSetSize();
-//    return size;
-//  }
-//
-//  template<class Key>
-//  MemLocObjectPtr MappedMemLocObject<Key>::copyAO() const {
-//    return boost::make_shared<MappedMemLocObject<Key> >(*this);
-//  }
-//
-//  template<class Key>
-//  string MappedMemLocObject<Key>::str(string indent) const {
-//    ostringstream oss;
-//    oss << "<table border=\"1\">";
-//    oss << "<tr>";
-//    oss << "<th>" << (isUnion() ? "UnionMappedML:" : "IntersectMappedML:")
-//        << "</th>";
-//    if (nFull > 0 && aoMap.size() == 0)
-//      oss << "<th> Full </th> </tr>";
-//    else if (nFull == 0 && aoMap.size() == 0)
-//      oss << "<th> Empty </th> </tr>";
-//    else {
-//      oss << "</tr>";
-//      typename map<Key, MemLocObjectPtr>::const_iterator it =
-//          aoMap.begin();
-//      for (; it != aoMap.end(); ++it) {
-//        oss << "<tr>";
-//        oss << "<td>" << (it->first)->str(indent) << "</td>";
-//        oss << "<td>" << (it->second)->str(indent) << "</td>";
-//        oss << "</tr>";
-//      }
-//    }
-//    oss << "</table>";
-//    return oss.str();
-//  }
-//
-//// Returns whether all instances of this class form a hierarchy. Every instance of the same
-//// class created by the same analysis must return the same value from this method!
-//  template<class Key>
-//  bool MappedMemLocObject<Key>::isHierarchy() const {
-//    // Combined MemLocs form hierarchy if:
-//    // - All the sub-MemLocs form hierarchies of their own, AND
-//    // - The combination is an intersection.
-//    //   If the combination is a union then consider the following:
-//    //            MLa     MLb
-//    //   comb1 = {a,b}, {w, x}
-//    //   comb2 = {a,b}, {y, z}
-//    //   Note that MLs from analyses a and b are either identical sets or disjoint
-//    //   However, comb1 U comb2 = {a, b, w, x, y, z}, for which this property does
-//    //   not hold unless we work out a new hierarchy for MLb.
-//
-//    // Unions are not hierarchical unless they're singletons
-//    if (isUnion()) {
-//      if (aoMap.size() == 1)
-//        return aoMap.begin()->second->isHierarchy();
-//      else
-//        return false;
-//    }
-//
-//    typename map<Key, MemLocObjectPtr>::const_iterator it;
-//    for (it = aoMap.begin(); it != aoMap.end(); ++it)
-//      if (!it->second->isHierarchy())
-//        return false;
-//    return true;
-//  }
-//
-//// Returns a key that uniquely identifies this particular AbstractObject in the 
-//// set hierarchy.
-//  template<class Key>
-//  const AbstractionHierarchy::hierKeyPtr& MappedMemLocObject<Key>::getHierKey() const {
-//    // The intersection of multiple objects is just a filtering process from the full
-//    // set of objects to the exact one, with each key in the hierarchy further filtering
-//    // the set down. As such, a hierarchical key for the intersection of multiple objects
-//    // is just the concatenation of the keys of all the individual objects.
-//    if (!isHierKeyCached) {
-//      /*((MappedMemLocObject<Key>*)this)->cachedHierKey = boost::make_shared<AOSHierKey>(((MappedMemLocObject<Key>*)this)->shared_from_this());
-//       typename map<Key, MemLocObjectPtr>::const_iterator it;
-//       for(it = aoMap.begin(); it != aoMap.end(); ++it) {
-//       AbstractionHierarchyPtr hierIt = boost::dynamic_pointer_cast<AbstractionHierarchy>(it->second);
-//       ROSE_ASSERT(hierIt);
-//
-//       ((MappedMemLocObject<Key>*)this)->cachedHierKey->add(hierIt->getHierKey()->begin(), hierIt->getHierKey()->end());
-//       }*/
-//      map<Key, hierKeyPtr> subHierKeys;
-//      for(typename map<Key, MemLocObjectPtr>::const_iterator it = aoMap.begin();
-//          it != aoMap.end(); ++it) {
-//        AbstractionHierarchyPtr hierIt = boost::dynamic_pointer_cast<AbstractionHierarchy>(it->second);
-//        ROSE_ASSERT(hierIt);
-//        subHierKeys[it->first] = hierIt->getHierKey();
-//      }
-//
-//      ((MappedMemLocObject<Key>*) this)->cachedHierKey =
-//          boost::make_shared<IntersectMappedHierKey<Key> >(subHierKeys);
-//
-//      ((MappedMemLocObject<Key>*) this)->isHierKeyCached = true;
-//    }
-//    return cachedHierKey;
-//  }
 
 /* #############################
- # PartEdgeUnionMemLocObject #
+   # PartEdgeUnionMemLocObject #
    ############################# */
 
 PartEdgeUnionMemLocObject::PartEdgeUnionMemLocObject() :
@@ -7481,15 +4135,27 @@ PartEdgeUnionMemLocObject::PartEdgeUnionMemLocObject() :
 
 PartEdgeUnionMemLocObject::PartEdgeUnionMemLocObject(
     const PartEdgeUnionMemLocObject& thatML) :
-    MemLocObject(thatML), unionML_p(thatML.copyAOType()) {
+    MemLocObject(thatML), unionML_p(thatML.unionML_p->copyAOType()) {
 }
 
 SgNode* PartEdgeUnionMemLocObject::getBase() const {
   return unionML_p->getBase();
 }
 
+MemRegionObjectPtr PartEdgeUnionMemLocObject::getRegion() const {
+  return unionML_p->getRegion();
+}
+
+ValueObjectPtr     PartEdgeUnionMemLocObject::getIndex() const {
+  return unionML_p->getIndex();
+}
+
 void PartEdgeUnionMemLocObject::add(MemLocObjectPtr ml_p, PartEdgePtr pedge,
     Composer* comp, ComposedAnalysis* analysis) {
+  scope s("PartEdgeUnionMemLocObject::add");
+  dbg << "Init: unionML_p="<<(unionML_p? unionML_p->str(): "NULL")<<endl;
+  dbg << "ml_p="<<ml_p->str()<<endl;
+
   // If this is the very first object
   if (!unionML_p)
     unionML_p = ml_p->copyAOType();
@@ -7501,6 +4167,9 @@ void PartEdgeUnionMemLocObject::add(MemLocObjectPtr ml_p, PartEdgePtr pedge,
   //else unionML_p->meetUpdateAO(ml_p, pedge);
   else
     unionML_p->meetUpdate(ml_p, pedge, comp, analysis);
+
+
+  dbg << "Final: unionML_p="<<(unionML_p? unionML_p->str(): "NULL")<<endl;
 }
 
 //bool PartEdgeUnionMemLocObject::mayEqualAO(MemLocObjectPtr that, PartEdgePtr pedge) {
@@ -7575,7 +4244,10 @@ bool PartEdgeUnionMemLocObject::isLive(PartEdgePtr pedge, Composer* comp,
 bool PartEdgeUnionMemLocObject::isFull(PartEdgePtr pedge, Composer* comp,
     ComposedAnalysis* analysis) {
   assert(unionML_p);
-  //return unionML_p->isFullAO(pedge);
+
+  scope s("PartEdgeUnionMemLocObject::isFull");
+  dbg << "unionML_p="<<unionML_p->str()<<endl;
+
   return unionML_p->isFull(pedge, comp, analysis);
 }
 
@@ -7607,8 +4279,7 @@ void PartEdgeUnionMemLocObject::setAOToFull() {
 
 string PartEdgeUnionMemLocObject::str(string indent) const {
   ostringstream oss;
-  assert(unionML_p);
-  oss << "[UnionML=" << unionML_p->str(indent) << "]";
+  oss << "[UnionML=" << (unionML_p? unionML_p->str(indent): "NULL") << "]";
   return oss.str();
 }
 
@@ -7702,45 +4373,26 @@ bool IndexVector::isEmpty(PartEdgePtr pedge, Composer* comp,
   return false;
 }
 
-// Sriram: gcc 4.1.2 complains of undefined references to unused to template functions
-// fix: explicit template instantiation
-/*template class CombinedCodeLocObject<true> ;
-template class CombinedCodeLocObject<false> ;
-template class CombinedValueObject<true> ;
-template class CombinedValueObject<false> ;
-template class CombinedMemLocObject<true> ;
-template class CombinedMemLocObject<false> ;
-template class CombinedMemRegionObject<true> ;
-template class CombinedMemRegionObject<false> ;*/
+template class GenericMappedCodeLocObject  <ComposedAnalysis*>;
+template class GenericMappedValueObject    <ComposedAnalysis*>;
+template class GenericMappedMemRegionObject<ComposedAnalysis*>;
+template class GenericMappedMemLocObject   <ComposedAnalysis*>;
+template class MappedCodeLocObject  <ComposedAnalysis*, GenericMappedCodeLocObject<ComposedAnalysis*> >;
+template class MappedValueObject    <ComposedAnalysis*, GenericMappedValueObject<ComposedAnalysis*> > ;
+template class MappedMemRegionObject<ComposedAnalysis*, GenericMappedMemRegionObject<ComposedAnalysis*>, GenericMappedValueObject<ComposedAnalysis*> >;
+template class MappedMemLocObject   <ComposedAnalysis*, GenericMappedMemLocObject<ComposedAnalysis*>, GenericMappedValueObject<ComposedAnalysis*>, GenericMappedMemRegionObject<ComposedAnalysis*> >;
+template class MappedAbstractObject<ComposedAnalysis*, CodeLocObject,   AbstractObject::CodeLoc,   GenericMappedCodeLocObject<ComposedAnalysis*> >;
+template class MappedAbstractObject<ComposedAnalysis*, ValueObject,     AbstractObject::Value,     GenericMappedValueObject<ComposedAnalysis*> >;
+template class MappedAbstractObject<ComposedAnalysis*, MemRegionObject, AbstractObject::MemRegion, GenericMappedMemRegionObject<ComposedAnalysis*> >;
+template class MappedAbstractObject<ComposedAnalysis*, MemLocObject,    AbstractObject::MemLoc,    GenericMappedMemLocObject<ComposedAnalysis*> >;
 
-/*  template class MappedCodeLocObject<ComposedAnalysis*, true> ;
-template class MappedCodeLocObject<ComposedAnalysis*, false> ;
-template class MappedValueObject<ComposedAnalysis*, true> ;
-template class MappedValueObject<ComposedAnalysis*, false> ;
-template class MappedMemRegionObject<ComposedAnalysis*, true> ;
-template class MappedMemRegionObject<ComposedAnalysis*, false> ;
-template class MappedMemLocObject<ComposedAnalysis*, true> ;
-template class MappedMemLocObject<ComposedAnalysis*, false> ;*/
-template class MappedCodeLocObject<ComposedAnalysis*>;
-template class MappedMemLocObject<ComposedAnalysis*>;
-template class MappedValueObject<ComposedAnalysis*> ;
-template class MappedMemRegionObject<ComposedAnalysis*>;
-template class MappedAbstractObject<ComposedAnalysis*, CodeLocObject,   AbstractObject::CodeLoc,   MappedCodeLocObject<ComposedAnalysis*> >;
-template class MappedAbstractObject<ComposedAnalysis*, ValueObject,     AbstractObject::Value,     MappedValueObject<ComposedAnalysis*> >;
-template class MappedAbstractObject<ComposedAnalysis*, MemRegionObject, AbstractObject::MemRegion, MappedMemRegionObject<ComposedAnalysis*> >;
-template class MappedAbstractObject<ComposedAnalysis*, MemLocObject,    AbstractObject::MemLoc,    MappedMemLocObject<ComposedAnalysis*> >;
-
-template class MappedCodeLocObject<UInt>;
-template class MappedValueObject<UInt>;
-template class MappedMemRegionObject<UInt>;
-template class MappedMemLocObject<UInt>;
-template class MappedAbstractObject<UInt, CodeLocObject,   AbstractObject::CodeLoc,   MappedCodeLocObject<UInt> >;
-template class MappedAbstractObject<UInt, ValueObject,     AbstractObject::Value,     MappedValueObject<UInt> >;
-template class MappedAbstractObject<UInt, MemRegionObject, AbstractObject::MemRegion, MappedMemRegionObject<UInt> >;
-template class MappedAbstractObject<UInt, MemLocObject,    AbstractObject::MemLoc,    MappedMemLocObject<UInt> >;
-
-/*template class MappedValueObject<ComposedAnalysis*> ;
-template class MappedMemRegionObject<ComposedAnalysis*> ;
-template class MappedMemLocObject<ComposedAnalysis*> ;*/
+template class MappedCodeLocObject  <UInt, CombinedCodeLocObject>;
+template class MappedValueObject    <UInt, CombinedValueObject>;
+template class MappedMemRegionObject<UInt, CombinedMemRegionObject, CombinedValueObject>;
+template class MappedMemLocObject   <UInt, CombinedMemLocObject, CombinedValueObject, CombinedMemRegionObject>;
+template class MappedAbstractObject<UInt, CodeLocObject,   AbstractObject::CodeLoc,   CombinedCodeLocObject>;
+template class MappedAbstractObject<UInt, ValueObject,     AbstractObject::Value,     CombinedValueObject>;
+template class MappedAbstractObject<UInt, MemRegionObject, AbstractObject::MemRegion, CombinedMemRegionObject>;
+template class MappedAbstractObject<UInt, MemLocObject,    AbstractObject::MemLoc,    CombinedMemLocObject>;
 
 } //namespace fuse

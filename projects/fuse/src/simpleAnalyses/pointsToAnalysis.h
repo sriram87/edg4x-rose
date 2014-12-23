@@ -114,6 +114,9 @@ namespace fuse
     MemRegionObjectPtr getRegion() const;
     ValueObjectPtr     getIndex() const;
     
+    // Allocates a copy of this object and returns a pointer to it
+    MemLocObjectPtr copyAOType() const;
+
     void add(MemLocObjectPtr ml_p, PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis);
     void add(boost::shared_ptr<AbstractObjectSet> thataos_p, PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis);
     const AbstractObjectSet& getMLSet() const;

@@ -249,7 +249,7 @@ namespace fuse
   }
 
   PTMemLocObject::PTMemLocObject(const PTMemLocObject& thatPTML)
-    : MemLocObject(thatPTML) {
+    : MemLocObject(thatPTML), ptanalysis(thatPTML.ptanalysis) {
     aos_p = boost::make_shared<AbstractObjectSet>(*(thatPTML.aos_p));
   }
 
@@ -280,6 +280,11 @@ namespace fuse
     return index;
   }
   
+  // Allocates a copy of this object and returns a pointer to it
+  MemLocObjectPtr PTMemLocObject::copyAOType() const {
+    return boost::make_shared<PTMemLocObject>(*this);
+  }
+
   void PTMemLocObject::add(MemLocObjectPtr ml_p, PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis) {
     if(ml_p->isFull(pedge, comp, analysis)) {
       // Set the set to full

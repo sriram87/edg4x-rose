@@ -16,15 +16,14 @@ using namespace sight;
 
 namespace fuse {
 
-  DEBUG_LEVEL(tightComposerDebugLevel, 0);
+  DEBUG_LEVEL(tightComposerDebugLevel, 3);
 
   /***************
    * Expr2AnyKey *
    ***************/
 
   bool Expr2AnyKey::operator<(const Expr2AnyKey& that) const {
-    scope reg(txt()<<"Expr2AnyKey::<",
-              scope::medium, attrGE("tightComposerDebugLevel", 4));
+    scope reg(txt()<<"Expr2AnyKey::<", scope::medium, attrGE("tightComposerDebugLevel", 4));
 
     if(tightComposerDebugLevel() >= 4) {
       dbg << "this=" << str() << endl;
@@ -138,8 +137,7 @@ namespace fuse {
   }
 
   void TightCompositionQueryManager::transToAnalState(Expr2AnyKey key, ComposedAnalysis* analysis_) {
-    scope reg(txt()<<"transToAnalState",
-              scope::medium, attrGE("tightComposerDebugLevel", 4)); 
+    scope reg(txt()<<"transToAnalState", scope::medium, attrGE("tightComposerDebugLevel", 4));
 
     if(tightComposerDebugLevel() >= 4) {
       dbg << "key=" << key.str() << endl;
@@ -284,6 +282,7 @@ namespace fuse {
       if(implementsExpr2AnyOp(*a)) {
         boost::shared_ptr<CombinedAOType> cao_p = boost::make_shared<CombinedAOType>();
         for(qIt = queryList.begin(); qIt != queryList.end(); ++qIt) {
+          scope s(txt()<<"query "<<qIt->str());
           Expr2AnyKey query = *qIt;
           // Transition this query to analysis state corresponding to *a
           tcqm.transToAnalState(query, *a);
@@ -295,8 +294,11 @@ namespace fuse {
             dbg << (*a)->str() << ":" << ao_p->str() << endl;
           }
 
+          //dbg << "cao_p="<<cao_p->str()<<endl;
           cao_p->add(ao_p, query.pedge, this, client);
-        }        
+        }
+
+        dbg << "cao_p="<<cao_p->str()<<endl;
         amao_p->add(*a, cao_p, pedge, this, client);
       }
     }
@@ -447,11 +449,11 @@ namespace fuse {
 
     MemRegionObjectPtr mr_p = Expr2Any<MemRegionObject, FullMemRegionObject,
                                        PartEdgeUnionMemRegionObject, AnalMapMemRegionObject>("Expr2MemRegion",
-                                                                                                      queryList,
-                                                                                                      pedge,
-                                                                                                      client,
-                                                                                                      implementsExpr2AnyOp, Expr2AnyOp,
-                                                                                                      ComposerExpr2AnyOp);
+                                                                                             queryList,
+                                                                                             pedge,
+                                                                                             client,
+                                                                                             implementsExpr2AnyOp, Expr2AnyOp,
+                                                                                             ComposerExpr2AnyOp);
     return mr_p;
   }
     
@@ -500,11 +502,11 @@ namespace fuse {
 
     MemLocObjectPtr ml_p = Expr2Any<MemLocObject, FullMemLocObject, 
                                      PartEdgeUnionMemLocObject, AnalMapMemLocObject>("Expr2MemLoc",
-                                                                                              queryList,
-                                                                                              pedge,
-                                                                                              client,
-                                                                                              implementsExpr2AnyOp, Expr2AnyOp,
-                                                                                              ComposerExpr2AnyOp);
+                                                                                     queryList,
+                                                                                     pedge,
+                                                                                     client,
+                                                                                     implementsExpr2AnyOp, Expr2AnyOp,
+                                                                                     ComposerExpr2AnyOp);
     return ml_p;
   }
   

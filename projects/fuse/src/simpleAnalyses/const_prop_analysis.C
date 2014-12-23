@@ -14,7 +14,7 @@ using namespace SageInterface;
 
 #include <cwchar>
 
-#define constantPropagationAnalysisDebugLevel 0
+#define constantPropagationAnalysisDebugLevel 1
 
 // Define type conversions for lambda operators that are not supported by Boost::Lambda
 namespace boost { 

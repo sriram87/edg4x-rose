@@ -13,7 +13,7 @@ using namespace boost;
 using namespace sight;
 
 namespace fuse {
-#define AOMDebugLevel 0
+#define AOMDebugLevel 1
 
 
 AbstractObjectMapKindPtr NULLAbstractObjectMapKind;
@@ -66,30 +66,13 @@ AbstractObjectMap::~AbstractObjectMap() {
 void AbstractObjectMap::initImplementation(AbstractObjectPtr key) {
   if(implementation==NULL) {
     implementation = createAOMKind(key, this);
-    /*cout << "AbstractObjectMap::initImplementation() key="<<key->str()<<
-                             ", key->isMappedAO()="<<key->isMappedAO()<<
-                             ", key->isHierarchy()="<<key->isHierarchy()<<
-                             ", getenv(\"DISABLE_HIER_AO\")="<<(getenv("DISABLE_HIER_AO")?getenv("DISABLE_HIER_AO"):"NULL")<<endl;
-    / *if(key->isDisjoint()) implementation = ???;
-     else * /
-    if(key->isMappedAO()) {
-      if(boost::dynamic_pointer_cast<MappedAbstractionBase>(key)->membersIsHierarchy() && getenv("DISABLE_HIER_AO")==NULL)
-        implementation = boost::make_shared<MappedAOMKind>(this, boost::make_shared<HierarchicalAOMFactory>(this), key);
-      else
-        implementation = boost::make_shared<MappedAOMKind>(this, boost::make_shared<GenericAOMFactory>(this), key);
-    } else {
-      if(key->isHierarchy() && getenv("DISABLE_HIER_AO")==NULL)
-        implementation = boost::make_shared<HierarchicalAOM>(this);
-      else
-        implementation = boost::make_shared<GenericAOM>(this);
-    }*/
   }
 }
 
 // Returns a newly-allocated AOMKind object that can map the given key type to values
 AbstractObjectMapKindPtr AbstractObjectMap::createAOMKind(AbstractObjectPtr key, AbstractObjectMap* parent) {
-    /*cout << "AbstractObjectMap::createAOMKind() key="<<key->str()<<
-                             ", key->isMappedAO()="<<key->isMappedAO()<<
+    SIGHT_VERB(dbg << "AbstractObjectMap::createAOMKind() key="<<key->str()<<endl, 1, AOMDebugLevel)
+                             /*", key->isMappedAO()="<<key->isMappedAO()<<
                              ", key->isHierarchy()="<<key->isHierarchy()<<
                              ", getenv(\"DISABLE_HIER_AO\")="<<(getenv("DISABLE_HIER_AO")?getenv("DISABLE_HIER_AO"):"NULL")<<endl;*/
     /*if(key->isDisjoint()) implementation = ???;
@@ -1738,7 +1721,8 @@ bool HierarchicalAOM::isEmpty() {
 
 std::string HierarchicalAOM::str(std::string indent) const {
   ostringstream s;
-  s << "pedge = "<<(parent->latPEdge? parent->latPEdge->str(): "NULL")<<endl;
+  //s << "pedge = "<<(parent->latPEdge? parent->latPEdge->str(): "NULL")<<endl;
+  s << "<u>HierarchicalAOM</u>"<<endl;
   s << tree;
   return s.str();
 }

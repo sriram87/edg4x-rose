@@ -61,6 +61,13 @@ class MemLocObject;
 class MemRegionObject;
 
 typedef enum {Union, Intersection} uiType;
+// Describes for a given pair of MemLocs or MemRegions whether either is a FuncResultMemLoc/MemRegion
+// and how they relate to each other
+typedef enum {FuncResultSameFunc, // Both are FuncResult* and refer to the same function
+              FuncResultUnequal,  // Both are FuncResult* and refer to the different functions or
+                                  // one is a FuncResult* and the other is not
+              NeitherFuncResult   // Neither is a FuncResult*
+              } FuncResultRelationType;
 
 class AbstractionHierarchy;
 typedef boost::shared_ptr<AbstractionHierarchy> AbstractionHierarchyPtr;
@@ -1185,223 +1192,42 @@ class FullCodeLocObject : public CodeLocObject
   { return cachedHierKey; }
 };
 
-
-// The combination of multiple CodeLocObjects. Maintains multiple CodeLocObjects and responds to
-//   API calls with the most or least accurate response that its constituent objects return, depending
-//   on the value of the template parameter defaultMayEq (the default value that mayEqual would return
-//   if any constituent MemLocObject returns this value).
-// For practical purposes analyses should ensure that different instances of IntersectCodeLocObject 
-//   are only compared if they include the same types of CodeLocObjects in the same order. Otherwise, 
-//   the comparisons will be uselessly inaccurate.
-/*template <bool defaultMayEq>
-class CombinedCodeLocObject: public CodeLocObject
-{
-  public:
-  std::list<CodeLocObjectPtr> codeLocs;
-  
-  CombinedCodeLocObject(CodeLocObjectPtr codeLoc) : CodeLocObject(NULL) { codeLocs.push_back(codeLoc); }
-  CombinedCodeLocObject(const std::list<CodeLocObjectPtr>& codeLocs) : CodeLocObject(NULL), codeLocs(codeLocs) {}
-  
-  const std::list<CodeLocObjectPtr>& getCodeLocs() const { return codeLocs; }
-  
-  SgNode* getBase() const;
-
-  void add(CodeLocObjectPtr codeLoc);
-  
-  // Returns whether this object may/must be equal to o within the given Part p
-  // These methods are private to prevent analyses from calling them directly.
-  bool mayEqualAO(CodeLocObjectPtr o, PartEdgePtr pedge);
-  bool mustEqualAO(CodeLocObjectPtr o, PartEdgePtr pedge);
-  
-  // Returns whether the two abstract objects denote the same set of concrete objects
-  bool equalSetAO(CodeLocObjectPtr o, PartEdgePtr pedge);
-  
-  // Returns whether this abstract object denotes a non-strict subset (the sets may be equal) of the set denoted
-  // by the given abstract object.
-  bool subSetAO(CodeLocObjectPtr o, PartEdgePtr pedge);
-  
-  // Returns true if this object is live at the given part and false otherwise
-  bool isLiveAO(PartEdgePtr pedge);
-  
-  // Computes the meet of this and that and saves the result in this
-  // returns true if this causes this to change and false otherwise
-  bool meetUpdateAO(CodeLocObjectPtr that, PartEdgePtr pedge);
-  
-  // Returns whether this AbstractObject denotes the set of all possible execution prefixes.
-  bool isFullAO(PartEdgePtr pedge);
-  // Returns whether this AbstractObject denotes the empty set.
-  bool isEmptyAO(PartEdgePtr pedge);
-  
-  // Returns true if this ValueObject corresponds to a concrete value that is statically-known
-  bool isConcrete();
-  // Returns the number of concrete values in this set
-  int concreteSetSize();
-  
-  // Allocates a copy of this object and returns a pointer to it
-  CodeLocObjectPtr copyAOType() const;
-  
-  std::string str(std::string indent="") const;
-  
-  // Returns whether all instances of this class form a hierarchy. Every instance of the same
-  // class created by the same analysis must return the same value from this method!
-  bool isHierarchy() const;
-  
-  // Returns a key that uniquely identifies this particular AbstractObject in the 
-  // set hierarchy.
-  const hierKeyPtr& getHierKey() const;
-}; // class CombinedCodeLocObject
-typedef CombinedCodeLocObject<false> IntersectCodeLocObject;
-typedef boost::shared_ptr<IntersectCodeLocObject> IntersectCodeLocObjectPtr;
-typedef CombinedCodeLocObject<true> UnionCodeLocObject;
-typedef boost::shared_ptr<UnionCodeLocObject> UnionCodeLocObjectPtr;
-
-// Sriram: gcc 4.1.2 complains of undefined references to unused to template functions
-// fix: explicit template instantiation
-extern template class CombinedCodeLocObject<true>;
-extern template class CombinedCodeLocObject<false>;
-*/
-
 /* #############################
    #### MappedCodeLocObject ####
    ############################# */
 
-////! Collection of combined CodeLocObjects stored using map.
-////! MostAccurate=true -> query is answered based on intersection of sub-executions.
-////! MostAccurate=false -> query is answered based on union of sub-executions.
-//template<class Key>
-//class MappedCodeLocObject : public CodeLocObject, public MappedAbstractObject<Key, CodeLocObject>, public AbstractionHierarchy
-//{
-//  public:
-//  MappedCodeLocObject(typename MappedAbstractObject<Key, CodeLocObject>::uiType type) : 
-//    CodeLocObject(NULL), MappedAbstractObject<Key, CodeLocObject>(type, /*nFull*/0) { }
-//  MappedCodeLocObject(const std::map<Key, CodeLocObject>& aoMap, typename MappedAbstractObject<Key, CodeLocObject>::uiType type) : 
-//    CodeLocObject(NULL), MappedAbstractObject<Key, CodeLocObject>(type, /*nFull*/0, aoMap) { }
-//  MappedCodeLocObject(const MappedCodeLocObject& that) : 
-//    CodeLocObject(that),
-//    MappedAbstractObject<Key, CodeLocObject>(that), 
-//    AbstractionHierarchy(that)
-//  {}
-//
-//  SgNode* getBase() const;
-//
-//  void add(Key key, CodeLocObjectPtr clo_p, PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis);
-//  const std::map<Key, CodeLocObjectPtr>& getCodeLocsMap() const { return MappedAbstractObject<Key, CodeLocObject>::aoMap; }
-//  
-//private:
-//  //! Helper methods.
-//  bool mayEqualAOWithKey(Key key, const std::map<Key, CodeLocObjectPtr>& thatAOMap, PartEdgePtr pedge);
-//  bool mustEqualAOWithKey(Key key, const std::map<Key, CodeLocObjectPtr>& thatAOMap, PartEdgePtr pedge);
-//  bool equalSetAOWithKey(Key key,const std::map<Key, CodeLocObjectPtr>& thatAOMap, PartEdgePtr pedge);
-//  bool subSetAOWithKey(Key key,const std::map<Key, CodeLocObjectPtr>& thatAOMap, PartEdgePtr pedge);
-//
-//public:  
-//  // Returns whether this object may/must be equal to o within the given Part p
-//  // These methods are private to prevent analyses from calling them directly.
-//  bool mayEqualAO(CodeLocObjectPtr o, PartEdgePtr pedge);
-//  bool mustEqualAO(CodeLocObjectPtr o, PartEdgePtr pedge);
-//  
-//  // Returns whether the two abstract objects denote the same set of concrete objects
-//  bool equalSetAO(CodeLocObjectPtr o, PartEdgePtr pedge);
-//  
-//  // Returns whether this abstract object denotes a non-strict subset (the sets may be equal) of the set denoted
-//  // by the given abstract object.
-//  bool subSetAO(CodeLocObjectPtr o, PartEdgePtr pedge);
-//  
-//  // Returns true if this object is live at the given part and false otherwise
-//  bool isLiveAO(PartEdgePtr pedge);
-//  
-//  // Computes the meet of this and that and saves the result in this
-//  // returns true if this causes this to change and false otherwise
-//  bool meetUpdateAO(CodeLocObjectPtr that, PartEdgePtr pedge);
-//
-//  void setAOToFull();
-//  
-//  // Returns whether this AbstractObject denotes the set of all possible execution prefixes.
-//  bool isFullAO(PartEdgePtr pedge);
-//  // Returns whether this AbstractObject denotes the empty set.
-//  bool isEmptyAO(PartEdgePtr pedge);
-//  
-//  // Returns true if this ValueObject corresponds to a concrete value that is statically-known
-//  bool isConcrete();
-//  // Returns the number of concrete values in this set
-//  int concreteSetSize();
-//  
-//  // Allocates a copy of this object and returns a pointer to it
-//  CodeLocObjectPtr copyAO() const;
-//  
-//  std::string str(std::string indent="") const;
-//  
-//  // Returns whether all instances of this class form a hierarchy. Every instance of the same
-//  // class created by the same analysis must return the same value from this method!
-//  bool isHierarchy() const;
-//  
-//  // Returns a key that uniquely identifies this particular AbstractObject in the 
-//  // set hierarchy.
-//  const AbstractionHierarchy::hierKeyPtr& getHierKey() const;
-//};
-//
-///*typedef MappedCodeLocObject<ComposedAnalysis*, false> UnionAnalMapCodeLocObject;
-//typedef boost::shared_ptr<MappedCodeLocObject<ComposedAnalysis*, false> > UnionAnalMapCodeLocObjectPtr;
-//typedef MappedCodeLocObject<ComposedAnalysis*, true> IntersectAnalMapCodeLocObject;
-//typedef boost::shared_ptr<MappedCodeLocObject<ComposedAnalysis*, true> > IntersectAnalMapCodeLocObjectPtr;
-//
-//extern template class MappedCodeLocObject<ComposedAnalysis*, true>;
-//extern template class MappedCodeLocObject<ComposedAnalysis*, false>;*/
-/*extern template class MappedAbstractObject<ComposedAnalysis*, CodeLocObject, AbstractObject::CodeLoc>;
-typedef boost::shared_ptr<MappedAbstractObject<ComposedAnalysis*, CodeLocObject, AbstractObject::CodeLoc> > AnalMapCodeLocObjectPtr;
-typedef MappedAbstractObject<ComposedAnalysis*, CodeLocObject, AbstractObject::CodeLoc> AnalMapCodeLocObject;*/
-
-template<class Key>
-class MappedCodeLocObject : public MappedAbstractObject<Key, CodeLocObject, AbstractObject::CodeLoc, MappedCodeLocObject<Key> >
+template<class Key, class MappedAOSubType>
+class MappedCodeLocObject : public MappedAbstractObject<Key, CodeLocObject, AbstractObject::CodeLoc, MappedAOSubType>
 {
 public:
   MappedCodeLocObject(uiType ui, ComposedAnalysis* analysis) :
-    MappedAbstractObject<Key, CodeLocObject, AbstractObject::CodeLoc, MappedCodeLocObject<Key> >(ui, /*nFull*/ 0, analysis)
+    MappedAbstractObject<Key, CodeLocObject, AbstractObject::CodeLoc, MappedAOSubType>(ui, /*nFull*/ 0, analysis)
   {}
   MappedCodeLocObject(uiType ui, ComposedAnalysis* analysis, const std::map<Key, CodeLocObjectPtr>& aoMap) :
-    MappedAbstractObject<Key, CodeLocObject, AbstractObject::CodeLoc, MappedCodeLocObject<Key> >(ui, /*nFull*/ 0, analysis, aoMap)
+    MappedAbstractObject<Key, CodeLocObject, AbstractObject::CodeLoc, MappedAOSubType>(ui, /*nFull*/ 0, analysis, aoMap)
   {}
   MappedCodeLocObject(uiType ui, int nFull, ComposedAnalysis* analysis, const std::map<Key, CodeLocObjectPtr>& aoMap) :
-    MappedAbstractObject<Key, CodeLocObject, AbstractObject::CodeLoc, MappedCodeLocObject<Key> >(ui, nFull, analysis, aoMap)
+    MappedAbstractObject<Key, CodeLocObject, AbstractObject::CodeLoc, MappedAOSubType>(ui, nFull, analysis, aoMap)
   {}
   MappedCodeLocObject(const MappedCodeLocObject& that) : 
-    MappedAbstractObject<Key, CodeLocObject, AbstractObject::CodeLoc, MappedCodeLocObject<Key> >(that)
+    MappedAbstractObject<Key, CodeLocObject, AbstractObject::CodeLoc, MappedAOSubType>(that)
   {}
-
-/*  // Returns whether this object may/must be equal to o within the given Part p
-  // These methods are called by composers and should not be called by analyses.
-  bool mayEqualAO(CodeLocObjectPtr o, PartEdgePtr pedge){ assert(0); }
-  bool mustEqualAO(CodeLocObjectPtr o, PartEdgePtr pedge){ assert(0); }
-
-  // Returns whether the two abstract objects denote the same set of concrete objects
-  // These methods are called by composers and should not be called by analyses.
-  bool equalSetAO(CodeLocObjectPtr o, PartEdgePtr pedge){ assert(0); }
-  // Returns whether this abstract object denotes a non-strict subset (the sets may be equal) of the set denoted
-  // by the given abstract object.
-  // These methods are called by composers and should not be called by analyses.
-  bool subSetAO(CodeLocObjectPtr o, PartEdgePtr pedge){ assert(0); }
-
-  // Returns true if this object is live at the given part and false otherwise.
-  // This method is called by composers and should not be called by analyses.
-  bool isLiveAO(PartEdgePtr pedge){ assert(0); }
-
-  // Computes the meet of this and that and saves the result in this
-  // returns true if this causes this to change and false otherwise
-  bool meetUpdateAO(CodeLocObjectPtr that, PartEdgePtr pedge){ assert(0); }
-
-  // Returns whether this AbstractObject denotes the set of all possible execution prefixes.
-  bool isFullAO(PartEdgePtr pedge){ assert(0); }
-  // Returns whether this AbstractObject denotes the empty set.
-  bool isEmptyAO(PartEdgePtr pedge){ assert(0); }
-
-  // Allocates a copy of this object and returns a pointer to it
-  AbstractObjectPtr copyAO() const { return copyAOType(); }
-  CodeLocObjectPtr copyAOType() const { return boost::make_shared<MappedCodeLocObject<Key> > (*this); }*/
 }; // class MappedCodeLocObject
-extern template class MappedCodeLocObject<ComposedAnalysis*>;
-extern template class MappedAbstractObject<ComposedAnalysis*, CodeLocObject, AbstractObject::CodeLoc, MappedCodeLocObject<ComposedAnalysis*> >;
-typedef boost::shared_ptr<MappedCodeLocObject<ComposedAnalysis*> > AnalMapCodeLocObjectPtr;
-typedef MappedCodeLocObject<ComposedAnalysis*> AnalMapCodeLocObject;
+
+template<class Key>
+class GenericMappedCodeLocObject : public MappedCodeLocObject<Key, GenericMappedCodeLocObject<Key> > {
+  public:
+  GenericMappedCodeLocObject(uiType ui, ComposedAnalysis* analysis) : MappedCodeLocObject<Key, GenericMappedCodeLocObject<Key> >(ui, analysis) {}
+  GenericMappedCodeLocObject(uiType ui, ComposedAnalysis* analysis, const std::map<Key, CodeLocObjectPtr>& aoMap) : MappedCodeLocObject<Key, GenericMappedCodeLocObject<Key> >(ui, analysis, aoMap) {}
+  GenericMappedCodeLocObject(uiType ui, int nFull, ComposedAnalysis* analysis, const std::map<Key, CodeLocObjectPtr>& aoMap) : MappedCodeLocObject<Key, GenericMappedCodeLocObject<Key> >(ui, nFull, analysis, aoMap) {}
+  GenericMappedCodeLocObject(const GenericMappedCodeLocObject& that) : MappedCodeLocObject<Key, GenericMappedCodeLocObject<Key> >(that) {}
+};
+
+extern template class GenericMappedCodeLocObject<ComposedAnalysis*>;
+extern template class MappedCodeLocObject<ComposedAnalysis*, GenericMappedCodeLocObject<ComposedAnalysis*> >;
+extern template class MappedAbstractObject<ComposedAnalysis*, CodeLocObject, AbstractObject::CodeLoc, GenericMappedCodeLocObject<ComposedAnalysis*> >;
+typedef boost::shared_ptr<GenericMappedCodeLocObject<ComposedAnalysis*> > AnalMapCodeLocObjectPtr;
+typedef GenericMappedCodeLocObject<ComposedAnalysis*> AnalMapCodeLocObject;
 
 /* ##############################
    # PartEdgeUnionCodeLocObject #
@@ -1616,248 +1442,48 @@ class FullValueObject : public ValueObject
   { return cachedHierKey; }
 };
 
-// The combination of multiple ValueObjects. Maintains multiple ValueObjects and responds to
-//   API calls with the most or least accurate response that its constituent objects return, depending
-//   on the value of the template parameter defaultMayEq (the default value that mayEqual would return
-//   if any constituent ValueObject returns this value).
-// For practical purposes analyses should ensure that different instances of IntersectValueObject 
-//   are only compared if they include the same types of ValueObjects in the same order. Otherwise, 
-//   the comparisons will be uselessly inaccurate.
-/*template <bool defaultMayEq>
-class CombinedValueObject : public ValueObject
-{
-  std::list<ValueObjectPtr> vals;
-  
-  public:
-  CombinedValueObject(ValueObjectPtr val): ValueObject(NULL) { vals.push_back(val); }
-  CombinedValueObject(const std::list<ValueObjectPtr>& vals): ValueObject(NULL), vals(vals) {}
-  
-  const std::list<ValueObjectPtr>& getVals() const { return vals; }
-  
-  SgNode* getBase() const;
-
-  // Creates a new CombinedValueObject. Template instantiation is used to ensure that instances of
-  // CombinedalueObjectV<true> and CombinedValueObjeVctV<false> get instantiated
-  //static boost::shared_ptr<CombinedValueObject<defaultMayEq> > create(const std::list<ValueObjectPtr>& vals);
-  
-  void add(ValueObjectPtr val);
-  
-  // Returns whether this object may/must be equal to o within the given Part p
-  // These methods are private to prevent analyses from calling them directly.
-  bool mayEqualAO(ValueObjectPtr o, PartEdgePtr pedge);
-  bool mustEqualAO(ValueObjectPtr o, PartEdgePtr pedge);
-  
-  // Returns whether the two abstract objects denote the same set of concrete objects
-  bool equalSetAO(ValueObjectPtr o, PartEdgePtr pedge);
-  
-  // Returns whether this abstract object denotes a non-strict subset (the sets may be equal) of the set denoted
-  // by the given abstract object.
-  bool subSetAO(ValueObjectPtr o, PartEdgePtr pedge);
-  
-  // Computes the meet of this and that and saves the result in this
-  // returns true if this causes this to change and false otherwise
-  bool meetUpdateAO(ValueObjectPtr that, PartEdgePtr pedge);
-  
-  // Returns whether this AbstractObject denotes the set of all possible execution prefixes.
-  bool isFullAO(PartEdgePtr pedge);
-  // Returns whether this AbstractObject denotes the empty set.
-  bool isEmptyAO(PartEdgePtr pedge);
-  
-  // Returns true if this ValueObject corresponds to a concrete value that is statically-known
-  bool isConcrete();
-  // Returns the number of concrete values in this set
-  int concreteSetSize();
-  // Returns the type of the concrete value (if there is one)
-  SgType* getConcreteType();
-  // Returns the concrete value (if there is one) as an SgValueExp, which allows callers to use
-  // the normal ROSE mechanisms to decode it
-  std::set<boost::shared_ptr<SgValueExp> > getConcreteValue();
-  
-  // Allocates a copy of this object and returns a pointer to it
-  ValueObjectPtr copyAOType() const;
-  
-  std::string str(std::string indent="") const;
-  
-  // Returns whether all instances of this class form a hierarchy. Every instance of the same
-  // class created by the same analysis must return the same value from this method!
-  virtual bool isHierarchy() const;
-  // AbstractObjects that form a hierarchy must inherit from the AbstractionHierarchy class
-  
-  // Returns a key that uniquely identifies this particular AbstractObject in the 
-  // set hierarchy.
-  const AbstractionHierarchy::hierKeyPtr& getHierKey() const;
-};
-typedef CombinedValueObject<false> IntersectValueObject;
-typedef boost::shared_ptr<IntersectValueObject> IntersectValueObjectPtr;
-typedef CombinedValueObject<true> UnionValueObject;
-typedef boost::shared_ptr<UnionValueObject> UnionValueObjectPtr;
-
-
-
-// Sriram: gcc 4.1.2 complains of undefined references to unused to template functions
-// fix: explicit template instantiation
-extern template class CombinedValueObject<true>;
-extern template class CombinedValueObject<false>;*/
-
 /* ###########################
    #### MappedValueObject ####
    ########################### */
-//
-//template<class Key>
-//class MappedValueObject : public ValueObject, public MappedAbstractObject<Key, ValueObject>, public AbstractionHierarchy
-//{
-//public:
-//  MappedValueObject(typename MappedAbstractObject<Key, ValueObject>::uiType type) : 
-//    ValueObject(NULL), MappedAbstractObject<Key, ValueObject>(type, /*nFull*/0) { }
-//  MappedValueObject(const std::map<Key, ValueObjectPtr>& aoMap, typename MappedAbstractObject<Key, ValueObject>::uiType type) : 
-//    ValueObject(NULL), MappedAbstractObject<Key, ValueObjectPtr>(type, /*nFull*/0, aoMap) { }
-//  MappedValueObject(const MappedValueObject& that) : 
-//    ValueObject(that), 
-//    MappedAbstractObject<Key, ValueObjectPtr>(that), 
-//    AbstractionHierarchy(that)
-//  { }
-//
-//  SgNode* getBase() const;
-//
-//  void add(Key key, ValueObjectPtr vo_p, PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis);
-//  const std::map<Key, ValueObjectPtr>& getValuesMap() const { return MappedAbstractObject<Key, ValueObject>::aoMap; }
-//  
-//private:
-//  //! Helper methods.
-//  bool mayEqualVWithKey(Key key, const std::map<Key, ValueObjectPtr>& thatVMap, PartEdgePtr pedge);
-//  bool mustEqualVWithKey(Key key, const std::map<Key, ValueObjectPtr>& thatVMap, PartEdgePtr pedge);
-//  bool equalSetVWithKey(Key key,const std::map<Key, ValueObjectPtr>& thatVMap, PartEdgePtr pedge);
-//  bool subSetVWithKey(Key key,const std::map<Key, ValueObjectPtr>& thatVMap, PartEdgePtr pedge);
-//  //! Actual implementation of full and emptiness checking
-//  //! These methods don't depend on PartEdgePtr
-//  bool isFullAO();
-//  bool isEmptyAO();
-//  //! Lookup for the item one by one in the given set
-//  //! Not efficient but such a comparison is needed as the stored objects are pointers
-//  bool find(boost::shared_ptr<SgValueExp> item, const std::set<boost::shared_ptr<SgValueExp> >& valueSet);
-//
-//public:  
-//  // Returns whether this object may/must be equal to o within the given Part p
-//  // These methods are private to prevent analyses from calling them directly.
-//  bool mayEqualAO(ValueObjectPtr o, PartEdgePtr pedge);
-//  bool mustEqualAO(ValueObjectPtr o, PartEdgePtr pedge);
-//  
-//  // Returns whether the two abstract objects denote the same set of concrete objects
-//  bool equalSetAO(ValueObjectPtr o, PartEdgePtr pedge);
-//  
-//  // Returns whether this abstract object denotes a non-strict subset (the sets may be equal) of the set denoted
-//  // by the given abstract object.
-//  bool subSetAO(ValueObjectPtr o, PartEdgePtr pedge);
-//  
-//  // Returns true if this object is live at the given part and false otherwise
-//  bool isLiveAO(PartEdgePtr pedge);
-//  
-//  // Computes the meet of this and that and saves the result in this
-//  // returns true if this causes this to change and false otherwise
-//  bool meetUpdateAO(ValueObjectPtr that, PartEdgePtr pedge);
-//
-//  void setVToFull();
-//  
-//  // Returns whether this AbstractObject denotes the set of all possible execution prefixes.
-//  bool isFullAO(PartEdgePtr pedge);
-//  // Returns whether this AbstractObject denotes the empty set.
-//  bool isEmptyAO(PartEdgePtr pedge);
-//
-//  // Is this object enumerable?
-//  bool isConcrete();
-//  
-//  // Returns the number of concrete values in this set
-//  int concreteSetSize();
-//
-//  // Type of concrete value
-//  SgType* getConcreteType();
-//
-//  // set of values that are enumerable
-//  std::set<boost::shared_ptr<SgValueExp> > getConcreteValue();
-//  
-//  
-//  // Allocates a copy of this object and returns a pointer to it
-//  ValueObjectPtr copyAO() const;
-//  
-//  std::string str(std::string indent="") const;
-//  
-//    // Returns whether all instances of this class form a hierarchy. Every instance of the same
-//  // class created by the same analysis must return the same value from this method!
-//  virtual bool isHierarchy() const;
-//  // AbstractObjects that form a hierarchy must inherit from the AbstractionHierarchy class
-//  
-//  // Returns a key that uniquely identifies this particular AbstractObject in the 
-//  // set hierarchy.
-//  const AbstractionHierarchy::hierKeyPtr& getHierKey() const;
-//}; // class MappedValueObject
-//
-///*typedef MappedValueObject<ComposedAnalysis*, false> UnionAnalMapValueObject;
-//typedef boost::shared_ptr<MappedValueObject<ComposedAnalysis*, false> > UnionAnalMapValueObjectPtr;
-//typedef MappedValueObject<ComposedAnalysis*, true> IntersectAnalMapValueObject;
-//typedef boost::shared_ptr<MappedValueObject<ComposedAnalysis*, true> > IntersectAnalMapValueObjectPtr;
-//
-//extern template class MappedValueObject<ComposedAnalysis*, true>;
-//extern template class MappedValueObject<ComposedAnalysis*, false>;*/
-/*extern template class MappedAbstractObject<ComposedAnalysis*, ValueObject, AbstractObject::Value>;
-typedef boost::shared_ptr<MappedAbstractObject<ComposedAnalysis*, ValueObject, AbstractObject::Value> > AnalMapValueObjectPtr;
-typedef MappedAbstractObject<ComposedAnalysis*, ValueObject, AbstractObject::Value> AnalMapValueObject;*/
-template<class Key>
-class MappedValueObject : public MappedAbstractObject<Key, ValueObject, AbstractObject::Value, MappedValueObject<Key> >
+
+template<class Key, class MappedAOSubType>
+class MappedValueObject : public MappedAbstractObject<Key, ValueObject, AbstractObject::Value, MappedAOSubType>
 {
-public:
+  public:
   MappedValueObject(uiType ui, ComposedAnalysis* analysis) :
-    MappedAbstractObject<Key, ValueObject, AbstractObject::Value, MappedValueObject<Key> >(ui, /*nFull*/ 0, analysis)
+    MappedAbstractObject<Key, ValueObject, AbstractObject::Value, MappedAOSubType>(ui, /*nFull*/ 0, analysis)
   {}
   MappedValueObject(uiType ui, ComposedAnalysis* analysis, const std::map<Key, ValueObjectPtr>& aoMap) :
-    MappedAbstractObject<Key, ValueObject, AbstractObject::Value, MappedValueObject<Key> >(ui, /*nFull*/ 0, analysis, aoMap)
+    MappedAbstractObject<Key, ValueObject, AbstractObject::Value, MappedAOSubType>(ui, /*nFull*/ 0, analysis, aoMap)
   {}
   MappedValueObject(uiType ui, int nFull, ComposedAnalysis* analysis, const std::map<Key, ValueObjectPtr>& aoMap) :
-    MappedAbstractObject<Key, ValueObject, AbstractObject::Value, MappedValueObject<Key> >(ui, nFull, analysis, aoMap)
+    MappedAbstractObject<Key, ValueObject, AbstractObject::Value, MappedAOSubType>(ui, nFull, analysis, aoMap)
   {}
   MappedValueObject(const MappedValueObject& that) : 
-    MappedAbstractObject<Key, ValueObject, AbstractObject::Value, MappedValueObject<Key> >(that)
+    MappedAbstractObject<Key, ValueObject, AbstractObject::Value, MappedAOSubType>(that)
   {}
   
-/*  // Returns whether this object may/must be equal to o within the given Part p
-  // These methods are called by composers and should not be called by analyses.
-  bool mayEqualAO(ValueObjectPtr o, PartEdgePtr pedge){ assert(0); }
-  bool mustEqualAO(ValueObjectPtr o, PartEdgePtr pedge){ assert(0); }
-
-  // Returns whether the two abstract objects denote the same set of concrete objects
-  // These methods are called by composers and should not be called by analyses.
-  bool equalSetAO(ValueObjectPtr o, PartEdgePtr pedge){ assert(0); }
-  // Returns whether this abstract object denotes a non-strict subset (the sets may be equal) of the set denoted
-  // by the given abstract object.
-  // These methods are called by composers and should not be called by analyses.
-  bool subSetAO(ValueObjectPtr o, PartEdgePtr pedge){ assert(0); }
-
-  // Returns true if this object is live at the given part and false otherwise.
-  // This method is called by composers and should not be called by analyses.
-  bool isLiveAO(PartEdgePtr pedge){ assert(0); }
-
-  // Computes the meet of this and that and saves the result in this
-  // returns true if this causes this to change and false otherwise
-  bool meetUpdateAO(ValueObjectPtr that, PartEdgePtr pedge){ assert(0); }
-
-  // Returns whether this AbstractObject denotes the set of all possible execution prefixes.
-  bool isFullAO(PartEdgePtr pedge){ assert(0); }
-  // Returns whether this AbstractObject denotes the empty set.
-  bool isEmptyAO(PartEdgePtr pedge){ assert(0); }*/
-
   // Type of concrete value
   SgType* getConcreteType();
 
   // set of values that are enumerable
   std::set<boost::shared_ptr<SgValueExp> > getConcreteValue();
-
-/*  // Allocates a copy of this object and returns a pointer to it
-  AbstractObjectPtr copyAO() const { return copyAOType(); }
-  ValueObjectPtr copyAOType() const { return boost::make_shared<MappedValueObject<Key> > (*this); }*/
 }; // class MappedValueObject
-extern template class MappedValueObject<ComposedAnalysis*>;
-extern template class MappedAbstractObject<ComposedAnalysis*, ValueObject, AbstractObject::Value, MappedValueObject<ComposedAnalysis*> >;
-typedef boost::shared_ptr<MappedValueObject<ComposedAnalysis*> > AnalMapValueObjectPtr;
-typedef MappedValueObject<ComposedAnalysis*> AnalMapValueObject;
+
+template<class Key>
+class GenericMappedValueObject : public MappedValueObject<Key, GenericMappedValueObject<Key> > {
+  public:
+  GenericMappedValueObject(uiType ui, ComposedAnalysis* analysis) : MappedValueObject<Key, GenericMappedValueObject>(ui, analysis) {}
+  GenericMappedValueObject(uiType ui, ComposedAnalysis* analysis, const std::map<Key, ValueObjectPtr>& aoMap) : MappedValueObject<Key, GenericMappedValueObject>(ui, analysis, aoMap) {}
+  GenericMappedValueObject(uiType ui, int nFull, ComposedAnalysis* analysis, const std::map<Key, ValueObjectPtr>& aoMap) : MappedValueObject<Key, GenericMappedValueObject>(ui, nFull, analysis, aoMap) {}
+  GenericMappedValueObject(const GenericMappedValueObject& that) : MappedValueObject<Key, GenericMappedValueObject<Key> >(that) {}
+};
+
+extern template class GenericMappedValueObject<ComposedAnalysis*>;
+extern template class MappedValueObject<ComposedAnalysis*, GenericMappedValueObject<ComposedAnalysis*> >;
+extern template class MappedAbstractObject<ComposedAnalysis*, ValueObject, AbstractObject::Value, GenericMappedValueObject<ComposedAnalysis*> >;
+typedef boost::shared_ptr<GenericMappedValueObject<ComposedAnalysis*> > AnalMapValueObjectPtr;
+typedef GenericMappedValueObject<ComposedAnalysis*> AnalMapValueObject;
 
 /* ############################
    # PartEdgeUnionValueObject #
@@ -1929,6 +1555,10 @@ public:
   // Wrapper for shared_from_this that returns an instance of this class rather than its parent
   MemRegionObjectPtr shared_from_this() { return boost::static_pointer_cast<MemRegionObject>(AbstractObject::shared_from_this()); }
   
+  // Returns the relationship between the given AbstractObjects, considering whether either
+  // or both are FuncResultMemRegionObjects and if they refer to the same function
+  FuncResultRelationType getFuncResultRel(AbstractObject* one, AbstractObjectPtr two, PartEdgePtr pedge);
+
   // Functions that identify the type of AbstractObject this is. Should be over-ridden by derived
   // classes to save the cost of a dynamic cast.
   bool isValueObject()      { return false; }
@@ -2162,241 +1792,22 @@ class FullMemRegionObject : public MemRegionObject/*, public AbstractionHierarch
   { return cachedHierKey; }
 };
 
-
-// The combination of multiple MemRegionObjects. Maintains multiple MemRegionObjects and responds to
-//   API calls with the most or least accurate response that its constituent objects return, depending
-//   on the value of the template parameter defaultMayEq (the default value that mayEqual would return
-//   if any constituent MemRegionObject returns this value).
-// For practical purposes analyses should ensure that different instances of IntersectMemRegionObject 
-//   are only compared if they include the same types of MemRegionObjects in the same order. Otherwise, 
-//   the comparisons will be uselessly inaccurate.
-//template <bool defaultMayEq>
-//class CombinedMemRegionObject : public virtual MemRegionObject
-//{
-//  std::list<MemRegionObjectPtr> memRegions;
-//
-//  public:
-//  CombinedMemRegionObject(MemRegionObjectPtr memReg) : MemRegionObject(NULL) {   memRegions.push_back(memReg); }
-//  CombinedMemRegionObject(const std::list<MemRegionObjectPtr>& memRegions) : MemRegionObject(NULL), memRegions(memRegions) {}
-//
-//  virtual ~CombinedMemRegionObject() {}
-//
-//  const std::list<MemRegionObjectPtr>& getMemRegions() const { return memRegions; }
-//
-//  public:
-//  // Creates a new CombinedMemRegionObject. If all the sub-objects have a given type (Scalar, FunctionMemLoc,
-//  // LabeledAggregate, Array or Pointer), the created CombinedMemRegionObject has the same type. Otherwise, the
-//  // created CombinedMemRegionObject is an instance of the generic CombinedMemRegionObject class.
-//  /*static boost::shared_ptr<CombinedMemRegionObject<defaultMayEq> > create(MemRegionObjectPtr memReg);
-//  static boost::shared_ptr<CombinedMemRegionObject<defaultMayEq> > create(const std::list<MemRegionObjectPtr>& memRegions);*/
-//
-//  SgNode* getBase() const;
-//
-//  void add(MemRegionObjectPtr memLoc);
-//
-//  // Returns whether this object may/must be equal to o within the given Part p
-//  bool mayEqualAO(MemRegionObjectPtr o, PartEdgePtr pedge);
-//  bool mustEqualAO(MemRegionObjectPtr o, PartEdgePtr pedge);
-//
-//  // Returns whether the two abstract objects denote the same set of concrete objects
-//  bool equalSetAO(MemRegionObjectPtr o, PartEdgePtr pedge);
-//
-//  // Returns whether this abstract object denotes a non-strict subset (the sets may be equal) of the set denoted
-//  // by the given abstract object.
-//  bool subSetAO(MemRegionObjectPtr o, PartEdgePtr pedge);
-//
-//  // Allocates a copy of this object and returns a pointer to it
-//  MemRegionObjectPtr copyAOType() const;
-//
-//  // Returns true if this object is live at the given part and false otherwise
-//  bool isLiveAO(PartEdgePtr pedge);
-//
-//  // Computes the meet of this and that and saves the result in this
-//  // returns true if this causes this to change and false otherwise
-//  bool meetUpdateAO(MemRegionObjectPtr that, PartEdgePtr pedge);
-//
-//  // Returns whether this AbstractObject denotes the set of all possible execution prefixes.
-//  bool isFullAO(PartEdgePtr pedge);
-//  // Returns whether this AbstractObject denotes the empty set.
-//  bool isEmptyAO(PartEdgePtr pedge);
-//
-//  // Returns true if this MemRegionObject denotes a finite set of concrete regions
-//  bool isConcrete();
-//  // Returns the number of concrete values in this set
-//  int concreteSetSize();
-//  // Returns the type of the concrete regions (if there is one)
-//  SgType* getConcreteType();
-//  // Returns the set of concrete memory regions as SgExpressions, which allows callers to use
-//  // the normal ROSE mechanisms to decode it
-//  std::set<SgNode* > getConcrete();
-//
-//  // Returns a ValueObject that denotes the size of this memory region
-//  ValueObjectPtr getRegionSizeAO(PartEdgePtr pedge);
-//
-//  std::string str(std::string indent="") const;
-//
-//  // Returns whether all instances of this class form a hierarchy. Every instance of the same
-//  // class created by the same analysis must return the same value from this method!
-//  bool isHierarchy() const;
-//
-//  // Returns a key that uniquely identifies this particular AbstractObject in the
-//  // set hierarchy.
-//  const AbstractionHierarchy::hierKeyPtr& getHierKey() const;
-//};
-//typedef CombinedMemRegionObject<false> IntersectMemRegionObject;
-//typedef boost::shared_ptr<IntersectMemRegionObject> IntersectMemRegionObjectPtr;
-//typedef CombinedMemRegionObject<true> UnionMemRegionObject;
-//typedef boost::shared_ptr<UnionMemRegionObject> UnionMemRegionObjectPtr;
-//
-//// Sriram: gcc 4.1.2 complains of undefined references to unused to template functions
-//// fix: explicit template instantiation
-//extern template class CombinedMemRegionObject<true>;
-//extern template class CombinedMemRegionObject<false>; // not sure if this is needed as there were no errors
-
-/* ###############################
-   #### MappedMemRegionObject ####
-   ############################### */
-//
-//template<class Key>
-//class MappedMemRegionObject : public MemRegionObject, public MappedAbstractObject<Key, MemRegionObject>, public AbstractionHierarchy
-//{
-//public:
-//  MappedMemRegionObject(typename MappedAbstractObject<Key, MemRegionObject>::uiType type) : 
-//    MemRegionObject(NULL), MappedAbstractObject<Key, MemRegionObject>(type, /*nFull*/0) { }
-//  MappedMemRegionObject(const std::map<Key, MemRegionObjectPtr>& aoMap, typename MappedAbstractObject<Key, MemRegionObject>::uiType type) : 
-//    MemRegionObject(NULL), MappedAbstractObject<Key, MemRegionObject>(type, /*nFull*/0, aoMap) { }
-//  MappedMemRegionObject(const MappedMemRegionObject& that) : 
-//    MemRegionObject(that), 
-//    MappedAbstractObject<Key, MemRegionObject>(that), 
-//    AbstractionHierarchy(that)
-//  { }
-//
-//  SgNode* getBase() const;
-//
-//  void add(Key key, MemRegionObjectPtr clo_p, PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis);
-//  const std::map<Key, MemRegionObjectPtr>& getMemRegionsMap() const { return MappedAbstractObject<Key, MemRegionObject>::aoMap; }
-//  
-//private:
-//  //! Helper methods.
-//  bool mayEqualMRWithKey(Key key, const std::map<Key, MemRegionObjectPtr>& thatMRMap, PartEdgePtr pedge);
-//  bool mustEqualMRWithKey(Key key, const std::map<Key, MemRegionObjectPtr>& thatMRMap, PartEdgePtr pedge);
-//  bool equalSetMRWithKey(Key key,const std::map<Key, MemRegionObjectPtr>& thatMRMap, PartEdgePtr pedge);
-//  bool subSetMRWithKey(Key key,const std::map<Key, MemRegionObjectPtr>& thatMRMap, PartEdgePtr pedge);
-//
-//public:  
-//  // Returns whether this object may/must be equal to o within the given Part p
-//  // These methods are private to prevent analyses from calling them directly.
-//  bool mayEqualAO(MemRegionObjectPtr o, PartEdgePtr pedge);
-//  bool mustEqualAO(MemRegionObjectPtr o, PartEdgePtr pedge);
-//  
-//  // Returns whether the two abstract objects denote the same set of concrete objects
-//  bool equalSetAO(MemRegionObjectPtr o, PartEdgePtr pedge);
-//  
-//  // Returns whether this abstract object denotes a non-strict subset (the sets may be equal) of the set denoted
-//  // by the given abstract object.
-//  bool subSetAO(MemRegionObjectPtr o, PartEdgePtr pedge);
-//  
-//  // Returns true if this object is live at the given part and false otherwise
-//  bool isLiveAO(PartEdgePtr pedge);
-//  
-//  // Computes the meet of this and that and saves the result in this
-//  // returns true if this causes this to change and false otherwise
-//  bool meetUpdateAO(MemRegionObjectPtr that, PartEdgePtr pedge);
-//
-//  void setMRToFull();
-//  
-//  // Returns whether this AbstractObject denotes the set of all possible execution prefixes.
-//  bool isFullAO(PartEdgePtr pedge);
-//  // Returns whether this AbstractObject denotes the empty set.
-//  bool isEmptyAO(PartEdgePtr pedge);
-//  
-//  // Returns whether this AbstractObject denotes the set of all possible execution prefixes.
-//  bool isFullAO();
-//  // Returns whether this AbstractObject denotes the empty set.
-//  bool isEmptyAO();
-//  
-//  // Returns true if this MemRegionObject denotes a finite set of concrete regions
-//  bool isConcrete();
-//  // Returns the number of concrete values in this set
-//  int concreteSetSize();
-//  // Returns the type of the concrete regions (if there is one)
-//  SgType* getConcreteType();
-//  // Returns the set of concrete memory regions as SgExpressions, which allows callers to use
-//  // the normal ROSE mechanisms to decode it
-//  std::set<SgNode* > getConcrete();
-//
-//  ValueObjectPtr getRegionSizeAO(PartEdgePtr pedge);
-//  
-//  // Allocates a copy of this object and returns a pointer to it
-//  MemRegionObjectPtr copyAO() const;
-//  
-//  std::string str(std::string indent="") const;
-//    
-//  // Returns whether all instances of this class form a hierarchy. Every instance of the same
-//  // class created by the same analysis must return the same value from this method!
-//  bool isHierarchy() const;
-//  
-//  // Returns a key that uniquely identifies this particular AbstractObject in the 
-//  // set hierarchy.
-//  const AbstractionHierarchy::hierKeyPtr& getHierKey() const;
-//};
-
-
-/*typedef MappedMemRegionObject<ComposedAnalysis*, false> UnionAnalMapMemRegionObject;
-typedef boost::shared_ptr<MappedMemRegionObject<ComposedAnalysis*, false> > UnionAnalMapMemRegionObjectPtr;
-typedef MappedMemRegionObject<ComposedAnalysis*, true> IntersectAnalMapMemRegionObject;
-typedef boost::shared_ptr<MappedMemRegionObject<ComposedAnalysis*, true> > IntersectAnalMapMemRegionObjectPtr;
-
-extern template class MappedMemRegionObject<ComposedAnalysis*, true>;
-extern template class MappedMemRegionObject<ComposedAnalysis*, false>;*/
-
-/*extern template class MappedAbstractObject<ComposedAnalysis*, MemRegionObject, AbstractObject::MemRegion>;
-typedef boost::shared_ptr<MappedAbstractObject<ComposedAnalysis*, MemRegionObject, AbstractObject::MemRegion> > AnalMapMemRegionObjectPtr;
-typedef MappedAbstractObject<ComposedAnalysis*, MemRegionObject, AbstractObject::MemRegion> AnalMapMemRegionObject;
-*/
-
-template<class Key>
-class MappedMemRegionObject : public MappedAbstractObject<Key, MemRegionObject, AbstractObject::MemRegion, MappedMemRegionObject<Key> >
+template<class Key, class MappedAOSubType, class MappedAOValueType>
+class MappedMemRegionObject : public MappedAbstractObject<Key, MemRegionObject, AbstractObject::MemRegion, MappedAOSubType>
 {
-public:
+  public:
   MappedMemRegionObject(uiType ui, ComposedAnalysis* analysis) :
-    MappedAbstractObject<Key, MemRegionObject, AbstractObject::MemRegion, MappedMemRegionObject<Key> >(ui, /*nFull*/ 0, analysis)
+    MappedAbstractObject<Key, MemRegionObject, AbstractObject::MemRegion, MappedAOSubType>(ui, /*nFull*/ 0, analysis)
   {}
   MappedMemRegionObject(uiType ui, ComposedAnalysis* analysis, const std::map<Key, MemRegionObjectPtr>& aoMap) :
-    MappedAbstractObject<Key, MemRegionObject, AbstractObject::MemRegion, MappedMemRegionObject<Key> >(ui, /*nFull*/ 0, analysis, aoMap)
+    MappedAbstractObject<Key, MemRegionObject, AbstractObject::MemRegion, MappedAOSubType>(ui, /*nFull*/ 0, analysis, aoMap)
   {}
   MappedMemRegionObject(uiType ui, int nFull, ComposedAnalysis* analysis, const std::map<Key, MemRegionObjectPtr>& aoMap) :
-    MappedAbstractObject<Key, MemRegionObject, AbstractObject::MemRegion, MappedMemRegionObject<Key> >(ui, nFull, analysis, aoMap)
+    MappedAbstractObject<Key, MemRegionObject, AbstractObject::MemRegion, MappedAOSubType>(ui, nFull, analysis, aoMap)
   {}
   MappedMemRegionObject(const MappedMemRegionObject& that) : 
-    MappedAbstractObject<Key, MemRegionObject, AbstractObject::MemRegion, MappedMemRegionObject<Key> >(that)
+    MappedAbstractObject<Key, MemRegionObject, AbstractObject::MemRegion, MappedAOSubType>(that)
   {}
-
-/*  // Returns whether this object may/must be equal to o within the given Part p
-  // These methods are called by composers and should not be called by analyses.
-  bool mayEqualAO(MemRegionObjectPtr o, PartEdgePtr pedge){ assert(0); }
-  bool mustEqualAO(MemRegionObjectPtr o, PartEdgePtr pedge){ assert(0); }
-
-  // Returns whether the two abstract objects denote the same set of concrete objects
-  // These methods are called by composers and should not be called by analyses.
-  bool equalSetAO(MemRegionObjectPtr o, PartEdgePtr pedge){ assert(0); }
-  // Returns whether this abstract object denotes a non-strict subset (the sets may be equal) of the set denoted
-  // by the given abstract object.
-  // These methods are called by composers and should not be called by analyses.
-  bool subSetAO(MemRegionObjectPtr o, PartEdgePtr pedge){ assert(0); }
-
-  // Returns true if this object is live at the given part and false otherwise.
-  // This method is called by composers and should not be called by analyses.
-  bool isLiveAO(PartEdgePtr pedge){ assert(0); }
-
-  // Computes the meet of this and that and saves the result in this
-  // returns true if this causes this to change and false otherwise
-  bool meetUpdateAO(MemRegionObjectPtr that, PartEdgePtr pedge){ assert(0); }
-
-  // Returns whether this AbstractObject denotes the set of all possible execution prefixes.
-  bool isFullAO(PartEdgePtr pedge){ assert(0); }
-  // Returns whether this AbstractObject denotes the empty set.
-  bool isEmptyAO(PartEdgePtr pedge){ assert(0); }*/
 
   // Returns the type of the concrete regions (if there is one)
   SgType* getConcreteType();
@@ -2406,14 +1817,39 @@ public:
 
   ValueObjectPtr getRegionSizeAO(PartEdgePtr pedge);
 
-/*  // Allocates a copy of this object and returns a pointer to it
-  AbstractObjectPtr copyAO() const { return copyAOType(); }
-  MemRegionObjectPtr copyAOType() const { return boost::make_shared<MappedMemRegionObject<Key> > (*this); }*/
+  // Check whether that is a MemLocObject and if so, call the version of mayEqual specific to MemLocObjects
+  bool mayEqual(AbstractObjectPtr that, PartEdgePtr pedge,Composer* comp, ComposedAnalysis* analysis);
+
+  // Check whether that is a MemLocObject and if so, call the version of mustEqual specific to MemLocObjects
+  bool mustEqual(AbstractObjectPtr that, PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis);
+
+  // Returns whether the two abstract objects denote the same set of concrete objects
+  bool equalSet(AbstractObjectPtr that, PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis);
+
+  // Returns whether this abstract object denotes a non-strict subset (the sets may be equal) of the set denoted
+  // by the given abstract object.
+  bool subSet(AbstractObjectPtr that, PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis);
+
+  // General version of meetUpdate() that accounts for framework details before routing the call to the derived class'
+  // meetUpdateML check. Specifically, it routes the call through the composer to make sure the meetUpdateML
+  // call gets the right PartEdge
+  bool meetUpdate(AbstractObjectPtr that, PartEdgePtr pedge,Composer* comp, ComposedAnalysis* analysis);
 }; // class MappedMemRegionObject
-extern template class MappedMemRegionObject<ComposedAnalysis*>;
-extern template class MappedAbstractObject<ComposedAnalysis*, MemRegionObject, AbstractObject::MemRegion, MappedMemRegionObject<ComposedAnalysis*> >;
-typedef boost::shared_ptr<MappedMemRegionObject<ComposedAnalysis*> > AnalMapMemRegionObjectPtr;
-typedef MappedMemRegionObject<ComposedAnalysis*> AnalMapMemRegionObject;
+
+template<class Key>
+class GenericMappedMemRegionObject : public MappedMemRegionObject<Key, GenericMappedMemRegionObject<Key>, GenericMappedValueObject<Key> > {
+  public:
+  GenericMappedMemRegionObject(uiType ui, ComposedAnalysis* analysis) : MappedMemRegionObject<Key, GenericMappedMemRegionObject<Key>, GenericMappedValueObject<Key> >(ui, analysis) {}
+  GenericMappedMemRegionObject(uiType ui, ComposedAnalysis* analysis, const std::map<Key, MemRegionObjectPtr>& aoMap) : MappedMemRegionObject<Key, GenericMappedMemRegionObject<Key>, GenericMappedValueObject<Key> >(ui, analysis, aoMap) {}
+  GenericMappedMemRegionObject(uiType ui, int nFull, ComposedAnalysis* analysis, const std::map<Key, MemRegionObjectPtr>& aoMap) : MappedMemRegionObject<Key, GenericMappedMemRegionObject<Key>, GenericMappedValueObject<Key> >(ui, nFull, analysis, aoMap) {}
+  GenericMappedMemRegionObject(const GenericMappedMemRegionObject& that) : MappedMemRegionObject<Key, GenericMappedMemRegionObject<Key>, GenericMappedValueObject<Key>  >(that) {}
+};
+
+extern template class GenericMappedMemRegionObject<ComposedAnalysis*>;
+extern template class MappedMemRegionObject<ComposedAnalysis*, GenericMappedMemRegionObject<ComposedAnalysis*>, GenericMappedValueObject<ComposedAnalysis*> >;
+extern template class MappedAbstractObject<ComposedAnalysis*, MemRegionObject, AbstractObject::MemRegion, GenericMappedMemRegionObject<ComposedAnalysis*> >;
+typedef boost::shared_ptr<GenericMappedMemRegionObject<ComposedAnalysis*> > AnalMapMemRegionObjectPtr;
+typedef GenericMappedMemRegionObject<ComposedAnalysis*> AnalMapMemRegionObject;
 
 /* ################################
    # PartEdgeUnionMemRegionObject #
@@ -2428,7 +1864,8 @@ public:
   PartEdgeUnionMemRegionObject(const PartEdgeUnionMemRegionObject& that);
 
   SgNode* getBase() const;
-  void add(MemRegionObjectPtr mr_p, PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis);
+
+    void add(MemRegionObjectPtr mr_p, PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis);
   MemRegionObjectPtr getUnionAO() { return unionMR_p; }
 
   bool mayEqualAO(MemRegionObjectPtr o, PartEdgePtr pedge);
@@ -2501,6 +1938,10 @@ class MemLocObject : public AbstractObject
   virtual MemRegionObjectPtr getRegion() const;
   virtual ValueObjectPtr     getIndex() const;
   
+  // Returns the relationship between the given AbstractObjects, considering whether either
+  // or both are FuncResultMemLocObjects and if they refer to the same function
+  FuncResultRelationType getFuncResultRel(AbstractObject* one, AbstractObjectPtr two, PartEdgePtr pedge);
+
 //private:
 //  // Returns whether this object may/must be equal to o within the given Part p
 //  // These methods are called by composers and should not be called by analyses.
@@ -2600,7 +2041,7 @@ class MemLocObject : public AbstractObject
   
   // Returns a key that uniquely identifies this particular AbstractObject in the 
   // set hierarchy.
-  const hierKeyPtr& getHierKey() const;
+  virtual const hierKeyPtr& getHierKey() const;
 }; // MemLocObject
 
 // Special MemLocObject used internally by the framework to associate with the return value of a function.
@@ -2628,6 +2069,8 @@ class FuncResultMemLocObject : public MemLocObject
   // Allocates a copy of this object and returns a shared pointer to it
   MemLocObjectPtr copyAOType() const;
   
+  bool mustEqualAO(MemLocObjectPtr o, PartEdgePtr pedge);
+
   // Returns whether all instances of this class form a hierarchy. Every instance of the same
   // class created by the same analysis must return the same value from this method!
   bool isHierarchy() const { 
@@ -2695,100 +2138,6 @@ public:
   { return cachedHierKey; }
 };
 
-// The combination of multiple MemLocObjects. Maintains multiple MemLocObjects and responds to
-//   API calls with the most or least accurate response that its constituent objects return, depending
-//   on the value of the template parameter defaultMayEq (the default value that mayEqual would return
-//   if any constituent MemLocObject returns this value).
-// For practical purposes analyses should ensure that different instances of IntersectMemLocObject 
-//   are only compared if they include the same types of MemLocObjects in the same order. Otherwise, 
-//   the comparisons will be uselessly inaccurate.
-/*template <bool defaultMayEq>
-class CombinedMemLocObject : public virtual MemLocObject
-{
-  public:
-  std::list<MemLocObjectPtr> memLocs;
-  
-  public:
-  CombinedMemLocObject(MemLocObjectPtr memLoc) : MemLocObject(NULL) { memLocs.push_back(memLoc); }
-  CombinedMemLocObject(const std::list<MemLocObjectPtr>& memLocs) : MemLocObject(NULL), memLocs(memLocs) { }
-  
-  const std::list<MemLocObjectPtr>& getMemLocs() const { return memLocs; }
-    
-  // Creates a new CombinedMemLocObject. Template instantiation is used to ensure that instances of
-  // CombinedMemLocObject<true> and CombinedMemLocObject<false> get instantiated
-  / *static boost::shared_ptr<CombinedMemLocObject<defaultMayEq> > create(MemLocObjectPtr memLoc);
-  static boost::shared_ptr<CombinedMemLocObject<defaultMayEq> > create(const std::list<MemLocObjectPtr>& memLocs);* /
-  
-  SgNode* getBase() const;
-  MemRegionObjectPtr getRegion() const;
-  ValueObjectPtr     getIndex() const;
-  
-  void add(MemLocObjectPtr memLoc);
-  
-  // Returns whether this object may/must be equal to o within the given Part p
-  //bool mayEqualAO(MemLocObjectPtr o, PartEdgePtr pedge);
-  //bool mustEqualAO(MemLocObjectPtr o, PartEdgePtr pedge);
-  bool mayEqual(MemLocObjectPtr that, PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis);
-  bool mustEqual(MemLocObjectPtr that, PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis);
-  
-  // Returns whether the two abstract objects denote the same set of concrete objects
-  //bool equalSetAO(MemLocObjectPtr o, PartEdgePtr pedge);
-  bool equalSet(MemLocObjectPtr that, PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis);
-  
-  // Returns whether this abstract object denotes a non-strict subset (the sets may be equal) of the set denoted
-  // by the given abstract object.
-  //bool subSetAO(MemLocObjectPtr o, PartEdgePtr pedge);
-  bool subSet(MemLocObjectPtr that, PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis);
-  
-  // Allocates a copy of this object and returns a pointer to it
-  MemLocObjectPtr copyAOType() const;
-  
-  // Returns true if this object is live at the given part and false otherwise
-//  bool isLiveAO(PartEdgePtr pedge);
-
-  // General version of isLive that accounts for framework details before routing the call to the derived class' 
-  // isLiveML check. Specifically, it routes the call through the composer to make sure the isLiveML call gets the 
-  bool isLive(PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis);
-
-  // Computes the meet of this and that and saves the result in this
-  // returns true if this causes this to change and false otherwise
-  //bool meetUpdateAO(MemLocObjectPtr that, PartEdgePtr pedge);
-  bool meetUpdate(MemLocObjectPtr that, PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis);
-  
-  // Returns whether this AbstractObject denotes the set of all possible execution prefixes.
-  //bool isFullAO(PartEdgePtr pedge);
-  bool isFull(PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis);
-  // Returns whether this AbstractObject denotes the empty set.
-  //bool isEmptyAO(PartEdgePtr pedge);
-  bool isEmpty(PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis);
-  
-  // Returns true if this AbstractObject corresponds to a concrete value that is statically-known
-  bool isConcrete();
-  // Returns the number of concrete values in this set
-  int concreteSetSize();
-  
-  std::string str(std::string indent="") const;
-  
-  // Returns whether all instances of this class form a hierarchy. Every instance of the same
-  // class created by the same analysis must return the same value from this method!
-  bool isHierarchy() const;
-  
-  // Returns a key that uniquely identifies this particular AbstractObject in the 
-  // set hierarchy.
-  const AbstractionHierarchy::hierKeyPtr& getHierKey() const;
-};
-typedef CombinedMemLocObject<false> IntersectMemLocObject;
-typedef boost::shared_ptr<IntersectMemLocObject> IntersectMemLocObjectPtr;
-typedef CombinedMemLocObject<true> UnionMemLocObject;
-typedef boost::shared_ptr<UnionMemLocObject> UnionMemLocObjectPtr;
-
-
-// Sriram: gcc 4.1.2 complains of undefined references to unused to template functions
-// fix: explicit template instantiation
-extern template class CombinedMemLocObject<true>;
-extern template class CombinedMemLocObject<false>; // not sure if this is needed as there were no errors
-*/
-
 /* #############################
    #### MappedMemLocObject ####
    ############################# */
@@ -2854,138 +2203,64 @@ extern template class CombinedMemLocObject<false>; // not sure if this is needed
 //! that counts the number of full mls subjected to be added to the map using add  or meetUpdateML method.
 //! n_FullML != 0 along with empty map determines that the MappedML denotes full set of ML.
 //! n_FullML == 0 and en empty map indicates that the MappedML is empty.
-template<class Key>
-class MappedMemLocObject : public MappedAbstractObject<Key, MemLocObject, AbstractObject::MemLoc, MappedMemLocObject<Key> >
+template<class Key, class MappedAOSubType, class MappedAOValueType, class MappedAOMemRegionType>
+class MappedMemLocObject : public MappedAbstractObject<Key, MemLocObject, AbstractObject::MemLoc, MappedAOSubType>
 {
 public:
   MappedMemLocObject(uiType ui, ComposedAnalysis* analysis) :
-    MappedAbstractObject<Key, MemLocObject, AbstractObject::MemLoc, MappedMemLocObject<Key> >(ui, /*nFull*/ 0, analysis)
+    MappedAbstractObject<Key, MemLocObject, AbstractObject::MemLoc, MappedAOSubType>(ui, /*nFull*/ 0, analysis)
   {}
   MappedMemLocObject(uiType ui, ComposedAnalysis* analysis, const std::map<Key, MemLocObjectPtr>& aoMap) :
-    MappedAbstractObject<Key, MemLocObject, AbstractObject::MemLoc, MappedMemLocObject<Key> >(ui, /*nFull*/ 0, analysis, aoMap)
+    MappedAbstractObject<Key, MemLocObject, AbstractObject::MemLoc, MappedAOSubType>(ui, /*nFull*/ 0, analysis, aoMap)
   {}
   MappedMemLocObject(uiType ui, int nFull, ComposedAnalysis* analysis, const std::map<Key, MemLocObjectPtr>& aoMap) :
-    MappedAbstractObject<Key, MemLocObject, AbstractObject::MemLoc, MappedMemLocObject<Key> >(ui, nFull, analysis, aoMap)
+    MappedAbstractObject<Key, MemLocObject, AbstractObject::MemLoc, MappedAOSubType>(ui, nFull, analysis, aoMap)
   {}
   MappedMemLocObject(const MappedMemLocObject& that) : 
-    MappedAbstractObject<Key, MemLocObject, AbstractObject::MemLoc, MappedMemLocObject<Key> >(that)
+    MappedAbstractObject<Key, MemLocObject, AbstractObject::MemLoc, MappedAOSubType>(that)
   {}
 
-/*  // Returns whether this object may/must be equal to o within the given Part p
-  // These methods are called by composers and should not be called by analyses.
-  bool mayEqualAO(MemLocObjectPtr o, PartEdgePtr pedge){ assert(0); }
-  bool mustEqualAO(MemLocObjectPtr o, PartEdgePtr pedge){ assert(0); }
-
-  // Returns whether the two abstract objects denote the same set of concrete objects
-  // These methods are called by composers and should not be called by analyses.
-  bool equalSetAO(MemLocObjectPtr o, PartEdgePtr pedge){ assert(0); }
-  // Returns whether this abstract object denotes a non-strict subset (the sets may be equal) of the set denoted
-  // by the given abstract object.
-  // These methods are called by composers and should not be called by analyses.
-  bool subSetAO(MemLocObjectPtr o, PartEdgePtr pedge){ assert(0); }
-
-  // Returns true if this object is live at the given part and false otherwise.
-  // This method is called by composers and should not be called by analyses.
-  bool isLiveAO(PartEdgePtr pedge){ assert(0); }
-
-  // Computes the meet of this and that and saves the result in this
-  // returns true if this causes this to change and false otherwise
-  bool meetUpdateAO(MemLocObjectPtr that, PartEdgePtr pedge){ assert(0); }
-
-  // Returns whether this AbstractObject denotes the set of all possible execution prefixes.
-  bool isFullAO(PartEdgePtr pedge){ assert(0); }
-  // Returns whether this AbstractObject denotes the empty set.
-  bool isEmptyAO(PartEdgePtr pedge){ assert(0); }
-
-  // Allocates a copy of this object and returns a pointer to it
-  AbstractObjectPtr copyAO() const { return copyAOType(); }
-  MemLocObjectPtr copyAOType() const { return boost::make_shared<MappedMemLocObject<Key> > (*this); }*/
-
   // Allocates a copy of this object and returns a regular pointer to it
-  MemLocObject* copyMLPtr() const { return new MappedMemLocObject<Key>(*this); }
+  MemLocObject* copyMLPtr() const { return new MappedMemLocObject<Key, MappedAOSubType, MappedAOValueType, MappedAOMemRegionType>(*this); }
 
   //SgNode* getBase() const;
   MemRegionObjectPtr getRegion() const;
   ValueObjectPtr     getIndex() const;
-  
-/*  void add(Key key, MemLocObjectPtr clo_p, PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis);
-  const std::map<Key, MemLocObjectPtr>& getMemLocsMap() const { return MappedAbstractObject<Key, MemLocObject>::aoMap; }
-  
-private:
-  //! Helper methods.
-  bool mayEqualMLWithKey(Key key, const std::map<Key, MemLocObjectPtr>& thatMLMap, PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis);
-  bool mustEqualMLWithKey(Key key, const std::map<Key, MemLocObjectPtr>& thatMLMap, PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis);
-  bool equalSetMLWithKey(Key key,const std::map<Key, MemLocObjectPtr>& thatMLMap, PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis);
-  bool subSetMLWithKey(Key key,const std::map<Key, MemLocObjectPtr>& thatMLMap, PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis);
 
-public:  
-  // Returns whether this object may/must be equal to o within the given Part p
-  // These methods are private to prevent analyses from calling them directly.
-  //bool mayEqualAO(MemLocObjectPtr o, PartEdgePtr pedge);
-  //bool mustEqualAO(MemLocObjectPtr o, PartEdgePtr pedge);
-  bool mayEqual(MemLocObjectPtr o, PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis);
-  bool mustEqual(MemLocObjectPtr o, PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis);
+
+  // Check whether that is a MemLocObject and if so, call the version of mayEqual specific to MemLocObjects
+  bool mayEqual(AbstractObjectPtr that, PartEdgePtr pedge,Composer* comp, ComposedAnalysis* analysis);
+
+  // Check whether that is a MemLocObject and if so, call the version of mustEqual specific to MemLocObjects
+  bool mustEqual(AbstractObjectPtr that, PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis);
 
   // Returns whether the two abstract objects denote the same set of concrete objects
-  //bool equalSetAO(MemLocObjectPtr o, PartEdgePtr pedge);
-  bool equalSet(MemLocObjectPtr o, PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis);
-  
+  bool equalSet(AbstractObjectPtr that, PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis);
+
   // Returns whether this abstract object denotes a non-strict subset (the sets may be equal) of the set denoted
   // by the given abstract object.
-  //bool subSetAO(MemLocObjectPtr o, PartEdgePtr pedge);
-  bool subSet(MemLocObjectPtr o, PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis);
-  
-  // Returns true if this object is live at the given part and false otherwise
-  //bool isLiveAO(PartEdgePtr pedge);
-  // General version of isLive that accounts for framework details before routing the call to the derived class' 
-  // isLiveML check. Specifically, it routes the call through the composer to make sure the isLiveML call gets the 
-  // right PartEdge
-  bool isLive(PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis);
+  bool subSet(AbstractObjectPtr that, PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis);
 
-  // Computes the meet of this and that and saves the result in this
-  // returns true if this causes this to change and false otherwise
-  //bool meetUpdateAO(MemLocObjectPtr that, PartEdgePtr pedge);
-  bool meetUpdate(MemLocObjectPtr that, PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis);
-
-  void setMLToFull();
-  
-  // Returns whether this AbstractObject denotes the set of all possible execution prefixes.
-  //bool isFullAO(PartEdgePtr pedge);
-  bool isFull(PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis);
-  // Returns whether this AbstractObject denotes the empty set.
-  //bool isEmptyAO(PartEdgePtr pedge);
-  bool isEmpty(PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis);
-  
-  // Returns true if this AbstractObject corresponds to a concrete value that is statically-known
-  bool isConcrete();
-  // Returns the number of concrete values in this set
-  int concreteSetSize();
-  
-  // Allocates a copy of this object and returns a pointer to it
-  MemLocObjectPtr copyAO() const;
-  
-  std::string str(std::string indent="") const;
-  
-  // Returns whether all instances of this class form a hierarchy. Every instance of the same
-  // class created by the same analysis must return the same value from this method!
-  bool isHierarchy() const;
-  
-  // Returns a key that uniquely identifies this particular AbstractObject in the 
-  // set hierarchy.
-  const AbstractionHierarchy::hierKeyPtr& getHierKey() const;*/
+  // General version of meetUpdate() that accounts for framework details before routing the call to the derived class'
+  // meetUpdateML check. Specifically, it routes the call through the composer to make sure the meetUpdateML
+  // call gets the right PartEdge
+  bool meetUpdate(AbstractObjectPtr that, PartEdgePtr pedge,Composer* comp, ComposedAnalysis* analysis);
 }; // class MappedMemLocObject
 
-/*typedef MappedMemLocObject<ComposedAnalysis*, false> UnionAnalMapMemLocObject;
-typedef boost::shared_ptr<MappedMemLocObject<ComposedAnalysis*, false> > UnionAnalMapMemLocObjectPtr;
-typedef MappedMemLocObject<ComposedAnalysis*, true> IntersectAnalMapMemLocObject;
-typedef boost::shared_ptr<MappedMemLocObject<ComposedAnalysis*, true> > IntersectAnalMapMemLocObjectPtr;
+template<class Key>
+class GenericMappedMemLocObject : public MappedMemLocObject<Key, GenericMappedMemLocObject<Key>, GenericMappedValueObject<Key>, GenericMappedMemRegionObject<Key> > {
+  public:
+  GenericMappedMemLocObject(uiType ui, ComposedAnalysis* analysis) : MappedMemLocObject<Key, GenericMappedMemLocObject<Key>, GenericMappedValueObject<Key>, GenericMappedMemRegionObject<Key> >(ui, analysis) {}
+  GenericMappedMemLocObject(uiType ui, ComposedAnalysis* analysis, const std::map<Key, MemLocObjectPtr>& aoMap) : MappedMemLocObject<Key, GenericMappedMemLocObject<Key>, GenericMappedValueObject<Key>, GenericMappedMemRegionObject<Key> >(ui, analysis, aoMap) {}
+  GenericMappedMemLocObject(uiType ui, int nFull, ComposedAnalysis* analysis, const std::map<Key, MemLocObjectPtr>& aoMap) : MappedMemLocObject<Key, GenericMappedMemLocObject<Key>, GenericMappedValueObject<Key>, GenericMappedMemRegionObject<Key> >(ui, nFull, analysis, aoMap) {}
+  GenericMappedMemLocObject(const GenericMappedMemLocObject& that) : MappedMemLocObject<Key, GenericMappedMemLocObject<Key>, GenericMappedValueObject<Key>, GenericMappedMemRegionObject<Key> >(that) {}
+};
 
-extern template class MappedMemLocObject<ComposedAnalysis*, true>;
-extern template class MappedMemLocObject<ComposedAnalysis*, false>;*/
-extern template class MappedMemLocObject<ComposedAnalysis*>;
-extern template class MappedAbstractObject<ComposedAnalysis*, MemLocObject, AbstractObject::MemLoc, MappedMemLocObject<ComposedAnalysis*> >;
-typedef boost::shared_ptr<MappedMemLocObject<ComposedAnalysis*> > AnalMapMemLocObjectPtr;
-typedef MappedMemLocObject<ComposedAnalysis*> AnalMapMemLocObject;
+extern template class GenericMappedMemLocObject<ComposedAnalysis*>;
+extern template class MappedMemLocObject<ComposedAnalysis*, GenericMappedMemLocObject<ComposedAnalysis*>, GenericMappedValueObject<ComposedAnalysis*>, GenericMappedMemRegionObject<ComposedAnalysis*> >;
+extern template class MappedAbstractObject<ComposedAnalysis*, MemLocObject, AbstractObject::MemLoc, GenericMappedMemLocObject<ComposedAnalysis*> >;
+typedef boost::shared_ptr<GenericMappedMemLocObject<ComposedAnalysis*> > AnalMapMemLocObjectPtr;
+typedef GenericMappedMemLocObject<ComposedAnalysis*> AnalMapMemLocObject;
 
 /* #############################
    # PartEdgeUnionMemLocObject #
@@ -2998,7 +2273,12 @@ class PartEdgeUnionMemLocObject : public MemLocObject {
 public:
   PartEdgeUnionMemLocObject();
   PartEdgeUnionMemLocObject(const PartEdgeUnionMemLocObject& that);
+
   SgNode* getBase() const;
+
+  MemRegionObjectPtr getRegion() const;
+  ValueObjectPtr     getIndex() const;
+
   void add(MemLocObjectPtr ml_p, PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis);
   MemLocObjectPtr getUnionAO() { return unionML_p; }
 
@@ -3055,65 +2335,30 @@ class UInt {
   }
 };
 
-//template <class AOSubType, AbstractObject::AOType type, class MappedAOSubType>
-//class CombinedAbstractObject : public MappedAbstractObject<UInt, AOSubType, type, MappedAOSubType >
-//{
-//  public:
-//  std::list<boost::shared_ptr<AOSubType> > subObjs;
-//  CombinedAbstractObject(uiType ui, ComposedAnalysis* analysis, boost::shared_ptr<AOSubType> subObj) :
-//        MappedAbstractObject<UInt, AOSubType, type, MappedAOSubType >(ui, /*nFull*/ 0, analysis)
-//  {
-//    MappedAbstractObject<UInt, AOSubType, type, MappedAOSubType >::aoMap[UInt(0)] = subObj;
-//    subObjs.push_back(subObj);
-//  }
-//  CombinedAbstractObject(uiType ui, ComposedAnalysis* analysis, const std::list<boost::shared_ptr<AOSubType> >& subObjs) :
-//        MappedAbstractObject<UInt, AOSubType, type, MappedAOSubType >(ui, /*nFull*/ 0, analysis),
-//        subObjs(subObjs)
-//  {
-//    unsigned int i=0;
-//    for(typename std::list<boost::shared_ptr<AOSubType> >::const_iterator sub=subObjs.begin(); sub!=subObjs.end(); ++sub, ++i)
-//      MappedAbstractObject<UInt, AOSubType, type, MappedAOSubType >::aoMap[UInt(i)] = *sub;
-//
-//  }
-//  CombinedAbstractObject(uiType ui, int nFull, ComposedAnalysis* analysis, const std::map<UInt, boost::shared_ptr<AOSubType> >& aoMap) :
-//        MappedAbstractObject<UInt, AOSubType, type, MappedAOSubType >(ui, nFull, analysis, aoMap)
-//  {}
-//
-//  CombinedAbstractObject(const CombinedAbstractObject& that) :
-//        MappedAbstractObject<UInt, AOSubType, type, MappedAOSubType >(that),
-//        subObjs(that.subObjs)
-//  {}
-//}; // class CombinedAbstractObject
-
-extern template class MappedCodeLocObject<UInt>;
-extern template class MappedValueObject<UInt>;
-extern template class MappedMemRegionObject<UInt>;
-extern template class MappedMemLocObject<UInt>;
-
-class CombinedCodeLocObject : public MappedCodeLocObject<UInt>
+class CombinedCodeLocObject : public MappedCodeLocObject<UInt, CombinedCodeLocObject>
 {
   public:
   std::list<CodeLocObjectPtr > subObjs;
   CombinedCodeLocObject(uiType ui, ComposedAnalysis* analysis, CodeLocObjectPtr subObj) :
-        MappedCodeLocObject<UInt>(ui, analysis)
+        MappedCodeLocObject<UInt, CombinedCodeLocObject>(ui, analysis)
   {
-    MappedCodeLocObject<UInt>::aoMap[UInt(0)] = subObj;
+    MappedCodeLocObject<UInt, CombinedCodeLocObject>::aoMap[UInt(0)] = subObj;
     subObjs.push_back(subObj);
   }
   CombinedCodeLocObject(uiType ui, ComposedAnalysis* analysis, const std::list<CodeLocObjectPtr >& subObjs) :
-        MappedCodeLocObject<UInt>(ui, analysis),
+        MappedCodeLocObject<UInt, CombinedCodeLocObject>(ui, analysis),
         subObjs(subObjs)
   {
     unsigned int i=0;
     for(std::list<CodeLocObjectPtr >::const_iterator sub=subObjs.begin(); sub!=subObjs.end(); ++sub, ++i)
-      MappedCodeLocObject<UInt>::aoMap[UInt(i)] = *sub;
+      MappedCodeLocObject<UInt, CombinedCodeLocObject>::aoMap[UInt(i)] = *sub;
   }
   CombinedCodeLocObject(uiType ui, int nFull, ComposedAnalysis* analysis, const std::map<UInt, CodeLocObjectPtr >& aoMap) :
-        MappedCodeLocObject<UInt>(ui, nFull, analysis, aoMap)
+        MappedCodeLocObject<UInt, CombinedCodeLocObject>(ui, nFull, analysis, aoMap)
   {}
 
   CombinedCodeLocObject(const CombinedCodeLocObject& that) :
-        MappedCodeLocObject<UInt>(that),
+        MappedCodeLocObject<UInt, CombinedCodeLocObject>(that),
         subObjs(that.subObjs)
   {}
 
@@ -3122,30 +2367,30 @@ class CombinedCodeLocObject : public MappedCodeLocObject<UInt>
 
 typedef boost::shared_ptr<CombinedCodeLocObject> CombinedCodeLocObjectPtr;
 
-class CombinedValueObject : public MappedValueObject<UInt>
+class CombinedValueObject : public MappedValueObject<UInt, CombinedValueObject>
 {
   public:
   std::list<ValueObjectPtr > subObjs;
   CombinedValueObject(uiType ui, ComposedAnalysis* analysis, ValueObjectPtr subObj) :
-        MappedValueObject<UInt>(ui, analysis)
+        MappedValueObject<UInt, CombinedValueObject>(ui, analysis)
   {
-    MappedValueObject<UInt>::aoMap[UInt(0)] = subObj;
+    MappedValueObject<UInt, CombinedValueObject>::aoMap[UInt(0)] = subObj;
     subObjs.push_back(subObj);
   }
   CombinedValueObject(uiType ui, ComposedAnalysis* analysis, const std::list<ValueObjectPtr >& subObjs) :
-        MappedValueObject<UInt>(ui, analysis),
+        MappedValueObject<UInt, CombinedValueObject>(ui, analysis),
         subObjs(subObjs)
   {
     unsigned int i=0;
     for(std::list<ValueObjectPtr >::const_iterator sub=subObjs.begin(); sub!=subObjs.end(); ++sub, ++i)
-      MappedValueObject<UInt>::aoMap[UInt(i)] = *sub;
+      MappedValueObject<UInt, CombinedValueObject>::aoMap[UInt(i)] = *sub;
   }
   CombinedValueObject(uiType ui, int nFull, ComposedAnalysis* analysis, const std::map<UInt, ValueObjectPtr >& aoMap) :
-        MappedValueObject<UInt>(ui, nFull, analysis, aoMap)
+        MappedValueObject<UInt, CombinedValueObject>(ui, nFull, analysis, aoMap)
   {}
 
   CombinedValueObject(const CombinedValueObject& that) :
-        MappedValueObject<UInt>(that),
+        MappedValueObject<UInt, CombinedValueObject>(that),
         subObjs(that.subObjs)
   {}
 
@@ -3154,30 +2399,30 @@ class CombinedValueObject : public MappedValueObject<UInt>
 
 typedef boost::shared_ptr<CombinedValueObject> CombinedValueObjectPtr;
 
-class CombinedMemRegionObject : public MappedMemRegionObject<UInt>
+class CombinedMemRegionObject : public MappedMemRegionObject<UInt, CombinedMemRegionObject, CombinedValueObject>
 {
   public:
   std::list<MemRegionObjectPtr > subObjs;
   CombinedMemRegionObject(uiType ui, ComposedAnalysis* analysis, MemRegionObjectPtr subObj) :
-        MappedMemRegionObject<UInt>(ui, analysis)
+        MappedMemRegionObject<UInt, CombinedMemRegionObject, CombinedValueObject>(ui, analysis)
   {
-    MappedMemRegionObject<UInt>::aoMap[UInt(0)] = subObj;
+    MappedMemRegionObject<UInt, CombinedMemRegionObject, CombinedValueObject>::aoMap[UInt(0)] = subObj;
     subObjs.push_back(subObj);
   }
   CombinedMemRegionObject(uiType ui, ComposedAnalysis* analysis, const std::list<MemRegionObjectPtr >& subObjs) :
-        MappedMemRegionObject<UInt>(ui, analysis),
+        MappedMemRegionObject<UInt, CombinedMemRegionObject, CombinedValueObject>(ui, analysis),
         subObjs(subObjs)
   {
     unsigned int i=0;
     for(std::list<MemRegionObjectPtr >::const_iterator sub=subObjs.begin(); sub!=subObjs.end(); ++sub, ++i)
-      MappedMemRegionObject<UInt>::aoMap[UInt(i)] = *sub;
+      MappedMemRegionObject<UInt, CombinedMemRegionObject, CombinedValueObject>::aoMap[UInt(i)] = *sub;
   }
   CombinedMemRegionObject(uiType ui, int nFull, ComposedAnalysis* analysis, const std::map<UInt, MemRegionObjectPtr >& aoMap) :
-        MappedMemRegionObject<UInt>(ui, nFull, analysis, aoMap)
+        MappedMemRegionObject<UInt, CombinedMemRegionObject, CombinedValueObject>(ui, nFull, analysis, aoMap)
   {}
 
   CombinedMemRegionObject(const CombinedMemRegionObject& that) :
-        MappedMemRegionObject<UInt>(that),
+        MappedMemRegionObject<UInt, CombinedMemRegionObject, CombinedValueObject>(that),
         subObjs(that.subObjs)
   {}
 
@@ -3186,30 +2431,30 @@ class CombinedMemRegionObject : public MappedMemRegionObject<UInt>
 
 typedef boost::shared_ptr<CombinedMemRegionObject> CombinedMemRegionObjectPtr;
 
-class CombinedMemLocObject : public MappedMemLocObject<UInt>
+class CombinedMemLocObject : public MappedMemLocObject<UInt, CombinedMemLocObject, CombinedValueObject, CombinedMemRegionObject>
 {
   public:
   std::list<MemLocObjectPtr > subObjs;
   CombinedMemLocObject(uiType ui, ComposedAnalysis* analysis, MemLocObjectPtr subObj) :
-        MappedMemLocObject<UInt>(ui, analysis)
+        MappedMemLocObject<UInt, CombinedMemLocObject, CombinedValueObject, CombinedMemRegionObject>(ui, analysis)
   {
-    MappedMemLocObject<UInt>::aoMap[UInt(0)] = subObj;
+    MappedMemLocObject<UInt, CombinedMemLocObject, CombinedValueObject, CombinedMemRegionObject>::aoMap[UInt(0)] = subObj;
     subObjs.push_back(subObj);
   }
   CombinedMemLocObject(uiType ui, ComposedAnalysis* analysis, const std::list<MemLocObjectPtr >& subObjs) :
-        MappedMemLocObject<UInt>(ui, analysis),
+        MappedMemLocObject<UInt, CombinedMemLocObject, CombinedValueObject, CombinedMemRegionObject>(ui, analysis),
         subObjs(subObjs)
   {
     unsigned int i=0;
     for(std::list<MemLocObjectPtr >::const_iterator sub=subObjs.begin(); sub!=subObjs.end(); ++sub, ++i)
-      MappedMemLocObject<UInt>::aoMap[UInt(i)] = *sub;
+      MappedMemLocObject<UInt, CombinedMemLocObject, CombinedValueObject, CombinedMemRegionObject>::aoMap[UInt(i)] = *sub;
   }
   CombinedMemLocObject(uiType ui, int nFull, ComposedAnalysis* analysis, const std::map<UInt, MemLocObjectPtr >& aoMap) :
-        MappedMemLocObject<UInt>(ui, nFull, analysis, aoMap)
+        MappedMemLocObject<UInt, CombinedMemLocObject, CombinedValueObject, CombinedMemRegionObject>(ui, nFull, analysis, aoMap)
   {}
 
   CombinedMemLocObject(const CombinedMemLocObject& that) :
-        MappedMemLocObject<UInt>(that),
+        MappedMemLocObject<UInt, CombinedMemLocObject, CombinedValueObject, CombinedMemRegionObject>(that),
         subObjs(that.subObjs)
   {}
 
@@ -3218,7 +2463,14 @@ class CombinedMemLocObject : public MappedMemLocObject<UInt>
 
 typedef boost::shared_ptr<CombinedMemLocObject> CombinedMemLocObjectPtr;
 
-
+extern template class MappedCodeLocObject  <UInt, CombinedCodeLocObject>;
+extern template class MappedValueObject    <UInt, CombinedValueObject>;
+extern template class MappedMemRegionObject<UInt, CombinedMemRegionObject, CombinedValueObject>;
+extern template class MappedMemLocObject   <UInt, CombinedMemLocObject, CombinedValueObject, CombinedMemRegionObject>;
+extern template class MappedAbstractObject<UInt, CodeLocObject,   AbstractObject::CodeLoc,   CombinedCodeLocObject>;
+extern template class MappedAbstractObject<UInt, ValueObject,     AbstractObject::Value,     CombinedValueObject>;
+extern template class MappedAbstractObject<UInt, MemRegionObject, AbstractObject::MemRegion, CombinedMemRegionObject>;
+extern template class MappedAbstractObject<UInt, MemLocObject,    AbstractObject::MemLoc,    CombinedMemLocObject>;
 
 /* ###########################################
    ##### Specific Types of MemLocObjects ##### 

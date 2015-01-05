@@ -1115,13 +1115,15 @@ bool MappedAbstractObject<Key, AOSubType, type, MappedAOSubType>::isEmpty(PartEd
 // Returns true if this AbstractObject corresponds to a concrete value that is statically-known
 template<class Key, class AOSubType, AbstractObject::AOType type, class MappedAOSubType>
 bool MappedAbstractObject<Key, AOSubType, type, MappedAOSubType>::isConcrete() {
-  if(nFull>0) return false;
+  if(isUnion() && nFull>0) return false;
 
   typename map<Key, boost::shared_ptr<AOSubType> >::iterator it;
-  for (it = aoMap.begin(); it != aoMap.end(); ++it)
-    if (!it->second->isConcrete())
-      return false;
-  return true;
+  for (it = aoMap.begin(); it != aoMap.end(); ++it) {
+    if (isIntersection() && it->second->isConcrete()) return true;
+    if (isUnion()        && !it->second->isConcrete()) return false;
+  }
+  if (isIntersection()) return false;
+  else                  return true;
 }
 
 // Returns the number of concrete values in this set
@@ -1132,7 +1134,8 @@ int MappedAbstractObject<Key, AOSubType, type, MappedAOSubType>::concreteSetSize
   int size = 0;
   typename map<Key, boost::shared_ptr<AOSubType> >::iterator it;
   for (it = aoMap.begin(); it != aoMap.end(); ++it)
-    size += it->second->concreteSetSize();
+    if (it->second->isConcrete())
+      size += it->second->concreteSetSize();
   return size;
 }
 
@@ -1214,10 +1217,12 @@ template<class Key, class AOSubType, AbstractObject::AOType type, class MappedAO
 const AbstractionHierarchy::hierKeyPtr& MappedAbstractObject<Key, AOSubType, type, MappedAOSubType>::getHierKey() const {
   assert(aoMap.size()==1);
   scope s("MappedAbstractObject<Key, AOSubType, type, MappedAOSubType>::getHierKey()");
+  dbg << "this="<<str()<<endl;
   dbg << "aoMap.begin()->second="<<aoMap.begin()->second->str()<<endl;
   assert(aoMap.begin()->second->isHierarchy());
 
   if(aoMap.size()==1 && aoMap.begin()->second->isHierarchy()) return aoMap.begin()->second->getHierKey();
+  assert(0);
 }
 //  // The intersection of multiple objects is just a filtering process from the full
 //  // set of objects to the exact one, with each key in the hierarchy further filtering
@@ -2588,47 +2593,64 @@ std::string FullValueObject::str(std::string indent) const {
 template<class Key, class MappedAOSubType>
 SgType* MappedValueObject<Key, MappedAOSubType>::getConcreteType() {
   if(!MappedValueObject<Key, MappedAOSubType>::isConcrete()) assert(0);
-  typename map<Key, ValueObjectPtr>::iterator it =
-      MappedAbstractObject<Key, ValueObject, AbstractObject::Value, MappedAOSubType>::aoMap.begin();
-  SgType* c_type = it->second->getConcreteType();
+  SgType* c_type = NULL;
   // assert that all other objects have the same type
-  for (++it; it != MappedAbstractObject<Key, ValueObject, AbstractObject::Value, MappedAOSubType>::aoMap.end(); ++it) {
-    SgType* votype = it->second->getConcreteType();
-    assert(c_type == votype);
+  for(typename map<Key, ValueObjectPtr>::iterator it =
+          MappedAbstractObject<Key, ValueObject, AbstractObject::Value, MappedAOSubType>::aoMap.begin();
+      it != MappedAbstractObject<Key, ValueObject, AbstractObject::Value, MappedAOSubType>::aoMap.end(); ++it) {
+    if (it->second->isConcrete()) {
+      SgType* votype = it->second->getConcreteType();
+      if(c_type==NULL) c_type = votype;
+      else             assert(c_type == votype);
+    }
   }
   return c_type;
 }
 
 template<class Key, class MappedAOSubType>
 set<boost::shared_ptr<SgValueExp> > MappedValueObject<Key, MappedAOSubType>::getConcreteValue() {
+  scope s("MappedValueObject<Key, MappedAOSubType>::getConcreteValue()");
   if(!MappedAbstractObject<Key, ValueObject, AbstractObject::Value, MappedAOSubType>::isConcrete()) assert(0);
   // If this is a union type (defaultMayEq=true), the result is the Union of the sets returned by getConcrete() on all the memRegions.
   // If this is an intersection type (defaultMayEq=false), an object is their Intersection.
 
   // Maps each concrete value to the number of elements in aoMap for which it was returned
   std::map<boost::shared_ptr<SgValueExp>, size_t> concreteVals;
+  // Number of concrete sub-objects
+  unsigned int numConcrete=0;
   for(typename map<Key, ValueObjectPtr>::iterator v_it =
-      MappedAbstractObject<Key, ValueObject, AbstractObject::Value, MappedAOSubType>::aoMap.begin();
+          MappedAbstractObject<Key, ValueObject, AbstractObject::Value, MappedAOSubType>::aoMap.begin();
       v_it != MappedAbstractObject<Key, ValueObject, AbstractObject::Value, MappedAOSubType>::aoMap.end(); ++v_it) {
-    // Iterate through the current sub-MemRegion's concrete values and increment each
-    // concrete value's counter in concreteMRs.
-    std::set<boost::shared_ptr<SgValueExp> > c_valueSet =
-        v_it->second->getConcreteValue();
-    for (std::set<boost::shared_ptr<SgValueExp> >::iterator s_it =
-        c_valueSet.begin(); s_it != c_valueSet.end(); ++s_it) {
-      map<boost::shared_ptr<SgValueExp>, size_t>::iterator c_it =
-          concreteVals.begin();
-      for (; c_it != concreteVals.end(); ++c_it) {
-        // If we've found the same value, increment its counter
-        if (ValueObject::equalValueExp(c_it->first.get(), (*s_it).get())) {
-          c_it->second++;
-          break;
+    scope s(txt()<<"Value "<<v_it->second->str());
+    dbg << "isConcrete = "<<v_it->second->isConcrete()<<endl;
+    if (v_it->second->isConcrete()) {
+      // Iterate through the current sub-MemRegion's concrete values and increment each
+      // concrete value's counter in concreteMRs.
+      std::set<boost::shared_ptr<SgValueExp> > c_valueSet =
+          v_it->second->getConcreteValue();
+      dbg << "#c_valueSet="<<c_valueSet.size()<<endl;
+      for(std::set<boost::shared_ptr<SgValueExp> >::iterator s_it =
+          c_valueSet.begin(); s_it != c_valueSet.end(); ++s_it) {
+        indent ind;
+        dbg << SgNode2Str((*s_it).get());
+        map<boost::shared_ptr<SgValueExp>, size_t>::iterator c_it =
+            concreteVals.begin();
+        for (; c_it != concreteVals.end(); ++c_it) {
+          // If we've found the same value, increment its counter
+          if (ValueObject::equalValueExp(c_it->first.get(), (*s_it).get())) {
+            indent ind;
+            c_it->second++;
+            dbg << "found, count="<<c_it->second<<endl;
+            break;
+          }
         }
+
+        // If we did not find the value, add it to concreteVals;
+        if (c_it == concreteVals.end())
+          concreteVals[*s_it] = 1;
       }
 
-      // If we did not find the value, add it to concreteVals;
-      if (c_it == concreteVals.end())
-        concreteVals[*s_it] = 1;
+      ++numConcrete;
     }
   }
 
@@ -2641,7 +2663,7 @@ set<boost::shared_ptr<SgValueExp> > MappedValueObject<Key, MappedAOSubType>::get
       ret.insert(i->first);
     // Intersection: only add the keys that appear in every MemRegion in memRegions
     else if (MappedAbstractObject<Key, ValueObject, AbstractObject::Value, MappedAOSubType>::isIntersection() &&
-             i->second == MappedAbstractObject<Key, ValueObject, AbstractObject::Value, MappedAOSubType>::aoMap.size())
+             i->second == numConcrete)
       ret.insert(i->first);
   }
 
@@ -4152,9 +4174,9 @@ ValueObjectPtr     PartEdgeUnionMemLocObject::getIndex() const {
 
 void PartEdgeUnionMemLocObject::add(MemLocObjectPtr ml_p, PartEdgePtr pedge,
     Composer* comp, ComposedAnalysis* analysis) {
-  scope s("PartEdgeUnionMemLocObject::add");
+  /*scope s("PartEdgeUnionMemLocObject::add");
   dbg << "Init: unionML_p="<<(unionML_p? unionML_p->str(): "NULL")<<endl;
-  dbg << "ml_p="<<ml_p->str()<<endl;
+  dbg << "ml_p="<<ml_p->str()<<endl;*/
 
   // If this is the very first object
   if (!unionML_p)
@@ -4169,7 +4191,7 @@ void PartEdgeUnionMemLocObject::add(MemLocObjectPtr ml_p, PartEdgePtr pedge,
     unionML_p->meetUpdate(ml_p, pedge, comp, analysis);
 
 
-  dbg << "Final: unionML_p="<<(unionML_p? unionML_p->str(): "NULL")<<endl;
+  //dbg << "Final: unionML_p="<<(unionML_p? unionML_p->str(): "NULL")<<endl;
 }
 
 //bool PartEdgeUnionMemLocObject::mayEqualAO(MemLocObjectPtr that, PartEdgePtr pedge) {
@@ -4245,8 +4267,8 @@ bool PartEdgeUnionMemLocObject::isFull(PartEdgePtr pedge, Composer* comp,
     ComposedAnalysis* analysis) {
   assert(unionML_p);
 
-  scope s("PartEdgeUnionMemLocObject::isFull");
-  dbg << "unionML_p="<<unionML_p->str()<<endl;
+  /*scope s("PartEdgeUnionMemLocObject::isFull");
+  dbg << "unionML_p="<<unionML_p->str()<<endl;*/
 
   return unionML_p->isFull(pedge, comp, analysis);
 }

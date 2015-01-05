@@ -22,7 +22,7 @@ using namespace sight;
 namespace fuse
 {
 #define composedAnalysisDebugLevel 1
-
+#define moduleProfile false
 /****************************
  ***** ComposedAnalysis *****
  ****************************/
@@ -394,9 +394,18 @@ void ComposedAnalysis::runAnalysisDense()
         visited.insert(part);
       }
 
+      SgNode* sgn = part->CFGNodes().begin()->getNode(); assert(sgn);
+      set<CFGNode> matches;
+      SIGHT_DECL(module, (instance("Process", 1, 0),
+                                   port(context("part",        part->str(),
+                                                "firstVisit",  firstVisit,
+                                                "SgNode*",     sgn,
+                                                "#desc",       (int)getDescendants(part).size(),
+                                                "outFuncCall", part->mayOutgoingFuncCall(matches),
+                                                "inFuncCall",  part->mayIncomingFuncCall(matches)))), moduleProfile)
+
       // If we're at the first side of a function call (call for fw, return for bw), add the matching side
       // to unmatchedCallReturnParts.
-      set<CFGNode> matches;
       if((getDirection()==fw && part->mayOutgoingFuncCall(matches)) ||
          (getDirection()==bw && part->mayIncomingFuncCall(matches))) {
         set<PartPtr> matchingParts = part->matchingCallParts();
@@ -465,7 +474,7 @@ void ComposedAnalysis::runAnalysisDense()
       }
 
       transferPropagateAStateDense(part, visited, firstVisit, initialized, curNodeIt,
-                              scopeAnchor, worklistGraph, toAnchors, fromAnchors);
+                                   scopeAnchor, worklistGraph, toAnchors, fromAnchors);
     } // end worklist iteration
 
     // If unmatchedCallReturnParts is not empty, add all the parts within it to the worklist
@@ -845,6 +854,10 @@ bool ComposedAnalysis::propagateStateToNextNode(
 bool ComposedAnalysis::transferDFStateDense(ComposedAnalysis* analysis, PartPtr part, CFGNode cn, SgNode* sgn, NodeState& state,
                                        map<PartEdgePtr, vector<Lattice*> >& dfInfo, const set<PartPtr>& ultimateParts)
 {
+  SIGHT_DECL(module, (instance("transferDFStateDense", 1, 0),
+                                     port(context("CFGNode",     CFGNode2Str(cn),
+                                                  "SgNode*",     sgn,
+                                                  "#desc",       (int)getEdgesToDescendants(part).size()))), moduleProfile)
   SIGHT_VERB_DECL(scope, ("Transferring", scope::medium), 1, composedAnalysisDebugLevel);
   bool modified = false;
 
@@ -853,9 +866,16 @@ bool ComposedAnalysis::transferDFStateDense(ComposedAnalysis* analysis, PartPtr 
   PartEdgePtr wildCardPartEdge = getDirection() == fw? part->inEdgeFromAny() : part->outEdgeToAny();
   assert(dfInfo.find(wildCardPartEdge) != dfInfo.end());
 
-  boost::shared_ptr<DFTransferVisitor> transferVisitor = analysis->getTransferVisitor(part, cn, state, dfInfo);
-  sgn->accept(*transferVisitor);
-  modified = transferVisitor->finish() || modified;
+  {
+    SIGHT_DECL(module, (instance("Transfer", 1, 0),
+                                         port(context("CFGNode",     CFGNode2Str(cn),
+                                                      "SgNode*",     sgn,
+                                                      "#desc",       (int)getEdgesToDescendants(part).size()))), moduleProfile)
+
+    boost::shared_ptr<DFTransferVisitor> transferVisitor = analysis->getTransferVisitor(part, cn, state, dfInfo);
+    sgn->accept(*transferVisitor);
+    modified = transferVisitor->finish() || modified;
+  }
 
   SIGHT_VERB_IF(1, composedAnalysisDebugLevel)
     dbg << "dfInfo after transfer="<<endl;
@@ -956,6 +976,12 @@ void ComposedAnalysis::propagateDF2DescDense(ComposedAnalysis* analysis,
 {
   list<PartPtr>   descendants = getDescendants(part);
   list<PartEdgePtr> descEdges = getEdgesToDescendants(part);
+
+  SgNode* sgn = part->CFGNodes().begin()->getNode(); assert(sgn);
+  SIGHT_DECL(module, (instance("propagateDF2DescDense", 1, 0),
+                               port(context("part",        part->str(),
+                                            "SgNode*",     sgn,
+                                            "#desc",       (int)descendants.size()))), moduleProfile)
 
   SIGHT_VERB_DECL(scope, (txt()<<"Propagating/Merging the outgoing  Lattice to all descendant nodes("<<descEdges.size()<<")", scope::medium), 1, composedAnalysisDebugLevel)
 

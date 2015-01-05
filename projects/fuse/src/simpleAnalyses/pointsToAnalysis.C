@@ -195,45 +195,45 @@ namespace fuse
 
     // Switch based on the type of the expression
     switch(sgn->variantT()) {
-    // Handle all pointer dereference expressions by looking up analysis state
-    case V_SgPointerDerefExp: {
-      MemLocObjectPtr opML_p = getComposer()->OperandExpr2MemLoc(sgn, isSgPointerDerefExp(sgn)->get_operand(), pedge, this);
+      // Handle all pointer dereference expressions by looking up analysis state
+      case V_SgPointerDerefExp: {
+        MemLocObjectPtr opML_p = getComposer()->OperandExpr2MemLoc(sgn, isSgPointerDerefExp(sgn)->get_operand(), pedge, this);
 
-      Lattice* lattice=NULL;
-      // Incoming information is stored Above for Forward analysis
-      if(pedge->target()) {
-        NodeState* state = NodeState::getNodeState(this, pedge->target());
-        lattice = state->getLatticeAbove(this, pedge, 0);
+        Lattice* lattice=NULL;
+        // Incoming information is stored Above for Forward analysis
+        if(pedge->target()) {
+          NodeState* state = NodeState::getNodeState(this, pedge->target());
+          lattice = state->getLatticeAbove(this, pedge, 0);
+        }
+        // Incoming information is stored Below for Backward analysis
+        else if(pedge->source()) {
+        //if(pedge->source()) {
+          NodeState* state = NodeState::getNodeState(this, pedge->source());
+          lattice = state->getLatticeBelow(this, pedge, 0);
+        }
+        else ROSE_ASSERT(0);
+
+        assert(lattice);
+        AbstractObjectMap* aom_p = dynamic_cast<AbstractObjectMap*>(lattice);
+
+        if(pointsToAnalysisDebugLevel() >= 2) {
+          dbg << "PointsToMap=" << aom_p->str() << endl;
+        }
+
+        boost::shared_ptr<AbstractObjectSet> aos_p = boost::dynamic_pointer_cast<AbstractObjectSet>(aom_p->get(opML_p));
+        assert(!aos_p->isEmpty());
+        if(pointsToAnalysisDebugLevel() >= 2) dbg << "MLSet=" << aos_p->str() << endl;
+        ptML_p->add(aos_p, pedge, getComposer(), this);
+        break;
       }
-      // Incoming information is stored Below for Backward analysis
-      else if(pedge->source()) {
-      //if(pedge->source()) {
-        NodeState* state = NodeState::getNodeState(this, pedge->source());
-        lattice = state->getLatticeBelow(this, pedge, 0);
-      }
-      else ROSE_ASSERT(0);
 
-      assert(lattice);
-      AbstractObjectMap* aom_p = dynamic_cast<AbstractObjectMap*>(lattice);
-
-      if(pointsToAnalysisDebugLevel() >= 2) {
-        dbg << "PointsToMap=" << aom_p->str() << endl;
-      }
-
-      boost::shared_ptr<AbstractObjectSet> aos_p = boost::dynamic_pointer_cast<AbstractObjectSet>(aom_p->get(opML_p));
-      assert(!aos_p->isEmpty());
-      if(pointsToAnalysisDebugLevel() >= 2) dbg << "MLSet=" << aos_p->str() << endl;
-      ptML_p->add(aos_p, pedge, getComposer(), this);
-      break;
-    }
-
-    // For all other cases forward the query back to the composer
-    case V_SgVarRefExp:
-    case V_SgInitializedName:
-    default:
-      MemLocObjectPtr ml_p = getComposer()->Expr2MemLoc(sgn, pedge, this);
-      ptML_p->add(ml_p, pedge, getComposer(), this);
-      break;      
+      // For all other cases forward the query back to the composer
+      case V_SgVarRefExp:
+      case V_SgInitializedName:
+      default:
+        MemLocObjectPtr ml_p = getComposer()->Expr2MemLoc(sgn, pedge, this);
+        ptML_p->add(ml_p, pedge, getComposer(), this);
+        break;
     };     
 
     return ptML_p;

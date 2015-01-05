@@ -15,7 +15,7 @@ using namespace boost;
 
 namespace fuse {
 
-#define atsDebugLevel 1
+#define atsDebugLevel 0
 #define moduleProfile false
 
 /* ###########################

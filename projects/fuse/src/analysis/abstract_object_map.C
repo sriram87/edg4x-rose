@@ -2154,7 +2154,7 @@ bool MappedAOMKind::remove(AbstractObjectPtr key) {
 // Get all x-frontier for a given abstract memory object
 AbstractionPtr MappedAOMKind::get(AbstractObjectPtr key) {
   SIGHT_VERB_DECL(scope, (txt()<<"MappedAOMKind::get() ui="<<(ui==Union? "Union": "Intersection"), scope::medium), 1, AOMDebugLevel)
-  //dbg << "key="<<key->str()<<endl;
+  dbg << "key="<<key->str()<<endl;
   assert(key->isMappedAO());
 
   // Create a fresh map to hold the mapping of the sub-keys inside the MappedAbstractObject key

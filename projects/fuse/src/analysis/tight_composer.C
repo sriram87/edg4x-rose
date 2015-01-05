@@ -14,39 +14,41 @@ using namespace std;
 using namespace boost;
 using namespace sight;
 
+#define tightComposerDebugLevel 3
+
 namespace fuse {
 
-  DEBUG_LEVEL(tightComposerDebugLevel, 3);
+  DEBUG_LEVEL(tightComposerDebugLevelOLD, 3);
 
   /***************
    * Expr2AnyKey *
    ***************/
 
   bool Expr2AnyKey::operator<(const Expr2AnyKey& that) const {
-    scope reg(txt()<<"Expr2AnyKey::<", scope::medium, attrGE("tightComposerDebugLevel", 4));
+    SIGHT_VERB_DECL(scope, (txt()<<"Expr2AnyKey::<", scope::medium), 4, tightComposerDebugLevel)
 
-    if(tightComposerDebugLevel() >= 4) {
+    SIGHT_VERB_IF(4, tightComposerDebugLevel)
       dbg << "this=" << str() << endl;
       dbg << "that=" << that.str() << endl;
-    }
+    SIGHT_VERB_FI()
 
     // Order by the sgn expression first
     if(sgn < that.sgn) {
-      // if(tightComposerDebugLevel() >= 4) dbg << "this < that=" << "true";
+      // if(tightComposerDebugLevelOLD() >= 4) dbg << "this < that=" << "true";
       return true;
     }
     // Order by PartEdge if the expression is same
     else if(sgn == that.sgn && pedge < that.pedge) {
-      // if(tightComposerDebugLevel() >= 4) dbg << "this < that=" << "true";
+      // if(tightComposerDebugLevelOLD() >= 4) dbg << "this < that=" << "true";
       return true;
     }
     // Order by reqtype if both expression and PartEdge are same
     else if(sgn == that.sgn && pedge == that.pedge && reqtype < that.reqtype) {
-      // if(tightComposerDebugLevel() >= 4) dbg << "this < that=" << "true";     
+      // if(tightComposerDebugLevelOLD() >= 4) dbg << "this < that=" << "true";
       return true;
     }
     else {
-      // if(tightComposerDebugLevel() >= 4) dbg << "this < that=" << "false";
+      // if(tightComposerDebugLevelOLD() >= 4) dbg << "this < that=" << "false";
       return false;
     }
   }
@@ -57,13 +59,13 @@ namespace fuse {
     oss << "pedge=" << pedge->str() <<",";        
     oss << " reqtype="; 
     switch(reqtype) {
-    case 0: oss << "any"; break;
-    case 1: oss << "codeloc"; break;
-    case 2: oss << "val"; break;
-    case 3: oss << "memloc"; break;
-    case 4: oss << "memregion"; break;
-    case 5: oss << "atsGraph"; break;
-    default: assert(0);
+      case 0: oss << "any"; break;
+      case 1: oss << "codeloc"; break;
+      case 2: oss << "val"; break;
+      case 3: oss << "memloc"; break;
+      case 4: oss << "memregion"; break;
+      case 5: oss << "atsGraph"; break;
+      default: assert(0);
     }
     oss << "]";
     return oss.str();
@@ -75,18 +77,18 @@ namespace fuse {
    ********************************/
 
   void TightCompositionQueryManager::initializeQuery(Expr2AnyKey key) {
-    scope reg(txt()<<"initializeQuery",
-              scope::medium, attrGE("tightComposerDebugLevel", 4)); 
+    SIGHT_VERB_DECL(scope, (txt()<<"initializeQuery", scope::medium), 4, tightComposerDebugLevel)
     
-    if(tightComposerDebugLevel() >= 4) {
+    SIGHT_VERB_IF(4, tightComposerDebugLevel)
       dbg << "key=" << key.str() << endl;
       dbg << this->str();
-    }
+    SIGHT_VERB_FI()
+
     // There is no prior entry in the map
     assert(queryStateMap.find(key) == queryStateMap.end());
     pair<Expr2AnyKey, Expr2AnyState> elem = make_pair(key, Expr2AnyState());
     queryStateMap.insert(elem);
-    if(tightComposerDebugLevel() >= 4) dbg << this->str();
+    if(tightComposerDebugLevelOLD() >= 4) dbg << this->str();
   }
 
   const Expr2AnyState TightCompositionQueryManager::getQueryState(Expr2AnyKey key) const {
@@ -105,19 +107,18 @@ namespace fuse {
   }
 
   bool TightCompositionQueryManager::isLoopingQuery(Expr2AnyKey key, ComposedAnalysis* analysis_) {
-    scope reg(txt()<<"isLoopingQuery",
-          scope::medium, attrGE("tightComposerDebugLevel", 4));
+    SIGHT_VERB_DECL(scope, (txt()<<"isLoopingQuery", scope::medium), 4, tightComposerDebugLevel)
 
-    if(tightComposerDebugLevel() >= 4) {
+    SIGHT_VERB_IF(4, tightComposerDebugLevel)
       dbg << "key=" << key.str() << endl;
       dbg << this->str();
-    }
+    SIGHT_VERB_FI()
 
     if(queryStateMap.find(key) == queryStateMap.end()) return false;
 
     Expr2AnyState& qstate = queryStateMap.find(key)->second;    
 
-    // if(tightComposerDebugLevel() >= 4) {
+    // if(tightComposerDebugLevelOLD() >= 4) {
     //   dbg << "key=" << key.str() << " found\n";
     //   dbg << "state=" << qstate.str() << "\n";
     // }
@@ -125,7 +126,7 @@ namespace fuse {
     // query is not in the analysis state
     if(qstate.state != Expr2AnyState::anal) return false;
 
-    // if(tightComposerDebugLevel() >= 4) {
+    // if(tightComposerDebugLevelOLD() >= 4) {
     //   dbg << "LastAnalysis=" << qstate.getLastAnalysisQueried() << endl;
     //   dbg << "client=" << analysis_ << endl;
     // }
@@ -137,12 +138,12 @@ namespace fuse {
   }
 
   void TightCompositionQueryManager::transToAnalState(Expr2AnyKey key, ComposedAnalysis* analysis_) {
-    scope reg(txt()<<"transToAnalState", scope::medium, attrGE("tightComposerDebugLevel", 4));
+    SIGHT_VERB_DECL(scope, (txt()<<"transToAnalState", scope::medium), 4, tightComposerDebugLevel)
 
-    if(tightComposerDebugLevel() >= 4) {
+    SIGHT_VERB_IF(4, tightComposerDebugLevel)
       dbg << "key=" << key.str() << endl;
       dbg << this->str();
-    }
+    SIGHT_VERB_FI()
 
     // key is already in the map
     assert(queryStateMap.find(key) != queryStateMap.end());
@@ -242,11 +243,11 @@ namespace fuse {
                                                     function<shared_ptr<AOType> (ComposedAnalysis*, SgNode*, PartEdgePtr)> Expr2AnyOp,
                                                     function<shared_ptr<AOType> (SgNode*, PartEdgePtr)> parentComposerExpr2AnyOp) {
     scope reg(txt()<<"TightComposer::Expr2Any",
-              scope::medium, attrGE("tightComposerDebugLevel", 3));
+              scope::medium, attrGE("tightComposerDebugLevelOLD", 3));
 
     list<Expr2AnyKey>::iterator qIt;
 
-    if(tightComposerDebugLevel() >= 3) {
+    if(tightComposerDebugLevelOLD() >= 3) {
       dbg << "queryList=[\n";
       for(qIt = queryList.begin(); qIt != queryList.end(); ++qIt) {
         dbg << (*qIt).str() << endl;
@@ -263,7 +264,7 @@ namespace fuse {
       for(qIt = queryList.begin(); qIt != queryList.end(); ++qIt) {
         Expr2AnyKey query = *qIt;     
         boost::shared_ptr<AOType> ao_p = parentComposerExpr2AnyOp(query.sgn, query.pedge);
-        if(tightComposerDebugLevel() >= 3) {
+        if(tightComposerDebugLevelOLD() >= 3) {
           dbg << dynamic_cast<ComposedAnalysis*>(getComposer())->str() << ":" << ao_p->str() << endl;
         }
         cao_p->add(ao_p, query.pedge, this, client);
@@ -290,7 +291,7 @@ namespace fuse {
           // dispatch the query to the analysis
           boost::shared_ptr<AOType> ao_p = Expr2AnyOp(*a, query.sgn, query.pedge);
           
-          if(tightComposerDebugLevel() >= 3) {
+          if(tightComposerDebugLevelOLD() >= 3) {
             dbg << (*a)->str() << ":" << ao_p->str() << endl;
           }
 
@@ -311,7 +312,7 @@ namespace fuse {
 
       boost::shared_ptr<AOType> ao_p = parentComposerExpr2AnyOp(query.sgn, query.pedge);
 
-      if(tightComposerDebugLevel() >= 3) {
+      if(tightComposerDebugLevelOLD() >= 3) {
         dbg << dynamic_cast<ComposedAnalysis*>(getComposer())->str() << ":" << ao_p->str() << endl;
       }
 
@@ -320,7 +321,7 @@ namespace fuse {
 
     amao_p->add(dynamic_cast<ComposedAnalysis*>(getComposer()), cao_p, pedge, this, client);
 
-    if(tightComposerDebugLevel() >= 3) {
+    if(tightComposerDebugLevelOLD() >= 3) {
       dbg << amao_p->str() << endl;
     }
 
@@ -350,14 +351,14 @@ namespace fuse {
 
   CodeLocObjectPtr TightComposer::Expr2CodeLoc(SgNode* n, PartEdgePtr pedge, ComposedAnalysis* client) {
     scope reg(txt()<<"TightComposer::Expr2CodeLoc(n="<<SgNode2Str(n)<<", pedge=" << pedge->str(),
-              scope::medium, attrGE("tightComposerDebugLevel", 2));
+              scope::medium, attrGE("tightComposerDebugLevelOLD", 2));
     // Create and run a single Expr2Any query for this pedge
     Expr2AnyKey key(n, pedge, Composer::codeloc);
     list<Expr2AnyKey> queryList;
     queryList.push_back(key);
 
     CodeLocObjectPtr rcl_p = Expr2CodeLoc_ex(queryList, pedge, client);
-    if(tightComposerDebugLevel() >= 2) dbg << "CL=" << rcl_p->str() << endl;
+    if(tightComposerDebugLevelOLD() >= 2) dbg << "CL=" << rcl_p->str() << endl;
     return rcl_p;
   }
  
@@ -366,7 +367,7 @@ namespace fuse {
   // given node n, where the part denotes the set of prefixes that terminate at SgNode n.
   CodeLocObjectPtr TightComposer::OperandExpr2CodeLoc(SgNode* n, SgNode* operand, PartEdgePtr pedge, ComposedAnalysis* client) {
     scope reg(txt()<<"TightComposer::OperandExpr2CodeLoc(n="<<SgNode2Str(n)<< ", op="<< SgNode2Str(operand) << ", pedge=" << pedge->str(),
-              scope::medium, attrGE("tightComposerDebugLevel", 2));
+              scope::medium, attrGE("tightComposerDebugLevelOLD", 2));
     list<PartEdgePtr> pedgeList = pedge->getOperandPartEdge(n, operand);
     list<Expr2AnyKey> queryList;
 
@@ -379,7 +380,7 @@ namespace fuse {
 
     // Run all the queries
     CodeLocObjectPtr rcl_p = Expr2CodeLoc_ex(queryList, pedge, client);
-    if(tightComposerDebugLevel() >= 2) dbg << "CL=" << rcl_p->str() << endl;
+    if(tightComposerDebugLevelOLD() >= 2) dbg << "CL=" << rcl_p->str() << endl;
     return rcl_p;
   }
 
@@ -406,14 +407,14 @@ namespace fuse {
   // The objects returned by these functions are expected to be deallocated by their callers.
   ValueObjectPtr TightComposer::Expr2Val(SgNode* n, PartEdgePtr pedge, ComposedAnalysis* client) {
     scope reg(txt()<<"TightComposer::Expr2Val(n="<<SgNode2Str(n)<<", pedge=" << pedge->str(),
-              scope::medium, attrGE("tightComposerDebugLevel", 2));
+              scope::medium, attrGE("tightComposerDebugLevelOLD", 2));
     // Create and run a single Expr2Any query for this pedge
     Expr2AnyKey key(n, pedge, Composer::val);
     list<Expr2AnyKey> queryList;
     queryList.push_back(key);
 
     ValueObjectPtr rv_p = Expr2Val_ex(queryList, pedge, client);
-    if(tightComposerDebugLevel() >= 2) dbg << "Val=" << rv_p->str() << endl;
+    if(tightComposerDebugLevelOLD() >= 2) dbg << "Val=" << rv_p->str() << endl;
     return rv_p;
   }
   
@@ -421,7 +422,7 @@ namespace fuse {
   // given node n, where the part denotes the set of prefixes that terminate at SgNode n.
   ValueObjectPtr TightComposer::OperandExpr2Val(SgNode* n, SgNode* operand, PartEdgePtr pedge, ComposedAnalysis* client) {
     scope reg(txt()<<"TightComposer::OperandExpr2Val(n="<<SgNode2Str(n)<< ", op="<< SgNode2Str(operand) << ", pedge=" << pedge->str(),
-              scope::medium, attrGE("tightComposerDebugLevel", 2));
+              scope::medium, attrGE("tightComposerDebugLevelOLD", 2));
     list<PartEdgePtr> pedgeList = pedge->getOperandPartEdge(n, operand);
     list<Expr2AnyKey> queryList;
 
@@ -434,7 +435,7 @@ namespace fuse {
 
     // Run all the queries
     ValueObjectPtr rv_p = Expr2Val_ex(queryList, pedge, client);
-    if(tightComposerDebugLevel() >= 2) dbg << "Val=" << rv_p->str() << endl;
+    if(tightComposerDebugLevelOLD() >= 2) dbg << "Val=" << rv_p->str() << endl;
     return rv_p;
   }
 
@@ -459,14 +460,14 @@ namespace fuse {
     
   MemRegionObjectPtr TightComposer::Expr2MemRegion(SgNode* n, PartEdgePtr pedge, ComposedAnalysis* client) {
     scope reg(txt()<<"TightComposer::Expr2MemRegion(n="<<SgNode2Str(n)<<", pedge=" << pedge->str(),
-              scope::medium, attrGE("tightComposerDebugLevel", 2));
+              scope::medium, attrGE("tightComposerDebugLevelOLD", 2));
     // Create and run a single Expr2Any query for this pedge
     Expr2AnyKey key(n, pedge, Composer::memregion);
     list<Expr2AnyKey> queryList;
     queryList.push_back(key);
 
     MemRegionObjectPtr rmr_p = Expr2MemRegion_ex(queryList, pedge, client);
-    if(tightComposerDebugLevel() >= 2) dbg << "MR=" << rmr_p->str() << endl;
+    if(tightComposerDebugLevelOLD() >= 2) dbg << "MR=" << rmr_p->str() << endl;
     return rmr_p;
   }
   
@@ -475,7 +476,7 @@ namespace fuse {
   // the part denotes the set of prefixes that terminate at SgNode n.
   MemRegionObjectPtr TightComposer::OperandExpr2MemRegion(SgNode* n, SgNode* operand, PartEdgePtr pedge, ComposedAnalysis* client) {
     scope reg(txt()<<"TightComposer::OperandExpr2MemRegion(n="<<SgNode2Str(n)<< ", op="<< SgNode2Str(operand) << ", pedge=" << pedge->str(),
-              scope::medium, attrGE("tightComposerDebugLevel", 2));
+              scope::medium, attrGE("tightComposerDebugLevelOLD", 2));
     list<PartEdgePtr> pedgeList = pedge->getOperandPartEdge(n, operand);
     list<Expr2AnyKey> queryList;
 
@@ -488,7 +489,7 @@ namespace fuse {
 
     // Run all the queries
     MemRegionObjectPtr rmr_p = Expr2MemRegion_ex(queryList, pedge, client);
-    if(tightComposerDebugLevel() >= 2) dbg << "MR=" << rmr_p->str() << endl;
+    if(tightComposerDebugLevelOLD() >= 2) dbg << "MR=" << rmr_p->str() << endl;
     return rmr_p;
   }
 
@@ -515,14 +516,14 @@ namespace fuse {
   //! Returns IntersectMemLocObjectPtr
   MemLocObjectPtr TightComposer::Expr2MemLoc(SgNode* n, PartEdgePtr pedge, ComposedAnalysis* client) {
     scope reg(txt()<<"TightComposer::Expr2MemLoc(n="<<SgNode2Str(n)<<", pedge=" << pedge->str(),
-              scope::medium, attrGE("tightComposerDebugLevel", 2));
+              scope::medium, attrGE("tightComposerDebugLevelOLD", 2));
     // Create and run a single Expr2Any query for this pedge
     Expr2AnyKey key(n, pedge, Composer::memloc);
     list<Expr2AnyKey> queryList;
     queryList.push_back(key);
 
     MemLocObjectPtr rml_p = Expr2MemLoc_ex(queryList, pedge, client);
-    if(tightComposerDebugLevel() >=2) dbg << "ML=" << rml_p->str() << endl;
+    if(tightComposerDebugLevelOLD() >=2) dbg << "ML=" << rml_p->str() << endl;
     return rml_p;
   }
   
@@ -530,7 +531,7 @@ namespace fuse {
   // the part denotes the set of prefixes that terminate at SgNode n.
   MemLocObjectPtr TightComposer::OperandExpr2MemLoc(SgNode* n, SgNode* operand, PartEdgePtr pedge, ComposedAnalysis* client) {
     scope reg(txt()<<"TightComposer::OperandExpr2MemLoc(n="<<SgNode2Str(n)<< ", op="<< SgNode2Str(operand) << ", pedge=" << pedge->str(),
-              scope::medium, attrGE("tightComposerDebugLevel", 2));
+              scope::medium, attrGE("tightComposerDebugLevelOLD", 2));
     list<PartEdgePtr> pedgeList = pedge->getOperandPartEdge(n, operand);
     list<Expr2AnyKey> queryList;
 
@@ -543,7 +544,7 @@ namespace fuse {
 
     // Run all the queries
     MemLocObjectPtr rml_p = Expr2MemLoc_ex(queryList, pedge, client);
-    if(tightComposerDebugLevel() >=2) dbg << "ML=" << rml_p->str() << endl;
+    if(tightComposerDebugLevelOLD() >=2) dbg << "ML=" << rml_p->str() << endl;
     return rml_p;
   }
   
@@ -680,7 +681,7 @@ namespace fuse {
     list<ComposedAnalysis*>::iterator a = allAnalyses.begin();
     for( ; a != allAnalyses.end(); ++a) {
       scope reg(txt() << "TightComposer::transferPropagateAState",
-                scope::medium, attrGE("tightComposerDebugLevel", 2));
+                scope::medium, attrGE("tightComposerDebugLevelOLD", 2));
       dbg << "ComposedAnalysis=" << (*a)->str() << endl;
       ComposedAnalysis::transferPropagateAStateDense(*a, part, visited, firstVisit, initialized, curNodeIt, curPartAnchor,
                                                 worklistGraph, toAnchors, fromAnchors);
@@ -694,7 +695,7 @@ namespace fuse {
     list<ComposedAnalysis*>::iterator a = allAnalyses.begin();
     for( ; a != allAnalyses.end(); ++a) {
       scope reg(txt() << "TightComposer::transferPropagateAState",
-                scope::medium, attrGE("tightComposerDebugLevel", 2));
+                scope::medium, attrGE("tightComposerDebugLevelOLD", 2));
       dbg << "ComposedAnalysis=" << (*a)->str() << endl;
       ComposedAnalysis::transferPropagateAStateSSA(*a, part, visited, firstVisit, initialized, curNodeIt, curPartAnchor,
                                                 worklistGraph, toAnchors, fromAnchors);

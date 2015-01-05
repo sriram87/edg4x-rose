@@ -133,6 +133,15 @@ namespace fuse
     virtual MemLocObjectPtr copyML() const;
     virtual MemLocObject* copyMLPtr() const;
     virtual std::string str(std::string indent="") const;
+
+    // Returns whether all instances of this class form a hierarchy. Every instance of the same
+    // class created by the same analysis must return the same value from this method!
+    virtual bool isHierarchy() const { return false; }
+    // AbstractObjects that form a hierarchy must inherit from the AbstractionHierarchy class
+
+    // Returns a key that uniquely identifies this particular AbstractObject in the
+    // set hierarchy.
+    virtual const hierKeyPtr& getHierKey() const { assert(0); }
   };
 
   typedef boost::shared_ptr<PTMemLocObject> PTMemLocObjectPtr;

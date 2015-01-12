@@ -660,12 +660,12 @@ list<PartEdgePtr> VirtualMethodPart::outEdges()
 {
   if(!cacheInitialized_outEdges) {
     SIGHT_VERB(scope reg(txt()<<"VirtualMethodPart::outEdges()", scope::medium), 2, VirtualMethodAnalysisDebugLevel)
-    list<PartEdgePtr> baseEdges = getParent()->outEdges();
+    list<PartEdgePtr> baseEdges = getSupersetPart()->outEdges();
 
     SIGHT_VERB(dbg << "#baseEdges="<<baseEdges.size()<<endl, 2, VirtualMethodAnalysisDebugLevel)
 
     // The NodeState at the current part
-    NodeState* curPartState = NodeState::getNodeState(analysis, getParent());
+    NodeState* curPartState = NodeState::getNodeState(analysis, getSupersetPart());
     SIGHT_VERB(dbg << "curPartState="<<curPartState->str(analysis)<<endl, 2, VirtualMethodAnalysisDebugLevel)
     
     // Consider all the VirtualMethodParts along all of this part's outgoing edges. Since this is a forward
@@ -737,7 +737,7 @@ list<PartEdgePtr> VirtualMethodPart::inEdges()
 {
   assert(0);
 /*  if(!cacheInitialized_inEdges) {
-    list<PartEdgePtr> baseEdges = getParent()->inEdges();
+    list<PartEdgePtr> baseEdges = getSupersetPart()->inEdges();
 
   //  scope reg(txt()<<"VirtualMethodPart::inEdges() #baseEdges="<<baseEdges.size(), scope::medium, attrGE("VirtualMethodAnalysisDebugLevel", 2));
 
@@ -767,11 +767,11 @@ list<PartEdgePtr> VirtualMethodPart::inEdges()
 set<CFGNode> VirtualMethodPart::CFGNodes() const
 {
   if(!cacheInitialized_CFGNodes) {
-    const_cast<VirtualMethodPart*>(this)->cache_CFGNodes = getParent()->CFGNodes();
+    const_cast<VirtualMethodPart*>(this)->cache_CFGNodes = getSupersetPart()->CFGNodes();
     const_cast<VirtualMethodPart*>(this)->cacheInitialized_CFGNodes = true;
   }
   return cache_CFGNodes;
-  //return getParent()->CFGNodes();
+  //return getSupersetPart()->CFGNodes();
 }
 
 // If this Part corresponds to a function call/return, returns the set of Parts that contain
@@ -779,7 +779,7 @@ set<CFGNode> VirtualMethodPart::CFGNodes() const
 set<PartPtr> VirtualMethodPart::matchingCallParts() const {
   if(!cacheInitialized_matchingCallParts) {
     // Wrap the parts returned by the call to the parent Part with VirtualMethodPart
-    set<PartPtr> parentMatchParts = getParent()->matchingCallParts();
+    set<PartPtr> parentMatchParts = getSupersetPart()->matchingCallParts();
     for(set<PartPtr>::iterator mp=parentMatchParts.begin(); mp!=parentMatchParts.end(); mp++) {
       const_cast<VirtualMethodPart*>(this)->cache_matchingCallParts.insert(VirtualMethodPart::create(*mp, analysis));
     }
@@ -791,7 +791,7 @@ set<PartPtr> VirtualMethodPart::matchingCallParts() const {
 // Returns a PartEdgePtr, where the source is a wild-card part (NULLPart) and the target is this Part
 PartEdgePtr VirtualMethodPart::inEdgeFromAny() { 
   if(!cacheInitialized_inEdgeFromAny) {
-    cache_inEdgeFromAny = VirtualMethodPartEdge::create(getParent()->inEdgeFromAny(), analysis);
+    cache_inEdgeFromAny = VirtualMethodPartEdge::create(getSupersetPart()->inEdgeFromAny(), analysis);
     cacheInitialized_inEdgeFromAny=true;
   }
   return cache_inEdgeFromAny;
@@ -800,7 +800,7 @@ PartEdgePtr VirtualMethodPart::inEdgeFromAny() {
 // Returns a PartEdgePtr, where the target is a wild-card part (NULLPart) and the source is this Part
 PartEdgePtr VirtualMethodPart::outEdgeToAny() { 
   if(!cacheInitialized_outEdgeToAny) {
-    cache_outEdgeToAny = VirtualMethodPartEdge::create(getParent()->outEdgeToAny(), analysis);
+    cache_outEdgeToAny = VirtualMethodPartEdge::create(getSupersetPart()->outEdgeToAny(), analysis);
     cacheInitialized_outEdgeToAny=true;
   }
   return cache_outEdgeToAny;
@@ -813,9 +813,9 @@ bool VirtualMethodPart::equal(const PartPtr& o) const
   assert(analysis == that->analysis);
   
   if(cache_equal.find(that.get()) == cache_equal.end())
-    const_cast<VirtualMethodPart*>(this)->cache_equal[that.get()] = (getParent() == that->getParent());
+    const_cast<VirtualMethodPart*>(this)->cache_equal[that.get()] = (getSupersetPart() == that->getSupersetPart());
   return const_cast<VirtualMethodPart*>(this)->cache_equal[that.get()];
-  //return getParent() == that->getParent();
+  //return getSupersetPart() == that->getSupersetPart();
 }
 
 bool VirtualMethodPart::less(const PartPtr& o) const
@@ -825,16 +825,16 @@ bool VirtualMethodPart::less(const PartPtr& o) const
   assert(analysis == that->analysis);
   
   if(cache_less.find(that.get()) == cache_less.end())
-    const_cast<VirtualMethodPart*>(this)->cache_less[that.get()] = (getParent() < that->getParent());
+    const_cast<VirtualMethodPart*>(this)->cache_less[that.get()] = (getSupersetPart() < that->getSupersetPart());
   return const_cast<VirtualMethodPart*>(this)->cache_less[that.get()];
-  //return getParent() < that->getParent();
+  //return getSupersetPart() < that->getSupersetPart();
 }
 
 // Pretty print for the object
 std::string VirtualMethodPart::str(std::string indent) const
 {
   ostringstream oss;
-  oss << "[VMPart: "<<getParent()->str()<<"]";
+  oss << "[VMPart: "<<getSupersetPart()->str()<<"]";
   return oss.str();
 }
 
@@ -875,9 +875,9 @@ PartPtr VirtualMethodPartEdge::target() const
 { return tgt; }
 
 // Sets this PartEdge's parent
-void VirtualMethodPartEdge::setParent(PartEdgePtr parent)
+void VirtualMethodPartEdge::setSupersetPartEdge(PartEdgePtr parent)
 {
-  PartEdge::setParent(parent);
+  PartEdge::setSupersetPartEdge(parent);
 }
 
 // Let A={ set of execution prefixes that terminate at the given anchor SgNode }
@@ -913,7 +913,7 @@ std::list<PartEdgePtr> VirtualMethodPartEdge::getOperandPartEdge(SgNode* anchor,
     SIGHT_VERB(scope reg("VirtualMethodPartEdge::getOperandPartEdge()", scope::medium), 1, VirtualMethodAnalysisDebugLevel)
     SIGHT_VERB(dbg << "anchor="<<SgNode2Str(anchor)<<" operand="<<SgNode2Str(operand)<<endl, 1, VirtualMethodAnalysisDebugLevel)
 
-    std::list<PartEdgePtr> baseEdges = getParent()->getOperandPartEdge(anchor, operand);
+    std::list<PartEdgePtr> baseEdges = getSupersetPartEdge()->getOperandPartEdge(anchor, operand);
     for(std::list<PartEdgePtr>::iterator e=baseEdges.begin(); e!=baseEdges.end(); e++) {
       SIGHT_VERB(dbg << "e="<<(*e)->str()<<endl, 1, VirtualMethodAnalysisDebugLevel)
       PartEdgePtr dpeEdge = VirtualMethodPartEdge::create(*e, analysis);
@@ -935,7 +935,7 @@ std::list<PartEdgePtr> VirtualMethodPartEdge::getOperandPartEdge(SgNode* anchor,
 std::map<CFGNode, boost::shared_ptr<SgValueExp> > VirtualMethodPartEdge::getPredicateValue()
 {
   if(!cacheInitialized_getPredicateValue) {
-    cache_getPredicateValue = getParent()->getPredicateValue();
+    cache_getPredicateValue = getSupersetPartEdge()->getPredicateValue();
     cacheInitialized_getPredicateValue = true;
   }
   return cache_getPredicateValue;
@@ -978,7 +978,7 @@ std::string VirtualMethodPartEdge::str(std::string indent) const
                       (src ? src->str(indent+"&nbsp;&nbsp;&nbsp;&nbsp;"): "NULL")<<" ==&gt; " <<
                       (tgt ? tgt->str(indent+"&nbsp;&nbsp;&nbsp;&nbsp;"): "NULL")<<
                       ", "<<endl;
-  oss << indent /*<<", parent=<"<<getParent()->str()*/<<"]";
+  oss << indent /*<<", parent=<"<<getSupersetPartEdge()->str()*/<<"]";
   return oss.str();
 }
 
@@ -992,7 +992,7 @@ VirtualMethodAnalysis::VirtualMethodAnalysis(bool trackBase2RefinedPartEdgeMappi
   cacheInitialized_GetEndAStates_Spec = false;
 }
 
-void VirtualMethodAnalysis::genInitLattice(PartPtr part, PartEdgePtr pedge,
+void VirtualMethodAnalysis::genInitLattice(PartPtr part, PartEdgePtr pedge, PartPtr supersetPart,
                                       std::vector<Lattice*>& initLattices)
 {
   AbstractObjectMap* productlattice = new AbstractObjectMap(boost::make_shared<ClassInheritanceTree>(pedge),
@@ -1004,10 +1004,10 @@ void VirtualMethodAnalysis::genInitLattice(PartPtr part, PartEdgePtr pedge,
 
 
 boost::shared_ptr<DFTransferVisitor>
-VirtualMethodAnalysis::getTransferVisitor(PartPtr part, CFGNode cn, NodeState& state, 
+VirtualMethodAnalysis::getTransferVisitor(PartPtr part, PartPtr supersetPart, CFGNode cn, NodeState& state,
                                      std::map<PartEdgePtr, std::vector<Lattice*> >& dfInfo)                                     
 {
-  VirtualMethodAnalysisTransfer* ptat = new VirtualMethodAnalysisTransfer(part, cn, state, dfInfo, getComposer(), this);
+  VirtualMethodAnalysisTransfer* ptat = new VirtualMethodAnalysisTransfer(part, supersetPart, cn, state, dfInfo, getComposer(), this);
   return boost::shared_ptr<DFTransferVisitor>(ptat);
 }
 
@@ -1049,12 +1049,12 @@ set<PartPtr> VirtualMethodAnalysis::GetEndAStates_Spec()
  *****************************************/
   
 VirtualMethodAnalysisTransfer::VirtualMethodAnalysisTransfer(
-          PartPtr part, CFGNode cn, NodeState& state, 
+          PartPtr part, PartPtr supersetPart, CFGNode cn, NodeState& state, 
           map<PartEdgePtr, vector<Lattice*> >& dfInfo, 
           Composer* composer, VirtualMethodAnalysis* analysis)
    : VariableStateTransfer<ClassInheritanceTree, VirtualMethodAnalysis>
                        (state, dfInfo, boost::make_shared<ClassInheritanceTree>(part->inEdgeFromAny()), 
-                        composer, analysis, part, cn, 
+                        composer, analysis, part, supersetPart, cn, 
                         VirtualMethodAnalysisDebugLevel, "VirtualMethodAnalysisDebugLevel")
 {}
 

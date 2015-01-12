@@ -131,11 +131,11 @@ class DeadPathElimPartEdge : public FiniteLattice, public PartEdge {
                        PartEdgePtr baseEdge, DeadPathElimAnalysis* analysis);*/
   
   // Constructor to be used when constructing the edges (e.g. from genInitLattice()).  
-  DeadPathElimPartEdge(PartEdgePtr baseEdge, ComposedAnalysis* analysis, DPELevel level);
+  DeadPathElimPartEdge(PartEdgePtr atsLocationPartEdge, PartEdgePtr supersetPartEdge, ComposedAnalysis* analysis, DPELevel level);
   
   // Constructor to be used when traversing the part graph created by the DeadPathElimAnalysis, after
   // all the DeadPathElimPartEdges have been constructed and stored in NodeStates.
-  DeadPathElimPartEdge(PartEdgePtr baseEdge, ComposedAnalysis* analysis);
+  DeadPathElimPartEdge(PartEdgePtr atsLocationPartEdge, PartEdgePtr supersetPartEdge, ComposedAnalysis* analysis);
   
   DeadPathElimPartEdge(const DeadPathElimPartEdge& that);
 
@@ -143,13 +143,13 @@ class DeadPathElimPartEdge : public FiniteLattice, public PartEdge {
   // Parts must be created via static construction methods to make it possible to separately
   // initialize them. This is needed to allow Parts to register themselves with global directories,
   // a process that requires the creation of a shared pointer to themselves.
-  static DeadPathElimPartEdgePtr create(PartEdgePtr base, ComposedAnalysis* analysis, DPELevel level) {
-    DeadPathElimPartEdgePtr newPartEdge(boost::shared_ptr<DeadPathElimPartEdge>(new DeadPathElimPartEdge(base, analysis, level)));
+  static DeadPathElimPartEdgePtr create(PartEdgePtr atsLocationPartEdge, PartEdgePtr supersetPartEdge, ComposedAnalysis* analysis, DPELevel level) {
+    DeadPathElimPartEdgePtr newPartEdge(boost::shared_ptr<DeadPathElimPartEdge>(new DeadPathElimPartEdge(atsLocationPartEdge, supersetPartEdge, analysis, level)));
     newPartEdge->init();
     return newPartEdge;
   }
-  static DeadPathElimPartEdgePtr create(PartEdgePtr base, ComposedAnalysis* analysis) {
-    DeadPathElimPartEdgePtr newPartEdge(boost::shared_ptr<DeadPathElimPartEdge>(new DeadPathElimPartEdge(base, analysis)));
+  static DeadPathElimPartEdgePtr create(PartEdgePtr atsLocationPartEdge, PartEdgePtr supersetPartEdge, ComposedAnalysis* analysis) {
+    DeadPathElimPartEdgePtr newPartEdge(boost::shared_ptr<DeadPathElimPartEdge>(new DeadPathElimPartEdge(atsLocationPartEdge, supersetPartEdge, analysis)));
     newPartEdge->init();
     return newPartEdge;
   }
@@ -158,13 +158,13 @@ class DeadPathElimPartEdge : public FiniteLattice, public PartEdge {
     newPartEdge->init();
     return newPartEdge;
   }
-  static DeadPathElimPartEdge* createRaw(PartEdgePtr base, ComposedAnalysis* analysis, DPELevel level) {
-    DeadPathElimPartEdge* newPartEdge = new DeadPathElimPartEdge(base, analysis, level);
+  static DeadPathElimPartEdge* createRaw(PartEdgePtr atsLocationPartEdge, PartEdgePtr supersetPartEdge, ComposedAnalysis* analysis, DPELevel level) {
+    DeadPathElimPartEdge* newPartEdge = new DeadPathElimPartEdge(atsLocationPartEdge, supersetPartEdge, analysis, level);
     //newPartEdge->init();
     return newPartEdge;
   }
-  static DeadPathElimPartEdge* createRaw(PartEdgePtr base, ComposedAnalysis* analysis) {
-    DeadPathElimPartEdge* newPartEdge = new DeadPathElimPartEdge(base, analysis);
+  static DeadPathElimPartEdge* createRaw(PartEdgePtr atsLocationPartEdge, PartEdgePtr supersetPartEdge, ComposedAnalysis* analysis) {
+    DeadPathElimPartEdge* newPartEdge = new DeadPathElimPartEdge(atsLocationPartEdge, supersetPartEdge, analysis);
     //newPartEdge->init();
     return newPartEdge;
   }
@@ -176,7 +176,7 @@ class DeadPathElimPartEdge : public FiniteLattice, public PartEdge {
   // Create a shared pointer to a DeadPathElimPartEdge from a raw pointer to it
   static DeadPathElimPartEdgePtr raw2shared(DeadPathElimPartEdge* raw) {
     DeadPathElimPartEdgePtr shared = initPtr(raw);
-    shared->init();
+    //shared->init();
     return shared;   
   }
   private:
@@ -187,13 +187,13 @@ class DeadPathElimPartEdge : public FiniteLattice, public PartEdge {
   PartPtr source() const;
   PartPtr target() const;
     
-  // Overload the setPartEdge (from Lattice) and setParent (from Part) methods to ensure that they
+  // Overload the setPartEdge (from Lattice) and setSupersetPartEdge (from PartEdge) methods to ensure that they
   // are always set in a consistent manner regardless of which one is called
   // Sets the PartEdge that this Lattice's information corresponds to. 
   // Returns true if this causes the edge to change and false otherwise
   bool setPartEdge(PartEdgePtr latPEdge);
   // Sets this Part's parent
-  void setParent(PartEdgePtr parent);
+  void setSupersetPartEdge(PartEdgePtr parent);
   
   // Let A={ set of execution prefixes that terminate at the given anchor SgNode }
   // Let O={ set of execution prefixes that terminate at anchor's operand SgNode }
@@ -301,13 +301,14 @@ class DeadPathElimTransfer : public DFTransferVisitor
 {
   DeadPathElimAnalysis* dpea;
   PartPtr part;
+  PartPtr supersetPart;
   CFGNode cn;
   bool modified;
   
   typedef enum {may, must} maymust;
 
   public:
-  DeadPathElimTransfer(PartPtr part, CFGNode cn, NodeState &s, std::map<PartEdgePtr, std::vector<Lattice*> > &d, 
+  DeadPathElimTransfer(PartPtr part, PartPtr supersetPart, CFGNode cn, NodeState &s, std::map<PartEdgePtr, std::vector<Lattice*> > &d,
                        DeadPathElimAnalysis* dpea);
 
   bool finish();
@@ -341,13 +342,13 @@ class DeadPathElimAnalysis : public FWDataflow
   
   // Initializes the state of analysis lattices at the given function, part and edge into our out of the part
   // by setting initLattices to refer to freshly-allocated Lattice objects.
-  void genInitLattice(PartPtr part, PartEdgePtr pedge, 
+  void genInitLattice(PartPtr part, PartEdgePtr pedge, PartPtr supersetPart,
                       std::vector<Lattice*>& initLattices);
   
   bool transfer(PartPtr part, CFGNode cn, NodeState& state, 
                 std::map<PartEdgePtr, std::vector<Lattice*> >& dfInfo);
   
-  boost::shared_ptr<DFTransferVisitor> getTransferVisitor(PartPtr part, CFGNode cn, 
+  boost::shared_ptr<DFTransferVisitor> getTransferVisitor(PartPtr part, PartPtr supersetPart, CFGNode cn,
                                                           NodeState& state, std::map<PartEdgePtr, 
                                                           std::vector<Lattice*> >& dfInfo);
   

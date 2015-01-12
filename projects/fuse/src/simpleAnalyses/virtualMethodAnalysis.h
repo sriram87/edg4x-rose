@@ -303,7 +303,7 @@ class VirtualMethodPartEdge : public PartEdge {
   PartPtr target() const;
     
   // Sets this PartEdge's parent
-  void setParent(PartEdgePtr parent);
+  void setSupersetPartEdge(PartEdgePtr parent);
   
   // Let A={ set of execution prefixes that terminate at the given anchor SgNode }
   // Let O={ set of execution prefixes that terminate at anchor's operand SgNode }
@@ -353,14 +353,14 @@ class VirtualMethodAnalysis : public virtual FWDataflow
   // Returns a shared pointer to a freshly-allocated copy of this ComposedAnalysis object
   ComposedAnalysisPtr copy() { return boost::make_shared<VirtualMethodAnalysis>(); }
 
-  void genInitLattice(PartPtr part, PartEdgePtr pedge,
+  void genInitLattice(PartPtr part, PartEdgePtr pedge, PartPtr supersetPart,
                       std::vector<Lattice*>& initLattices);
 
   bool transfer(PartPtr part, CFGNode cn, NodeState& state, 
                 std::map<PartEdgePtr, std::vector<Lattice*> >& dfInfo) { assert(false); return false; }
 
   boost::shared_ptr<DFTransferVisitor> 
-  getTransferVisitor(PartPtr part, CFGNode cn, NodeState& state, 
+  getTransferVisitor(PartPtr part, PartPtr supersetPart, CFGNode cn, NodeState& state,
                      std::map<PartEdgePtr, std::vector<Lattice*> >& dfInfo);
 
   std::set<PartPtr> GetStartAStates_Spec();
@@ -384,7 +384,7 @@ class VirtualMethodAnalysis : public virtual FWDataflow
 class VirtualMethodAnalysisTransfer : public VariableStateTransfer<ClassInheritanceTree, VirtualMethodAnalysis>
 {
   public:
-  VirtualMethodAnalysisTransfer(PartPtr part, CFGNode cn, NodeState& state,
+  VirtualMethodAnalysisTransfer(PartPtr part, PartPtr supersetPart, CFGNode cn, NodeState& state,
                                 std::map<PartEdgePtr, std::vector<Lattice*> >& dfInfo,
                                 Composer* composer, VirtualMethodAnalysis* analysis);
 

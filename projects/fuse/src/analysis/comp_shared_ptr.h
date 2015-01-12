@@ -16,14 +16,17 @@ class CompSharedPtr : public boost::shared_ptr<Type>//: public sight::printable
   public:
   CompSharedPtr() {}
   
-  // Wraps a raw pointer of an object that has a dynamic copying method with a comparable shared pointer
-  CompSharedPtr(Type* p) {
-    Type* c = dynamic_cast<Type*>(p->copy());
+  // Wraps a raw pointer of an object with a shared pointer.
+  // copy - If true, the shared pointer will refer to a copy of the original object
+  CompSharedPtr(Type* p, bool copy=false) {
+    Type* c;
+    if(copy) c = dynamic_cast<Type*>(p->copy());
+    else     c = p;
     assert(c);
     //ptr = boost::shared_ptr<Type>(c);
     *this = boost::shared_ptr<Type>(c);
   }
-    
+
   // Copy constructor
   CompSharedPtr(const CompSharedPtr<Type>& o) : boost::shared_ptr<Type>(o) {} //ptr(o.ptr) {}
   
@@ -167,10 +170,11 @@ CompSharedPtr<Type> makePtrFromThis(boost::shared_ptr<Type> s)
 { return CompSharedPtr<Type>(s); }
 
 // Initializes a shared pointer from a raw pointer
+// copy - If true, the shared pointer will refer to a copy of the original object
 template <class Type>
-CompSharedPtr<Type> initPtr(Type* p)
+CompSharedPtr<Type> initPtr(Type* p, bool copy=false)
 {
-  return CompSharedPtr<Type>(p);
+  return CompSharedPtr<Type>(p, false);
 }
 
 }; // namespace fuse

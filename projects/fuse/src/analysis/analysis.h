@@ -83,14 +83,15 @@ class DFTransferVisitor : public ROSE_VisitorPatternDefaultBase
   protected:
   // Common arguments to the underlying transfer function
   PartPtr part;
+  PartPtr supersetPart;
   CFGNode cn;
   NodeState &nodeState;
   std::map<PartEdgePtr, std::vector<Lattice*> >& dfInfo;
 
   public:
-  DFTransferVisitor(PartPtr p, CFGNode cn, NodeState &s, 
+  DFTransferVisitor(PartPtr p, PartPtr supersetPart, CFGNode cn, NodeState &s, 
                          std::map<PartEdgePtr, std::vector<Lattice*> >& dfInfo)
-    : part(p), cn(cn), nodeState(s), dfInfo(dfInfo)
+    : part(p), supersetPart(supersetPart), cn(cn), nodeState(s), dfInfo(dfInfo)
   { }
   
   PartPtr getPart() const { return part; }
@@ -122,9 +123,9 @@ class Dataflow : virtual public Analysis
     bool modified;
     Dataflow *analysis;
     public:
-    DefaultTransfer(PartPtr part, CFGNode cn, NodeState& state, 
+    DefaultTransfer(PartPtr part, PartPtr supersetPart, CFGNode cn, NodeState& state, 
         std::map<PartEdgePtr, std::vector<Lattice*> >& dfInfo, Dataflow *a)
-      : DFTransferVisitor(part, cn, state, dfInfo), modified(false), analysis(a)
+      : DFTransferVisitor(part, supersetPart, cn, state, dfInfo), modified(false), analysis(a)
       { }
 
     void visit(SgNode *n) { modified = analysis->transfer(part, cn, nodeState, dfInfo); }
@@ -147,10 +148,10 @@ class Dataflow : virtual public Analysis
   //     }
   // \endcode
   virtual boost::shared_ptr<DFTransferVisitor> getTransferVisitor(
-                PartPtr part, CFGNode cn,
+                PartPtr part, PartPtr supersetPart, CFGNode cn,
                 NodeState& state, 
                 std::map<PartEdgePtr, std::vector<Lattice*> >& dfInfo)
-  { return boost::shared_ptr<DFTransferVisitor>(new DefaultTransfer(part, cn, state, dfInfo, this)); }
+  { return boost::shared_ptr<DFTransferVisitor>(new DefaultTransfer(part,supersetPart, cn, state, dfInfo, this)); }
 };
 
 }; // namespace fuse

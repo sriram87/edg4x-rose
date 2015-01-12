@@ -189,9 +189,9 @@ map<EdgeTypePtr, CompSharedPtr<HierEdge<EdgeTypePtr> > > HierEdge<EdgeTypePtr>::
       dbg << "    i-&gt;second"<<i->second.get()->str("        ")<<endl;
     }
     // If there is no mapping for the grand-parent of PartEdge->HierEdge mapping, create a new HierEdge for it
-    if(all.find(i->first->getParent()) == all.end())
-      all[i->first->getParent()] = makePtr<HierEdge<EdgeTypePtr> >(singleVisit);
-    all[i->first->getParent()]->insert(i->first, *(i->second.get()));
+    if(all.find(i->first->getSupersetPartEdge()) == all.end())
+      all[i->first->getSupersetPartEdge()] = makePtr<HierEdge<EdgeTypePtr> >(singleVisit);
+    all[i->first->getSupersetPartEdge()]->insert(i->first, *(i->second.get()));
   }
   }
   
@@ -205,13 +205,13 @@ map<EdgeTypePtr, CompSharedPtr<HierEdge<EdgeTypePtr> > > HierEdge<EdgeTypePtr>::
     for(typename map<EdgeTypePtr, CompSharedPtr<HierEdge<EdgeTypePtr> > >::iterator j=lOut.begin(); j!=lOut.end(); j++) {
       if(analysisTesterDebugLevel()>=2) {
         dbg << "    j-&gt;first="<<(j->first.get()? j->first.get()->str(): "NULL")<<endl;
-        if(j->first) dbg << "    j-&gt;first-&gt;getParent()="<<(j->first->getParent()? j->first->getParent()->str(): "NULL")<<endl;
+        if(j->first) dbg << "    j-&gt;first-&gt;getSupersetPartEdge()="<<(j->first->getSupersetPartEdge()? j->first->getSupersetPartEdge()->str(): "NULL")<<endl;
         dbg << "    j-&gt;second="<<j->second.get()->str()<<endl;
       }
       
       // If j->first is not NULL, set its parent appropriately. Otherwise, let its parent be NULL
       EdgeTypePtr parent;
-      if(j->first) parent = j->first->getParent();
+      if(j->first) parent = j->first->getSupersetPartEdge();
       
       // If there is no mapping for the grand-parent of PartEdge->HierEdge mapping, create a new HierEdge for it
       if(all.find(parent) == all.end())
@@ -312,12 +312,12 @@ map<EdgeTypePtr, CompSharedPtr<HierEdge_Leaf<EdgeTypePtr> > > HierEdge_Leaf<Edge
     for(typename list<EdgeTypePtr>::iterator o=out.begin(); o!=out.end(); o++) {
       if(analysisTesterDebugLevel()>=2) {
         dbg << "o="<<o->get()->str()<<endl;
-        dbg << "(*o)-&gt;getParent()="<<((*o)->getParent()? (*o)->getParent()->str(): "NULL")<<endl;
+        dbg << "(*o)-&gt;getSupersetPartEdge()="<<((*o)->getSupersetPartEdge()? (*o)->getSupersetPartEdge()->str(): "NULL")<<endl;
       }
       // Create a new mapping for this edge's parent
-      if(newHPEmap.find((*o)->getParent()) == newHPEmap.end())
-        newHPEmap[(*o)->getParent()] = makePtr<HierEdge_Leaf<EdgeTypePtr> >(singleVisit);
-      newHPEmap[(*o)->getParent()]->insert(*o);
+      if(newHPEmap.find((*o)->getSupersetPartEdge()) == newHPEmap.end())
+        newHPEmap[(*o)->getSupersetPartEdge()] = makePtr<HierEdge_Leaf<EdgeTypePtr> >(singleVisit);
+      newHPEmap[(*o)->getSupersetPartEdge()]->insert(*o);
     }
   }
   
@@ -325,7 +325,7 @@ map<EdgeTypePtr, CompSharedPtr<HierEdge_Leaf<EdgeTypePtr> > > HierEdge_Leaf<Edge
   // visite edge set as well as its the current edge set to the new leaf nodes' visited set
   if(singleVisit) {
     for(typename set<EdgeTypePtr>::iterator v=visited.begin(); v!=visited.end(); v++) {
-      EdgeTypePtr parent = (*v)->getParent();
+      EdgeTypePtr parent = (*v)->getSupersetPartEdge();
       // If the new map does not contains an entry for the given parent, create it
       if(newHPEmap.find(parent) == newHPEmap.end())
         newHPEmap[parent] = makePtr<HierEdge_Leaf<EdgeTypePtr> >(singleVisit);
@@ -336,7 +336,7 @@ map<EdgeTypePtr, CompSharedPtr<HierEdge_Leaf<EdgeTypePtr> > > HierEdge_Leaf<Edge
     }
     
     for(typename set<EdgeTypePtr>::iterator v=s.begin(); v!=s.end(); v++) {
-      EdgeTypePtr parent = (*v)->getParent();
+      EdgeTypePtr parent = (*v)->getSupersetPartEdge();
       // If the new map does not contains an entry for the given parent, create it
       if(newHPEmap.find(parent) == newHPEmap.end())
         newHPEmap[parent] = makePtr<HierEdge_Leaf<EdgeTypePtr> >(singleVisit);
@@ -454,7 +454,7 @@ class IntProgressEdge
     return edges;
   }
   
-  IntProgressEdgePtr getParent() const {
+  IntProgressEdgePtr getSupersetPartEdge() const {
     if(commonFactors.size()>1) {
       list<int> parentCF = commonFactors;
       parentCF.pop_back();
@@ -560,7 +560,7 @@ void AnalysisTester_selfTest() {
     while(cur) {
       dbg << "cur="<<cur->str()<<endl;
       entry.push_front(cur);
-      cur = cur->getParent();
+      cur = cur->getSupersetPartEdge();
     }
     startEdges.insert(entry);
   }
@@ -768,7 +768,7 @@ bool ComposedAnalysisSelfTester::testAnalysis()
     while(cur) {
       entry.push_front(cur);
       //dbg << ":"<<cur->str() << endl;
-      cur = cur->getParent();
+      cur = cur->getSupersetPartEdge();
     //}
     //dbg << "size="<<entry.size()<<endl; 
     }

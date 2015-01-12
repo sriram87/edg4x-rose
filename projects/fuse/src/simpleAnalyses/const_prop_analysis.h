@@ -880,12 +880,12 @@ class ConstantPropagationAnalysis : virtual public FWDataflow
   
   // Initializes the state of analysis lattices at the given function, part and edge into our out of the part
   // by setting initLattices to refer to freshly-allocated Lattice objects.
-  void genInitLattice(PartPtr part, PartEdgePtr pedge, 
+  void genInitLattice(PartPtr part, PartEdgePtr pedge, PartPtr supersetPart,
                       std::vector<Lattice*>& initLattices);
   
   bool transfer(PartPtr part, CFGNode cn, NodeState& state, std::map<PartEdgePtr, std::vector<Lattice*> >& dfInfo);
   
-  boost::shared_ptr<DFTransferVisitor> getTransferVisitor(PartPtr part, CFGNode cn, 
+  boost::shared_ptr<DFTransferVisitor> getTransferVisitor(PartPtr part, PartPtr supersetPart, CFGNode cn,
                                               NodeState& state, std::map<PartEdgePtr, std::vector<Lattice*> >& dfInfo);
   
   boost::shared_ptr<ValueObject> Expr2Val(SgNode* n, PartEdgePtr pedge);
@@ -929,7 +929,7 @@ class ConstantPropagationAnalysisTransfer : public VariableStateTransfer<CPValue
   
   void visit(SgValueExp *val);
   
-  ConstantPropagationAnalysisTransfer(PartPtr part, CFGNode cn, NodeState& state, 
+  ConstantPropagationAnalysisTransfer(PartPtr part, PartPtr supersetPart, CFGNode cn, NodeState& state, 
                                       std::map<PartEdgePtr, std::vector<Lattice*> >& dfInfo, 
                                       Composer* composer, ConstantPropagationAnalysis* analysis);
 };

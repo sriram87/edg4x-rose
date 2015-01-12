@@ -183,9 +183,9 @@ public:
                         // A pointer to a default example lattice that can be duplicated
                         // via defaultLat->copy() to make more instances of this Lattice type.
                         LatticePtr defaultLat,
-                        Composer* composer, AnalysisType* analysis, PartPtr part, CFGNode cn, 
+                        Composer* composer, AnalysisType* analysis, PartPtr part, PartPtr supersetPart, CFGNode cn, 
                         int dLevel, std::string dLevelStr) : 
-    DFTransferVisitor(part, cn, state, dfInfo), 
+    DFTransferVisitor(part, supersetPart, cn, state, dfInfo), 
     modified(false),
     dLevel(dLevel), dLevelStr(dLevelStr),
     defaultLat(defaultLat), 
@@ -201,7 +201,9 @@ public:
     //#SA: Incoming dfInfo is associated with inEdgeFromAny/outEdgeToAny
     PartEdgePtr wildCardPartEdge;
     if(((ComposedAnalysis*)analysis)->useSSA) wildCardPartEdge = NULLPartEdge;
-    else wildCardPartEdge = ((ComposedAnalysis*)analysis)->getDirection()==ComposedAnalysis::fw? part->inEdgeFromAny() : part->outEdgeToAny();
+    else wildCardPartEdge = ((ComposedAnalysis*)analysis)->getDirection()==ComposedAnalysis::fw? 
+                                   supersetPart->inEdgeFromAny() : 
+                                   supersetPart->outEdgeToAny();
 
     assert(dfInfo[wildCardPartEdge][0]);
     Lattice *l = dfInfo[wildCardPartEdge][0];

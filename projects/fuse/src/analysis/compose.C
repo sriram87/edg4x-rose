@@ -257,7 +257,7 @@ CCQueryServers::CCQueryServers(ComposedAnalysis* startAnalysis) {
   lastSSAGraphAnalysis  = startAnalysis;
 
   // The number of ATSGraph analyses that separate the current analysis from the last analysis that
-  // can answer a given query type. This is also the number of times we'll call PartEdge->getParent()
+  // can answer a given query type. This is also the number of times we'll call PartEdge->getSupersetPartEdge()
   // to convert the edges of the current analysis to those of the server of the given query type.
   // There is no counter for ATS Graph queries since it would always be 0.
   ATSGraphsSinceLastCodeLocAnalysis   = 0;
@@ -535,7 +535,7 @@ RetType ChainComposer::callServerAnalysisFunc(
   
   // Set pedge to the PartEdge of the ATS graph on which the server analysis ran
   for(int i=0; i<pedgeUnrollCnt; i++)
-    pedge = pedge->getParent();
+    pedge = pedge->getSupersetPartEdge();
   
   //endMeasure(opMeasure);
   //cout << "server="<<server->str()<<endl;
@@ -1210,8 +1210,10 @@ std::string PartSet2Str(const set<PartPtr>& parts, string indent) {
   return oss.str();
 }
 
-set<PartPtr> ChainComposer::GetStartAStates(ComposedAnalysis* client) { 
-  return callServerAnalysisFunc<set<PartPtr> >("GetStartAStates",
+set<PartPtr> ChainComposer::GetStartAStates(ComposedAnalysis* client) {
+  scope s("ChainComposer::GetStartAStates");
+  set<PartPtr> baseParts =
+      callServerAnalysisFunc<set<PartPtr> >("GetStartAStates",
            CallWithCA<set<PartPtr> >(
                function<set<PartPtr> (ComposedAnalysis*)>(&ComposedAnalysis::GetStartAStates)),
            //function<bool (ComposedAnalysis*)>(&ComposedAnalysis::implementsATSGraph, _1),
@@ -1220,10 +1222,30 @@ set<PartPtr> ChainComposer::GetStartAStates(ComposedAnalysis* client) {
            function<string (const set<PartPtr>&, string)>(&PartSet2Str),
            function<set<PartPtr> (const map<ComposedAnalysis*, set<PartPtr> >&)>(createPartIntersection),
            NULLPartEdge, client, false);
+return baseParts;
+/*  { scope s("baseParts");
+    for(set<PartPtr>::iterator s=baseParts.begin(); s!=baseParts.end(); ++s)
+      dbg << (*s)->str()<<endl;
+  }
+
+  // Wrap the results with IdentityParts
+  set<PartPtr> wrappedParts;
+  for(set<PartPtr>::iterator bp=baseParts.begin(); bp!=baseParts.end(); ++bp) {
+    if(*bp) wrappedParts.insert(makePtr<IdentityPart>(*bp));
+    else    wrappedParts.insert(NULLPart);
+  }
+
+  { scope s("wrappedParts");
+    for(set<PartPtr>::iterator s=wrappedParts.begin(); s!=wrappedParts.end(); ++s)
+      dbg << (*s)->str()<<endl;
+  }
+
+  return wrappedParts;*/
 }
 
 set<PartPtr> ChainComposer::GetEndAStates(ComposedAnalysis* client) { 
-  return callServerAnalysisFunc<set<PartPtr> >("GetEndAStates",
+  set<PartPtr> baseParts =
+      callServerAnalysisFunc<set<PartPtr> >("GetEndAStates",
            CallWithCA<set<PartPtr> >(
                function<set<PartPtr> (ComposedAnalysis*)>(&ComposedAnalysis::GetEndAStates, _1)),
            //function<bool (ComposedAnalysis*)>(&ComposedAnalysis::implementsATSGraph, _1),
@@ -1232,6 +1254,15 @@ set<PartPtr> ChainComposer::GetEndAStates(ComposedAnalysis* client) {
            function<string (const set<PartPtr>&, string)>(&PartSet2Str),
            function<set<PartPtr> (const map<ComposedAnalysis*, set<PartPtr> >&)>(createPartIntersection),
            NULLPartEdge, client, false);
+return baseParts;
+/*
+  // Wrap the results with IdentityParts
+  set<PartPtr> wrappedParts;
+  for(set<PartPtr>::iterator bp=baseParts.begin(); bp!=baseParts.end(); ++bp) {
+    if(*bp) wrappedParts.insert(makePtr<IdentityPart>(*bp));
+    else    wrappedParts.insert(NULLPart);
+  }
+  return wrappedParts;*/
 }
 
 // Return an SSAGraph object that describes the overall structure of the transition system
@@ -1337,6 +1368,10 @@ void ChainComposer::runAnalysis()
     if(doneAnalyses.size()>0) {
       SIGHT_VERB_IF(1, composerDebugLevel)
       set<PartPtr> startStates = GetStartAStates(currentAnalysis);
+      { scope s("startStates");
+      for(set<PartPtr>::iterator s=startStates.begin(); s!=startStates.end(); ++s)
+        dbg << (*s)->str()<<endl;
+      }
       set<PartPtr> endStates   = GetEndAStates(currentAnalysis);
       ostringstream fName; fName << "ats." << i << "." << doneAnalyses.back()->str();
       ats2dot(fName.str(), "ATS", startStates, endStates);
@@ -2081,14 +2116,14 @@ set<PartPtr> LooseParallelComposer::GetStartOrEndAStates_Spec(callStartOrEndASta
         // If this is the first analysis, simply copy its curParts into intersection
         if(a==allAnalyses.begin()) {
           for(set<PartPtr>::iterator cur=curParts.begin(); cur!=curParts.end(); cur++)
-            intersection[(*cur)->getParent()][*a] = *cur;
+            intersection[(*cur)->getSupersetPart()][*a] = *cur;
         // If this is not the first analysis, intersect curParts with intersection, storing the result in intersection
         } else {
           map<PartPtr, map<ComposedAnalysis*, PartPtr> >::iterator i=intersection.begin();
           set<PartPtr>::iterator curI=curParts.begin();
           while(i!=intersection.end() && curI!=curParts.end()) {
             // If i and curI have the same parent Part, it must be kept in the intersection of intersection and curParts
-            if((*curI)->getParent() == i->first) {
+            if((*curI)->getSupersetPart() == i->first) {
               // A single analysis cannot return multiple Parts with the same parent Part
               assert(i->second.find(*a) == i->second.end());
               
@@ -2154,7 +2189,7 @@ set<PartPtr> LooseParallelComposer::GetStartOrEndAStates_Spec(callStartOrEndASta
     // Convert all the Parts in parts into IntersectionParts to match the result of 
     set<PartPtr> interParts;
     for(map<PartPtr, map<ComposedAnalysis*, PartPtr> >::iterator i=intersection.begin(); i!=intersection.end(); i++) {
-      interParts.insert(makePtr<IntersectionPart>(i->second, i->first, this));
+      interParts.insert(makePtr<IntersectionPart>(i->second, i->first));
     }
     return interParts;
   }
@@ -2235,7 +2270,7 @@ set<PartPtr> LooseParallelComposer::GetStartOrEndAStates_Spec(callStartOrEndASta
     set<PartPtr> interParts;
     for(set<PartPtr>::iterator i=parts.begin(); i!=parts.end(); i++) {
       set<PartPtr> singleton; singleton.insert(*i);
-      interParts.insert(makePtr<IntersectionPart>(singleton, (*i)->getParent(), this));
+      interParts.insert(makePtr<IntersectionPart>(singleton, (*i)->getSupersetPart(), this));
     }
     return interParts;
   }

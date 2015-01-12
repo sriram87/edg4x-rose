@@ -606,7 +606,7 @@ int main(int argc, char** argv)
       }
 
     } else
-      cout << "FAIL composer\n";
+      cout << "ERROR: cannot parse the fuse pragma\n";
   }
   
   printf("==========  E  N  D  ==========\n");

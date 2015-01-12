@@ -77,7 +77,7 @@ class LiveDeadMemTransfer : public DFTransferVisitor
     bool isMemLocLive(SgExpression* sgn, SgExpression* operand);
 
 public:
-LiveDeadMemTransfer(PartPtr part, CFGNode cn, NodeState &s, 
+LiveDeadMemTransfer(PartPtr part, PartPtr supersetPart, CFGNode cn, NodeState &s,
                     std::map<PartEdgePtr, std::vector<Lattice*> > &dfInfo, 
                     LiveDeadMemAnalysis* ldma,
                     /*ComposerExpr2MemLocPtr ceml, */Composer* composer, funcSideEffectUses *fseu);
@@ -112,11 +112,11 @@ public:
     
     // Initializes the state of analysis lattices at the given function, part and edge into our out of the part
     // by setting initLattices to refer to freshly-allocated Lattice objects.
-    void genInitLattice(PartPtr part, PartEdgePtr pedge, 
+    void genInitLattice(PartPtr part, PartEdgePtr pedge, PartPtr supersetPart,
                         std::vector<Lattice*>& initLattices);
         
     boost::shared_ptr<DFTransferVisitor> getTransferVisitor(
-                                                      PartPtr part, CFGNode cn,
+                                                      PartPtr part, PartPtr supersetPart, CFGNode cn,
                                                       NodeState& state, 
                                                       std::map<PartEdgePtr, std::vector<Lattice*> >& dfInfo)
     { 
@@ -129,7 +129,7 @@ public:
           (*l)->setPartEdge(part->inEdgeFromAny());
       
       return boost::shared_ptr<DFTransferVisitor>(
-                new LiveDeadMemTransfer(part, cn, state, dfInfo, 
+                new LiveDeadMemTransfer(part, supersetPart, cn, state, dfInfo,
                                         this, getComposer(), //ComposerExpr2MemLocPtr(new ComposerExpr2MemLoc(*getComposer(), part->inEdgeFromAny(), *((ComposedAnalysis*)this))),
                                         fseu));
     }

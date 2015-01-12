@@ -21,10 +21,10 @@ LiveDeadMemAnalysis::LiveDeadMemAnalysis(funcSideEffectUses* fseu):
 
 // Initializes the state of analysis lattices at the given function, part and edge into our out of the part
 // by setting initLattices to refer to freshly-allocated Lattice objects.
-void LiveDeadMemAnalysis::genInitLattice(PartPtr part, PartEdgePtr pedge, 
+void LiveDeadMemAnalysis::genInitLattice(PartPtr part, PartEdgePtr pedge, PartPtr supersetPart,
                                          std::vector<Lattice*>& initLattices)
 {
-  AbstractObjectSet* s = new AbstractObjectSet(part->outEdgeToAny(), getComposer(), this, AbstractObjectSet::may);
+  AbstractObjectSet* s = new AbstractObjectSet(pedge, getComposer(), this, AbstractObjectSet::may);
   
   // If this part is the return statement of main(), make sure that its return value is live
   if(SgReturnStmt* returnStmt = part->maySgNodeAny<SgReturnStmt>()) {
@@ -317,11 +317,11 @@ public:
     { }
 };
 
-LiveDeadMemTransfer::LiveDeadMemTransfer(PartPtr part, CFGNode cn, NodeState &s, 
+LiveDeadMemTransfer::LiveDeadMemTransfer(PartPtr part, PartPtr supersetPart, CFGNode cn, NodeState &s,
                     std::map<PartEdgePtr, std::vector<Lattice*> > &dfInfo, 
                     LiveDeadMemAnalysis* ldma,
                     Composer* composer, funcSideEffectUses *fseu)
-    : DFTransferVisitor(part, cn, s, dfInfo),
+    : DFTransferVisitor(part, supersetPart, cn, s, dfInfo),
     ldma(ldma), 
     composer(composer),
     modified(false), 

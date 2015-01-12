@@ -281,28 +281,28 @@ class NodeState
   // static void copyLattices_aEQa(Analysis* analysis, NodeState& to, const NodeState& from);
 
   // Copies along the given departing edges
-  static void copyLattices_aEQa(Analysis* analysis, NodeState& to,   PartEdgePtr toDepartEdge, 
-                                              const NodeState& from, PartEdgePtr fromDepartEdge);
+  static void copyLattices_aEQa(Analysis* analysis, NodeState& to,   PartEdgePtr toDepartEdge,   PartEdgePtr toSuperDepartEdge, 
+                                              const NodeState& from, PartEdgePtr fromDepartEdge, PartEdgePtr fromSuperDepartEdge);
   
   // Copies from's above lattices for analysis to to's below lattices for the same analysis, both along the NULL edge.
   //#SA: deprecate functions copying on NULLPartEdge
   // static void copyLattices_bEQa(Analysis* analysis, NodeState& to, const NodeState& from);
 
   // Copies along the given departing edges
-  static void copyLattices_bEQa(Analysis* analysis, NodeState& to,   PartEdgePtr toDepartEdge, 
-                                              const NodeState& from, PartEdgePtr fromDepartEdge);
+  static void copyLattices_bEQa(Analysis* analysis, NodeState& to,   PartEdgePtr toDepartEdge,   PartEdgePtr toSuperDepartEdge, 
+                                              const NodeState& from, PartEdgePtr fromDepartEdge, PartEdgePtr fromSuperDepartEdge);
   
   // Copies from's below lattices for analysis to to's below lattices for the same analysis, both along the NULL edge.
   // static void copyLattices_bEQb(Analysis* analysis, NodeState& to, const NodeState& from);
   // Copies along the given departing edges
-  static void copyLattices_bEQb(Analysis* analysis, NodeState& to,   PartEdgePtr toDepartEdge, 
-                                              const NodeState& from, PartEdgePtr fromDepartEdge);
+  static void copyLattices_bEQb(Analysis* analysis, NodeState& to,   PartEdgePtr toDepartEdge,   PartEdgePtr toSuperDepartEdge, 
+                                              const NodeState& from, PartEdgePtr fromDepartEdge, PartEdgePtr fromSuperDepartEdge);
   
   // Copies from's below lattices for analysis to to's above lattices for the same analysis, both along the NULL edge.
   // static void copyLattices_aEQb(Analysis* analysis, NodeState& to, const NodeState& from);
   // Copies along the given departing edges
-  static void copyLattices_aEQb(Analysis* analysis, NodeState& to,   PartEdgePtr toDepartEdge, 
-                                              const NodeState& from, PartEdgePtr fromDepartEdge);
+  static void copyLattices_aEQb(Analysis* analysis, NodeState& to,   PartEdgePtr toDepartEdge,   PartEdgePtr toSuperDepartEdge, 
+                                              const NodeState& from, PartEdgePtr fromDepartEdge, PartEdgePtr fromSuperDepartEdge);
   
   
   // Makes dfInfoTo[*] a copy of dfInfoFrom[*], ensuring that they both have the same structure
@@ -316,16 +316,20 @@ class NodeState
 
   // Makes dfInfoTo[toDepartEdge] a copy of dfInfoFrom[fromDepartEdge]
   // If adjustPEdge is true, calls Lattice::setPartEdge() on the copied lattices in dfInfoTo to associate them with this edge.
-  static void copyLattices(std::map<PartEdgePtr, std::vector<Lattice*> >& dfInfoTo,   PartEdgePtr toDepartEdge, 
-                     const std::map<PartEdgePtr, std::vector<Lattice*> >& dfInfoFrom, PartEdgePtr fromDepartEdge,
-                     bool adjustPEdge=false);
+  static void copyLattices(std::map<PartEdgePtr, std::vector<Lattice*> >& dfInfoTo,   
+                           PartEdgePtr toDepartEdge, PartEdgePtr toSuperDepartEdge,
+                           const std::map<PartEdgePtr, std::vector<Lattice*> >& dfInfoFrom, 
+                           PartEdgePtr fromDepartEdge, PartEdgePtr fromSuperDepartEdge,
+                           bool adjustPEdge=false);
 
   // Makes dfInfoTo[toDepartEdge] a copy of dfInfoFrom[fromDepartEdge]. If dfInfoTo[toDepartEdge] is not initially empty, 
   // it is cleared and its Lattices are deallocated.
   // If adjustPEdge is true, calls Lattice::setPartEdge() on the copied lattices in dfInfoTo to associate them with this edge.
-  static void copyLatticesOW(std::map<PartEdgePtr, std::vector<Lattice*> >& dfInfoTo,   PartEdgePtr toDepartEdge,
-                       const std::map<PartEdgePtr, std::vector<Lattice*> >& dfInfoFrom, PartEdgePtr fromDepartEdge, 
-                       bool adjustPEdge=false);
+  static void copyLatticesOW(std::map<PartEdgePtr, std::vector<Lattice*> >& dfInfoTo,   
+                             PartEdgePtr toDepartEdge, PartEdgePtr toSuperDepartEdge,
+                             const std::map<PartEdgePtr, std::vector<Lattice*> >& dfInfoFrom, 
+                             PartEdgePtr fromDepartEdge, PartEdgePtr fromSuperDepartEdge,
+                             bool adjustPEdge=false);
   
   /*public:
   void operator=(NodeState& that);*/

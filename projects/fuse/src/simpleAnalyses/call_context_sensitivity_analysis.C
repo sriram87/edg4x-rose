@@ -255,11 +255,11 @@ std::list<PartEdgePtr> CallCtxSensPart::outEdges()
   // For now we'll only consider Parts with a single CFGNode
   assert(CFGNodes().size()==1);
   
-  list<PartEdgePtr> baseEdges = getParent()->outEdges();
+  list<PartEdgePtr> baseEdges = getSupersetPart()->outEdges();
   list<PartEdgePtr> ccsEdges;
   
   // The NodeState at the current part
-  NodeState* outState = NodeState::getNodeState(analysis, getParent());
+  NodeState* outState = NodeState::getNodeState(analysis, getSupersetPart());
   SIGHT_VERB(dbg << "outState="<<outState->str(analysis)<<endl, 2, callContextSensitivityDebugLevel)
   
   // Consider all the CallCtxSensPartEdges along all of this part's outgoing edges. Since this is a forward
@@ -286,7 +286,7 @@ std::list<PartEdgePtr> CallCtxSensPart::inEdges() {
   // For now we'll only consider Parts with a single CFGNode
   assert(CFGNodes().size()==1);
   
-  list<PartEdgePtr> baseEdges = getParent()->inEdges();
+  list<PartEdgePtr> baseEdges = getSupersetPart()->inEdges();
   list<PartEdgePtr> ccsEdges;
   
   // Since this is a forward analysis, only outgoing edges below a node are maintained separately.
@@ -313,7 +313,7 @@ std::list<PartEdgePtr> CallCtxSensPart::inEdges() {
 }
 
 std::set<CFGNode> CallCtxSensPart::CFGNodes() const
-{ return getParent()->CFGNodes(); }
+{ return getSupersetPart()->CFGNodes(); }
 
 // If this Part corresponds to a function call/return, returns the set of Parts that contain
 // its corresponding return/call, respectively.
@@ -321,7 +321,7 @@ set<PartPtr> CallCtxSensPart::matchingCallParts() const {
   set<PartPtr> matchParts;
   
   // Wrap the parts returned by the call to the parent Part with CallCtxSensParts
-  set<PartPtr> parentMatchParts = getParent()->matchingCallParts();
+  set<PartPtr> parentMatchParts = getSupersetPart()->matchingCallParts();
   for(set<PartPtr>::iterator mp=parentMatchParts.begin(); mp!=parentMatchParts.end(); mp++) {
     matchParts.insert(CallCtxSensPart::create(*mp, *this, analysis));
   }
@@ -341,13 +341,13 @@ std::list<PartPtr> getOperandPart(SgNode* anchor, SgNode* operand);*/
 // Returns a PartEdgePtr, where the source is a wild-card part (NULLPart) and the target is this Part
 PartEdgePtr CallCtxSensPart::inEdgeFromAny()
 {
-  return CallCtxSensPartEdge::create(getParent()->inEdgeFromAny(), NULLPart, get_shared_this(), analysis);
+  return CallCtxSensPartEdge::create(getSupersetPart()->inEdgeFromAny(), NULLPart, get_shared_this(), analysis);
 }
 
 // Returns a PartEdgePtr, where the target is a wild-card part (NULLPart) and the source is this Part
 PartEdgePtr CallCtxSensPart::outEdgeToAny()
 {
-  return CallCtxSensPartEdge::create(getParent()->outEdgeToAny(), get_shared_this(), NULLPart, analysis);
+  return CallCtxSensPartEdge::create(getSupersetPart()->outEdgeToAny(), get_shared_this(), NULLPart, analysis);
 }
 
 // Returns the specific context of this Part. Can return the NULLPartContextPtr if this
@@ -369,7 +369,7 @@ bool CallCtxSensPart::equal(const PartPtr& o) const {
   assert(that.get());
   assert(analysis == that->analysis);
   
-  return getParent() == that->getParent() &&
+  return getSupersetPart() == that->getSupersetPart() &&
          context == that->context;
 }
 
@@ -378,8 +378,8 @@ bool CallCtxSensPart::less(const PartPtr& o)  const {
   assert(that.get());
   assert(analysis == that->analysis);
   
-  if(getParent() < that->getParent()) return true;
-  if(getParent() > that->getParent()) return false;
+  if(getSupersetPart() < that->getSupersetPart()) return true;
+  if(getSupersetPart() > that->getSupersetPart()) return false;
   return context < that->context;
 }
 
@@ -387,7 +387,7 @@ bool CallCtxSensPart::less(const PartPtr& o)  const {
 std::string CallCtxSensPart::str(std::string indent) const {
   ostringstream oss;
   
-  oss << "[CallCtxSensPart: "<<getParent()->str(indent+"    ");
+  oss << "[CallCtxSensPart: "<<getSupersetPart()->str(indent+"    ");
   oss << ", recursive="<<recursive<<", lastCtxtFunc="<<lastCtxtFunc.get_name().getString()<<"()";
   if(context.getCtxtStackDepth()>0)
     oss << endl << indent << "    context=" << context.str(indent+"        ");
@@ -436,7 +436,7 @@ std::list<PartEdgePtr> CallCtxSensPartEdge::getOperandPartEdge(SgNode* anchor, S
     dbg << "this PartEdge="<<str()<<endl;
   SIGHT_VERB_FI()
   
-  std::list<PartEdgePtr> baseEdges = getParent()->getOperandPartEdge(anchor, operand);
+  std::list<PartEdgePtr> baseEdges = getSupersetPartEdge()->getOperandPartEdge(anchor, operand);
   SIGHT_VERB_IF(2, callContextSensitivityDebugLevel)
     scope regBE("baseOperandEdges", scope::medium);
     for(list<PartEdgePtr>::iterator be=baseEdges.begin(); be!=baseEdges.end(); be++)
@@ -479,14 +479,14 @@ std::list<PartEdgePtr> CallCtxSensPartEdge::getOperandPartEdge(SgNode* anchor, S
 // this edge. 
 std::map<CFGNode, boost::shared_ptr<SgValueExp> > CallCtxSensPartEdge::getPredicateValue()
 {
-  return getParent()->getPredicateValue();
+  return getSupersetPartEdge()->getPredicateValue();
 }
 
 bool CallCtxSensPartEdge::equal(const PartEdgePtr& o) const
 {
   const CallCtxSensPartEdgePtr that = dynamicConstPtrCast<CallCtxSensPartEdge>(o);
   assert(that.get());
-  return getParent()==that->getParent() &&
+  return getSupersetPartEdge()==that->getSupersetPartEdge() &&
          src==that->src &&
          tgt==that->tgt;
 }
@@ -496,16 +496,16 @@ bool CallCtxSensPartEdge::less(const PartEdgePtr& o)  const
   const CallCtxSensPartEdgePtr that = dynamicConstPtrCast<CallCtxSensPartEdge>(o);
   assert(that.get());
 
-  return getParent() < that->getParent() ||
-         (getParent()==that->getParent() && src < that->src) ||
-         (getParent()==that->getParent() && src == that->src && tgt < that->tgt);
+  return getSupersetPartEdge() < that->getSupersetPartEdge() ||
+         (getSupersetPartEdge()==that->getSupersetPartEdge() && src < that->src) ||
+         (getSupersetPartEdge()==that->getSupersetPartEdge() && src == that->src && tgt < that->tgt);
 }
 
 // Pretty print for the object
 std::string CallCtxSensPartEdge::str(std::string indent) const
 {
   ostringstream oss;
-  oss << "[CallCtxSensPartEdge: parent="<<getParent()->str(indent+"    ")<<endl;
+  oss << "[CallCtxSensPartEdge: parent="<<getSupersetPartEdge()->str(indent+"    ")<<endl;
   if(src) oss << indent << "    src="<<src->str(indent+"    ")<<endl;
   if(tgt) oss << indent << "    tgt="<<tgt->str(indent+"    ")<<"]";
   return oss.str();
@@ -548,7 +548,7 @@ bool CallCtxSensMR::mayEqualAO(MemRegionObjectPtr that_arg, PartEdgePtr pedge_ar
   dbg << "context.setOverlap(that->context)="<<context.setOverlap(that->context)<<endl;*/
   // If there exist sub-executions where this and that MemRegionObjects may have existed together
   if(context.setOverlap(that->context))
-    return baseMR->mayEqual(that->baseMR, pedge->getParent(), ccsa->getComposer(), ccsa);
+    return baseMR->mayEqual(that->baseMR, pedge->getSupersetPartEdge(), ccsa->getComposer(), ccsa);
   // Otherwise, they may not be equal
   else
     return false;
@@ -563,7 +563,7 @@ bool CallCtxSensMR::mustEqualAO(MemRegionObjectPtr that_arg, PartEdgePtr pedge_a
   // If there exist sub-executions where this and that MemRegionObjects may have existed together
   //dbg << "CallCtxSensMR::mustEqualMR overlap="<<context.setOverlap(that->context)<<endl;
   if(context.setOverlap(that->context))
-    return baseMR->mustEqual(that->baseMR, pedge->getParent(), ccsa->getComposer(), ccsa);
+    return baseMR->mustEqual(that->baseMR, pedge->getSupersetPartEdge(), ccsa->getComposer(), ccsa);
   // Otherwise, they are not must-equal
   else
     return false;
@@ -578,7 +578,7 @@ bool CallCtxSensMR::equalSetAO(MemRegionObjectPtr that_arg, PartEdgePtr pedge_ar
   
   // If there exist sub-executions where this and that MemRegionObjects may have existed together
   if(context.setOverlap(that->context))
-    return baseMR->equalSet(that->baseMR, pedge->getParent(), ccsa->getComposer(), ccsa);
+    return baseMR->equalSet(that->baseMR, pedge->getSupersetPartEdge(), ccsa->getComposer(), ccsa);
   // Otherwise, their sets must not be equal
   else
     return false;
@@ -594,7 +594,7 @@ bool CallCtxSensMR::subSetAO(MemRegionObjectPtr that_arg, PartEdgePtr pedge_arg)
   
   // If there exist sub-executions where this and that MemRegionObjects may have existed together
   if(context.setOverlap(that->context))
-    return baseMR->subSet(that->baseMR, pedge->getParent(), ccsa->getComposer(), ccsa);
+    return baseMR->subSet(that->baseMR, pedge->getSupersetPartEdge(), ccsa->getComposer(), ccsa);
   // Otherwise, this is not a subset of that
   else
     return false;
@@ -618,7 +618,7 @@ bool CallCtxSensMR::isLiveAO(PartEdgePtr pedge_arg) {
   else           dbg << "pedge->tgt->context="<<pedge->tgt->context.str()<<endl;
   dbg << "overlap="<<context.setOverlap(pedge->src? pedge->src->context: pedge->tgt->context)<<endl;*/
   return context.setOverlap(pedge->src? pedge->src->context: pedge->tgt->context) &&
-         baseMR->isLive(pedge->getParent(), ccsa->getComposer(), ccsa);
+         baseMR->isLive(pedge->getSupersetPartEdge(), ccsa->getComposer(), ccsa);
 }
 
 // Computes the meet of this and that and saves the result in this
@@ -631,19 +631,19 @@ bool CallCtxSensMR::meetUpdateAO(MemRegionObjectPtr that_arg, PartEdgePtr pedge_
   
   bool modified = false;
   modified = context.meetUpdate(that->context, pedge) || modified;
-  //modified = ccsa->getComposer()->meetUpdateMemLoc(baseMR, that->baseMR, pedge->getParent(), ccsa) || modified;
-  modified = baseMR->meetUpdate(that->baseMR, pedge->getParent(), ccsa->getComposer(), ccsa) || modified;
+  //modified = ccsa->getComposer()->meetUpdateMemLoc(baseMR, that->baseMR, pedge->getSupersetPartEdge(), ccsa) || modified;
+  modified = baseMR->meetUpdate(that->baseMR, pedge->getSupersetPartEdge(), ccsa->getComposer(), ccsa) || modified;
   return modified;
 }
 
 // Returns whether this AbstractObject denotes the set of all possible execution prefixes.
 bool CallCtxSensMR::isFullAO(PartEdgePtr pedge) {
-  return context.isFull(pedge) && baseMR->isFull(pedge->getParent(), ccsa->getComposer(), ccsa);
+  return context.isFull(pedge) && baseMR->isFull(pedge->getSupersetPartEdge(), ccsa->getComposer(), ccsa);
 }
 
 // Returns whether this AbstractObject denotes the empty set.
 bool CallCtxSensMR::isEmptyAO(PartEdgePtr pedge) {
-  return context.isEmpty(pedge) || baseMR->isEmpty(pedge->getParent(), ccsa->getComposer(), ccsa);
+  return context.isEmpty(pedge) || baseMR->isEmpty(pedge->getSupersetPartEdge(), ccsa->getComposer(), ccsa);
 }
 
 // Set this object to represent the set of all possible MemLocs
@@ -654,7 +654,7 @@ bool CallCtxSensMR::setToFull() {
   assert(0);
   // WE CANNOT IMPLEMENT THIS BECAUSE SETTING baseMR TO FULL WOULD CHANGE IT, WHICH WOULD BE BAD FOR
   // ALL OF ITS OTHER USERS. AS SUCH, WE NEED AbstractObjects TO IMPLEMENT A COPY FUNCTIONALITY.
-  //modified = ccsa->getComposer()->setToFull(baseMR, pedge->getParent(), ccsa) || modified;
+  //modified = ccsa->getComposer()->setToFull(baseMR, pedge->getSupersetPartEdge(), ccsa) || modified;
   return modified;
 }
 // Set this Lattice object to represent the empty set of MemLocs.
@@ -727,7 +727,7 @@ bool CallCtxSensML::mayEqual(MemLocObjectPtr that_arg, PartEdgePtr pedge_arg, Co
   dbg << "context.setOverlap(that->context)="<<context.setOverlap(that->context)<<endl;*/
   // If there exist sub-executions where this and that MemLocObjects may have existed together
   if(context.setOverlap(that->context))
-    return baseML->mayEqual(that->baseML, pedge->getParent(), comp, analysis);
+    return baseML->mayEqual(that->baseML, pedge->getSupersetPartEdge(), comp, analysis);
   // Otherwise, they may not be equal
   else
     return false;
@@ -742,7 +742,7 @@ bool CallCtxSensML::mustEqual(MemLocObjectPtr that_arg, PartEdgePtr pedge_arg, C
   // If there exist sub-executions where this and that MemLocObjects may have existed together
   //dbg << "CallCtxSensML::mustEqualML overlap="<<context.setOverlap(that->context)<<endl;
   if(context.setOverlap(that->context))
-    return baseML->mustEqual(that->baseML, pedge->getParent(), comp, analysis);
+    return baseML->mustEqual(that->baseML, pedge->getSupersetPartEdge(), comp, analysis);
   // Otherwise, they are not must-equal
   else
     return false;
@@ -757,7 +757,7 @@ bool CallCtxSensML::equalSet(MemLocObjectPtr that_arg, PartEdgePtr pedge_arg, Co
   
   // If there exist sub-executions where this and that MemLocObjects may have existed together
   if(context.setOverlap(that->context))
-    return baseML->equalSet(that->baseML, pedge->getParent(), comp, analysis);
+    return baseML->equalSet(that->baseML, pedge->getSupersetPartEdge(), comp, analysis);
   // Otherwise, their sets must not be equal
   else
     return false;
@@ -773,7 +773,7 @@ bool CallCtxSensML::subSet(MemLocObjectPtr that_arg, PartEdgePtr pedge_arg, Comp
   
   // If there exist sub-executions where this and that MemLocObjects may have existed together
   if(context.setOverlap(that->context))
-    return baseML->subSet(that->baseML, pedge->getParent(), comp, analysis);
+    return baseML->subSet(that->baseML, pedge->getSupersetPartEdge(), comp, analysis);
   // Otherwise, this is not a subset of that
   else
     return false;
@@ -795,7 +795,7 @@ bool CallCtxSensML::isLive(PartEdgePtr pedge_arg, Composer* comp, ComposedAnalys
   else           dbg << "pedge->tgt->context="<<pedge->tgt->context.str()<<endl;
   dbg << "overlap="<<context.setOverlap(pedge->src? pedge->src->context: pedge->tgt->context)<<endl;*/
   return context.setOverlap(pedge->src? pedge->src->context: pedge->tgt->context) &&
-         baseML->isLive(pedge->getParent(), comp, analysis);
+         baseML->isLive(pedge->getSupersetPartEdge(), comp, analysis);
 }
 
 // Computes the meet of this and that and saves the result in this
@@ -808,19 +808,19 @@ bool CallCtxSensML::meetUpdate(MemLocObjectPtr that_arg, PartEdgePtr pedge_arg, 
   
   bool modified = false;
   modified = context.meetUpdate(that->context, pedge) || modified;
-  //modified = ccsa->getComposer()->meetUpdateMemLoc(baseML, that->baseML, pedge->getParent(), ccsa) || modified;
-  modified = baseML->meetUpdate(that->baseML, pedge->getParent(), comp, analysis) || modified;
+  //modified = ccsa->getComposer()->meetUpdateMemLoc(baseML, that->baseML, pedge->getSupersetPartEdge(), ccsa) || modified;
+  modified = baseML->meetUpdate(that->baseML, pedge->getSupersetPartEdge(), comp, analysis) || modified;
   return modified;
 }
 
 // Returns whether this AbstractObject denotes the set of all possible execution prefixes.
 bool CallCtxSensML::isFull(PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis) {
-  return context.isFull(pedge) && baseML->isFull(pedge->getParent(), comp, analysis);
+  return context.isFull(pedge) && baseML->isFull(pedge->getSupersetPartEdge(), comp, analysis);
 }
 
 // Returns whether this AbstractObject denotes the empty set.
 bool CallCtxSensML::isEmpty(PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis) {
-  return context.isEmpty(pedge) || baseML->isEmpty(pedge->getParent(), comp, analysis);
+  return context.isEmpty(pedge) || baseML->isEmpty(pedge->getSupersetPartEdge(), comp, analysis);
 }
 
 // Set this object to represent the set of all possible MemLocs
@@ -831,7 +831,7 @@ bool CallCtxSensML::setToFull() {
   assert(0);
   // WE CANNOT IMPLEMENT THIS BECAUSE SETTING baseML TO FULL WOULD CHANGE IT, WHICH WOULD BE BAD FOR
   // ALL OF ITS OTHER USERS. AS SUCH, WE NEED AbstractObjects TO IMPLEMENT A COPY FUNCTIONALITY.
-  //modified = ccsa->getComposer()->setToFull(baseML, pedge->getParent(), ccsa) || modified;
+  //modified = ccsa->getComposer()->setToFull(baseML, pedge->getSupersetPartEdge(), ccsa) || modified;
   return modified;
 }
 // Set this Lattice object to represent the empty set of MemLocs.
@@ -1125,7 +1125,7 @@ std::string CallCtxSensLattice::str(std::string indent) const {
 
 // Initializes the state of analysis lattices at the given function, part and edge into our out of the part
 // by setting initLattices to refer to freshly-allocated Lattice objects.
-void CallContextSensitivityAnalysis::genInitLattice(PartPtr part, PartEdgePtr pedge, 
+void CallContextSensitivityAnalysis::genInitLattice(PartPtr part, PartEdgePtr pedge, PartPtr supersetPart,
                     std::vector<Lattice*>& initLattices)
 {
   CallCtxSensLattice *ccsLat = new CallCtxSensLattice(pedge, this);
@@ -1133,7 +1133,7 @@ void CallContextSensitivityAnalysis::genInitLattice(PartPtr part, PartEdgePtr pe
   // If this is the starting node of the application
   set<PartPtr> startParts = getComposer()->GetStartAStates(this);
   if(startParts.find(part) != startParts.end()) {
-    list<PartEdgePtr> baseEdges = part->outEdges();
+    list<PartEdgePtr> baseEdges = supersetPart->outEdges();
     
     // The only way this could have happened is if we're just starting the analysis. As such, 
     // initialize this entry CallCtxSensLattice object with edges that thinly wrap the 
@@ -1187,7 +1187,7 @@ bool CallContextSensitivityAnalysis::transfer(PartPtr part, CFGNode cn, NodeStat
     // edges created by the transfer function.
     for(map<CallCtxSensPartPtr, set<CallCtxSensPartPtr> >::iterator start=oldCCSLat->outgoing.begin(); start!=oldCCSLat->outgoing.end(); start++) {
       // Focus on the CallCtxSensPartEdges that derive from the current baseEdge
-      //if((start->first? start->first->getParent(): NULLPart) != (*e)->source()) continue;
+      //if((start->first? start->first->getSupersetPartEdge(): NULLPart) != (*e)->source()) continue;
       
       /*if(callContextSensitivityDebugLevel()>=1) dbg << "start="<<(start->first? start->first.get()->str(): "NULLPartPtr")<<endl;
       indent ind(attrGE("callContextSensitivityDebugLevel", 1));*/
@@ -1195,13 +1195,13 @@ bool CallContextSensitivityAnalysis::transfer(PartPtr part, CFGNode cn, NodeStat
       
       for(set<CallCtxSensPartPtr>::iterator src=start->second.begin(); src!=start->second.end(); src++) {
         // Focus on the CallCtxSensPartEdges that derive from the current baseEdge
-        if((*src? (*src)->getParent(): NULLPart) != (*e)->source()) continue;
+        if((*src? (*src)->getSupersetPart(): NULLPart) != (*e)->source()) continue;
         
         //SIGHT_VERB(dbg << "src="<<src->get()->str()<<endl, 1, callContextSensitivityDebugLevel)
 //        SIGHT_VERB_DECL(scope, (txt()<<"src="<<src->get()->str(), scope::medium), 1, callContextSensitivityDebugLevel)
         SIGHT_VERB(dbg << "sensDepth="<<getSensDepth()<<", src->context(#"<<(*src)->context.getCtxtStackDepth()<<")="<<src->get()->context.str()<<endl, 1, callContextSensitivityDebugLevel)
         //indent ind(attrGE("callContextSensitivityDebugLevel", 1));
-        assert((*e)->source() == (*src)->getParent());
+        assert((*e)->source() == (*src)->getSupersetPart());
 
         set<CallCtxSensPartPtr> newTargets;
         if(isOutgoingCallAmbiguous(*e)) {
@@ -1602,9 +1602,9 @@ MemRegionObjectPtr CallContextSensitivityAnalysis::Expr2MemRegion(SgNode* n, Par
   CallCtxSensPartEdgePtr pedge = dynamicConstPtrCast<CallCtxSensPartEdge>(pedge_arg);
   assert(pedge);
   
-  //NodeState* state = NodeState::getNodeState(this, pedge->getParent());
+  //NodeState* state = NodeState::getNodeState(this, pedge->getSupersetPartEdge());
   
-  MemRegionObjectPtr baseMR = getComposer()->Expr2MemRegion(n, pedge->getParent(), this);
+  MemRegionObjectPtr baseMR = getComposer()->Expr2MemRegion(n, pedge->getSupersetPartEdge(), this);
   // Where the edge has both a source and destination their contexts must be the same. This holds for
   // MemRegions since they cannot be created along edges where calling contexts do change.
   return boost::make_shared<CallCtxSensMR>(n, baseMR, (pedge->src? pedge->src->context: pedge->tgt->context), this);
@@ -1615,9 +1615,9 @@ MemLocObjectPtr CallContextSensitivityAnalysis::Expr2MemLoc(SgNode* n, PartEdgeP
   CallCtxSensPartEdgePtr pedge = dynamicConstPtrCast<CallCtxSensPartEdge>(pedge_arg);
   assert(pedge);
   
-  //NodeState* state = NodeState::getNodeState(this, pedge->getParent());
+  //NodeState* state = NodeState::getNodeState(this, pedge->getSupersetPartEdge());
   
-  MemLocObjectPtr baseML = getComposer()->Expr2MemLoc(n, pedge->getParent(), this);
+  MemLocObjectPtr baseML = getComposer()->Expr2MemLoc(n, pedge->getSupersetPartEdge(), this);
   // Where the edge has both a source and destination their contexts must be the same. This holds for
   // MemLocs since they cannot be created along edges where calling contexts do change.
   return boost::make_shared<CallCtxSensML>(n, baseML, (pedge->src? pedge->src->context: pedge->tgt->context), this);
@@ -1679,7 +1679,7 @@ set<PartPtr> CallContextSensitivityAnalysis::GetEndAStates_Spec()
 // from which pedge was derived. This function caches the results if possible.
 /*PartEdgePtr CallContextSensitivityAnalysis::convertPEdge_Spec(PartEdgePtr pedge)
 {
-  return pedge->getParent();
+  return pedge->getSupersetPartEdge();
 }*/
 
 }; //namespace fuse

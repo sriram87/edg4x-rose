@@ -12,11 +12,11 @@ namespace fuse
    * PointsToAnalysisTransfer *
    ****************************/
   
-  PointsToAnalysisTransfer::PointsToAnalysisTransfer(PartPtr part,
+  PointsToAnalysisTransfer::PointsToAnalysisTransfer(PartPtr part, PartPtr supersetPart,
                                                      CFGNode cn, NodeState& state,
                                                      std::map<PartEdgePtr, std::vector<Lattice*> >& dfInfo,
                                                      Composer* _composer, PointsToAnalysis* _analysis)                                                     
-    :DFTransferVisitor(part, cn, state, dfInfo),
+    :DFTransferVisitor(part, supersetPart, cn, state, dfInfo),
      composer(_composer),
      analysis(_analysis),
      modified(false)
@@ -156,7 +156,7 @@ namespace fuse
    * PointsToAnalysis *
    ********************/
 
-  void PointsToAnalysis::genInitLattice(PartPtr part, PartEdgePtr pedge,
+  void PointsToAnalysis::genInitLattice(PartPtr part, PartEdgePtr pedge, PartPtr supersetPart,
                                         std::vector<Lattice*>& initLattices)
   {
     AbstractObjectMap* productlattice = new AbstractObjectMap(boost::make_shared<AbstractObjectSet>(pedge, 
@@ -171,10 +171,10 @@ namespace fuse
 
 
   boost::shared_ptr<DFTransferVisitor>
-  PointsToAnalysis::getTransferVisitor(PartPtr part, CFGNode cn, NodeState& state, 
+  PointsToAnalysis::getTransferVisitor(PartPtr part, PartPtr supersetPart, CFGNode cn, NodeState& state,
                                        std::map<PartEdgePtr, std::vector<Lattice*> >& dfInfo)                                     
   {
-    PointsToAnalysisTransfer* ptat = new PointsToAnalysisTransfer(part, cn, state, dfInfo, getComposer(), this);
+    PointsToAnalysisTransfer* ptat = new PointsToAnalysisTransfer(part, supersetPart, cn, state, dfInfo, getComposer(), this);
     return boost::shared_ptr<DFTransferVisitor>(ptat);
   }
 

@@ -185,7 +185,7 @@ void graphEdgeIterator<GraphEdgePtr, GraphNodePtr>::pushAllDescendants(GraphEdge
   //dbg << "pushAllDescendants(): #nextE="<<nextE.size()<<endl;
   for(typename list<GraphEdgePtr>::iterator it=nextE.begin(); it!=nextE.end(); it++)
   {
-//    dbg << "pushAllDescendants(): nextN="<<(*it ? it->get()->str(): "NullPartEdge")<<" visited="<<(visited.find(*it) != visited.end())<<" remaining="<<isRemaining(*it)<<endl;
+    //dbg << "pushAllDescendants(): nextN="<<(*it ? it->get()->str(): "NullPartEdge")<<" visited="<<(visited.find(*it) != visited.end())<<endl;
 
     /* // if we haven't yet visited this node and don't yet have it on the remainingNodes list
     if(visited.find(*it) == visited.end() &&
@@ -273,10 +273,10 @@ template <class GraphEdgePtr, class GraphNodePtr>
 void graphEdgeIterator<GraphEdgePtr, GraphNodePtr>::advance(bool pushAllChildren)
 {
   assert(initialized);
-  //dbg << "graphEdgeIterator<GraphEdgePtr, GraphNodePtr>::advance(pushAllChildren="<<pushAllChildren<<") #remainingNodes="<<remainingNodes.size()<<" front="<<remainingNodes.front()->str()<<endl;
-  /*cout<<"  visited=\n";
-  for(typename set<GraphNodePtr>::iterator it=visited.begin(); it!=visited.end(); it++)
-    cout << "      ["<<it.getNode()->class_name()<<" | "<<it.getNode()<<" | "<<it.getNode()->unparseToString()<<"]\n";*/
+  /*dbg << "graphEdgeIterator<GraphEdgePtr, GraphNodePtr>::advance(pushAllChildren="<<pushAllChildren<<") #worklist="<<worklist->size()<<" worklist->getNext()="<<worklist->getNext()->str()<<endl;
+  dbg <<"  visited=\n";
+  for(typename set<GraphEdgePtr>::iterator it=visited.begin(); it!=visited.end(); it++)
+    dbg << "      "<<(*it)->str()<<endl;*/
   //if(remainingNodes.size()>0)
   if(worklist->size()>0)
   {
@@ -284,10 +284,11 @@ void graphEdgeIterator<GraphEdgePtr, GraphNodePtr>::advance(bool pushAllChildren
     /*GraphEdgePtr cur = remainingNodes.front();
     remainingNodes.pop_front();*/
     GraphEdgePtr cur = worklist->grabNext();
-    //dbg << "#remainingNodes="<<remainingNodes.size()<<" cur="<<(cur? cur->str(): "NULLPart")<<endl;
+    //dbg << "cur="<<(cur? cur->str(): "NULLPart")<<endl;
     
     if(pushAllChildren)
       pushAllDescendants(cur);
+
   }
 }
 

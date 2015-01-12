@@ -99,7 +99,7 @@ class MLRemapper
   // The edge for which the remapping is being performed
   PartEdgePtr pedge;
   
-  // Set of sets that map that maps MemLocObjects at the edges's source to MemLocObjects at its destination 
+  // Set of sets of maps that map MemLocObjects at the edges's source to MemLocObjects at its destination
   // (for forwards analyses) and vice versa (for backwards analyses) as they are converted by the edge. 
   // Since both the source and destination Part may maintain multiple CFGNodes, we may have a different remapping
   // for different CFGNode pairs at the source/destination Part. We thus maintain a set of such mappings for the
@@ -295,33 +295,74 @@ class Part: public boost::enable_shared_from_this<Part>
 {
   protected:
   ComposedAnalysis* analysis;
-  PartPtr parent;
+  // The set sub-executions denoted by this Part is a subset of supersetPart. More specifically,
+  // in the hierarchy of Part's according to their set containment relations, supersetPart
+  // is the immediate ancestor of this Part.
+  PartPtr supersetPart;
+
+  // The current part is implemented by some analysis and to implement the Part API the implementation
+  //    of this part needs access to the NodeState that contains the information computed by this analysis.
+  // When analyses are composed loosely, the ATS they run on is already complete when they begin their
+  //    execution and their NodeStates are associated with the Parts of this complete ATS.
+  // When analyses are composed tightly, the ATS they run on is being constructed as they run. Their
+  //    NodeStates are this associated with the Parts of this in-construction ATS.
+  // atsLocationPart points to the Part where the NodeState where the Lattices computed by the analysis
+  //    that implements this Part may be found. For loose composition atsLocationPart==supersetPart.
+  //    For tight composition atsLocationPart is the IntersectionPart that contains this Part.
+  // atsLocationPart is NULL while the Part is being constructed but must be set to a specific Part
+  //    before any other methods are called within this Part.
+  PartPtr atsLocationPart;
+
   PartContextPtr pContext;
   
   public:
   Part() {}
-  Part(ComposedAnalysis* analysis, PartPtr parent, PartContextPtr pContext=NULLPartContextPtr);
+  Part(ComposedAnalysis* analysis, PartPtr supersetPart, PartContextPtr pContext=NULLPartContextPtr);
   Part(const Part& that);
   
   // Function that will always be called after a Part is created and before it is returned
   // to the caller. It is called outside of the Part constructor, which makes it possible to
   // place code inside that registers a shared pointer to this Part with a directory of some kind.
-  void init() {}
+  virtual void init() {}
   
   ~Part();
   
   // Returns true if this Part comes from the same analysis as that Part and false otherwise
-  bool compatible(const Part& that) { return analysis == that.analysis; }
-  bool compatible(PartPtr that)     { return analysis == that->analysis; }
+  virtual bool compatible(const Part& that) { return analysis == that.analysis; }
+  virtual bool compatible(PartPtr that)     { return analysis == that->analysis; }
   
-  // Returns the Part from which this Part is derived. This function documents the hierarchical descent of this Part
-  // and makes it possible to find the common parent of parts derived from different analyses.
-  // Returns NULLPart if this part has no parents (i.e. it is implemented by the syntactic analysis)
-  virtual PartPtr getParent() const { return parent; }
+  virtual ComposedAnalysis* getAnalysis() const { return analysis; }
+
+  // Returns the Part from which this Part refines (it is this part's superset). This function documents
+  // the hierarchical descent of this Part and makes it possible to find the common parent of parts
+  // derived from different analyses.
+  // Returns NULLPart if this part has no supersets (i.e. it is implemented by the syntactic analysis)
+  virtual PartPtr getSupersetPart() const { return supersetPart; }
   
-  // Sets this Part's parent
-  virtual void setParent(PartPtr parent) { this->parent = parent; }
+  // Sets this Part's superset
+  virtual void setSupersetPart(PartPtr supersetPart) { this->supersetPart = supersetPart; }
   
+  // Returns the superset Part of this Part, while guaranteeing that the superset is not identical
+  // to this Part. When we wrap Parts with IdentityParts it is convenient to say that the superset
+  // of the identity part is itself. This method must return the parent of the identity part, not
+  // the identity part itself.
+  virtual PartPtr getParentSupersetPart() const { return supersetPart; }
+
+  // Returns the Part where the lattices computed by the analysis that implements this Part may
+  // be found. This Part should never be NULL.
+  virtual PartPtr getATSLocationPart() const { assert(atsLocationPart); return atsLocationPart; }
+
+  // Sets this Part's atsLocationPart
+  virtual void setATSLocationPart(PartPtr atsLocationPart) { assert(atsLocationPart); this->atsLocationPart = atsLocationPart; }
+
+  // Returns the NodeState where the Lattices computed by the analysis that implements this Part
+  // (given as an argument) may be found
+  //NodeState* getNodeState(ComposedAnalysis* analysis) const;
+
+  // Returns the list of this Part's outgoing edges. These edges may be computed incrementally
+  // as the analysis runs and thus, this function should not be called by analyses that implement
+  // the ATS inside their transfer function, since they may end up calling the outEdges() function
+  // before they've computed these edges
   virtual std::list<PartEdgePtr> outEdges()=0;
   virtual std::list<PartEdgePtr> inEdges()=0;
   virtual std::set<CFGNode> CFGNodes() const=0;
@@ -526,35 +567,56 @@ class EndPart : public Part {
 }; // class EndPart
 typedef CompSharedPtr<EndPart> EndPartPtr;
 
-class PartEdge : public boost::enable_shared_from_this<PartEdge> {
+class PartEdge: public boost::enable_shared_from_this<PartEdge> {
   protected:
   ComposedAnalysis* analysis;
-  PartEdgePtr parent;
+  // The current PartEdge is implemented by some analysis and to implement the PartEdge API the implementation
+  //    of this part needs access to the NodeState that contains the information computed by this analysis.
+  // atsLocationPartEdge points to the PartEdge of the ATS where the Lattices computed by the analysis
+  //    that implements this PartEdge may be found.
+  PartEdgePtr atsLocationPartEdge;
+
+  // The set sub-executions denoted by this Part is a subset of supersetPart. More specifically,
+  // in the hierarchy of Part's according to their set containment relations, supersetPart
+  // is the immediate ancestor of this Part.
+  PartEdgePtr supersetPartEdge;
+
   // The functor that remaps lattices across function call boundaries that this edge may be a part of
   MLRemapper remap;
   
   public:
   PartEdge() {}
-  PartEdge(ComposedAnalysis* analysis, PartEdgePtr parent);
+  PartEdge(ComposedAnalysis* analysis, PartEdgePtr supersetPartEdge);
+  PartEdge(ComposedAnalysis* analysis, PartEdgePtr atsLocationPartEdge, PartEdgePtr supersetPartEdge);
   PartEdge(const PartEdge& that);
 
   // Function that will always be called after a PartEdge is created and before it is returned
   // to the caller. It is called outside of the PartEdge constructor, which makes it possible to
   // place code inside that registers a shared pointer to this PartEdge with a directory of some kind.
-  void init();
+  virtual void init();
   
   // Returns true if this PartEdge comes from the same analysis as that PartEdge and false otherwise
-  bool compatible(const PartEdge& that) { return analysis == that.analysis; }
-  bool compatible(PartEdgePtr that)     { return analysis == that->analysis; }
+  virtual bool compatible(const PartEdge& that) { return analysis == that.analysis; }
+  virtual bool compatible(PartEdgePtr that)     { return analysis == that->analysis; }
   
-  // Returns the PartEdge from which this PartEdge is derived. This function documents the hierarchical descent of this 
-  // PartEdge and makes it possible to find the common parent of parts derived from different analyses.
+  virtual ComposedAnalysis* getAnalysis() const { return analysis; }
+
+  // Returns the PartEdge this PartEdge refines (it is thie PartEdge's superset). This function documents
+  // the hierarchical descent of this PartEdge and makes it possible to find the common parent of parts
+  // derived from different analyses.
   // Returns NULLPartEdge if this part has no parents (i.e. it is implemented by the syntactic analysis)
-  virtual PartEdgePtr getParent() const { return parent; }
+  virtual PartEdgePtr getSupersetPartEdge() const { return supersetPartEdge; }
   
   // Sets this PartEdge's parent
-  virtual void setParent(PartEdgePtr parent) { this->parent = parent; }
+  virtual void setSupersetPartEdge(PartEdgePtr supersetPartEdge) { this->supersetPartEdge = supersetPartEdge; }
   
+  // Returns the PartEdge where the lattices computed by the analysis that implements this PartEdge may
+  // be found. This PartEdge should never be NULL.
+  virtual PartEdgePtr getATSLocationPartEdge() const { assert(atsLocationPartEdge); return atsLocationPartEdge; }
+
+  // Sets this PartEdge's atsLocationPartEdge
+  virtual void setATSLocationPartEdge(PartEdgePtr atsLocationPartEdge) { assert(atsLocationPartEdge); this->atsLocationPartEdge = atsLocationPartEdge; }
+
   virtual PartPtr source() const=0;
   virtual PartPtr target() const=0;
   
@@ -675,32 +737,46 @@ typedef CompSharedPtr<IntersectionPartContext> IntersectionPartContextPtr;
 //   accurate response that its constituent objects return.
 class IntersectionPart : public Part
 {
+  // Maps each IntersectionPart implemented by each analysis to the set of IntersectionPartEdges that come into or
+  // out of it.
+  // This data structure caches edges as they're created during the execution of an analysis, making it possible
+  // to return lists of edges in the opposite direction of analysis traversal without invoking the inEdges()
+  // and outEdges() methods of the Parts in parts, which would end up being a circularly recursive call.
+  static std::map<ComposedAnalysis*, std::map<IntersectionPartPtr, std::set<IntersectionPartEdgePtr> > > Part2InEdges;
+  static std::map<ComposedAnalysis*, std::map<IntersectionPartPtr, std::set<IntersectionPartEdgePtr> > > Part2OutEdges;
+
+  friend class IntersectionPartEdge;
+  protected:
   // Parts from analyses that implement partition graphs
   std::map<ComposedAnalysis*, PartPtr> parts;
+
+  // Records whether this object's init() method has been called.
+  // An IntersectionPart cannot be used until this is done.
+  bool initialized;
 
   public:
   
   //IntersectionPart(PartPtr part, ComposedAnalysis* analysis);
-  IntersectionPart(const std::map<ComposedAnalysis*, PartPtr>& parts, PartPtr parent, ComposedAnalysis* analysis);
+  IntersectionPart(const std::map<ComposedAnalysis*, PartPtr>& parts, PartPtr parent);
   
+  // Initializes this object and its relationships with the Parts that it contains
+  virtual void init();
+
+  IntersectionPartPtr shared_from_this()
+  { return boost::static_pointer_cast<IntersectionPart>(Part::shared_from_this()); }
+
   // Returns the Part associated with this analysis. If the analysis does not implement the partition graph
   // (is not among the keys of parts), returns the parent Part.
   PartPtr getPart(ComposedAnalysis* analysis);
   
+  // Returns the list of this Part's outgoing edges. These edges may be computed incrementally
+  // as the analysis runs and thus, this function should not be called by analyses that implement
+  // the ATS inside their transfer function, since they may end up calling the outEdges() function
+  // before they've computed these edges
   // Returns the list of outgoing IntersectionPartEdge of this Part, which are the cross-product of the outEdges()
   // of its sub-parts.
   std::list<PartEdgePtr> outEdges();
-  /*// Recursive computation of the cross-product of the outEdges of all the sub-parts of this Intersection part.
-  // Hierarchically builds a recursion tree that contains more and more combinations of PartsPtr from the outEdges
-  // of different sub-parts. When the recursion tree reaches its full depth (one level per part in parts), it creates
-  // an intersection the current combination of 
-  // partI - refers to the current part in parts
-  // outPartEdges - the list of outgoing edges of the current combination of this IntersectionPart's sub-parts, 
-  //         upto partI
-  void outEdges_rec(std::map<ComposedAnalysis*, PartPtr>::iterator partI, 
-                    std::map<ComposedAnalysis*, PartPtr> outPartEdges, 
-                    std::vector<PartEdgePtr>& edges);*/
-  
+
   // Returns the list of incoming IntersectionPartEdge of this Part, which are the cross-product of the inEdges()
   // of its sub-parts.
   std::list<PartEdgePtr> inEdges();
@@ -760,19 +836,47 @@ class IntersectionPart : public Part
   bool less(const PartPtr& that) const;
   
   std::string str(std::string indent="") const;
-};
+}; // class IntersectionPart
 
+// Given a map of sets of PartPtrs from multiple analyses, returns a set of corresponding IntersectionParts.
+// Two Parts appear within the same IntersectionPart if they have the same parent Part. If a given parent
+// Part has derived parts in sets associated with some but not all analyses, these derived parts are excluded
+// from the set returned by this function.
+std::set<PartPtr> createIntersectionPartSet(const std::map<ComposedAnalysis*, std::set<PartPtr> >& subParts);
 
 class IntersectionPartEdge : public PartEdge
 {
   // The edges being intersected
   std::map<ComposedAnalysis*, PartEdgePtr> edges;
   
+  // Indicates whether this edge corresponds to a inEdgeFromAny wildcard. If true, then
+  // cachedTarget must be non-NULL.
+  bool isInEdgeFromAny;
+  // Indicates whether this edge corresponds to a outEdgeToAny wildcard. If true, then
+  // cachedSource must be non-NULL.
+  bool isOutEdgeToAny;
+  // It is possible for the PartEdges in edges to be wildcards even if both isInEdgeFromAny and
+  // isOutEdgeToAny are false. In that case we look at the actual edges to figure this out.
+  // If either isInEdgeFromAny or isOutEdgeToAny are true (they can't both be), then edges
+  // must be empty.
+
+  // Point to cached Parts that denote the source and target of this edge.
+  IntersectionPartPtr cachedSource;
+  IntersectionPartPtr cachedTarget;
+
   public:
   
   //IntersectionPartEdge(PartEdgePtr edge, ComposedAnalysis* analysis);
   IntersectionPartEdge(const std::map<ComposedAnalysis*, PartEdgePtr>& edges, PartEdgePtr parent, ComposedAnalysis* analysis);
+  // Constructs an edge where either the source or the target is a wildcard
+  // isInEdgeFromAny/isOutEdgeToAny: indicates which side of the edge is a wildcard
+  // sourceTargetPart: if isInEdgeFromAny==true, this is the edge's target Part
+  //                   if isOutEdgeToAny==true, this is the edge's source Part
+  IntersectionPartEdge(bool isInEdgeFromAny, bool isOutEdgeToAny, IntersectionPartPtr sourceTargetPart, PartEdgePtr parent, ComposedAnalysis* analysis);
   
+  IntersectionPartEdgePtr shared_from_this()
+  { return boost::static_pointer_cast<IntersectionPartEdge>(PartEdge::shared_from_this()); }
+
   // Returns the PartEdge associated with this analysis. If the analysis does not implement the partition graph
   // (is not among the keys of parts), returns the parent PartEdge.
   PartEdgePtr getPartEdge(ComposedAnalysis* analysis);
@@ -790,7 +894,7 @@ class IntersectionPartEdge : public PartEdge
   // This function is the inverse of m: given the anchor node and operand as well as the
   //    PartEdge that denotes a subset of A (the function is called on this PartEdge), 
   //    it returns a list of PartEdges that partition O.
-  std::list<PartEdgePtr> getOperandPartEdge(SgNode* anchor, SgNode* operand);
+  //std::list<PartEdgePtr> getOperandPartEdge(SgNode* anchor, SgNode* operand);
   
   private:
   // Recursive computation of the cross-product of the getOperandParts of all the sub-part edges of this Intersection part edge.
@@ -843,6 +947,201 @@ class IntersectionPartEdge : public PartEdge
   
   std::string str(std::string indent="") const;
 }; // class IntersectionPartEdge
+
+/**************************************
+ ***** Identity Part and PartEdge *****
+ **************************************
+These wrap other Parts and PartEdges and forward all calls to the objects they wrap.
+These are used to make tight and loose composers more similar. Tight composers must
+wrap all their Parts and PartEdges with IntersectionParts and IntersectionEdges, so
+that if you call ->getSupersetPart*() on them you get the appropriate object from the
+ATS they refine. To ensure the same holds for ATSs on which loose composers run,
+all their Parts and PartEdges are wrapped inside IdentityParts and IdentityPartEdges.
+*/
+class IdentityPart;
+typedef CompSharedPtr<IdentityPart> IdentityPartPtr;
+class IdentityPart: public Part
+{
+  protected:
+  PartPtr base;
+  public:
+  IdentityPart(PartPtr base);
+  IdentityPart(const IdentityPart& that);
+
+  // Function that will always be called after a Part is created and before it is returned
+  // to the caller. It is called outside of the Part constructor, which makes it possible to
+  // place code inside that registers a shared pointer to this Part with a directory of some kind.
+  void init();
+
+  ~IdentityPart();
+
+  // Returns true if this Part comes from the same analysis as that Part and false otherwise
+  bool compatible(const Part& that_arg);
+  bool compatible(PartPtr that);
+
+  ComposedAnalysis* getAnalysis() const;
+
+  // Returns the Part from which this Part refines (it is this part's superset). This function documents
+  // the hierarchical descent of this Part and makes it possible to find the common parent of parts
+  // derived from different analyses.
+  // Returns NULLPart if this part has no supersets (i.e. it is implemented by the syntactic analysis)
+  virtual PartPtr getSupersetPart() const;
+
+  // Sets this Part's superset
+  virtual void setSupersetPart(PartPtr supersetPart);
+
+  // Returns the superset Part of this Part, while guaranteeing that the superset is not identical
+  // to this Part. When we wrap Parts with IdentityParts it is convenient to say that the superset
+  // of the identity part is itself. This method must return the parent of the identity part, not
+  // the identity part itself.
+  virtual PartPtr getParentSupersetPart() const;
+
+  // Returns the Part where the lattices computed by the analysis that implements this Part may
+  // be found. This Part should never be NULL.
+  virtual PartPtr getATSLocationPart() const;
+
+  // Sets this Part's atsLocationPart
+  virtual void setATSLocationPart(PartPtr atsLocationPart);
+
+  // Returns the list of this Part's outgoing edges. These edges may be computed incrementally
+  // as the analysis runs and thus, this function should not be called by analyses that implement
+  // the ATS inside their transfer function, since they may end up calling the outEdges() function
+  // before they've computed these edges
+  std::list<PartEdgePtr> outEdges();
+  std::list<PartEdgePtr> inEdges();
+  std::set<CFGNode> CFGNodes() const;
+
+  // If this Part corresponds to a function call/return, returns the set of Parts that contain
+  // its corresponding return/call, respectively.
+  std::set<PartPtr> matchingCallParts() const;
+
+  /*// Let A={ set of execution prefixes that terminate at the given anchor SgNode }
+  // Let O={ set of execution prefixes that terminate at anchor's operand SgNode }
+  // Since to reach a given SgNode an execution must first execute all of its operands it must
+  //    be true that there is a 1-1 mapping m() : O->A such that o in O is a prefix of m(o).
+  // This function is the inverse of m: given the anchor node and operand as well as the
+  //    Part that denotes a subset of A (the function is called on this part),
+  //    it returns a list of Parts that partition O.
+  virtual std::list<PartPtr> getOperandPart(SgNode* anchor, SgNode* operand)=0;*/
+
+  // Returns a PartEdgePtr, where the source is a wild-card part (NULLPart) and the target is this Part
+  PartEdgePtr inEdgeFromAny();
+  // Returns a PartEdgePtr, where the target is a wild-card part (NULLPart) and the source is this Part
+  PartEdgePtr outEdgeToAny();
+
+  // Returns the context that includes this Part and its ancestors.
+  ContextPtr getContext();
+
+  // Returns the specific context of this Part. Can return the NULLPartContextPtr if this
+  // Part doesn't implement a non-trivial context.
+  virtual PartContextPtr getPartContext() const;
+
+  // Returns whether both this and that parts have the same context and their CFGNode lists consist
+  // exclusively of matching pairs of outgoing and incoming function calls (for each outgoing call in one
+  // list there's an incoming call in the other and vice versa).
+  bool mustMatchFuncCall(PartPtr that);
+
+  // Returns whether both this and that parts have the same context and their CFGNode lists include some
+  // matching pairs of outgoing and incoming function calls.
+  bool mayMatchFuncCall(PartPtr that);
+
+  // The the base equality and comparison operators are implemented in Part and these functions
+  // call the equality and inequality test functions supplied by derived classes as needed
+
+  // If this and that come from the same analysis, call the type-specific equality test implemented
+  // in the derived class. Otherwise, these Parts are not equal.
+  bool equal(const PartPtr& that) const;
+
+  // If this and that come from the same analysis, call the type-specific inequality test implemented
+  // in the derived class. Otherwise, determine inequality by comparing the analysis pointers.
+  virtual bool less(const PartPtr& that) const;
+
+  std::string str(std::string indent="") const;
+};
+
+class IdentityPartEdge;
+typedef CompSharedPtr<IdentityPartEdge> IdentityPartEdgePtr;
+class IdentityPartEdge: public PartEdge {
+  protected:
+  PartEdgePtr base;
+
+  public:
+  IdentityPartEdge(PartEdgePtr base);
+  IdentityPartEdge(const IdentityPartEdge& that);
+
+  // Function that will always be called after a PartEdge is created and before it is returned
+  // to the caller. It is called outside of the PartEdge constructor, which makes it possible to
+  // place code inside that registers a shared pointer to this PartEdge with a directory of some kind.
+  virtual void init();
+
+  // Returns true if this PartEdge comes from the same analysis as that PartEdge and false otherwise
+  bool compatible(const PartEdge& that);
+  bool compatible(PartEdgePtr that);
+
+  // Returns the PartEdge this PartEdge refines (it is thie PartEdge's superset). This function documents
+  // the hierarchical descent of this PartEdge and makes it possible to find the common parent of parts
+  // derived from different analyses.
+  // Returns NULLPartEdge if this part has no parents (i.e. it is implemented by the syntactic analysis)
+  virtual PartEdgePtr getSupersetPartEdge() const;
+
+  // Sets this PartEdge's parent
+  virtual void setSupersetPartEdge(PartEdgePtr supersetPartEdge);
+
+  // Returns the PartEdge where the lattices computed by the analysis that implements this PartEdge may
+  // be found. This PartEdge should never be NULL.
+  virtual PartEdgePtr getATSLocationPartEdge() const;
+
+  // Sets this PartEdge's atsLocationPartEdge
+  virtual void setATSLocationPartEdge(PartEdgePtr atsLocationPartEdge);
+
+  virtual PartPtr source() const;
+  virtual PartPtr target() const;
+
+  // Let A={ set of execution prefixes that terminate at the given anchor SgNode }
+  // Let O={ set of execution prefixes that terminate at anchor's operand SgNode }
+  // Since to reach a given SgNode an execution must first execute all of its operands it must
+  //    be true that there is a 1-1 mapping m() : O->A such that o in O is a prefix of m(o).
+  // This function is the inverse of m: given the anchor node and operand as well as the
+  //    PartEdge that denotes a subset of A (the function is called on this PartEdge),
+  //    it returns a list of PartEdges that partition O.
+  // A default implementation that walks the server analysis-provided graph backwards to find
+  //    matching PartEdges is provided.
+  virtual std::list<PartEdgePtr> getOperandPartEdge(SgNode* anchor, SgNode* operand);
+
+  // If the source Part corresponds to a conditional of some sort (if, switch, while test, etc.)
+  // it must evaluate some predicate and depending on its value continue, execution along one of the
+  // outgoing edges. The value associated with each outgoing edge is fixed and known statically.
+  // getPredicateValue() returns the value associated with this particular edge. Since a single
+  // Part may correspond to multiple CFGNodes getPredicateValue() returns a map from each CFG node
+  // within its source part that corresponds to a conditional to the value of its predicate along
+  // this edge.
+  virtual std::map<CFGNode, boost::shared_ptr<SgValueExp> > getPredicateValue();
+
+  // The the base equality and comparison operators are implemented in Part and these functions
+  // call the equality and inequality test functions supplied by derived classes as needed
+
+  // If this and that come from the same analysis, call the type-specific equality test implemented
+  // in the derived class. Otherwise, these Parts are not equal.
+  virtual bool equal(const PartEdgePtr& that) const;
+
+  // If this and that come from the same analysis, call the type-specific inequality test implemented
+  // in the derived class. Otherwise, determine inequality by comparing the analysis pointers.
+  virtual bool less(const PartEdgePtr& that) const;
+
+  // Remaps the given Lattice as needed to take into account any function call boundaries.
+  // Remapping is performed both in the forwards and backwards directions.
+  // Returns the resulting Lattice object, which is freshly allocated.
+  // Since the function is called for the scope change across some Part, it needs to account for the fact that
+  //    some MemLocs are in scope on one side of Part, while others are in scope on the other side.
+  //    fromPEdge is the edge from which control is passing and the current PartEdge (same as the PartEdge of
+  //    the Lattice) is the one to which control is passing.
+  virtual Lattice* forwardRemapML(Lattice* lat, PartEdgePtr fromPEdge, ComposedAnalysis* client);
+  virtual Lattice* backwardRemapML(Lattice* lat, PartEdgePtr fromPEdge, ComposedAnalysis* client);
+
+  virtual std::string str(std::string indent="") const;
+};
+
+
 
 /**********************
  ****** Utilities *****

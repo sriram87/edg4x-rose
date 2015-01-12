@@ -930,6 +930,11 @@ bool StxPart::less(const PartPtr& o) const
 {
   /*assert(boost::dynamic_pointer_cast<StxPart>(o));
   return n < boost::dynamic_pointer_cast<StxPart>(o)->n;*/
+  /*scope s("StxPart::less");
+  dbg << "this="<<str()<<endl;
+  dbg << "o="<<o->str()<<endl;
+  dbg << "n="<<n.getNode()<<", o->n="<<dynamicPtrCast<StxPart>(o)->n.getNode()<<endl;
+  dbg << "less="<<(n < dynamicPtrCast<StxPart>(o)->n)<<endl;*/
   assert(dynamicPtrCast<StxPart>(o).get());
   return n < dynamicPtrCast<StxPart>(o)->n;
 }

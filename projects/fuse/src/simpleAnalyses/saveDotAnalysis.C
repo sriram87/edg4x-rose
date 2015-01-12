@@ -412,6 +412,11 @@ std::ostream & ats2dot(std::ostream &o, std::string graphName, set<PartPtr>& sta
     if(saveDotAnalysisDebugLevel()>=1) {
       dbg << "context="<<part->getContext()->str()<<endl;
       dbg << "pedge="<<state.getPartEdge()->str()<<endl;
+
+      /*{ scope s("partInfo");
+      for(map<PartPtr, partDotInfoPtr>::iterator i=partInfo.begin(); i!=partInfo.end(); ++i) {
+        dbg << i->first->str()<<endl;
+      } }*/
     }
     
     list<list<PartContextPtr> > key = part->getContext()->getDetailedPartContexts();

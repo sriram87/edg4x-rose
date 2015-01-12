@@ -344,6 +344,8 @@ bool AbstractObjectMap::propagateDef2Uses(const std::set<MemLocObjectPtr>& uses,
 // Returns true if this causes this to change and false otherwise
 bool AbstractObjectMap::meetUpdate(Lattice* thatL) {
   SIGHT_VERB_DECL(scope, (txt()<<"AbstractObjectMap::meetUpdate() this="<<this, scope::medium), 1, AOMDebugLevel)
+  dbg <<"this="<<str()<<endl;
+  dbg <<"thatL="<<thatL->str()<<endl;
   AbstractObjectMap* that = dynamic_cast<AbstractObjectMap*>(thatL);
   ROSE_ASSERT(that);
 

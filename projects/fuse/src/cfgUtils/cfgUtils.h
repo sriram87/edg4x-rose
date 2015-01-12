@@ -112,6 +112,15 @@ namespace fuse
 
   // Stringification of comparable lists
   std::ostream& operator<<(std::ostream& s, const std::list<comparablePtr>& l); 
+
+  // Given a list of elements return a set that contains the same elements
+  template <typename Type>
+  std::set<Type> list2set(const std::list<Type> l) {
+    std::set<Type> s;
+    for(typename std::list<Type>::const_iterator i=l.begin(); i!=l.end(); ++i)
+      s.insert(*i);
+    return s;
+  }
 } // namespace fuse
 
 #endif

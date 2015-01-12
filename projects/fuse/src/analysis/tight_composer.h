@@ -71,9 +71,9 @@ namespace fuse {
       std::ostringstream oss;
       oss << "[";
       switch(state) {
-      case 0: oss << "init"; break;
-      case 1: oss << "anal"; break;
-      case 2: oss << "finished"; break;
+        case 0: oss << "init"; break;
+        case 1: oss << "anal"; break;
+        case 2: oss << "finished"; break;
       }
       oss << "]";
       return oss.str();
@@ -174,6 +174,42 @@ namespace fuse {
                                        boost::function<bool (ComposedAnalysis*)> implementsExpr2AnyOp,
                                        boost::function<boost::shared_ptr<AOType> (ComposedAnalysis*, SgNode*, PartEdgePtr)> Expr2AnyOp,
                                        boost::function<boost::shared_ptr<AOType> (SgNode*, PartEdgePtr)> ComposerExpr2AnyOp);
+
+    //! Generic method for forwarding GetStartAStates and GetEndAStates queries to analyses.
+    //! Parts and PartEdges of different analyzes must form a hierarchy, where each Part/PartEdge
+    //! of a coarser ATS is refined into one or more disjoint Parts/PartEdges of the finer ATS.
+    //! In the context of tight composition this means that if multiple analyses that implement
+    //! ATS functions are composed tightly, their ATSs must refine the ATS of the parent composer
+    //! can cannot refine each others' ATSs. This means that:
+    //! - When the tight composer calls the GetStartAStates and GetEndAStates functions of all the
+    //!   analyses that implement the ATS, any GetStartAStates/GetEndAStates calls made by these
+    //!   functions must be forwarded directly to the parent composer rather than each other.
+    //! - The results of these calls can be represented as IntersectionParts and IntersectionPartEdges,
+    //!   which assume that all the intersected Parts/PartEdges have the same parent Part/PartEdge.
+    //!   These classes are then in charge of implementing Part::outEdges(), Part::inEdges(),
+    //!   PartEdge::source(), and PartEdge::target().
+    //! - If no analysis implements the ATS, all calls to GetStartAStates and GetEndAStates are forwarded
+    //!   to the parent composer.
+    //! \param n SgNode* expression on which the query is performed.
+    //! \param pedgeList List of PartEdges on which the query needs to be forwarded.
+    //! \param client Analysis* making the Expr2Any query.
+    //! \param reqtype Query type which is either memloc, memregion, value or codeloc.
+    //! \param implementsExpr2AnyOp boost function pointer used by this method to check if an
+    //! analysis implements the interface to answer this query.
+    //! \param Expr2AnyOp : boost function pointer to the GetStartAStates() or GetEndAStates() method
+    //! implemented by a given analysis that is being tightly composed
+    //! \param parentComposerExpr2AnyOp : boost function pointer to the GetStartAStates() or GetEndAStates() method
+    //! implemented by the parent composer
+    //! TightCompositionQueryManager maintains the state of each query.
+    //! If the query is already cached then the cached object is returned.
+    //! If the query is a recurring query then it is forwarded to the parent composer
+    //! If the query is not in finished state or not a recurring query then it is forwarded to each analysis.
+    std::set<PartPtr> GetAnyAStates(string opName,
+                                    list<Expr2AnyKey> queryList,
+                                    ComposedAnalysis* client,
+                                    boost::function<std::set<PartPtr> (ComposedAnalysis*)> GetAnyAStates,
+                                    boost::function<std::set<PartPtr> ()> parentGetAnyAStates);
+
     // -------------------------
     // - Methods from Composer -
     // -------------------------
@@ -283,26 +319,65 @@ namespace fuse {
     // ----- Methods from ComposedAnalysis -----
     // -----------------------------------------
     //! initialize the NodeState for the given part for each analysis in the list
-    void initNodeState(PartPtr part);
+    void initNodeState(PartPtr part, PartPtr supersetPart);
     bool transfer(PartPtr part, CFGNode cn, NodeState& state, 
                   std::map<PartEdgePtr, std::vector<Lattice*> >& dfInfo);
-    void transferPropagateAStateDense(PartPtr part, std::set<PartPtr>& visited, bool firstVisit,
-                                     std::set<PartPtr>& initialized, dataflowPartEdgeIterator* curNodeIt, anchor curPartAnchor,
-                                     sight::structure::graph& worklistGraph,std::map<PartPtr, std::set<anchor> >& toAnchors,
-                                     std::map<PartPtr, std::set<std::pair<anchor, PartPtr> > >& fromAnchors);
+
+    void propagateDF2DescDense(PartPtr part, PartPtr supersetPart,
+                               // Set of all the Parts that have already been visited by the analysis
+                               std::set<PartPtr>& visited,
+                               // Set of all the Parts that have been initialized
+                               std::set<PartPtr>& initialized,
+                               // The dataflow iterator that identifies the state of the iteration
+                               dataflowPartEdgeIterator* curNodeIt,
+                               // anchor that denotes the current abstract state in the debug output
+                               anchor curPartAnchor,
+                               // graph widget that visualizes the flow of the worklist algorithm
+                               sight::structure::graph& worklistGraph,
+                               // Maps each Abstract State to the anchors of outgoing links that target it from the last visit to its predecessors
+                               std::map<PartPtr, std::set<anchor> >& toAnchors,
+                               // Maps each Abstract state to the anchors of the AStates that lead to it, as well as the AStates themselves
+                               std::map<PartPtr, std::set<std::pair<anchor, PartPtr> > >& fromAnchors);
+
+
+    void transferAStateDense(PartPtr part, PartPtr supersetPart,
+                             std::set<PartPtr>& visited, bool firstVisit,
+                             std::set<PartPtr>& initialized, dataflowPartEdgeIterator* curNodeIt,
+                             map<PartEdgePtr, vector<Lattice*> >& dfInfoPost,
+                             set<PartPtr>& ultimateParts, set<PartPtr>& ultimateSupersetParts,
+                             anchor curPartAnchor,
+                             graph& worklistGraph,std::map<PartPtr, std::set<anchor> >& toAnchors,
+                             std::map<PartPtr, std::set<std::pair<anchor, PartPtr> > >& fromAnchors);
     void transferPropagateAStateSSA(PartPtr part, std::set<PartPtr>& visited, bool firstVisit,
                                      std::set<PartPtr>& initialized, dataflowPartEdgeIterator* curNodeIt, anchor curPartAnchor,
                                      sight::structure::graph& worklistGraph,std::map<PartPtr, std::set<anchor> >& toAnchors,
                                      std::map<PartPtr, std::set<std::pair<anchor, PartPtr> > >& fromAnchors);
-  std::set<PartPtr> getInitialWorklist();
+
+    // Invokes the analysis-specific method to set the ATS location PartEdges of all the newly-computed
+    // Lattices at part
+    // Invokes the analysis-specific method to set the ATS location PartEdges of all the newly-computed
+    // Lattices at part
+    void setDescendantLatticeLocationsDense(PartPtr part, PartPtr supersetPart);
+
+    std::set<PartPtr> getInitialWorklist();
     std::map<PartEdgePtr, std::vector<Lattice*> >& getLatticeAnte(NodeState *state);
     std::map<PartEdgePtr, std::vector<Lattice*> >& getLatticePost(NodeState *state);
+    std::map<PartEdgePtr, std::vector<Lattice*> >& getLatticeAnte(NodeState *state, ComposedAnalysis* analysis);
+    std::map<PartEdgePtr, std::vector<Lattice*> >& getLatticePost(NodeState *state, ComposedAnalysis* analysis);
     void setLatticeAnte(NodeState *state, std::map<PartEdgePtr, std::vector<Lattice*> >& dfInfo, bool overwrite);
     void setLatticePost(NodeState *state, std::map<PartEdgePtr, std::vector<Lattice*> >& dfInfo, bool overwrite);
 
     std::list<PartPtr> getDescendants(PartPtr p);
     std::list<PartEdgePtr> getEdgesToDescendants(PartPtr part);
-    std::set<PartPtr> getUltimate();
+    // Returns the set of Parts that denote the end of the ATS.
+    // getUltimateParts() returns the Parts from the ATS over which the analysis is being run.
+    // If the analysis is being composed loosely, this ATS is already complete when the analysis starts.
+    // If it is a tight composition, the ATS is created as the analysis runs.
+    std::set<PartPtr> getUltimateParts();
+    // getUltimateSupersetParts() returns the Parts from the completed ATS that the current analysis
+    // may be refining. getUltimateParts() == getUltimateSupersetParts() for loose composition but not
+    // for tight composition.
+    std::set<PartPtr> getUltimateSupersetParts();
     dataflowPartEdgeIterator* getIterator();
   
     // Remaps the given Lattice across the scope transition (if any) of the given edge, updating the lat vector

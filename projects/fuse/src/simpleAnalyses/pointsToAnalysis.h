@@ -31,7 +31,7 @@ namespace fuse
     // used by the analysis to determine if the states modified or not
     bool modified;
   public:
-    PointsToAnalysisTransfer(PartPtr part, CFGNode cn, NodeState& state,
+    PointsToAnalysisTransfer(PartPtr part, PartPtr supersetPart, CFGNode cn, NodeState& state,
                              std::map<PartEdgePtr, std::vector<Lattice*> >& dfInfo,
                              Composer* composer, PointsToAnalysis* analysis);                             
 
@@ -68,14 +68,14 @@ namespace fuse
     // Returns a shared pointer to a freshly-allocated copy of this ComposedAnalysis object
     ComposedAnalysisPtr copy() { return boost::make_shared<PointsToAnalysis>(useSSA); }
 
-    void genInitLattice(PartPtr part, PartEdgePtr pedge,
+    void genInitLattice(PartPtr part, PartEdgePtr pedge, PartPtr supersetPart,
                         std::vector<Lattice*>& initLattices);
 
     bool transfer(PartPtr part, CFGNode cn, NodeState& state, 
                   std::map<PartEdgePtr, std::vector<Lattice*> >& dfInfo) { assert(false); return false; }
 
     boost::shared_ptr<DFTransferVisitor> 
-    getTransferVisitor(PartPtr part, CFGNode cn, NodeState& state, 
+    getTransferVisitor(PartPtr part, PartPtr supersetPart, CFGNode cn, NodeState& state,
                        std::map<PartEdgePtr, std::vector<Lattice*> >& dfInfo);
     
     // functions called by composer

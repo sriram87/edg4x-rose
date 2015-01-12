@@ -585,7 +585,7 @@ class CallContextSensitivityAnalysis : public FWDataflow
   
   // Initializes the state of analysis lattices at the given function, part and edge into our out of the part
   // by setting initLattices to refer to freshly-allocated Lattice objects.
-  void genInitLattice(PartPtr part, PartEdgePtr pedge, 
+  void genInitLattice(PartPtr part, PartEdgePtr pedge, PartPtr supersetPart,
                       std::vector<Lattice*>& initLattices);
   
   bool transfer(PartPtr part, CFGNode cn, NodeState& state, 

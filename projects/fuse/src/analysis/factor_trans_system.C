@@ -220,7 +220,7 @@ void FactorTransState::operator=(FactorTransStatePtr that) {
 
 std::list<PartEdgePtr> FactorTransState::outEdges() {
   // If this part has a parent edge, then it can get its outEdges from the parent and then add its own commonFactor
-  if(getParent()) {
+  if(getSupersetPart()) {
     return outEdges_derived();
   // If this part has no parent, it must compute its outEdges using math
   } else {
@@ -271,7 +271,7 @@ std::list<PartEdgePtr> FactorTransState::outEdges_derived() {
   scope reg("FactorTransState::outEdges_derived", scope::medium, attrGE("factorTransSystemDebugLevel", 1));
   if(factorTransSystemDebugLevel()>=1) dbg << "    "<<str("    ")<<endl;
   
-  list<PartEdgePtr> baseOutEdges = getParent()->outEdges();
+  list<PartEdgePtr> baseOutEdges = getSupersetPart()->outEdges();
   // If we've reached the end of the sub-graph associated with the parent state
   if(numStepsInDerivedGraph == dynamic_cast<FactorTransSystemAnalysis*>(analysis)->maxNumStepsInDerivedGraph-1) {
     if(factorTransSystemDebugLevel()>=1) dbg << "Reached End"<<endl;
@@ -291,7 +291,7 @@ std::list<PartEdgePtr> FactorTransState::outEdges_derived() {
     if(factorTransSystemDebugLevel()>=1) dbg << "Not Reached End"<<endl;
     //for(list<PartEdgePtr>::iterator e=baseOutEdges.begin(); e!=baseOutEdges.end(); e++) {
       for(set<int>::iterator f=subGraphTransFactors.begin(); f!=subGraphTransFactors.end(); f++) {
-        PartEdgePtr pedge = makePtr<FactorTransEdge>(getParent()->inEdgeFromAny(), transitionFactors, subGraphTransFactors,
+        PartEdgePtr pedge = makePtr<FactorTransEdge>(getSupersetPart()->inEdgeFromAny(), transitionFactors, subGraphTransFactors,
                                            curVal, numSteps, numStepsInDerivedGraph,   myCommonFactor, //sgtFactorIt, 
                                            curVal, numSteps, numStepsInDerivedGraph+1, myCommonFactor * *f, // sgtFactorIt, 
                                            /*myCommonFactor * *f, */analysis);
@@ -305,7 +305,7 @@ std::list<PartEdgePtr> FactorTransState::outEdges_derived() {
 
 std::list<PartEdgePtr> FactorTransState::inEdges() {
   // If this part has a parent edge, then it can get its inEdges from the parent and then add its own commonFactor
-  if(getParent()) {
+  if(getSupersetPart()) {
     return inEdges_derived();
   // If this part has no parent, it must compute its inEdges using math
   } else {
@@ -370,7 +370,7 @@ std::list<PartEdgePtr> FactorTransState::inEdges_derived() {
 
   // If we've reached the start of the sub-graph associated with the parent state
   if(numStepsInDerivedGraph == 0) {
-    /*list<PartEdgePtr> baseInEdges = getParent()->inEdges();
+    /*list<PartEdgePtr> baseInEdges = getSupersetPart()->inEdges();
     for(list<PartEdgePtr>::iterator e=baseInEdges.begin(); e!=baseInEdges.end(); e++) {
       edges.push_back(makePtr<FactorTransEdge>(*e, transitionFactors, myCommonFactor, analysis));
     }*/
@@ -384,7 +384,7 @@ std::list<PartEdgePtr> FactorTransState::inEdges_derived() {
     // outVals_prior now contains all the values that are numRollbackSteps ahead of the curVal we started with.
     // Now, create the edges those values to curVal
     
-    list<PartEdgePtr> baseInEdges = getParent()->inEdges();
+    list<PartEdgePtr> baseInEdges = getSupersetPart()->inEdges();
     for(list<PartEdgePtr>::iterator e=baseInEdges.begin(); e!=baseInEdges.end(); e++) {
       for(set<int>::iterator v=outVals->begin(); v!=outVals->end(); v++) {
         FactorTransEdgePtr baseEdge = dynamicPtrCast<FactorTransEdge>(*e); assert(baseEdge);
@@ -403,7 +403,7 @@ std::list<PartEdgePtr> FactorTransState::inEdges_derived() {
   } else {
     for(set<int>::iterator f=subGraphTransFactors.begin(); f!=subGraphTransFactors.end(); f++) {
       if(myCommonFactor % *f == 0) {
-        edges.push_back(makePtr<FactorTransEdge>(getParent()->inEdgeFromAny(), transitionFactors, subGraphTransFactors,
+        edges.push_back(makePtr<FactorTransEdge>(getSupersetPart()->inEdgeFromAny(), transitionFactors, subGraphTransFactors,
                                            curVal, numSteps, numStepsInDerivedGraph-1, myCommonFactor / *f, //  sgtFactorIt, 
                                            curVal, numSteps, numStepsInDerivedGraph,   myCommonFactor,      // sgtFactorIt, 
                                            /*myCommonFactor / *f, */analysis));
@@ -432,8 +432,8 @@ std::set<PartPtr> FactorTransState::matchingCallParts() const {
 // Returns a PartEdgePtr, where the source is a wild-card part (NULLPart) and the target is this Part
 PartEdgePtr FactorTransState::inEdgeFromAny() {
   // If this part has a parent edge, then it can get its inEdgesFromAny from the parent and then add its own commonFactor
-  if(getParent()) {
-    return makePtr<FactorTransEdge>(getParent()->inEdgeFromAny(), transitionFactors, subGraphTransFactors,
+  if(getSupersetPart()) {
+    return makePtr<FactorTransEdge>(getSupersetPart()->inEdgeFromAny(), transitionFactors, subGraphTransFactors,
                                      -1,     -1,       -1,                     -1, //subGraphTransFactors.end(), 
                                      curVal, numSteps, numStepsInDerivedGraph, myCommonFactor, //sgtFactorIt, 
                                      /*myCommonFactor, */analysis);
@@ -447,8 +447,8 @@ PartEdgePtr FactorTransState::inEdgeFromAny() {
 // Returns a PartEdgePtr, where the target is a wild-card part (NULLPart) and the source is this Part
 PartEdgePtr FactorTransState::outEdgeToAny() {
   // If this part has a parent edge, then it can get its inEdgesFromAny from the parent and then add its own commonFactor
-  if(getParent()) {
-    return makePtr<FactorTransEdge>(getParent()->outEdgeToAny(), transitionFactors, subGraphTransFactors,
+  if(getSupersetPart()) {
+    return makePtr<FactorTransEdge>(getSupersetPart()->outEdgeToAny(), transitionFactors, subGraphTransFactors,
                                      curVal, numSteps, numStepsInDerivedGraph, myCommonFactor, //sgtFactorIt, 
                                      -1,     -1,       -1,                     -1, //subGraphTransFactors.end(),                          
                                      /*myCommonFactor, */analysis);
@@ -462,8 +462,8 @@ PartEdgePtr FactorTransState::outEdgeToAny() {
 // Returns the specific context of this Part. Can return the NULLPartContextPtr if this
 // Part doesn't implement a non-trivial context.
 PartContextPtr FactorTransState::getPartContext() const {
-  if(getParent()) return makePtr<PartPtrPartContext>(getParent());
-  else            return NULLPartContextPtr;
+  if(getSupersetPart()) return makePtr<PartPtrPartContext>(getSupersetPart());
+  else                  return NULLPartContextPtr;
 }
 
 bool FactorTransState::equal(const PartPtr& o) const {
@@ -479,7 +479,7 @@ bool FactorTransState::equal(const PartPtr& o) const {
           curVal         == that->curVal)?
            "EQUAL": "NOT EQUAL")<<endl;*/
 
-  return getParent()            == that->getParent() &&
+  return getSupersetPart()      == that->getSupersetPart() &&
          baseCommonFactor       == that->baseCommonFactor &&
          myCommonFactor         == that->myCommonFactor &&
          curVal                 == that->curVal && 
@@ -498,8 +498,8 @@ bool FactorTransState::less(const PartPtr& o)  const {
   /*scope reg("FactorTransState::<", scope::medium, 1, 1);
   dbg << "this="<<const_cast<FactorTransState*>(this)->str()<<endl;
   dbg << "that="<<that.get()->str()<<endl;
-  dbg << "getParent() < that->getParent(): "<<(getParent() < that->getParent())<<endl;
-  dbg << "getParent() == that->getParent(): "<<(getParent() == that->getParent())<<endl;
+  dbg << "getSupersetPart() < that->getSupersetPart(): "<<(getSupersetPart() < that->getSupersetPart())<<endl;
+  dbg << "getSupersetPart() == that->getSupersetPart(): "<<(getSupersetPart() == that->getSupersetPart())<<endl;
   dbg << "transitionFactors < that->transitionFactors: "<<(transitionFactors < that->transitionFactors)<<endl;
   dbg << "transitionFactors == that->transitionFactors: "<<(transitionFactors == that->transitionFactors)<<endl;
   dbg << "baseCommonFactor < that->baseCommonFactor: "<<(baseCommonFactor < that->baseCommonFactor)<<endl;
@@ -508,8 +508,8 @@ bool FactorTransState::less(const PartPtr& o)  const {
   dbg << "myCommonFactor < that->myCommonFactor: "<<(myCommonFactor < that->myCommonFactor)<<endl;
   dbg << "curVal("<<curVal<<" < that->curVal("<<that->curVal<<"): "<<(curVal < that->curVal)<<endl;*/
 
-  if(getParent() < that->getParent()) return true;
-  if(getParent() != that->getParent()) return false;
+  if(getSupersetPart() < that->getSupersetPart()) return true;
+  if(getSupersetPart() != that->getSupersetPart()) return false;
 
   if(baseCommonFactor  < that->baseCommonFactor) return true;
   if(baseCommonFactor != that->baseCommonFactor) return false;
@@ -537,7 +537,7 @@ std::string FactorTransState::str(std::string indent) const {
                  ", #StInDG="<<numStepsInDerivedGraph<<
                  ", transFacs=" << set2Str(transitionFactors, ",") << 
                  ", subGTransFacs=" << set2Str(subGraphTransFactors, ",") << 
-                 ", parent="<<getParent() << 
+                 ", parent="<<getSupersetPart() <<
                  //", *sgtFactorIt="<<(subGraphTransFactors.size()>0? *sgtFactorIt: -1)<<
          "]";
   return oss.str();
@@ -623,12 +623,12 @@ FactorTransEdge::FactorTransEdge(const FactorTransEdgePtr& that) :
 
 PartPtr FactorTransEdge::source() const
 {
-  if(getParent()) {
-    if(getParent()->source()) return makePtr<FactorTransState>(getParent()->source(), transitionFactors,
+  if(getSupersetPartEdge()) {
+    if(getSupersetPartEdge()->source()) return makePtr<FactorTransState>(getSupersetPartEdge()->source(), transitionFactors,
                                                                 srcNumStepsInDerivedGraph, subGraphTransFactors,
                                                                 srcVal, srcNumSteps, srcCommonFactor, analysis);
     // If the source is NULL simply because this edge is "inside" a base part
-    else if(srcVal!=-1) return makePtr<FactorTransState>(getParent()->target(), transitionFactors,
+    else if(srcVal!=-1) return makePtr<FactorTransState>(getSupersetPartEdge()->target(), transitionFactors,
                                                           srcNumStepsInDerivedGraph, subGraphTransFactors,
                                                           srcVal, srcNumSteps, srcCommonFactor, analysis);
     else                      return NULLPart;
@@ -638,12 +638,12 @@ PartPtr FactorTransEdge::source() const
 
 PartPtr FactorTransEdge::target() const
 {
-  if(getParent()) {
-    if(getParent()->target()) return makePtr<FactorTransState>(getParent()->target(), transitionFactors,
+  if(getSupersetPartEdge()) {
+    if(getSupersetPartEdge()->target()) return makePtr<FactorTransState>(getSupersetPartEdge()->target(), transitionFactors,
                                                                 tgtNumStepsInDerivedGraph, subGraphTransFactors,
                                                                 tgtVal, tgtNumSteps, tgtCommonFactor, analysis);
     // If the target is NULL simply because this edge is "inside" a base part
-    else if(tgtVal!=-1) return makePtr<FactorTransState>(getParent()->source(), transitionFactors,
+    else if(tgtVal!=-1) return makePtr<FactorTransState>(getSupersetPartEdge()->source(), transitionFactors,
                                                           tgtNumStepsInDerivedGraph, subGraphTransFactors,
                                                           tgtVal, tgtNumSteps, tgtCommonFactor, analysis);
     else                      return NULLPart;
@@ -661,7 +661,7 @@ PartPtr FactorTransEdge::target() const
 // this edge. 
 std::map<CFGNode, boost::shared_ptr<SgValueExp> > FactorTransEdge::getPredicateValue()
 {
-  if(getParent()) return getParent()->getPredicateValue();
+  if(getSupersetPartEdge()) return getSupersetPartEdge()->getPredicateValue();
   else            return map<CFGNode, boost::shared_ptr<SgValueExp> >();
 }
 
@@ -692,8 +692,8 @@ bool FactorTransEdge::less(const PartEdgePtr& o)  const {
   /*scope reg("FactorTransEdge::<", scope::medium, 1, 1);
   dbg << "this="<<const_cast<FactorTransEdge*>(this)->str()<<endl;
   dbg << "that="<<that.get()->str()<<endl;
-  dbg << "getParent() < that->getParent(): "<<(getParent() < that->getParent())<<endl;
-  dbg << "getParent() == that->getParent(): "<<(getParent() == that->getParent())<<endl;
+  dbg << "getSupersetPartEdge() < that->getSupersetPartEdge(): "<<(getSupersetPartEdge() < that->getSupersetPartEdge())<<endl;
+  dbg << "getSupersetPartEdge() == that->getSupersetPartEdge(): "<<(getSupersetPartEdge() == that->getSupersetPartEdge())<<endl;
   dbg << "myCommonFactor < that->myCommonFactor: "<<(myCommonFactor < that->myCommonFactor)<<endl;
   dbg << "myCommonFactor == that->myCommonFactor: "<<(myCommonFactor == that->myCommonFactor)<<endl;
   dbg << "srcVal < that->srcVal: "<<(srcVal < that->srcVal)<<endl;
@@ -706,8 +706,8 @@ bool FactorTransEdge::less(const PartEdgePtr& o)  const {
   dbg << "tgtNumSteps("<<tgtNumSteps<<") == that->tgtNumSteps("<<that->tgtNumSteps<<"): "<<(tgtNumSteps == that->tgtNumSteps)<<endl;
   dbg << "transitionFactors < that->transitionFactors: "<<(transitionFactors < that->transitionFactors)<<endl;*/
   
-  if(getParent() < that->getParent()) return true;
-  if(getParent() != that->getParent()) return false;
+  if(getSupersetPartEdge() < that->getSupersetPartEdge()) return true;
+  if(getSupersetPartEdge() != that->getSupersetPartEdge()) return false;
   /*if(myCommonFactor  < that->myCommonFactor) return true;
   if(myCommonFactor != that->myCommonFactor) return false;*/
   if(srcVal  < that->srcVal) return true;
@@ -739,13 +739,13 @@ bool FactorTransEdge::less(const PartEdgePtr& o)  const {
 std::string FactorTransEdge::str(std::string indent) const {
   ostringstream oss;
   int fullSrcCommonFactor = 1, fullTgtCommonFactor = 1;
-  if(getParent()) {
-    FactorTransEdgePtr parent = dynamicPtrCast<FactorTransEdge>(getParent());
+  if(getSupersetPartEdge()) {
+    FactorTransEdgePtr parent = dynamicPtrCast<FactorTransEdge>(getSupersetPartEdge());
     while(parent) {
       assert(parent);
       fullSrcCommonFactor *= parent->srcCommonFactor;
       fullTgtCommonFactor *= parent->tgtCommonFactor;
-      parent = dynamicPtrCast<FactorTransEdge>(parent->getParent());
+      parent = dynamicPtrCast<FactorTransEdge>(parent->getSupersetPartEdge());
     }
   }
   oss << "[FTEdge: src=" << list2Str(getPrimeDecomp(srcVal*fullSrcCommonFactor), ":") << 
@@ -760,7 +760,7 @@ std::string FactorTransEdge::str(std::string indent) const {
                 ", tgtComFac=" << list2Str(getPrimeDecomp(tgtCommonFactor), ":") << 
                 ", transFacs=" << set2Str(transitionFactors, ",") << 
                 ", subGTransFacs=" << set2Str(subGraphTransFactors, ",") << 
-                ", parent="<<getParent() << 
+                ", parent="<<getSupersetPartEdge() <<
          "]";
   return oss.str();
 }

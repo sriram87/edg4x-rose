@@ -3492,12 +3492,12 @@ ConstantPropagationAnalysisTransfer::finish()
 }
 
 ConstantPropagationAnalysisTransfer::ConstantPropagationAnalysisTransfer(
-          PartPtr part, CFGNode cn, NodeState& state, 
+          PartPtr part, PartPtr supersetPart, CFGNode cn, NodeState& state, 
           map<PartEdgePtr, vector<Lattice*> >& dfInfo, 
           Composer* composer, ConstantPropagationAnalysis* analysis)
    : VariableStateTransfer<CPValueObject, ConstantPropagationAnalysis>
                        (state, dfInfo, boost::make_shared<CPValueObject>(part->inEdgeFromAny()), 
-                        composer, analysis, part, cn, 
+                        composer, analysis, part, supersetPart, cn, 
                         constantPropagationAnalysisDebugLevel, "constantPropagationAnalysisDebugLevel")
 {
 }
@@ -3543,7 +3543,7 @@ CPMemLocObjectPtr ConstantPropagationAnalysis::createBasicCPML(SgNode* n, PartEd
 
 // Initializes the state of analysis lattices at the given function, part and edge into our out of the part
 // by setting initLattices to refer to freshly-allocated Lattice objects.
-void ConstantPropagationAnalysis::genInitLattice(PartPtr part, PartEdgePtr pedge, 
+void ConstantPropagationAnalysis::genInitLattice(PartPtr part, PartEdgePtr pedge, PartPtr supersetPart,
                                                  vector<Lattice*>& initLattices)
 {
   scope sEdge("genInitLattice", scope::medium, attrGE("constantPropagationAnalysisDebugLevel", 2));
@@ -3603,11 +3603,11 @@ ConstantPropagationAnalysis::transfer(PartPtr p, CFGNode cn, NodeState& state,
 }
 
 boost::shared_ptr<DFTransferVisitor>
-ConstantPropagationAnalysis::getTransferVisitor(PartPtr part, CFGNode cn, NodeState& state, 
+ConstantPropagationAnalysis::getTransferVisitor(PartPtr part, PartPtr supersetPart, CFGNode cn, NodeState& state,
                                                 map<PartEdgePtr, vector<Lattice*> >& dfInfo)
 {
   // Why is the boost shared pointer used here?
-  ConstantPropagationAnalysisTransfer* t = new ConstantPropagationAnalysisTransfer(part, cn, state, dfInfo, getComposer(), this);
+  ConstantPropagationAnalysisTransfer* t = new ConstantPropagationAnalysisTransfer(part, supersetPart, cn, state, dfInfo, getComposer(), this);
   return boost::shared_ptr<DFTransferVisitor>(t);
 }
 

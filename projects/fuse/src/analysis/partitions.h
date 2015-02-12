@@ -757,7 +757,7 @@ class IntersectionPart : public Part
   public:
   
   //IntersectionPart(PartPtr part, ComposedAnalysis* analysis);
-  IntersectionPart(const std::map<ComposedAnalysis*, PartPtr>& parts, PartPtr parent);
+  IntersectionPart(const std::map<ComposedAnalysis*, PartPtr>& parts, PartPtr parent, ComposedAnalysis* analysis);
   
   // Initializes this object and its relationships with the Parts that it contains
   virtual void init();
@@ -842,7 +842,8 @@ class IntersectionPart : public Part
 // Two Parts appear within the same IntersectionPart if they have the same parent Part. If a given parent
 // Part has derived parts in sets associated with some but not all analyses, these derived parts are excluded
 // from the set returned by this function.
-std::set<PartPtr> createIntersectionPartSet(const std::map<ComposedAnalysis*, std::set<PartPtr> >& subParts);
+std::set<PartPtr> createIntersectionPartSet(const std::map<ComposedAnalysis*, std::set<PartPtr> >& subParts,
+                                            ComposedAnalysis* analysis);
 
 class IntersectionPartEdge : public PartEdge
 {
@@ -942,8 +943,8 @@ class IntersectionPartEdge : public PartEdge
   //    some MemLocs are in scope on one side of Part, while others are in scope on the other side. 
   //    fromPEdge is the edge from which control is passing and the current PartEdge (same as the PartEdge of 
   //    the Lattice) is the one to which control is passing.
-  Lattice* forwardRemapML(Lattice* lat, PartEdgePtr fromPEdge, ComposedAnalysis* client);
-  Lattice* backwardRemapML(Lattice* lat, PartEdgePtr fromPEdge, ComposedAnalysis* client);
+  /*Lattice* forwardRemapML(Lattice* lat, PartEdgePtr fromPEdge, ComposedAnalysis* client);
+  Lattice* backwardRemapML(Lattice* lat, PartEdgePtr fromPEdge, ComposedAnalysis* client);*/
   
   std::string str(std::string indent="") const;
 }; // class IntersectionPartEdge
@@ -951,13 +952,14 @@ class IntersectionPartEdge : public PartEdge
 /**************************************
  ***** Identity Part and PartEdge *****
  **************************************
+!!! These ended up being useless and are now deprecated !!!
 These wrap other Parts and PartEdges and forward all calls to the objects they wrap.
 These are used to make tight and loose composers more similar. Tight composers must
 wrap all their Parts and PartEdges with IntersectionParts and IntersectionEdges, so
 that if you call ->getSupersetPart*() on them you get the appropriate object from the
 ATS they refine. To ensure the same holds for ATSs on which loose composers run,
 all their Parts and PartEdges are wrapped inside IdentityParts and IdentityPartEdges.
-*/
+* /
 class IdentityPart;
 typedef CompSharedPtr<IdentityPart> IdentityPartPtr;
 class IdentityPart: public Part
@@ -1015,14 +1017,14 @@ class IdentityPart: public Part
   // its corresponding return/call, respectively.
   std::set<PartPtr> matchingCallParts() const;
 
-  /*// Let A={ set of execution prefixes that terminate at the given anchor SgNode }
+  / * // Let A={ set of execution prefixes that terminate at the given anchor SgNode }
   // Let O={ set of execution prefixes that terminate at anchor's operand SgNode }
   // Since to reach a given SgNode an execution must first execute all of its operands it must
   //    be true that there is a 1-1 mapping m() : O->A such that o in O is a prefix of m(o).
   // This function is the inverse of m: given the anchor node and operand as well as the
   //    Part that denotes a subset of A (the function is called on this part),
   //    it returns a list of Parts that partition O.
-  virtual std::list<PartPtr> getOperandPart(SgNode* anchor, SgNode* operand)=0;*/
+  virtual std::list<PartPtr> getOperandPart(SgNode* anchor, SgNode* operand)=0;* /
 
   // Returns a PartEdgePtr, where the source is a wild-card part (NULLPart) and the target is this Part
   PartEdgePtr inEdgeFromAny();
@@ -1139,9 +1141,7 @@ class IdentityPartEdge: public PartEdge {
   virtual Lattice* backwardRemapML(Lattice* lat, PartEdgePtr fromPEdge, ComposedAnalysis* client);
 
   virtual std::string str(std::string indent="") const;
-};
-
-
+};*/
 
 /**********************
  ****** Utilities *****

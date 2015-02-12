@@ -14,7 +14,7 @@ using namespace boost;
 
 namespace fuse {
 
-#define partitionsDebugLevel 2
+#define partitionsDebugLevel 0
 
 /* #########################
    ##### Remap Functor #####
@@ -327,6 +327,7 @@ void setArgParamMap(PartEdgePtr callEdge, SgFunctionCallExp* call,
     //if((*itP)->get_name().getString() == "") continue;
     
     //cout << "itA="<<cfgUtils::SgNode2Str(*itA)<<", itP="<<cfgUtils::SgNode2Str(*itP)<<endl;
+
     // MemLocObjectPtrPair argP = composer->Expr2MemLoc(*itA, funcStartPart->inEdgeFromAny(), client);
     // The argument MemLoc is preferrably the argument expression but may be a memory location if the expression is not available
     MemLocObjectPtr arg = composer->OperandExpr2MemLoc(call, *itA, callEdge->source()->outEdgeToAny(), client);
@@ -458,7 +459,10 @@ Context::Context(PartPtr part)/*: part(part)*/ {
   PartPtr p = part;
   while(p) {
     if(p->getPartContext()) partContexts.push_back(p->getPartContext());
-    p = p->getParentSupersetPart();
+    PartPtr parent = p->getParentSupersetPart();
+    // If the Part is its own parent (true for Stx analysis, which has no suparset), break out
+    if(parent == p->getParentSupersetPart()) break;
+    else p = parent;
   }
 }
 
@@ -611,6 +615,8 @@ Part::Part(ComposedAnalysis* analysis, PartPtr supersetPart, PartContextPtr pCon
 Part::Part(const Part& that) : 
     analysis(that.analysis), supersetPart(that.supersetPart), atsLocationPart(that.atsLocationPart), pContext(that.pContext)
 {
+  if(analysis)
+    analysis->registerBase2RefinedMapping(supersetPart, shared_from_this());
 }
 
 Part::~Part()
@@ -1117,6 +1123,8 @@ std::list<PartEdgePtr> PartEdge::getOperandPartEdge(SgNode* anchor, SgNode* oper
   //   new edges from operand may lead to parts other than anchor. However, this is just an issue
   //   of precision since we'll account for paths that are actually infeasible.
   
+  struct timeval gopeStart, gopeEnd; gettimeofday(&gopeStart, NULL);
+
   // The target of this edge identifies the termination point of all the execution prefixes
   // denoted by this edge. We thus use it to query for the parts of the operands and only both
   // if this part is itself live.
@@ -1138,12 +1146,38 @@ std::list<PartEdgePtr> PartEdge::getOperandPartEdge(SgNode* anchor, SgNode* oper
     for(list<PartEdgePtr>::iterator be=baseEdges.begin(); be!=baseEdges.end(); be++)
       dbg << be->get()->str();
   SIGHT_VERB_FI()
-    
-  std::list<PartEdgePtr> ccsOperandEdges;
+
+  /*cout << "------------------------------------"<<endl;
+  cout << "analysis="<<getAnalysis()->str()<<endl;
+  cout << "this="<<str()<<endl;
+  for(list<PartEdgePtr>::iterator be=baseEdges.begin(); be!=baseEdges.end(); be++) {
+    cout << "base Edge="<<be->get()->str()<<endl;
+    set<PartEdgePtr> refined = getAnalysis()->getRefinedPartEdges(*be);
+    for(set<PartEdgePtr>::iterator ref=refined.begin(); ref!=refined.end(); ++ref) {
+      cout << "    "<<(*ref)->str()<<endl;
+    }
+  }*/
+
+  // Collect all refined edges in this ATS that correspond to the operand edges in the
+  // superset ATS
+  set<PartEdgePtr> refined;
+  for(list<PartEdgePtr>::iterator be=baseEdges.begin(); be!=baseEdges.end(); be++) {
+    set<PartEdgePtr> curRefined = getAnalysis()->getRefinedPartEdges(*be);
+    refined.insert(curRefined.begin(), curRefined.end());
+  }
+
+  // !!! Should change API to return a set!!!
+  list<PartEdgePtr> refinedL;
+  for(set<PartEdgePtr>::iterator i=refined.begin(); i!=refined.end(); ++i)
+    refinedL.push_back(*i);
+
+  return refinedL;
+  /*
+  std::set<PartEdgePtr> ccsOperandEdges;
   bw_dataflowPartEdgeIterator it(succ_back);
   it.add(makePtrFromThis(shared_from_this()));
   
-  /* // There are scenarios where getOperandPartEdge() is called on edges that immediately precede
+  / * // There are scenarios where getOperandPartEdge() is called on edges that immediately precede
   // the desired operand->anchor edge (e.g. live-dead analysis performs its transfer function
   // on the incoming edge of the current part to correctly read live-dead decisions of any prior
   // live-dead analyses). As such, initialize the graph iterator with this PartEdge's successors.
@@ -1151,13 +1185,17 @@ std::list<PartEdgePtr> PartEdge::getOperandPartEdge(SgNode* anchor, SgNode* oper
   if(target())      out = target()->outEdges();
   else if(source()) out = source()->outEdges();
   for(std::list<PartEdgePtr>::iterator o=out.begin(); o!=out.end(); o++)
-    it.add(*o);*/
+    it.add(*o);* /
   
+  gettimeofday(&gopeEnd, NULL); cout << "PartEdge::getOperandPartEdge() setup\t"<<(((gopeEnd.tv_sec*1000000 + gopeEnd.tv_usec) - (gopeStart.tv_sec*1000000 + gopeStart.tv_usec)) / 1000000.0)<<endl;
+
   SIGHT_VERB(dbg << "it="<<it.str()<<endl, 2, partitionsDebugLevel)
   SIGHT_VERB_DECL(scope, ("Backward search", scope::medium), 2, partitionsDebugLevel)
   
+  struct timeval searchStart, searchEnd; gettimeofday(&searchStart, NULL);
+
   // Walk backwards through the CCS edges, looking for the most recent CCS edge the parent of which is in list baseEdges
-  //while(it!=bw_dataflowPartEdgeIterator::end()) {
+  int numSteps=0;
   while(!it.isEnd()) {
     SIGHT_VERB_DECL(scope, ("Predecessor", scope::low), 2, partitionsDebugLevel)
     SIGHT_VERB_IF(2, partitionsDebugLevel)
@@ -1201,16 +1239,27 @@ std::list<PartEdgePtr> PartEdge::getOperandPartEdge(SgNode* anchor, SgNode* oper
     if(isOperandEdge) {
       SIGHT_VERB(dbg << "    Predecessor is an Operand edge."<<endl, 2, partitionsDebugLevel)
       // Add it to the operand edges
-      ccsOperandEdges.push_back(it.getPartEdge());
+      ccsOperandEdges.insert(it.getPartEdge());
     // Otherwise, keep searching backward
     } else {
       SIGHT_VERB(dbg << "    Not an Operand edge. Moving on..."<<endl, 2, partitionsDebugLevel)
       it.pushAllDescendants();
     }
     it++;
+    ++numSteps;
   }
+  gettimeofday(&searchEnd, NULL); cout << "PartEdge::getOperandPartEdge() search\t"<<(((searchEnd.tv_sec*1000000 + searchEnd.tv_usec) - (searchStart.tv_sec*1000000 + searchStart.tv_usec)) / 1000000.0)<<"\t"<<numSteps<<endl;
 
-  return ccsOperandEdges;
+  struct timeval convStart, convEnd; gettimeofday(&convStart, NULL);
+
+  // !!! Should change API to return a set!!!
+  list<PartEdgePtr> ccsOperandEdgesL;
+  for(set<PartEdgePtr>::iterator i=ccsOperandEdges.begin(); i!=ccsOperandEdges.end(); ++i)
+    ccsOperandEdgesL.push_back(*i);
+
+  gettimeofday(&convEnd, NULL); cout << "PartEdge::getOperandPartEdge() convert\t"<<(((convEnd.tv_sec*1000000 + convEnd.tv_usec) - (convStart.tv_sec*1000000 + convStart.tv_usec)) / 1000000.0)<<"\t"<<ccsOperandEdgesL.size()<<endl;
+
+  return ccsOperandEdgesL;*/
 }
 
 // If this and that come from the same analysis, call the type-specific equality test implemented
@@ -1427,6 +1476,7 @@ void intersectEdges(PartEdgePtr parent,
   // If we've reached the last part in parts and outEdgeParts contains all the outgoing PartEdges
   if(curA == analysis2Edges.end()) {
     PartEdgePtr newEdge = makePtr<IntersectionPartEdge>(outPartEdges, parent, analysisOfIntersection);
+    newEdge->init();
     //dbg << "analysisOfIntersection="<<analysisOfIntersection<<" newEdge="<<newEdge->str()<<endl;
     edges.push_back(newEdge);
   // If we haven't yet reached the end, recurse on all the outgoing edges of the current part
@@ -1456,8 +1506,8 @@ std::map<ComposedAnalysis*, std::map<IntersectionPartPtr, std::set<IntersectionP
     Part(analysis)
 { parts.push_back(part); }*/
 
-IntersectionPart::IntersectionPart(const std::map<ComposedAnalysis*, PartPtr>& parts, PartPtr parent) :
-    Part(parent->getAnalysis(), parent), parts(parts), initialized(false)
+IntersectionPart::IntersectionPart(const std::map<ComposedAnalysis*, PartPtr>& parts, PartPtr parent, ComposedAnalysis* analysis) :
+    Part(analysis, parent), parts(parts), initialized(false)
 {}
 
 // Initializes this object and its relationships with the Parts that it contains
@@ -1479,7 +1529,7 @@ std::list<PartEdgePtr> IntersectionPart::outEdges()
 {
   assert(initialized);
 
-  scope s("IntersectionPart::outEdges()");
+  //scope s("IntersectionPart::outEdges()");
   /*scope reg("IntersectionPart::outEdges", scope::high);*/
   // For each part in parts, maps the parent part of each outgoing part to the set of parts that share this parent
   map<PartEdgePtr, map<ComposedAnalysis*, set<PartEdgePtr> > > parent2Out;
@@ -1488,12 +1538,12 @@ std::list<PartEdgePtr> IntersectionPart::outEdges()
     list<PartEdgePtr> out = part->second->outEdges();
     
     // Group these edges according to their common parent edge
-    { scope s("outEdges");
+    //{ scope s("outEdges");
     for(list<PartEdgePtr>::iterator e=out.begin(); e!=out.end(); e++) {
-      dbg << "        e="<<(*e)->str()<<endl;
-      dbg  << "        (*e)->getSupersetPartEdge()="<<(*e)->getSupersetPartEdge()->str()<<endl;
+      //dbg << "        e="<<(*e)->str()<<endl;
+      //dbg  << "        (*e)->getSupersetPartEdge()="<<(*e)->getSupersetPartEdge()->str()<<endl;
       parent2Out[(*e)->getSupersetPartEdge()][part->first].insert(*e);
-    } }
+    } //}
   }
   
   /*for(map<PartEdgePtr, map<ComposedAnalysis*, set<PartEdgePtr> > >::iterator p=parent2Out.begin(); p!=parent2Out.end(); p++) {
@@ -1513,7 +1563,7 @@ std::list<PartEdgePtr> IntersectionPart::outEdges()
       par!=parent2Out.end(); par++) {
     map<ComposedAnalysis*, PartEdgePtr> outPartEdges;
     assert(par->second.size()!=0);
-    dbg << "IntersectionPart::outEdges(): parent = "<<par->first->str()<<endl;
+    //dbg << "IntersectionPart::outEdges(): parent = "<<par->first->str()<<endl;
     intersectEdges(par->first, par->second.begin(), par->second, outPartEdges, edges, analysis);
   }
   
@@ -1525,8 +1575,8 @@ std::list<PartEdgePtr> IntersectionPart::outEdges()
   // Cache the outgoing edges in Part2InEdges
   for(std::list<PartEdgePtr>::iterator e=edges.begin(); e!=edges.end(); ++e) {
     Part2InEdges[getAnalysis()][(*e)->target()].insert(*e);
-    dbg << "IntersectionPart::outEdges(): #Part2InEdges["<<getAnalysis()->str()<<"]["<<(*e)->target()->str()<<"]="<<Part2InEdges[getAnalysis()][(*e)->target()].size()<<endl;
-    dbg << "    "<<(*e)->str()<<endl;
+    //dbg << "IntersectionPart::outEdges(): #Part2InEdges["<<getAnalysis()->str()<<"]["<<(*e)->target()->str()<<"]="<<Part2InEdges[getAnalysis()][(*e)->target()].size()<<endl;
+    //dbg << "    "<<(*e)->str()<<endl;
   }
 
   return edges;
@@ -1538,16 +1588,16 @@ std::list<PartEdgePtr> IntersectionPart::inEdges()
 {
   assert(initialized);
 
-  scope s("IntersectionPart::inEdges()");
-  dbg << "#Part2InEdges["<<getAnalysis()->str()<<"]["<<str()<<"]="<<Part2InEdges[getAnalysis()][shared_from_this()].size()<<endl;
+  SIGHT_VERB_DECL(scope, ("IntersectionPart::inEdges()"), 2, partitionsDebugLevel)
+  SIGHT_VERB(dbg << "#Part2InEdges["<<getAnalysis()->str()<<"]["<<str()<<"]="<<Part2InEdges[getAnalysis()][shared_from_this()].size()<<endl, 2, partitionsDebugLevel)
 
   // If we've already cached this Part's incoming edges, return the cached set
   if(Part2InEdges[getAnalysis()].find(shared_from_this()) != Part2InEdges[getAnalysis()].end()) {
     set<IntersectionPartEdgePtr>& edgesS = Part2InEdges[getAnalysis()][shared_from_this()];
     list<PartEdgePtr> edgesL;
-    scope s("inEdges");
+    //scope s("inEdges");
     for(set<IntersectionPartEdgePtr>::iterator e=edgesS.begin(); e!=edgesS.end(); ++e) {
-      dbg << "    "<<(*e)->str()<<endl;
+      //dbg << "    "<<(*e)->str()<<endl;
       edgesL.push_back(*e);
     }
     return edgesL;
@@ -1717,7 +1767,7 @@ set<PartPtr> IntersectionPart::matchingCallParts() const {
   // The set of IntersectionParts that correspond to the mappes associated with the superset keys in allMCParts
   set<PartPtr> allMCInterParts;
   for(map<PartPtr, map<ComposedAnalysis*, PartPtr> >::iterator mcp=allMCParts.begin(); mcp!=allMCParts.end(); ++mcp) {
-    IntersectionPartPtr interPart = makePtr<IntersectionPart>(mcp->second, mcp->first);
+    IntersectionPartPtr interPart = makePtr<IntersectionPart>(mcp->second, mcp->first, getAnalysis());
     interPart->init();
     allMCInterParts.insert(interPart);
   }
@@ -1806,11 +1856,13 @@ PartEdgePtr IntersectionPart::inEdgeFromAny()
 {
   assert(initialized);
   //cout << "IntersectionPart::inEdgeFromAny() getSupersetPart()="<<getSupersetPart()->str()<<endl;
-  return makePtr<IntersectionPartEdge>(/*isInEdgeFromAny*/ true, /*outEdgeToAny*/ false, 
+  IntersectionPartEdgePtr iEdge =
+      makePtr<IntersectionPartEdge>(/*isInEdgeFromAny*/ true, /*outEdgeToAny*/ false,
                                        /*sourceTargetPart*/ shared_from_this(),
                                        /*parent*/ (getSupersetPart()? getSupersetPart()->inEdgeFromAny() : NULLPartEdge),
-                                       /*analysis*/ analysis);
-
+                                       /*analysis*/ getAnalysis());
+  iEdge->init();
+  return iEdge;
 /*  // Collect the incoming edges from each sub-part and intersect them
   map<ComposedAnalysis*, PartEdgePtr> edges;
   for(map<ComposedAnalysis*, PartPtr>::iterator part=parts.begin(); part!=parts.end(); part++) {
@@ -1826,10 +1878,18 @@ PartEdgePtr IntersectionPart::outEdgeToAny()
 {
   assert(initialized);
 
-  return makePtr<IntersectionPartEdge>(/*isInEdgeFromAny*/ false, /*outEdgeToAny*/ true, 
+  /*scope s("IntersectionPart::outEdgeToAny()");
+  dbg << "this="<<str()<<endl;
+  dbg << "getSupersetPart()="<<getSupersetPart()->str()<<endl;
+  dbg << "getSupersetPart()->outEdgeToAny()="<<getSupersetPart()->outEdgeToAny()->str()<<endl;*/
+
+  IntersectionPartEdgePtr iEdge =
+      makePtr<IntersectionPartEdge>(/*isInEdgeFromAny*/ false, /*outEdgeToAny*/ true,
                                        /*sourceTargetPart*/ shared_from_this(),
                                        /*parent*/ (getSupersetPart()? getSupersetPart()->outEdgeToAny() : NULLPartEdge),
-                                       /*analysis*/ analysis);
+                                       /*analysis*/ getAnalysis());
+  iEdge->init();
+  return iEdge;
 /*  // Collect the outgoing edges from each sub-part and intersect them
   map<ComposedAnalysis*, PartEdgePtr> edges;
   for(map<ComposedAnalysis*, PartPtr>::iterator part=parts.begin(); part!=parts.end(); part++)
@@ -1921,7 +1981,8 @@ std::string IntersectionPart::str(std::string indent) const
 // Two Parts appear within the same IntersectionPart if they have the same parent Part. If a given parent
 // Part has derived parts in sets associated with some but not all analyses, these derived parts are excluded
 // from the set returned by this function.
-std::set<PartPtr> createIntersectionPartSet(const std::map<ComposedAnalysis*, std::set<PartPtr> >& subParts) {
+std::set<PartPtr> createIntersectionPartSet(const std::map<ComposedAnalysis*, std::set<PartPtr> >& subParts,
+                                            ComposedAnalysis* analysis) {
   /*scope reg("IntersectionPart::outEdges", scope::high);*/
   // Maps each parent Part to the Parts in subParts that derive from it, one per ComposedAnalysis
   map<PartPtr, map<ComposedAnalysis*, PartPtr> > parent2Parts;
@@ -1944,7 +2005,7 @@ std::set<PartPtr> createIntersectionPartSet(const std::map<ComposedAnalysis*, st
         analysisParts.insert(i->second);*/
 
       // Create an IntersectionPart for this parent Part and add it to interParts
-      IntersectionPartPtr newPart = makePtr<IntersectionPart>(p->second, p->first);
+      IntersectionPartPtr newPart = makePtr<IntersectionPart>(p->second, p->first, analysis);
       newPart->init();
       interParts.insert(newPart);
     }
@@ -2012,8 +2073,8 @@ PartPtr IntersectionPartEdge::source() const {
   if(isInEdgeFromAny) {
     return NULLPart;
   } else if(isOutEdgeToAny) {
-    assert(cachedTarget);
-    return cachedTarget;
+    assert(cachedSource);
+    return cachedSource;
   } else {
     map<ComposedAnalysis*, PartPtr> sourceParts;
     bool allNULL=true; // True if all the source parts of the sub-edges are NULL, false otherwise.
@@ -2038,7 +2099,7 @@ PartPtr IntersectionPartEdge::source() const {
     }
     if(allNULL) return NULLPart;
     else  {
-      IntersectionPartPtr newPart = makePtr<IntersectionPart>(sourceParts, srcParent);
+      IntersectionPartPtr newPart = makePtr<IntersectionPart>(sourceParts, srcParent, getAnalysis());
       newPart->init();
       return newPart;
     }
@@ -2076,7 +2137,7 @@ PartPtr IntersectionPartEdge::target() const {
     }
     if(allNULL) return NULLPart;
     else {
-      IntersectionPartPtr newPart = makePtr<IntersectionPart>(targetParts, tgtParent);
+      IntersectionPartPtr newPart = makePtr<IntersectionPart>(targetParts, tgtParent, getAnalysis());
       newPart->init();
       return newPart;
     }
@@ -2316,7 +2377,7 @@ bool IntersectionPartEdge::isEqualRemap
 //    some MemLocs are in scope on one side of Part, while others are in scope on the other side. 
 //    fromPEdge is the edge from which control is passing and the current PartEdge (same as the PartEdge of 
 //    the Lattice) is the one to which control is passing.
-Lattice* IntersectionPartEdge::forwardRemapML(Lattice* lat, PartEdgePtr fromPEdge, ComposedAnalysis* client) 
+/*Lattice* IntersectionPartEdge::forwardRemapML(Lattice* lat, PartEdgePtr fromPEdge, ComposedAnalysis* client)
 {
   if(isInEdgeFromAny) assert(0);
   if(isOutEdgeToAny)  assert(0);
@@ -2327,6 +2388,7 @@ Lattice* IntersectionPartEdge::forwardRemapML(Lattice* lat, PartEdgePtr fromPEdg
   assert(makePtrFromThis(shared_from_this()) == lat->getPartEdge());
 
   // Since all the edges have the same remapper, call the remapper of the first one
+  //return edges.begin()->second->forwardRemapML(lat, fromPEdge, client);
   return edges.begin()->second->forwardRemapML(lat, fromPEdge, client);
 }
 
@@ -2342,14 +2404,14 @@ Lattice* IntersectionPartEdge::backwardRemapML(Lattice* lat, PartEdgePtr fromPEd
   
   // Since all the edges have the same remapper, call the remapper of the first one
   return edges.begin()->second->backwardRemapML(lat, fromPEdge, client);
-}
+}*/
 
 std::string IntersectionPartEdge::str(std::string indent) const
 {
   ostringstream oss;
   oss << "[IntersectionPartEdge:";
   if(isInEdgeFromAny)      { assert(cachedTarget); oss << "* ==> "<<cachedTarget->str()<<"]"; }
-  else if(isOutEdgeToAny)  { assert(cachedSource); oss << "* ==> "<<cachedSource->str()<<"]"; }
+  else if(isOutEdgeToAny)  { assert(cachedSource); oss << cachedSource->str()<<" ==> *]"; }
   else {
     if(edges.size() > 1) oss << endl;
     for(map<ComposedAnalysis*, PartEdgePtr>::const_iterator edge=edges.begin(); edge!=edges.end(); ) {
@@ -2365,13 +2427,16 @@ std::string IntersectionPartEdge::str(std::string indent) const
   return oss.str();
 }
 
-/**************************************
- ***** Identity Part and PartEdge *****
- **************************************/
+/*
+ !!! These ended up being useless and are now deprecated !!!
 
-/************************
+/ **************************************
+ ***** Identity Part and PartEdge *****
+ ************************************** /
+
+/ ************************
  ***** IdentityPart *****
- ************************/
+ ************************ /
 
 IdentityPart::IdentityPart(PartPtr base):
     Part(base->getAnalysis(), NULLPart),
@@ -2418,7 +2483,7 @@ PartPtr IdentityPart::getParentSupersetPart() const { return base; }
 
 // Returns the Part where the lattices computed by the analysis that implements this Part may
 // be found. This Part should never be NULL.
-PartPtr IdentityPart::getATSLocationPart() const { return ((IdentityPart*)this)->shared_from_this();/*base;*/ }
+PartPtr IdentityPart::getATSLocationPart() const { return ((IdentityPart*)this)->shared_from_this();/ *base;* / }
 
 // Sets this Part's atsLocationPart
 void IdentityPart::setATSLocationPart(PartPtr atsLocationPart) { assert(0); }
@@ -2507,9 +2572,9 @@ bool IdentityPart::mayMatchFuncCall(PartPtr that_arg) {
 // If this and that come from the same analysis, call the type-specific equality test implemented
 // in the derived class. Otherwise, these Parts are not equal.
 bool IdentityPart::equal(const PartPtr& that_arg) const {
-  /*scope s("IdentityPart::equal");
+  / *scope s("IdentityPart::equal");
   dbg << "this="<<str()<<endl;
-  dbg << "that="<<that_arg->str()<<endl;*/
+  dbg << "that="<<that_arg->str()<<endl;* /
   IdentityPartPtr that = dynamicPtrCast<IdentityPart>(that_arg);
   //dbg << "equal="<<base->equal(that->base)<<endl;
   assert(that);
@@ -2520,9 +2585,9 @@ bool IdentityPart::equal(const PartPtr& that_arg) const {
 // in the derived class. Otherwise, determine inequality by comparing the analysis pointers.
 bool IdentityPart::less(const PartPtr& that_arg) const
 {
-  /*scope s("IdentityPart::less");
+  / *scope s("IdentityPart::less");
   dbg << "this="<<str()<<endl;
-  dbg << "that="<<that_arg->str()<<endl;*/
+  dbg << "that="<<that_arg->str()<<endl;* /
   IdentityPartPtr that = dynamicPtrCast<IdentityPart>(that_arg);
   assert(that);
   //dbg << "less="<<base->less(that->base)<<endl;
@@ -2533,9 +2598,9 @@ std::string IdentityPart::str(std::string indent) const
 { return string(txt()<<"[IdentityPart:"<<base->str(indent)<<"]"); }
 
 
-/*****************************
+/ ****************************
  ***** IdentityPartEdge *****
- *****************************/
+ **************************** /
 
 IdentityPartEdge::IdentityPartEdge(PartEdgePtr base) :
     PartEdge(base->getAnalysis(), NULLPartEdge, NULLPartEdge),
@@ -2566,14 +2631,14 @@ bool IdentityPartEdge::compatible(PartEdgePtr that_arg) {
 // the hierarchical descent of this PartEdge and makes it possible to find the common parent of parts
 // derived from different analyses.
 // Returns NULLPartEdge if this part has no parents (i.e. it is implemented by the syntactic analysis)
-PartEdgePtr IdentityPartEdge::getSupersetPartEdge() const { return ((IdentityPartEdge*)this)->shared_from_this();/*base;*/ }
+PartEdgePtr IdentityPartEdge::getSupersetPartEdge() const { return ((IdentityPartEdge*)this)->shared_from_this();/ *base;* / }
 
 // Sets this PartEdge's parent
 void IdentityPartEdge::setSupersetPartEdge(PartEdgePtr supersetPartEdge) { assert(0); }
 
 // Returns the PartEdge where the lattices computed by the analysis that implements this PartEdge may
 // be found. This PartEdge should never be NULL.
-PartEdgePtr IdentityPartEdge::getATSLocationPartEdge() const { return ((IdentityPartEdge*)this)->shared_from_this();/*base;*/ }
+PartEdgePtr IdentityPartEdge::getATSLocationPartEdge() const { return ((IdentityPartEdge*)this)->shared_from_this();/ *base;* / }
 
 // Sets this PartEdge's atsLocationPartEdge
 void IdentityPartEdge::setATSLocationPartEdge(PartEdgePtr atsLocationPartEdge) { assert(0); }
@@ -2626,9 +2691,9 @@ std::map<CFGNode, boost::shared_ptr<SgValueExp> > IdentityPartEdge::getPredicate
 // in the derived class. Otherwise, these Parts are not equal.
 bool IdentityPartEdge::equal(const PartEdgePtr& that_arg) const
 {
-  /*scope s("IdentityPartEdge::equal");
+  / *scope s("IdentityPartEdge::equal");
   dbg << "this="<<str()<<endl;
-  dbg << "that="<<that_arg->str()<<endl;*/
+  dbg << "that="<<that_arg->str()<<endl;* /
   IdentityPartEdgePtr that = dynamicPtrCast<IdentityPartEdge>(that_arg);
   assert(that);
   //dbg << "equal="<<base->equal(that->base)<<endl;
@@ -2639,9 +2704,9 @@ bool IdentityPartEdge::equal(const PartEdgePtr& that_arg) const
 // in the derived class. Otherwise, determine inequality by comparing the analysis pointers.
 bool IdentityPartEdge::less(const PartEdgePtr& that_arg) const
 {
-  /*scope s("IdentityPartEdge::less");
+  / *scope s("IdentityPartEdge::less");
   dbg << "this="<<str()<<endl;
-  dbg << "that="<<that_arg->str()<<endl;*/
+  dbg << "that="<<that_arg->str()<<endl;* /
   IdentityPartEdgePtr that = dynamicPtrCast<IdentityPartEdge>(that_arg);
   assert(that);
   //dbg << "less="<<base->less(that->base)<<endl;
@@ -2668,6 +2733,8 @@ Lattice* IdentityPartEdge::backwardRemapML(Lattice* lat, PartEdgePtr fromPEdge_a
 
 std::string IdentityPartEdge::str(std::string indent) const
 { return string(txt()<<"[IdentityPartEdge:"<<base->str(indent)<<"]"); }
+*/
+
 
 /**********************
  ****** Utilities *****

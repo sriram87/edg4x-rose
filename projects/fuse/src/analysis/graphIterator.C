@@ -31,23 +31,29 @@ graphIterOrderT selectIterOrderFromEnvironment() {
  ****************************************/
 
 template <class GraphEdgePtr, class GraphNodePtr>
-graphEdgeIterator<GraphEdgePtr, GraphNodePtr>::graphEdgeIterator(iterDirection dir, graphIterOrderT iterOrder, bool initialized): 
-    dir(dir), iterOrder(iterOrder), initialized(initialized)
+graphEdgeIterator<GraphEdgePtr, GraphNodePtr>::graphEdgeIterator(bool incrementalGraph,
+                                                                 iterDirection dir, graphIterOrderT iterOrder,
+                                                                 bool initialized):
+    incrementalGraph(incrementalGraph), dir(dir), iterOrder(iterOrder), initialized(initialized)
 {
   worklist = createWorklist(iterOrder);
 }
 
 template <class GraphEdgePtr, class GraphNodePtr>
-graphEdgeIterator<GraphEdgePtr, GraphNodePtr>::graphEdgeIterator(const GraphNodePtr start, iterDirection dir, graphIterOrderT iterOrder) : 
-    dir(dir), iterOrder(iterOrder), initialized(false)
+graphEdgeIterator<GraphEdgePtr, GraphNodePtr>::graphEdgeIterator(const GraphNodePtr start,
+                                                                 bool incrementalGraph,
+                                                                 iterDirection dir, graphIterOrderT iterOrder) :
+    incrementalGraph(incrementalGraph), dir(dir), iterOrder(iterOrder), initialized(false)
 {
   worklist = createWorklist(iterOrder);
   init(start);
 }
 
 template <class GraphEdgePtr, class GraphNodePtr>
-graphEdgeIterator<GraphEdgePtr, GraphNodePtr>::graphEdgeIterator(const set<GraphNodePtr>& start, iterDirection dir, graphIterOrderT iterOrder) : 
-      dir(dir), iterOrder(iterOrder), initialized(false)
+graphEdgeIterator<GraphEdgePtr, GraphNodePtr>::graphEdgeIterator(const set<GraphNodePtr>& start,
+                                                                 bool incrementalGraph,
+                                                                 iterDirection dir, graphIterOrderT iterOrder) :
+    incrementalGraph(incrementalGraph), dir(dir), iterOrder(iterOrder), initialized(false)
 {
   worklist = createWorklist(iterOrder);
   init(start);
@@ -55,6 +61,7 @@ graphEdgeIterator<GraphEdgePtr, GraphNodePtr>::graphEdgeIterator(const set<Graph
 
 template <class GraphEdgePtr, class GraphNodePtr>
 graphEdgeIterator<GraphEdgePtr, GraphNodePtr>::graphEdgeIterator(const graphEdgeIterator& that) :
+      incrementalGraph(that.incrementalGraph),
       dir(that.dir),
       iterOrder(that.iterOrder),
       initialized(that.initialized),
@@ -130,6 +137,8 @@ GraphEdgePtr graphEdgeIterator<GraphEdgePtr, GraphNodePtr>::Part2PartEdge(GraphN
 template <class GraphEdgePtr, class GraphNodePtr>
 GraphNodePtr graphEdgeIterator<GraphEdgePtr, GraphNodePtr>::PartEdge2DirPart(GraphEdgePtr pedge) const
 {
+  //cout << "pedge-super="<<pedge->getSupersetPartEdge()->str()<<endl;
+  //cout << "pedge="<<pedge->str()<<endl;
   if(dir==fw) return pedge->target();
   else        return pedge->source();
 }
@@ -194,9 +203,8 @@ void graphEdgeIterator<GraphEdgePtr, GraphNodePtr>::pushAllDescendants(GraphEdge
       remainingNodes.push_back(*it);
     }*/
     
-    // if we haven't yet visited this node, add it to the worklist
     if(visited.find(*it) == visited.end()) {
-//cout << "        Adding descendant "<<(*it)->str()<<endl;
+      //dbg << "        Adding descendant "<<(*it? (*it)->str():"NULL")<<endl;
       worklist->add(*it);
     }
   }
@@ -288,7 +296,6 @@ void graphEdgeIterator<GraphEdgePtr, GraphNodePtr>::advance(bool pushAllChildren
     
     if(pushAllChildren)
       pushAllDescendants(cur);
-
   }
 }
 
@@ -508,21 +515,24 @@ string graphEdgeIterator<GraphEdgePtr, GraphNodePtr>::str(string indent) const
   return outs.str();
 }
 
-/*************************************
- ******* FORWARD_EDGE_ITERATOR *******
- *************************************/
+/************************************
+ ******* fw_graphEdgeIterator *******
+ ************************************/
 
 template <class GraphEdgePtr, class GraphNodePtr>
-fw_graphEdgeIterator<GraphEdgePtr, GraphNodePtr>::fw_graphEdgeIterator(graphIterOrderT iterOrder, bool initialized): 
-  graphEdgeIterator<GraphEdgePtr, GraphNodePtr>(graphEdgeIterator<GraphEdgePtr, GraphNodePtr>::fw, iterOrder, initialized) {}
+fw_graphEdgeIterator<GraphEdgePtr, GraphNodePtr>::fw_graphEdgeIterator(bool incrementalGraph,
+                                                                       graphIterOrderT iterOrder, bool initialized):
+  graphEdgeIterator<GraphEdgePtr, GraphNodePtr>(incrementalGraph, graphEdgeIterator<GraphEdgePtr, GraphNodePtr>::fw, iterOrder, initialized) {}
 
 template <class GraphEdgePtr, class GraphNodePtr>
-fw_graphEdgeIterator<GraphEdgePtr, GraphNodePtr>::fw_graphEdgeIterator(const GraphNodePtr start, graphIterOrderT iterOrder): 
-  graphEdgeIterator<GraphEdgePtr, GraphNodePtr>(start, graphEdgeIterator<GraphEdgePtr, GraphNodePtr>::fw, iterOrder) { }
+fw_graphEdgeIterator<GraphEdgePtr, GraphNodePtr>::fw_graphEdgeIterator(const GraphNodePtr start, bool incrementalGraph,
+                                                                       graphIterOrderT iterOrder):
+  graphEdgeIterator<GraphEdgePtr, GraphNodePtr>(start, incrementalGraph, graphEdgeIterator<GraphEdgePtr, GraphNodePtr>::fw, iterOrder) { }
 
 template <class GraphEdgePtr, class GraphNodePtr>
-fw_graphEdgeIterator<GraphEdgePtr, GraphNodePtr>::fw_graphEdgeIterator(const std::set<GraphNodePtr>& start, graphIterOrderT iterOrder): 
-  graphEdgeIterator<GraphEdgePtr, GraphNodePtr>(start, graphEdgeIterator<GraphEdgePtr, GraphNodePtr>::fw, iterOrder) { }
+fw_graphEdgeIterator<GraphEdgePtr, GraphNodePtr>::fw_graphEdgeIterator(const std::set<GraphNodePtr>& start, bool incrementalGraph,
+                                                                       graphIterOrderT iterOrder):
+  graphEdgeIterator<GraphEdgePtr, GraphNodePtr>(start, incrementalGraph, graphEdgeIterator<GraphEdgePtr, GraphNodePtr>::fw, iterOrder) { }
 
 template <class GraphEdgePtr, class GraphNodePtr>
 fw_graphEdgeIterator<GraphEdgePtr, GraphNodePtr> 
@@ -531,21 +541,24 @@ fw_graphEdgeIterator<GraphEdgePtr, GraphNodePtr>
   return fw_graphEdgeIterator(n);
 }
 
-/**********************************
- ******* bw_EDGE_ITERATOR *******
- *********************************/
+/************************************
+ ******* bw_graphEdgeIterator *******
+ ************************************/
 
 template <class GraphEdgePtr, class GraphNodePtr>
-bw_graphEdgeIterator<GraphEdgePtr, GraphNodePtr>::bw_graphEdgeIterator(graphIterOrderT iterOrder, bool initialized): 
-  graphEdgeIterator<GraphEdgePtr, GraphNodePtr>(graphEdgeIterator<GraphEdgePtr, GraphNodePtr>::bw, iterOrder, initialized) {}
+bw_graphEdgeIterator<GraphEdgePtr, GraphNodePtr>::bw_graphEdgeIterator(bool incrementalGraph,
+                                                                       graphIterOrderT iterOrder, bool initialized):
+  graphEdgeIterator<GraphEdgePtr, GraphNodePtr>(incrementalGraph, graphEdgeIterator<GraphEdgePtr, GraphNodePtr>::bw, iterOrder, initialized) {}
 
 template <class GraphEdgePtr, class GraphNodePtr>
-bw_graphEdgeIterator<GraphEdgePtr, GraphNodePtr>::bw_graphEdgeIterator(const GraphNodePtr start, graphIterOrderT iterOrder): 
-  graphEdgeIterator<GraphEdgePtr, GraphNodePtr>(start, graphEdgeIterator<GraphEdgePtr, GraphNodePtr>::bw, iterOrder) { }
+bw_graphEdgeIterator<GraphEdgePtr, GraphNodePtr>::bw_graphEdgeIterator(const GraphNodePtr start, bool incrementalGraph,
+                                                                       graphIterOrderT iterOrder):
+  graphEdgeIterator<GraphEdgePtr, GraphNodePtr>(start, incrementalGraph, graphEdgeIterator<GraphEdgePtr, GraphNodePtr>::bw, iterOrder) { }
 
 template <class GraphEdgePtr, class GraphNodePtr>
-bw_graphEdgeIterator<GraphEdgePtr, GraphNodePtr>::bw_graphEdgeIterator(const std::set<GraphNodePtr>& start, graphIterOrderT iterOrder): 
-  graphEdgeIterator<GraphEdgePtr, GraphNodePtr>(start, graphEdgeIterator<GraphEdgePtr, GraphNodePtr>::bw, iterOrder) { }
+bw_graphEdgeIterator<GraphEdgePtr, GraphNodePtr>::bw_graphEdgeIterator(const std::set<GraphNodePtr>& start, bool incrementalGraph,
+                                                                       graphIterOrderT iterOrder):
+  graphEdgeIterator<GraphEdgePtr, GraphNodePtr>(start, incrementalGraph, graphEdgeIterator<GraphEdgePtr, GraphNodePtr>::bw, iterOrder) { }
 
 template <class GraphEdgePtr, class GraphNodePtr>
 bw_graphEdgeIterator<GraphEdgePtr, GraphNodePtr> 
@@ -605,13 +618,18 @@ Part* bw_partIterator::operator -> ()
  ***********************************/
 
 template <class GraphEdgePtr, class GraphNodePtr>
-dataflowGraphEdgeIterator<GraphEdgePtr, GraphNodePtr>::dataflowGraphEdgeIterator(typename graphEdgeIterator<GraphEdgePtr, GraphNodePtr>::iterDirection dir, graphIterOrderT iterOrder) : 
-    graphEdgeIterator<GraphEdgePtr, GraphNodePtr>(dir, iterOrder, false)
+dataflowGraphEdgeIterator<GraphEdgePtr, GraphNodePtr>::dataflowGraphEdgeIterator(
+             bool incrementalGraph,
+             typename graphEdgeIterator<GraphEdgePtr, GraphNodePtr>::iterDirection dir, graphIterOrderT iterOrder) :
+    graphEdgeIterator<GraphEdgePtr, GraphNodePtr>(incrementalGraph, dir, iterOrder, false)
 { }
 
 template <class GraphEdgePtr, class GraphNodePtr>
-dataflowGraphEdgeIterator<GraphEdgePtr, GraphNodePtr>::dataflowGraphEdgeIterator(const GraphNodePtr& terminator_arg, typename graphEdgeIterator<GraphEdgePtr, GraphNodePtr>::iterDirection dir, graphIterOrderT iterOrder) : 
-    graphEdgeIterator<GraphEdgePtr, GraphNodePtr>(dir, iterOrder, false)
+dataflowGraphEdgeIterator<GraphEdgePtr, GraphNodePtr>::dataflowGraphEdgeIterator(
+             const GraphNodePtr& terminator_arg,
+             bool incrementalGraph,
+             typename graphEdgeIterator<GraphEdgePtr, GraphNodePtr>::iterDirection dir, graphIterOrderT iterOrder) :
+    graphEdgeIterator<GraphEdgePtr, GraphNodePtr>(incrementalGraph, dir, iterOrder, false)
 {
   terminators.insert(terminator_arg);
   // Record that the terminator has been visited to ensure that it is never analyzed
@@ -619,8 +637,11 @@ dataflowGraphEdgeIterator<GraphEdgePtr, GraphNodePtr>::dataflowGraphEdgeIterator
 }
 
 template <class GraphEdgePtr, class GraphNodePtr>
-dataflowGraphEdgeIterator<GraphEdgePtr, GraphNodePtr>::dataflowGraphEdgeIterator(const GraphNodePtr& start, const GraphNodePtr& terminator_arg, typename graphEdgeIterator<GraphEdgePtr, GraphNodePtr>::iterDirection dir, graphIterOrderT iterOrder) : 
-    graphEdgeIterator<GraphEdgePtr, GraphNodePtr>(start, dir, iterOrder)
+dataflowGraphEdgeIterator<GraphEdgePtr, GraphNodePtr>::dataflowGraphEdgeIterator(
+              const GraphNodePtr& start, const GraphNodePtr& terminator_arg,
+              bool incrementalGraph,
+              typename graphEdgeIterator<GraphEdgePtr, GraphNodePtr>::iterDirection dir, graphIterOrderT iterOrder) :
+    graphEdgeIterator<GraphEdgePtr, GraphNodePtr>(start, incrementalGraph, dir, iterOrder)
 {
   terminators.insert(terminator_arg);
   // Record that the terminator has been visited to ensure that it is never analyzed
@@ -630,8 +651,11 @@ dataflowGraphEdgeIterator<GraphEdgePtr, GraphNodePtr>::dataflowGraphEdgeIterator
 }
 
 template <class GraphEdgePtr, class GraphNodePtr>
-dataflowGraphEdgeIterator<GraphEdgePtr, GraphNodePtr>::dataflowGraphEdgeIterator(const std::set<GraphNodePtr>& terminators_arg, typename graphEdgeIterator<GraphEdgePtr, GraphNodePtr>::iterDirection dir, graphIterOrderT iterOrder) :
-      graphEdgeIterator<GraphEdgePtr, GraphNodePtr>(dir, iterOrder, true), terminators(terminators_arg)
+dataflowGraphEdgeIterator<GraphEdgePtr, GraphNodePtr>::dataflowGraphEdgeIterator(
+              const std::set<GraphNodePtr>& terminators_arg,
+              bool incrementalGraph,
+              typename graphEdgeIterator<GraphEdgePtr, GraphNodePtr>::iterDirection dir, graphIterOrderT iterOrder) :
+      graphEdgeIterator<GraphEdgePtr, GraphNodePtr>(incrementalGraph, dir, iterOrder, true), terminators(terminators_arg)
 {
   // Record that the terminator has been visited to ensure that it is never analyzed
   /*for(typename set<GraphNodePtr>::iterator i=terminators.begin(); i!=terminators.end(); i++)
@@ -639,8 +663,11 @@ dataflowGraphEdgeIterator<GraphEdgePtr, GraphNodePtr>::dataflowGraphEdgeIterator
 }
 
 template <class GraphEdgePtr, class GraphNodePtr>
-dataflowGraphEdgeIterator<GraphEdgePtr, GraphNodePtr>::dataflowGraphEdgeIterator(const GraphNodePtr& start, const std::set<GraphNodePtr>& terminators_arg, typename graphEdgeIterator<GraphEdgePtr, GraphNodePtr>::iterDirection dir, graphIterOrderT iterOrder): 
-    graphEdgeIterator<GraphEdgePtr, GraphNodePtr>(start, dir, iterOrder), terminators(terminators_arg)
+dataflowGraphEdgeIterator<GraphEdgePtr, GraphNodePtr>::dataflowGraphEdgeIterator(
+              const GraphNodePtr& start, const std::set<GraphNodePtr>& terminators_arg,
+              bool incrementalGraph,
+              typename graphEdgeIterator<GraphEdgePtr, GraphNodePtr>::iterDirection dir, graphIterOrderT iterOrder):
+    graphEdgeIterator<GraphEdgePtr, GraphNodePtr>(start, incrementalGraph, dir, iterOrder), terminators(terminators_arg)
 {
 /*  // Record that the terminator has been visited to ensure that it is never analyzed
   for(typename set<GraphNodePtr>::iterator i=terminators.begin(); i!=terminators.end(); i++)
@@ -776,28 +803,46 @@ string dataflowGraphEdgeIterator<GraphEdgePtr, GraphNodePtr>::str(string indent)
 *****************************/
 
 template <class GraphEdgePtr, class GraphNodePtr>
-fw_dataflowGraphEdgeIterator<GraphEdgePtr, GraphNodePtr>::fw_dataflowGraphEdgeIterator(graphIterOrderT iterOrder) : 
-        graphEdgeIterator<GraphEdgePtr, GraphNodePtr>(graphEdgeIterator<GraphEdgePtr, GraphNodePtr>::fw, iterOrder, false), 
-        dataflowGraphEdgeIterator<GraphEdgePtr, GraphNodePtr>(graphEdgeIterator<GraphEdgePtr, GraphNodePtr>::fw, iterOrder), 
-        fw_graphEdgeIterator<GraphEdgePtr, GraphNodePtr>(iterOrder, false) {}
+fw_dataflowGraphEdgeIterator<GraphEdgePtr, GraphNodePtr>::fw_dataflowGraphEdgeIterator(
+                 bool incrementalGraph, graphIterOrderT iterOrder) :
+        graphEdgeIterator<GraphEdgePtr, GraphNodePtr>(incrementalGraph, graphEdgeIterator<GraphEdgePtr, GraphNodePtr>::fw, iterOrder, false),
+        dataflowGraphEdgeIterator<GraphEdgePtr, GraphNodePtr>(incrementalGraph, graphEdgeIterator<GraphEdgePtr, GraphNodePtr>::fw, iterOrder),
+        fw_graphEdgeIterator<GraphEdgePtr, GraphNodePtr>(incrementalGraph, iterOrder, false) {}
+
 template <class GraphEdgePtr, class GraphNodePtr>
-fw_dataflowGraphEdgeIterator<GraphEdgePtr, GraphNodePtr>::fw_dataflowGraphEdgeIterator(const GraphNodePtr& terminator_arg, graphIterOrderT iterOrder) : 
-        graphEdgeIterator<GraphEdgePtr, GraphNodePtr>(graphEdgeIterator<GraphEdgePtr, GraphNodePtr>::fw, iterOrder, false), 
-        dataflowGraphEdgeIterator<GraphEdgePtr, GraphNodePtr>(terminator_arg, graphEdgeIterator<GraphEdgePtr, GraphNodePtr>::fw, iterOrder) {}
+fw_dataflowGraphEdgeIterator<GraphEdgePtr, GraphNodePtr>::fw_dataflowGraphEdgeIterator(
+                 const GraphNodePtr& terminator_arg,
+                 bool incrementalGraph,
+                 graphIterOrderT iterOrder) :
+        graphEdgeIterator<GraphEdgePtr, GraphNodePtr>(incrementalGraph, graphEdgeIterator<GraphEdgePtr, GraphNodePtr>::fw, iterOrder, false),
+        dataflowGraphEdgeIterator<GraphEdgePtr, GraphNodePtr>(terminator_arg, incrementalGraph, graphEdgeIterator<GraphEdgePtr, GraphNodePtr>::fw, iterOrder),
+        fw_graphEdgeIterator<GraphEdgePtr, GraphNodePtr>(incrementalGraph, iterOrder) {}
+
 template <class GraphEdgePtr, class GraphNodePtr>
-fw_dataflowGraphEdgeIterator<GraphEdgePtr, GraphNodePtr>::fw_dataflowGraphEdgeIterator(const set<GraphNodePtr>& terminators_arg, graphIterOrderT iterOrder) : 
-        graphEdgeIterator<GraphEdgePtr, GraphNodePtr>(graphEdgeIterator<GraphEdgePtr, GraphNodePtr>::fw, iterOrder, false), 
-        dataflowGraphEdgeIterator<GraphEdgePtr, GraphNodePtr>(terminators_arg, graphEdgeIterator<GraphEdgePtr, GraphNodePtr>::fw, iterOrder) {}
+fw_dataflowGraphEdgeIterator<GraphEdgePtr, GraphNodePtr>::fw_dataflowGraphEdgeIterator(
+                 const set<GraphNodePtr>& terminators_arg,
+                 bool incrementalGraph,
+                 graphIterOrderT iterOrder) :
+        graphEdgeIterator<GraphEdgePtr, GraphNodePtr>(incrementalGraph, graphEdgeIterator<GraphEdgePtr, GraphNodePtr>::fw, iterOrder, false),
+        dataflowGraphEdgeIterator<GraphEdgePtr, GraphNodePtr>(terminators_arg, incrementalGraph, graphEdgeIterator<GraphEdgePtr, GraphNodePtr>::fw, iterOrder),
+        fw_graphEdgeIterator<GraphEdgePtr, GraphNodePtr>(incrementalGraph, iterOrder){}
+
 template <class GraphEdgePtr, class GraphNodePtr>
-fw_dataflowGraphEdgeIterator<GraphEdgePtr, GraphNodePtr>::fw_dataflowGraphEdgeIterator(const GraphNodePtr end, const GraphNodePtr& terminator_arg, graphIterOrderT iterOrder): 
-        graphEdgeIterator<GraphEdgePtr, GraphNodePtr>(graphEdgeIterator<GraphEdgePtr, GraphNodePtr>::fw, iterOrder, true), 
-        dataflowGraphEdgeIterator<GraphEdgePtr, GraphNodePtr>(end, terminator_arg, graphEdgeIterator<GraphEdgePtr, GraphNodePtr>::fw, iterOrder), 
-        fw_graphEdgeIterator<GraphEdgePtr, GraphNodePtr>(end) {}
+fw_dataflowGraphEdgeIterator<GraphEdgePtr, GraphNodePtr>::fw_dataflowGraphEdgeIterator(
+                 const GraphNodePtr end, const GraphNodePtr& terminator_arg,
+                 bool incrementalGraph,
+                 graphIterOrderT iterOrder):
+        graphEdgeIterator<GraphEdgePtr, GraphNodePtr>(incrementalGraph, graphEdgeIterator<GraphEdgePtr, GraphNodePtr>::fw, iterOrder, true),
+        dataflowGraphEdgeIterator<GraphEdgePtr, GraphNodePtr>(end, terminator_arg, incrementalGraph, graphEdgeIterator<GraphEdgePtr, GraphNodePtr>::fw, iterOrder),
+        fw_graphEdgeIterator<GraphEdgePtr, GraphNodePtr>(end, incrementalGraph) {}
 template <class GraphEdgePtr, class GraphNodePtr>
-fw_dataflowGraphEdgeIterator<GraphEdgePtr, GraphNodePtr>::fw_dataflowGraphEdgeIterator(const GraphNodePtr end, const set<GraphNodePtr>& terminators_arg, graphIterOrderT iterOrder): 
-        graphEdgeIterator<GraphEdgePtr, GraphNodePtr>(graphEdgeIterator<GraphEdgePtr, GraphNodePtr>::fw, iterOrder, true), 
-        dataflowGraphEdgeIterator<GraphEdgePtr, GraphNodePtr>(end, terminators_arg, graphEdgeIterator<GraphEdgePtr, GraphNodePtr>::fw, iterOrder), 
-        fw_graphEdgeIterator<GraphEdgePtr, GraphNodePtr>(end) {}
+fw_dataflowGraphEdgeIterator<GraphEdgePtr, GraphNodePtr>::fw_dataflowGraphEdgeIterator(
+                 const GraphNodePtr end, const set<GraphNodePtr>& terminators_arg,
+                 bool incrementalGraph,
+                 graphIterOrderT iterOrder):
+        graphEdgeIterator<GraphEdgePtr, GraphNodePtr>(incrementalGraph, graphEdgeIterator<GraphEdgePtr, GraphNodePtr>::fw, iterOrder, true),
+        dataflowGraphEdgeIterator<GraphEdgePtr, GraphNodePtr>(end, terminators_arg, incrementalGraph, graphEdgeIterator<GraphEdgePtr, GraphNodePtr>::fw, iterOrder),
+        fw_graphEdgeIterator<GraphEdgePtr, GraphNodePtr>(end, incrementalGraph) {}
 
 /*void dataflowGraphEdgeIterator<GraphEdgePtr, GraphNodePtr>::operator ++ (int)
 {
@@ -809,28 +854,43 @@ fw_dataflowGraphEdgeIterator<GraphEdgePtr, GraphNodePtr>::fw_dataflowGraphEdgeIt
 *****************************/
 
 template <class GraphEdgePtr, class GraphNodePtr>
-bw_dataflowGraphEdgeIterator<GraphEdgePtr, GraphNodePtr>::bw_dataflowGraphEdgeIterator(graphIterOrderT iterOrder) : 
-        graphEdgeIterator<GraphEdgePtr, GraphNodePtr>(graphEdgeIterator<GraphEdgePtr, GraphNodePtr>::bw, iterOrder, false), 
-        dataflowGraphEdgeIterator<GraphEdgePtr, GraphNodePtr>(graphEdgeIterator<GraphEdgePtr, GraphNodePtr>::bw, iterOrder), 
-        bw_graphEdgeIterator<GraphEdgePtr, GraphNodePtr>(iterOrder, false) {}
+bw_dataflowGraphEdgeIterator<GraphEdgePtr, GraphNodePtr>::bw_dataflowGraphEdgeIterator(
+                 bool incrementalGraph, graphIterOrderT iterOrder) :
+        graphEdgeIterator<GraphEdgePtr, GraphNodePtr>(incrementalGraph, graphEdgeIterator<GraphEdgePtr, GraphNodePtr>::bw, iterOrder, false),
+        dataflowGraphEdgeIterator<GraphEdgePtr, GraphNodePtr>(incrementalGraph, graphEdgeIterator<GraphEdgePtr, GraphNodePtr>::bw, iterOrder),
+        bw_graphEdgeIterator<GraphEdgePtr, GraphNodePtr>(incrementalGraph, iterOrder, false) {}
 template <class GraphEdgePtr, class GraphNodePtr>
-bw_dataflowGraphEdgeIterator<GraphEdgePtr, GraphNodePtr>::bw_dataflowGraphEdgeIterator(const GraphNodePtr& terminator_arg, graphIterOrderT iterOrder) : 
-        graphEdgeIterator<GraphEdgePtr, GraphNodePtr>(graphEdgeIterator<GraphEdgePtr, GraphNodePtr>::bw, iterOrder, false), 
-        dataflowGraphEdgeIterator<GraphEdgePtr, GraphNodePtr>(terminator_arg, graphEdgeIterator<GraphEdgePtr, GraphNodePtr>::bw, iterOrder) {}
+bw_dataflowGraphEdgeIterator<GraphEdgePtr, GraphNodePtr>::bw_dataflowGraphEdgeIterator(
+                 const GraphNodePtr& terminator_arg,
+                 bool incrementalGraph,
+                 graphIterOrderT iterOrder) :
+        graphEdgeIterator<GraphEdgePtr, GraphNodePtr>(incrementalGraph, graphEdgeIterator<GraphEdgePtr, GraphNodePtr>::bw, iterOrder, false),
+        dataflowGraphEdgeIterator<GraphEdgePtr, GraphNodePtr>(terminator_arg, incrementalGraph, graphEdgeIterator<GraphEdgePtr, GraphNodePtr>::bw, iterOrder),
+        bw_graphEdgeIterator<GraphEdgePtr, GraphNodePtr>(incrementalGraph, iterOrder) {}
 template <class GraphEdgePtr, class GraphNodePtr>
-bw_dataflowGraphEdgeIterator<GraphEdgePtr, GraphNodePtr>::bw_dataflowGraphEdgeIterator(const set<GraphNodePtr>& terminators_arg, graphIterOrderT iterOrder) : 
-        graphEdgeIterator<GraphEdgePtr, GraphNodePtr>(graphEdgeIterator<GraphEdgePtr, GraphNodePtr>::bw, iterOrder, false), 
-        dataflowGraphEdgeIterator<GraphEdgePtr, GraphNodePtr>(terminators_arg, graphEdgeIterator<GraphEdgePtr, GraphNodePtr>::bw, iterOrder) {}
+bw_dataflowGraphEdgeIterator<GraphEdgePtr, GraphNodePtr>::bw_dataflowGraphEdgeIterator(
+                 const set<GraphNodePtr>& terminators_arg,
+                 bool incrementalGraph,
+                 graphIterOrderT iterOrder) :
+        graphEdgeIterator<GraphEdgePtr, GraphNodePtr>(incrementalGraph, graphEdgeIterator<GraphEdgePtr, GraphNodePtr>::bw, iterOrder, false),
+        dataflowGraphEdgeIterator<GraphEdgePtr, GraphNodePtr>(terminators_arg, incrementalGraph, graphEdgeIterator<GraphEdgePtr, GraphNodePtr>::bw, iterOrder),
+        bw_graphEdgeIterator<GraphEdgePtr, GraphNodePtr>(incrementalGraph, iterOrder) {}
 template <class GraphEdgePtr, class GraphNodePtr>
-bw_dataflowGraphEdgeIterator<GraphEdgePtr, GraphNodePtr>::bw_dataflowGraphEdgeIterator(const GraphNodePtr end, const GraphNodePtr& terminator_arg, graphIterOrderT iterOrder): 
-        graphEdgeIterator<GraphEdgePtr, GraphNodePtr>(graphEdgeIterator<GraphEdgePtr, GraphNodePtr>::bw, iterOrder, true), 
-        dataflowGraphEdgeIterator<GraphEdgePtr, GraphNodePtr>(end, terminator_arg, graphEdgeIterator<GraphEdgePtr, GraphNodePtr>::bw, iterOrder), 
-        bw_graphEdgeIterator<GraphEdgePtr, GraphNodePtr>(end) {}
+bw_dataflowGraphEdgeIterator<GraphEdgePtr, GraphNodePtr>::bw_dataflowGraphEdgeIterator(
+                 const GraphNodePtr end, const GraphNodePtr& terminator_arg,
+                 bool incrementalGraph,
+                 graphIterOrderT iterOrder):
+        graphEdgeIterator<GraphEdgePtr, GraphNodePtr>(incrementalGraph, graphEdgeIterator<GraphEdgePtr, GraphNodePtr>::bw, iterOrder, true),
+        dataflowGraphEdgeIterator<GraphEdgePtr, GraphNodePtr>(end, terminator_arg, incrementalGraph, graphEdgeIterator<GraphEdgePtr, GraphNodePtr>::bw, iterOrder),
+        bw_graphEdgeIterator<GraphEdgePtr, GraphNodePtr>(end, incrementalGraph) {}
 template <class GraphEdgePtr, class GraphNodePtr>
-bw_dataflowGraphEdgeIterator<GraphEdgePtr, GraphNodePtr>::bw_dataflowGraphEdgeIterator(const GraphNodePtr end, const set<GraphNodePtr>& terminators_arg, graphIterOrderT iterOrder): 
-        graphEdgeIterator<GraphEdgePtr, GraphNodePtr>(graphEdgeIterator<GraphEdgePtr, GraphNodePtr>::bw, iterOrder, true), 
-        dataflowGraphEdgeIterator<GraphEdgePtr, GraphNodePtr>(end, terminators_arg, graphEdgeIterator<GraphEdgePtr, GraphNodePtr>::bw, iterOrder), 
-        bw_graphEdgeIterator<GraphEdgePtr, GraphNodePtr>(end) {}
+bw_dataflowGraphEdgeIterator<GraphEdgePtr, GraphNodePtr>::bw_dataflowGraphEdgeIterator(
+                 const GraphNodePtr end, const set<GraphNodePtr>& terminators_arg,
+                 bool incrementalGraph,
+                 graphIterOrderT iterOrder):
+        graphEdgeIterator<GraphEdgePtr, GraphNodePtr>(incrementalGraph, graphEdgeIterator<GraphEdgePtr, GraphNodePtr>::bw, iterOrder, true),
+        dataflowGraphEdgeIterator<GraphEdgePtr, GraphNodePtr>(end, terminators_arg, incrementalGraph, graphEdgeIterator<GraphEdgePtr, GraphNodePtr>::bw, iterOrder),
+        bw_graphEdgeIterator<GraphEdgePtr, GraphNodePtr>(end, incrementalGraph) {}
 
 /*void bw_dataflowGraphEdgeIterator<GraphEdgePtr, GraphNodePtr>::operator ++ (int)
 {
@@ -909,6 +969,7 @@ void GEFrontBackIteratorWorklist<GraphEdgePtr, GraphNodePtr>::add(GraphEdgePtr e
 template <class GraphEdgePtr, class GraphNodePtr>
 GraphEdgePtr GEFrontBackIteratorWorklist<GraphEdgePtr, GraphNodePtr>::getNext() const { 
   ROSE_ASSERT(worklist.size()>0);
+  //dbg << "getNext: "<<(worklist.front()? worklist.front()->str(): "NULL")<<endl;
   return worklist.front();
 }
 
@@ -1021,10 +1082,22 @@ void GETopoOrderIteratorWorklist<GraphEdgePtr, GraphNodePtr>::initGivenStart(con
     }
   }*/
 
+  set<GraphEdgePtr> initialFrontier;
+  // If the graph is non-incremental initialize the frontiner to be the start edges
+  if(!GEIteratorWorklist<GraphEdgePtr, GraphNodePtr>::parent->incrementalGraph)
+    initialFrontier = startEdges;
+  // If it is incremental, initialize the frontier to be the supersets of the start edges,
+  // which belong to the superset graph, which has already been created
+  else {
+    for(typename set<GraphEdgePtr>::const_iterator e=startEdges.begin(); e!=startEdges.end(); ++e)
+      initialFrontier.insert((*e)->getSupersetPartEdge());
+  }
+
   // Traverse the graph to calculate the in-degree of all nodes
   map<GraphNodePtr, int> inDegree;
   {
-    set<GraphEdgePtr> frontier = startEdges;
+
+    set<GraphEdgePtr> frontier = initialFrontier;
     set<GraphEdgePtr> visited;
     while(frontier.size() != 0) {
       // Grab a node from the frontier
@@ -1048,7 +1121,7 @@ void GETopoOrderIteratorWorklist<GraphEdgePtr, GraphNodePtr>::initGivenStart(con
   }
 
   {
-    set<GraphEdgePtr> frontier = startEdges;
+    set<GraphEdgePtr> frontier = initialFrontier;
     set<GraphEdgePtr> visited;
     set<GraphEdgePtr> history;
 
@@ -1065,8 +1138,8 @@ void GETopoOrderIteratorWorklist<GraphEdgePtr, GraphNodePtr>::initGivenStart(con
       if(inDegree[cur->target()]<=0) {
         history.erase(cur);
         inDegree.erase(cur->target());
-        edge2Idx[cur] = ++maxEdgeTopoIdx;
         if(cur->source()) edge2Idx[cur->source()->outEdgeToAny()]  = ++maxEdgeTopoIdx;
+        edge2Idx[cur] = ++maxEdgeTopoIdx;
         if(cur->target()) edge2Idx[cur->target()->inEdgeFromAny()] = ++maxEdgeTopoIdx;
 
         list<GraphEdgePtr> outE = cur->target()->outEdges();
@@ -1174,18 +1247,53 @@ int GETopoOrderIteratorWorklist<GraphEdgePtr, GraphNodePtr>::getEdgeTopoIdx(Grap
   }
 }
 */
+
+// Remove the given edge from edge2Idx and worklist under its current index
+// and place it back using an index that's larger than all the indexes generated
+// thus far
+template <class GraphEdgePtr, class GraphNodePtr>
+void GETopoOrderIteratorWorklist<GraphEdgePtr, GraphNodePtr>::refreshEdgeIndex(GraphEdgePtr edge) {
+   // If the edge already has an index
+   typename map<GraphEdgePtr, int>::iterator edgeIdx = edge2Idx.find(edge);
+   if(edgeIdx != edge2Idx.end()) {
+     // Update maxEdgeTopoIdx to be the edge's new index
+     ++maxEdgeTopoIdx;
+     // If the edge is currently on the worklist
+     typename map<int, set<GraphEdgePtr> >::iterator workLoc = worklist.find(edgeIdx->second);
+     if(workLoc != worklist.end()) {
+       // Try erasing it from its current location at its current index and if we succeed 
+       // (it was indeed on the worklist), add it to the worklist under its new index
+       if(workLoc->second.erase(edge)>0)
+         worklist[maxEdgeTopoIdx].insert(edge);
+     }
+
+     dbg << "Updating edge index from "<<edgeIdx->second<<" to "<<maxEdgeTopoIdx<<", edge="<<edge->str()<<endl; 
+     
+     // Record the edge's new index in edge2Idx 
+     edgeIdx->second = maxEdgeTopoIdx;
+
+   }
+}
+
 // Add the given edge to the iterator's list of edges to follow
 template <class GraphEdgePtr, class GraphNodePtr>
 void GETopoOrderIteratorWorklist<GraphEdgePtr, GraphNodePtr>::add(GraphEdgePtr edge) {
 /*	cout << "###################################################"<<endl;
 	cout << "###################################################"<<endl;
 	cout << "###################################################"<<endl;*/
-	//dbg << "GETopoOrderIteratorWorklist<GraphEdgePtr, GraphNodePtr>::add("<<edge->str()<<")"<<endl;
-  // Place the new edge into the worklist. Note that this ensures that no
-  // edge can appear in the worklist more than once.
-//  worklist[getEdgeTopoIdx(edge)] = edge;
-  typename map<GraphEdgePtr, int>::iterator i=edge2Idx.find(edge);
-  //ROSE_ASSERT(i!=edge2Idx.end());
+
+  // Pre-computed edge selection algorithm
+  // -------------------------------------
+
+  // Find the index of edge.
+  typename map<GraphEdgePtr, int>::iterator i;
+  // If the graph is not incremental, use the edge itself for the lookup
+  if(!GEIteratorWorklist<GraphEdgePtr, GraphNodePtr>::parent->incrementalGraph)
+    i=edge2Idx.find(edge);
+  // Otherwise, use the edge's superset edge from the fully created superset graph
+  else
+    i=edge2Idx.find(edge->getSupersetPartEdge());
+
 //dbg << "(i!=edge2Idx.end())="<<(i!=edge2Idx.end())<<endl;
   if(i!=edge2Idx.end()) worklist[i->second].insert(edge);
   else {
@@ -1196,6 +1304,64 @@ void GETopoOrderIteratorWorklist<GraphEdgePtr, GraphNodePtr>::add(GraphEdgePtr e
     ROSE_ASSERT(0);*/
     worklist[0].insert(edge);
   }
+
+  // Online edge selection algorithm
+  // -------------------------------
+/*
+  // Place the new edge into the worklist. Note that this ensures that no
+  // edge can appear in the worklist more than once.
+  typename map<GraphEdgePtr, int>::iterator i=edge2Idx.find(edge);
+//dbg << "(i!=edge2Idx.end())="<<(i!=edge2Idx.end())<<endl;
+  if(i!=edge2Idx.end()) {
+    worklist[i->second].insert(edge);
+  } else {
+    // Add the edge and the wildcard edges coming into its target and out of its source to edge2Idx
+    int edgeIdx;
+    if(edge->source() && edge->target()) {
+      if(edge2Idx.find(edge->source()->outEdgeToAny()) == edge2Idx.end())
+        edge2Idx[edge->source()->outEdgeToAny()] = ++maxEdgeTopoIdx;
+
+      edge2Idx[edge] = ++maxEdgeTopoIdx;
+      edgeIdx = maxEdgeTopoIdx;
+
+      if(edge2Idx.find(edge->target()->inEdgeFromAny()) == edge2Idx.end())
+        edge2Idx[edge->target()->inEdgeFromAny()] = ++maxEdgeTopoIdx;
+    } else {
+      edge2Idx[edge] = ++maxEdgeTopoIdx;
+      edgeIdx = maxEdgeTopoIdx;
+    }
+
+    // Add the edge to the worklist, under its index
+    worklist[edgeIdx].insert(edge);
+
+    // If the edge's target is known
+    GraphNodePtr tgt = edge->target();
+    if(tgt) {
+      set<GraphEdgePtr>& tgtIn = incomingEdges[tgt];
+      typename set<GraphEdgePtr>::iterator in = tgtIn.find(edge);
+      // If we've discovered a new edge arriving into the target
+      if(in == tgtIn.end()) {
+        // If this is not the first edge to come into this target, refresh the indexes of all of the target's
+        // outgoing edges (which should all exist now) to have a larger index than the index of this edge.
+        if(tgtIn.size()>0) {
+          // First, refresh its outgoing wildcard edge
+          GraphEdgePtr wildcard = edge->target()->outEdgeToAny();
+          refreshEdgeIndex(wildcard);
+
+          // If the target of this edge has already visited, its outgoing edges must already be
+          // generated (iteration over the ATS with loose and tight composition of analyses)
+          if(edge->target() && visitedTargets.find(edge->target()) != visitedTargets.end()) {
+            // Refresh the indexes of all the specific edges going out of target
+            list<GraphEdgePtr> out = edge->target()->outEdges();
+            for(typename list<GraphEdgePtr>::iterator o=out.begin(); o!=out.end(); ++o)
+              refreshEdgeIndex(*o);
+          }
+        }
+
+        tgtIn.insert(edge);
+      }
+    }
+  }*/
 /*
   typename map<GraphNodePtr, int>::iterator iSrc=node2Idx.find(edge->source());
   if(iSrc!=node2Idx.end()) worklist[iSrc->second].insert(edge);
@@ -1270,7 +1436,7 @@ void GETopoOrderIteratorWorklist<GraphEdgePtr, GraphNodePtr>::print(ostream& out
   out << "GETopoOrderIteratorWorklist (#"<<size()<<")"<<endl;
   for(typename map<int, set<GraphEdgePtr> >::const_iterator e=worklist.begin(); e!=worklist.end(); ++e) {
     for(typename set<GraphEdgePtr>::const_iterator i=e->second.begin(); i!=e->second.end(); ++i)
-      out << "    <idx="<<e->first<<", "<<(*i)->str()<<">"<<endl;
+      out << "    idx="<<e->first<<", "<<(*i)->str()<<endl;
   }
 }
 

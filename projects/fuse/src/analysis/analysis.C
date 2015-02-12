@@ -36,21 +36,6 @@ namespace fuse {
 
 #define analysisDebugLevel 0
 
-// Initializes Fuse
-void FuseInit(int argc, char **argv) {
-  //#SA 8/18/14
-  // Command to set up the enviroment variable to find the binary fuseLayout
-  // fuseLayout is required to run fuse
-  // fuseLayout binary is at the same level as fuse in the build tree
-  // When compiling fuse ROSE_PREFIX is defined as -DROSE_PREFIX="\"${top_builddir}\"" which
-  // is top of the build tree
-  // If fuse fails to find fuseLayout set up this environment variable appropriately. 
-  setenv("SIGHT_LAYOUT_EXEC", (txt()<<ROSE_PREFIX<<"/projects/fuse/src/fuseLayout").c_str(), 1);
-  //setenv("SIGHT_LAYOUT_EXEC", (txt()<<ROSE_PREFIX<<"/bin//fuseLayout").c_str(), 1);
-  SightInit(argc, argv);
-  modularApp::setNamedMeasures(namedMeasures("time", new timeMeasure()));
-}
-
 /****************
  *** Analysis ***
  ****************/
@@ -77,7 +62,8 @@ void UnstructuredPassAnalysis::runAnalysis()
   
   // Iterate over all the nodes in this function
   
-  for(fw_graphEdgeIterator<PartEdgePtr, PartPtr> it(analysis->getComposer()->GetStartAStates(analysis)); 
+  for(fw_graphEdgeIterator<PartEdgePtr, PartPtr> it(analysis->getComposer()->GetStartAStates(analysis),
+                                                    /*incrementalGraph*/ false);
 //          it!=fw_graphEdgeIterator<PartEdgePtr, PartPtr>::end(); 
           !it.isEnd();         
           it++)

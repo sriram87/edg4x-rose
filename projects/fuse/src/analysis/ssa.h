@@ -75,6 +75,9 @@ Regular ATS Nodes {
 //   both used and defined) or accessed in a Phi Node (usedef accessType below)
 class SSAMemLocObject;
 class SSAMLHierKey;
+class Fuse;
+class FuseCFGNode;
+typedef CompSharedPtr<FuseCFGNode> FuseCFGNodePtr;
 //typedef boost::shared_ptr<SSAMemLocObject> SSAMemLocObjectPtr;
 typedef CompSharedPtr<SSAMemLocObject> SSAMemLocObjectPtr;
 class SSAMemLocObject : public MemLocObject, public comparable {
@@ -97,6 +100,9 @@ class SSAMemLocObject : public MemLocObject, public comparable {
   SSAMemLocObject(const SSAMemLocObject& that);
 
   PartPtr getLoc() const { return loc; }
+
+  // Return the FuseCFGNode of the given Fuse object that wraps the location Part of this SSAMemLocObject
+  FuseCFGNodePtr getFuseCFGNodeLoc(Fuse* fuseAnalysis) const;
 
   SgNode* getSgNode() const { return sgn; }
 
@@ -222,10 +228,10 @@ class SSAGraph: public boost::adjacency_list<boost::vecS, boost::vecS, boost::bi
   std::map<PartPtr, std::set<PartPtr> > domFrontierOf;
 
   public:
-  // Return the anchor Parts of a given function
+  // Return the entry Parts of the ATS
   std::set<PartPtr> GetStartAStates();
 
-  // There may be multiple terminal points in the application (multiple calls to exit(), returns from main(), etc.)
+  // Return the exit Parts of the ATS
   std::set<PartPtr> GetEndAStates();
 
   const SSAGraph::VertexVertexMap& getDominatorTree();// const;
@@ -364,9 +370,14 @@ class SSAGraph: public boost::adjacency_list<boost::vecS, boost::vecS, boost::bi
   // Returns the SSA uses for the given def
   const std::set<SSAMemLocObjectPtr>& getUses(SSAMemLocObjectPtr def) const;
   std::set<MemLocObjectPtr> getUsesML(SSAMemLocObjectPtr def) const;
+
   // Returns the SSA defs for the given use
   const std::set<SSAMemLocObjectPtr>& getDefs(SSAMemLocObjectPtr use) const;
   std::set<MemLocObjectPtr> getDefsML(SSAMemLocObjectPtr use) const;
+
+  // Returns the defs that transitively reach the given use through zero or more phi nodes
+  std::set<SSAMemLocObjectPtr> getTransitiveDefs(SSAMemLocObjectPtr use) const;
+  std::set<MemLocObjectPtr> getTransitiveDefsML(SSAMemLocObjectPtr use) const;
 
   /* // Matches the given use to the given def at the given edge.
   // If the def must-defines the use, the use is removed from liveUses, a def->use connection 
@@ -402,6 +413,9 @@ class SSAGraph: public boost::adjacency_list<boost::vecS, boost::vecS, boost::bi
   void computeUse2Def();
 
   void showUse2Def();
+
+  // Records whether the SSA has already been built
+  bool ssaBuilt;
 
   // Creates all the look-aside data structures required to represent the ATS in SSA form
   void buildSSA();

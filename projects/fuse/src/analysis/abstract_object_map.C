@@ -13,7 +13,7 @@ using namespace boost;
 using namespace sight;
 
 namespace fuse {
-#define AOMDebugLevel 1
+#define AOMDebugLevel 0
 
 
 AbstractObjectMapKindPtr NULLAbstractObjectMapKind;
@@ -71,10 +71,10 @@ void AbstractObjectMap::initImplementation(AbstractObjectPtr key) {
 
 // Returns a newly-allocated AOMKind object that can map the given key type to values
 AbstractObjectMapKindPtr AbstractObjectMap::createAOMKind(AbstractObjectPtr key, AbstractObjectMap* parent) {
-    SIGHT_VERB(dbg << "AbstractObjectMap::createAOMKind() key="<<key->str()<<endl, 1, AOMDebugLevel)
-                             /*", key->isMappedAO()="<<key->isMappedAO()<<
-                             ", key->isHierarchy()="<<key->isHierarchy()<<
-                             ", getenv(\"DISABLE_HIER_AO\")="<<(getenv("DISABLE_HIER_AO")?getenv("DISABLE_HIER_AO"):"NULL")<<endl;*/
+    SIGHT_VERB_DECL(scope, ("AbstractObjectMap::createAOMKind()"), 1, AOMDebugLevel)
+    SIGHT_VERB(dbg << "key="<<key->str()<<endl, 1, AOMDebugLevel)
+    SIGHT_VERB(dbg << "key->isMappedAO()="<<key->isMappedAO()<<", key->isHierarchy()="<<key->isHierarchy()<<endl, 1, AOMDebugLevel)
+                             /*", getenv(\"DISABLE_HIER_AO\")="<<(getenv("DISABLE_HIER_AO")?getenv("DISABLE_HIER_AO"):"NULL")<<endl;*/
     /*if(key->isDisjoint()) implementation = ???;
      else */
     if(key->isMappedAO()) {
@@ -123,9 +123,14 @@ AbstractionPtr AbstractObjectMap::get(AbstractObjectPtr key) {
     emptyLat->setToEmpty(latPEdge, comp, analysis);
     return emptyLat;
   } else {
+    //struct timeval aggrStart, aggrEnd; gettimeofday(&aggrStart, NULL);
+
     ROSE_ASSERT(mapState==between);
     initImplementation(key);
-    return implementation->get(key);
+    AbstractionPtr ret = implementation->get(key);
+    //gettimeofday(&aggrEnd, NULL); cout << "AbstractObjectMap::get()\t"<<(((aggrEnd.tv_sec*1000000 + aggrEnd.tv_usec) - (aggrStart.tv_sec*1000000 + aggrStart.tv_usec)) / 1000000.0)<<endl;
+
+    return ret;
   }
 }
 
@@ -344,8 +349,8 @@ bool AbstractObjectMap::propagateDef2Uses(const std::set<MemLocObjectPtr>& uses,
 // Returns true if this causes this to change and false otherwise
 bool AbstractObjectMap::meetUpdate(Lattice* thatL) {
   SIGHT_VERB_DECL(scope, (txt()<<"AbstractObjectMap::meetUpdate() this="<<this, scope::medium), 1, AOMDebugLevel)
-  dbg <<"this="<<str()<<endl;
-  dbg <<"thatL="<<thatL->str()<<endl;
+  /*dbg <<"this="<<str()<<endl;
+  dbg <<"thatL="<<thatL->str()<<endl;*/
   AbstractObjectMap* that = dynamic_cast<AbstractObjectMap*>(thatL);
   ROSE_ASSERT(that);
 
@@ -2156,8 +2161,10 @@ bool MappedAOMKind::remove(AbstractObjectPtr key) {
 // Get all x-frontier for a given abstract memory object
 AbstractionPtr MappedAOMKind::get(AbstractObjectPtr key) {
   SIGHT_VERB_DECL(scope, (txt()<<"MappedAOMKind::get() ui="<<(ui==Union? "Union": "Intersection"), scope::medium), 1, AOMDebugLevel)
-  dbg << "key="<<key->str()<<endl;
+  SIGHT_VERB(dbg << "key="<<key->str()<<endl, 1, AOMDebugLevel)
   assert(key->isMappedAO());
+
+  //struct timeval getStart, getEnd; gettimeofday(&getStart, NULL);
 
   // Create a fresh map to hold the mapping of the sub-keys inside the MappedAbstractObject key
   // to the results of get() for each sub-key.
@@ -2189,6 +2196,9 @@ AbstractionPtr MappedAOMKind::get(AbstractObjectPtr key) {
   AOMKindOp x;
   valMAOMap->setMapObjMapJoin(key, mappedAOMap, x);
 
+  //gettimeofday(&getEnd, NULL); cout << "MappedAOMKind::get() get\t"<<(((getEnd.tv_sec*1000000 + getEnd.tv_usec) - (getStart.tv_sec*1000000 + getStart.tv_usec)) / 1000000.0)<<endl;
+
+  //struct timeval aggrStart, aggrEnd; gettimeofday(&aggrStart, NULL);
   // Now that valMAOMap is populated with a mapping from keys to the results of get()
   // that correspond to these keys, return their union or intersection, whichever is the mode
   // of this MappedAOMKind.
@@ -2196,6 +2206,8 @@ AbstractionPtr MappedAOMKind::get(AbstractObjectPtr key) {
   AbstractionPtr res;
   if(ui==Union) res = x.representativeVal->genUnion(valMAOMap);
   else          res = x.representativeVal->genIntersection(valMAOMap);
+
+  //gettimeofday(&aggrEnd, NULL); cout << "MappedAOMKind::get() aggr\t"<<(((aggrEnd.tv_sec*1000000 + aggrEnd.tv_usec) - (aggrStart.tv_sec*1000000 + aggrStart.tv_usec)) / 1000000.0)<<endl;
 
   SIGHT_VERB(dbg << "result="<<res->str()<<endl, 1, AOMDebugLevel)
 

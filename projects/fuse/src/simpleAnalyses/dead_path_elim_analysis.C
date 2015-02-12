@@ -6,7 +6,10 @@ using namespace sight;
 
 namespace fuse {
 
-#define DPEAnalDebugLevel 2
+#define DPEAnalDebugLevel 0
+#if DPEAnalDebugDevel==0
+  #define DISABLE_SIGHT
+#endif
 
 std::string DPELevel2Str(enum DPELevel level) {
   return (level==bottom? "bottom": (level==dead? "dead": (level==live? "live": "???")));
@@ -73,7 +76,7 @@ list<PartEdgePtr> DeadPathElimPart::outEdges()
     // analysis, they are maintained separately
     for(list<PartEdgePtr>::iterator be=baseEdges.begin(); be!=baseEdges.end(); be++) {
       SIGHT_VERB_DECL(scope, (txt()<<"be="<<be->str(), scope::low), 2, DPEAnalDebugLevel)
-      dbg << "outState->getLatticeBelow(analysis, *be, 0) = "<<outState->getLatticeBelow(analysis, *be, 0)->str()<<endl;
+      //dbg << "outState->getLatticeBelow(analysis, *be, 0) = "<<outState->getLatticeBelow(analysis, *be, 0)->str()<<endl;
   
       DeadPathElimPartEdge* outPartEdge = dynamic_cast<DeadPathElimPartEdge*>(outState->getLatticeBelow(analysis, *be, 0));
       assert(outPartEdge);
@@ -397,11 +400,11 @@ bool DeadPathElimPartEdge::setPartEdge(PartEdgePtr latPEdge)
 void DeadPathElimPartEdge::setSupersetPartEdge(PartEdgePtr parent)
 {
   //Lattice::setPartEdge(parent);
-  scope s("DeadPathElimPartEdge::setSupersetPartEdge");
-  dbg << "parent="<<parent->str()<<endl;
+  /*scope s("DeadPathElimPartEdge::setSupersetPartEdge");
+  dbg << "parent="<<parent->str()<<endl;*/
   PartEdge::setSupersetPartEdge(parent);
-  dbg << "getSupersetPartEdge()="<<getSupersetPartEdge()->str()<<endl;
-  dbg << "this="<<str()<<endl;
+  /*dbg << "getSupersetPartEdge()="<<getSupersetPartEdge()->str()<<endl;
+  dbg << "this="<<str()<<endl;*/
 }
 
 // Let A={ set of execution prefixes that terminate at the given anchor SgNode }
@@ -560,15 +563,19 @@ std::string DeadPathElimPartEdge::str(std::string indent) const
   //cout << "latPEdge="<<latPEdge->str()<<endl;
   //cout << "getATSLocationPartEdge()="<<getATSLocationPartEdge()->str()<<endl;
 
-  if(latPEdge != getATSLocationPartEdge()) {
+
+/* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+ * This check should be reinstated but removing it for now to work on other stuff
+   if(latPEdge != getATSLocationPartEdge()) {
     dbg << "DeadPathElimPartEdge"<<endl;
     dbg << "this="<<"[DPEEdge("<<(level==dead? "D": (level==live? "L": (level==bottom? "B": "<font color=\"#FF0000\"><b>??? </b></font>")))<<"): "<<
                       (src ? src->str(indent+"&nbsp;&nbsp;&nbsp;&nbsp;"): "NULL")<<" ==&gt; " <<
                       (tgt ? tgt->str(indent+"&nbsp;&nbsp;&nbsp;&nbsp;"): "NULL")<<endl;
     dbg << "latPEdge="<<latPEdge->str()<<endl;
+    dbg << "getATSLocationPartEdge()="<<getATSLocationPartEdge()->str()<<endl;
     dbg << "getSupersetPartEdge()="<<getSupersetPartEdge()->str()<<endl;
   }
-//!!!!!  assert(latPEdge == getATSLocationPartEdge());
+  assert(latPEdge == getATSLocationPartEdge());*/
   oss << "[DPEEdge<"<<this<<"> ("<<(level==dead? "D": (level==live? "L": (level==bottom? "B": "<font color=\"#FF0000\"><b>??? </b></font>")))<<"): "<<
                       (src ? src->str(indent+"&nbsp;&nbsp;&nbsp;&nbsp;"): "NULL")<<" ==&gt; " <<
                       (tgt ? tgt->str(indent+"&nbsp;&nbsp;&nbsp;&nbsp;"): "NULL")<<
@@ -933,18 +940,18 @@ void DeadPathElimTransfer::visit(SgOrOp *op)
 
 void DeadPathElimTransfer::visit(SgNode *sgn)
 {
-  scope s(txt()<<"DeadPathElimTransfer::visit("<<SgNode2Str(sgn)<<")");
+  SIGHT_VERB_DECL(scope, (txt()<<"DeadPathElimTransfer::visit("<<SgNode2Str(sgn)<<")"), 1, DPEAnalDebugLevel)
 
   // Get the edge that is propagated along the incoming dataflow path
   //#SA: Incoming dfInfo is associated with inEdgeFromAny
   DeadPathElimPartEdge* dfEdge = dynamic_cast<DeadPathElimPartEdge*>(*dfInfo[supersetPart->inEdgeFromAny()].begin());
-  dbg << "Initial dfEdge="<<dfEdge->str()<<endl;
+  SIGHT_VERB(dbg << "Initial dfEdge="<<dfEdge->str()<<endl, 1, DPEAnalDebugLevel)
   // Adjust the base Edge so that it now starts at its original target part and terminates at NULL
   // (i.e. advance it forward by one node without specifying the target yet)
   dfEdge->src = dfEdge->tgt;
   dfEdge->tgt = NULLPart;
   dfEdge->clearPred2Val();
-  dbg << "Final dfEdge="<<dfEdge->str()<<endl;
+  SIGHT_VERB(dbg << "Final dfEdge="<<dfEdge->str()<<endl, 1, DPEAnalDebugLevel)
   
   // Consider all the source part's outgoing edges (implemented by a server analysis)
   std::list<PartEdgePtr> baseEdges = supersetPart->outEdges();
@@ -958,7 +965,7 @@ void DeadPathElimTransfer::visit(SgNode *sgn)
   dfInfo.clear();
 
   for(std::list<PartEdgePtr>::iterator e=baseEdges.begin(); e!=baseEdges.end(); e++) {
-    scope s2(txt()<<"e="<<(*e)->str());
+    SIGHT_VERB_DECL(scope, (txt()<<"e="<<(*e)->str()), 1, DPEAnalDebugLevel)
     // Create a DeadPathElimPartEdge to this server analysis-implemented edge
     DeadPathElimPartEdge* dpeEdge;
     // If this is the first edge to synthesize, make the dfEdge into true branch DeadPathElimPartEdge
@@ -972,8 +979,7 @@ void DeadPathElimTransfer::visit(SgNode *sgn)
     // Set this dpeEdges's baseEdge to be the current edge using both Lattice API (setPartEdge) and setSupersetPartEdge API (setParent)
     //dpeEdge->setPartEdge(*e);
     dpeEdge->setSupersetPartEdge(*e);
-    dbg << "dpeEdge="<<dpeEdge->str()<<endl;
-
+    SIGHT_VERB(dbg << "dpeEdge="<<dpeEdge->str()<<endl, 1, DPEAnalDebugLevel)
     
     vector<Lattice *> dfLatVec; 
     dfLatVec.push_back(dpeEdge);

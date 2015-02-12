@@ -1261,6 +1261,20 @@ public:
   CodeLocObjectPtr copyAOType() const;
   void setAOToFull();
   std::string str(std::string indent="") const;
+
+  // Returns whether all instances of this class form a hierarchy. Every instance of the same
+  // class created by the same analysis must return the same value from this method!
+  bool isHierarchy() const;
+
+  // Returns a key that uniquely identifies this particular AbstractObject in the
+  // set hierarchy.
+  const AbstractionHierarchy::hierKeyPtr& getHierKey() const;
+
+  // ----------------------------------------
+  // Objects that denote disjoint sets. Because no two sets may overlap, they can be
+  // represented using unique numbers, which enables efficient data structure implementations.
+  bool isDisjoint() const;
+  // AbstractObjects that form a hierarchy must inherit from the AbstractObjectDisjoint class
 };
 
 
@@ -1516,6 +1530,20 @@ public:
   SgType* getConcreteType();
   std::set<boost::shared_ptr<SgValueExp> > getConcreteValue();
   std::string str(std::string indent="") const;
+
+  // Returns whether all instances of this class form a hierarchy. Every instance of the same
+  // class created by the same analysis must return the same value from this method!
+  bool isHierarchy() const;
+
+  // Returns a key that uniquely identifies this particular AbstractObject in the
+  // set hierarchy.
+  const AbstractionHierarchy::hierKeyPtr& getHierKey() const;
+
+  // ----------------------------------------
+  // Objects that denote disjoint sets. Because no two sets may overlap, they can be
+  // represented using unique numbers, which enables efficient data structure implementations.
+  bool isDisjoint() const;
+  // AbstractObjects that form a hierarchy must inherit from the AbstractObjectDisjoint class
 }; // class PartEdgeUnionValueObject
 
 
@@ -1888,6 +1916,22 @@ public:
   // the normal ROSE mechanisms to decode it
   std::set<SgNode* > getConcrete();  
   ValueObjectPtr getRegionSizeAO(PartEdgePtr pedge);
+
+  // Returns whether all instances of this class form a hierarchy. Every instance of the same
+  // class created by the same analysis must return the same value from this method!
+  bool isHierarchy() const;
+  // AbstractObjects that form a hierarchy must inherit from the AbstractionHierarchy class
+
+  // Returns a key that uniquely identifies this particular AbstractObject in the
+  // set hierarchy
+  const hierKeyPtr& getHierKey() const;
+
+  // ----------------------------------------
+  // Objects that denote disjoint sets. Because no two sets may overlap, they can be
+  // represented using unique numbers, which enables efficient data structure implementations.
+  bool isDisjoint() const;
+  // AbstractObjects that form a hierarchy must inherit from the AbstractObjectDisjoint class
+
   std::string str(std::string indent="") const;
 };
 
@@ -2315,6 +2359,12 @@ public:
   // Returns a key that uniquely identifies this particular AbstractObject in the 
   // set hierarchy.
   const AbstractionHierarchy::hierKeyPtr& getHierKey() const;
+
+  // ----------------------------------------
+  // Objects that denote disjoint sets. Because no two sets may overlap, they can be
+  // represented using unique numbers, which enables efficient data structure implementations.
+  bool isDisjoint() const;
+  // AbstractObjects that form a hierarchy must inherit from the AbstractObjectDisjoint class
 };
 
 

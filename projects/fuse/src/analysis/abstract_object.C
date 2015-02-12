@@ -1171,8 +1171,9 @@ string MappedAbstractObject<Key, AOSubType, type, MappedAOSubType>::str(string i
 // class created by the same analysis must return the same value from this method!
 template<class Key, class AOSubType, AbstractObject::AOType type, class MappedAOSubType>
 bool MappedAbstractObject<Key, AOSubType, type, MappedAOSubType>::isHierarchy() const {
-//  cout << "MappedAbstractObject<Key, AOSubType, type, MappedAOSubType>::isHierarchy()"<<endl;
-  //return false;
+  /*scope s("MappedAbstractObject<Key, AOSubType, type, MappedAOSubType>::isHierarchy()");
+  dbg << "#aoMap="<<aoMap.size()<<", aoMap.begin()->second->isHierarchy()="<<aoMap.begin()->second->isHierarchy()<<endl;
+  dbg << "aoMap.begin()->second="<<aoMap.begin()->second->str()<<endl;*/
   if(aoMap.size()==1 && aoMap.begin()->second->isHierarchy()) return true;
   else return false;
 /*  // Combined CodeLocs form hierarchy if:
@@ -1216,9 +1217,9 @@ bool MappedAbstractObject<Key, AOSubType, type, MappedAOSubType>::membersIsHiera
 template<class Key, class AOSubType, AbstractObject::AOType type, class MappedAOSubType>
 const AbstractionHierarchy::hierKeyPtr& MappedAbstractObject<Key, AOSubType, type, MappedAOSubType>::getHierKey() const {
   assert(aoMap.size()==1);
-  scope s("MappedAbstractObject<Key, AOSubType, type, MappedAOSubType>::getHierKey()");
+  /*scope s("MappedAbstractObject<Key, AOSubType, type, MappedAOSubType>::getHierKey()");
   dbg << "this="<<str()<<endl;
-  dbg << "aoMap.begin()->second="<<aoMap.begin()->second->str()<<endl;
+  dbg << "aoMap.begin()->second="<<aoMap.begin()->second->str()<<endl;*/
   assert(aoMap.begin()->second->isHierarchy());
 
   if(aoMap.size()==1 && aoMap.begin()->second->isHierarchy()) return aoMap.begin()->second->getHierKey();
@@ -2264,6 +2265,24 @@ string PartEdgeUnionCodeLocObject::str(string indent) const {
   return oss.str();
 }
 
+// Returns whether all instances of this class form a hierarchy. Every instance of the same
+// class created by the same analysis must return the same value from this method!
+bool PartEdgeUnionCodeLocObject::isHierarchy() const {
+  return unionCL_p->isHierarchy();
+}
+
+// Returns a key that uniquely identifies this particular AbstractObject in the
+// set hierarchy.
+const AbstractionHierarchy::hierKeyPtr& PartEdgeUnionCodeLocObject::getHierKey() const {
+  return unionCL_p->getHierKey();
+}
+
+// ----------------------------------------
+// Objects that denote disjoint sets. Because no two sets may overlap, they can be
+// represented using unique numbers, which enables efficient data structure implementations.
+bool PartEdgeUnionCodeLocObject::isDisjoint() const
+{ return unionCL_p->isDisjoint(); }
+
 /* #######################
    ##### ValueObject #####
    ####################### */
@@ -2609,7 +2628,7 @@ SgType* MappedValueObject<Key, MappedAOSubType>::getConcreteType() {
 
 template<class Key, class MappedAOSubType>
 set<boost::shared_ptr<SgValueExp> > MappedValueObject<Key, MappedAOSubType>::getConcreteValue() {
-  scope s("MappedValueObject<Key, MappedAOSubType>::getConcreteValue()");
+  //scope s("MappedValueObject<Key, MappedAOSubType>::getConcreteValue()");
   if(!MappedAbstractObject<Key, ValueObject, AbstractObject::Value, MappedAOSubType>::isConcrete()) assert(0);
   // If this is a union type (defaultMayEq=true), the result is the Union of the sets returned by getConcrete() on all the memRegions.
   // If this is an intersection type (defaultMayEq=false), an object is their Intersection.
@@ -2621,18 +2640,18 @@ set<boost::shared_ptr<SgValueExp> > MappedValueObject<Key, MappedAOSubType>::get
   for(typename map<Key, ValueObjectPtr>::iterator v_it =
           MappedAbstractObject<Key, ValueObject, AbstractObject::Value, MappedAOSubType>::aoMap.begin();
       v_it != MappedAbstractObject<Key, ValueObject, AbstractObject::Value, MappedAOSubType>::aoMap.end(); ++v_it) {
-    scope s(txt()<<"Value "<<v_it->second->str());
-    dbg << "isConcrete = "<<v_it->second->isConcrete()<<endl;
+    /*scope s(txt()<<"Value "<<v_it->second->str());
+    dbg << "isConcrete = "<<v_it->second->isConcrete()<<endl;*/
     if (v_it->second->isConcrete()) {
       // Iterate through the current sub-MemRegion's concrete values and increment each
       // concrete value's counter in concreteMRs.
       std::set<boost::shared_ptr<SgValueExp> > c_valueSet =
           v_it->second->getConcreteValue();
-      dbg << "#c_valueSet="<<c_valueSet.size()<<endl;
+      //dbg << "#c_valueSet="<<c_valueSet.size()<<endl;
       for(std::set<boost::shared_ptr<SgValueExp> >::iterator s_it =
           c_valueSet.begin(); s_it != c_valueSet.end(); ++s_it) {
-        indent ind;
-        dbg << SgNode2Str((*s_it).get());
+        //indent ind;
+        //dbg << SgNode2Str((*s_it).get());
         map<boost::shared_ptr<SgValueExp>, size_t>::iterator c_it =
             concreteVals.begin();
         for (; c_it != concreteVals.end(); ++c_it) {
@@ -2640,7 +2659,7 @@ set<boost::shared_ptr<SgValueExp> > MappedValueObject<Key, MappedAOSubType>::get
           if (ValueObject::equalValueExp(c_it->first.get(), (*s_it).get())) {
             indent ind;
             c_it->second++;
-            dbg << "found, count="<<c_it->second<<endl;
+            //dbg << "found, count="<<c_it->second<<endl;
             break;
           }
         }
@@ -2782,6 +2801,25 @@ string PartEdgeUnionValueObject::str(string indent) const {
   oss << "[UnionV=" << (unionV_p? unionV_p->str(indent): "NULL") << "]";
   return oss.str();
 }
+
+
+// Returns whether all instances of this class form a hierarchy. Every instance of the same
+// class created by the same analysis must return the same value from this method!
+bool PartEdgeUnionValueObject::isHierarchy() const {
+  return unionV_p->isHierarchy();
+}
+
+// Returns a key that uniquely identifies this particular AbstractObject in the
+// set hierarchy.
+const AbstractionHierarchy::hierKeyPtr& PartEdgeUnionValueObject::getHierKey() const {
+  return unionV_p->getHierKey();
+}
+
+// ----------------------------------------
+// Objects that denote disjoint sets. Because no two sets may overlap, they can be
+// represented using unique numbers, which enables efficient data structure implementations.
+bool PartEdgeUnionValueObject::isDisjoint() const
+{ return unionV_p->isDisjoint(); }
 
 /* ###########################
    ##### MemRegionObject #####
@@ -3371,7 +3409,7 @@ SgNode* PartEdgeUnionMemRegionObject::getBase() const {
 void PartEdgeUnionMemRegionObject::add(MemRegionObjectPtr mr_p,
     PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis) {
   // If this is the very first object
-  if (!unionMR_p)
+  if (!unionMR_p.get())
     unionMR_p = mr_p->copyAOType();
   // If Full return without adding
   else if (isFullAO(pedge))
@@ -3459,10 +3497,25 @@ std::set<SgNode*> PartEdgeUnionMemRegionObject::getConcrete() {
   return unionMR_p->getConcrete();
 }
 
-ValueObjectPtr PartEdgeUnionMemRegionObject::getRegionSizeAO(
-    PartEdgePtr pedge) {
+ValueObjectPtr PartEdgeUnionMemRegionObject::getRegionSizeAO(PartEdgePtr pedge) {
   return unionMR_p->getRegionSizeAO(pedge);
 }
+
+// Returns whether all instances of this class form a hierarchy. Every instance of the same
+// class created by the same analysis must return the same value from this method!
+bool PartEdgeUnionMemRegionObject::isHierarchy() const
+{ return unionMR_p->isHierarchy(); }
+
+// Returns a key that uniquely identifies this particular AbstractObject in the
+// set hierarchy
+const AbstractionHierarchy::hierKeyPtr& PartEdgeUnionMemRegionObject::getHierKey() const
+{ return unionMR_p->getHierKey(); }
+
+// ----------------------------------------
+// Objects that denote disjoint sets. Because no two sets may overlap, they can be
+// represented using unique numbers, which enables efficient data structure implementations.
+bool PartEdgeUnionMemRegionObject::isDisjoint() const
+{ return unionMR_p->isDisjoint(); }
 
 string PartEdgeUnionMemRegionObject::str(string indent) const {
   ostringstream oss;
@@ -3830,8 +3883,7 @@ std::string MemLocObject::str(std::string indent) const { // pretty print for th
 // Returns whether all instances of this class form a hierarchy. Every instance of the same
 // class created by the same analysis must return the same value from this method!
 bool MemLocObject::isHierarchy() const {
-  //cout << "MemLocObject::isHierarchy() getRegion()->isHierarchy()="<<getRegion()->isHierarchy()<<", getIndex()->isHierarchy()="<<(getIndex()? getIndex()->isHierarchy(): -1)<<endl;
-  // MemLocs form a hierarchy only if their regions and indexes do
+  //dbg << "MemLocObject::isHierarchy() getRegion()->isHierarchy()="<<getRegion()->isHierarchy()<<", getIndex()->isHierarchy()="<<(getIndex()? getIndex()->isHierarchy(): -1)<<endl;  // MemLocs form a hierarchy only if their regions and indexes do
   return getRegion()->isHierarchy() && (!getIndex() || getIndex()->isHierarchy());
 }
 
@@ -4316,6 +4368,12 @@ bool PartEdgeUnionMemLocObject::isHierarchy() const {
 const AbstractionHierarchy::hierKeyPtr& PartEdgeUnionMemLocObject::getHierKey() const {
   return unionML_p->getHierKey();
 }
+
+// ----------------------------------------
+// Objects that denote disjoint sets. Because no two sets may overlap, they can be
+// represented using unique numbers, which enables efficient data structure implementations.
+bool PartEdgeUnionMemLocObject::isDisjoint() const
+{ return unionML_p->isDisjoint(); }
 
 /* #######################
    ##### IndexVector ##### 

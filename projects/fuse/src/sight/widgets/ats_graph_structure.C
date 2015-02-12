@@ -13,8 +13,7 @@ using namespace sight::structure;
 
 namespace fuse {
 
-//int ats2DotDebugLevel=0;
-DEBUG_LEVEL(ats2DotDebugLevel, 0);
+#define ats2DotDebugLevel 0
 
 /**************************************
  *** ATS Graph Visualizer for Sight ***
@@ -104,7 +103,7 @@ partStr getPartStr(std::map<PartPtr, partDotInfoPtr>& partInfo, PartPtr p, bool 
 // partInfo: maps Parts to the information required to display them in the dot graph
 // subgraphName: name of the subgraph that contains the current level in the map
 void Ctxt2PartsMap_Leaf_atsGraph::map2dot(std::ostream& o, std::map<PartPtr, partDotInfoPtr>& partInfo, std::string subgraphName, std::string indent) const {
-  scope reg(txt()<<"Ctxt2PartsMap_Leaf_atsGraph::map2dot() subgraphName="<<subgraphName<<" #m="<<m.size(), scope::medium, attrGE("ats2DotDebugLevel", 2));
+  SIGHT_VERB_DECL(scope, (txt()<<"Ctxt2PartsMap_Leaf_atsGraph::map2dot() subgraphName="<<subgraphName<<" #m="<<m.size()), 2, ats2DotDebugLevel)
   
   if(m.size()==0) return;
   
@@ -160,7 +159,7 @@ void Ctxt2PartsMap_Leaf_atsGraph::map2dot(std::ostream& o, std::map<PartPtr, par
     
     // Iterate over all the states in this context, printing them and recording the function calls
     for(set<PartPtr>::iterator p=c->second.begin(); p!=c->second.end(); p++) {
-      if(ats2DotDebugLevel()>=2) dbg << "part="<<p->get()->str();
+      SIGHT_VERB(dbg << "part="<<p->get()->str(), 2, ats2DotDebugLevel)
       
       if(partInfo.find(*p) == partInfo.end()) continue;
       
@@ -441,7 +440,7 @@ atsGraph::~atsGraph() {
     partInfo[pa->first] = boost::make_shared<partDotInfo_atsGraph>(partID, pa->second);
     
     PartPtr p = pa->first;
-    if(ats2DotDebugLevel()>=2) dbg << "Adding "<<p->str()<<endl;
+    SIGHT_VERB(dbg << "Adding "<<p->str()<<endl, 2, ats2DotDebugLevel)
   }
   
   for(map<PartPtr, list<anchor> >::iterator pa=partAnchors->begin(); pa!=partAnchors->end(); pa++) {
@@ -460,7 +459,7 @@ atsGraph::~atsGraph() {
     if(boost::dynamic_pointer_cast<partDotInfo_atsGraph>(pi->second)->anchors.size()==0) {
       boost::dynamic_pointer_cast<partDotInfo_atsGraph>(pi->second)->anchors.push_back(anchor());
       PartPtr p = pi->first;
-      if(ats2DotDebugLevel()>=2) dbg << "Blank mapping to "<<p->str()<<endl;
+      SIGHT_VERB(dbg << "Blank mapping to "<<p->str()<<endl, 2, ats2DotDebugLevel)
     }
   }
   
@@ -470,13 +469,13 @@ atsGraph::~atsGraph() {
 // Generates and returns the dot graph code for this graph
 void atsGraph::genDotGraph()
 {
-  scope s("dot", scope::medium, attrGE("ats2DotDebugLevel", 1));
+  SIGHT_VERB_DECL(scope, ("dot"), 1, ats2DotDebugLevel)
   
   // Maps contexts to the set of parts in each context
   Ctxt2PartsMap_atsGraph ctxt2parts(false, boost::make_shared<Ctxt2PartsMap_Generator_atsGraph>(),
                                            boost::make_shared<Ctxt2PartsMap_Leaf_Generator_atsGraph>());
   //for(fw_partEdgeIterator state(startParts); state!=fw_partEdgeIterator::end(); state++) {
-  for(fw_partEdgeIterator state(startParts); !state.isEnd(); state++) {
+  for(fw_partEdgeIterator state(startParts, /*incrementalGraph*/ false); !state.isEnd(); state++) {
     PartPtr part = state.getPart();
     
     list<list<PartContextPtr> > key = part->getContext()->getDetailedPartContexts();
@@ -520,12 +519,12 @@ void atsGraph::genDotGraph()
     cout << e->getFrom().getID() << " => " << e->getTo().getID()<<endl;*/
   
   {
-  scope se("Edges", scope::medium, attrGE("ats2DotDebugLevel", 1));
+  SIGHT_VERB_DECL(scope, ("Edges"), 1, ats2DotDebugLevel)
   for(set<graphEdge>::iterator e=uniqueEdges.begin(); e!=uniqueEdges.end(); e++) {
   //for(map<anchor, set<anchor> >::iterator from=uniqueEdges.begin(); from!=uniqueEdges.end(); from++) {
   //for(set<anchor>::iterator to=from->second.begin(); to!=from->second.end(); to++) {
     graphEdge edge = *e;
-    if(ats2DotDebugLevel()>=1) dbg << "edge "<<edge.getFrom().str()<<" => "<<edge.getTo().str()<<endl;
+    SIGHT_VERB(dbg << "edge "<<edge.getFrom().str()<<" => "<<edge.getTo().str()<<endl, 1, ats2DotDebugLevel)
     /*cout << "edge "<<edge.getFrom().str()<<"("<<(anchor2Parts.find(edge.getFrom())!=anchor2Parts.end())<<") => "<<
                      edge.getTo().str()<<"("<<(anchor2Parts.find(edge.getTo())!=anchor2Parts.end())<<")"<<endl;*/
     if(anchor2Parts.find(edge.getFrom()) != anchor2Parts.end() && 

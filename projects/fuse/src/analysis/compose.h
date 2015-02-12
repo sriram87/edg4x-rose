@@ -195,13 +195,16 @@ class Composer
 
   // Return an SSAGraph object that describes the overall structure of the transition system
   virtual SSAGraph* GetSSAGraph(ComposedAnalysis* client)=0;
- 
-  // Returns all the edges implemented by the entire composer that refine the given
-  // base PartEdge
-  // NOTE: Once we change ChainComposer to derive from ComposedAnalysis, we can modify
-  //       this to implement that interface.
+
+  // Given a Part or PartEdge implemented by the entire composer, returns the set of refined Parts/PartEdges implemented
+  // by the composer or the NULLPart/NULLPartEdge if this relationship was not tracked.
+  virtual const std::set<PartPtr>&     getRefinedParts    (PartPtr     base) const=0;
   virtual const std::set<PartEdgePtr>& getRefinedPartEdges(PartEdgePtr base) const=0;
-   
+
+  // Returns the number of Parts/PartEdges that refine the given base
+  virtual unsigned int  numRefinedParts    (PartPtr     base) const=0;
+  virtual unsigned int  numRefinedPartEdges(PartEdgePtr base) const=0;
+
   /*
   // Returns whether dom is a dominator of part
   virtual std::set<PartPtr> isDominator(PartPtr part, PartPtr dom, ComposedAnalysis* client);
@@ -504,9 +507,17 @@ class ChainComposer : public Composer, public UndirDataflow
   // Return an SSAGraph object that describes the overall structure of the transition system
   SSAGraph* GetSSAGraph(ComposedAnalysis* client);
 
-  // Returns all the edges implemented by the entire composer that refine the given
-  // base PartEdge
+  // Given a Part implemented by the entire composer, returns the set of refined Parts implemented
+  // by the composer or the NULLPart if this relationship was not tracked.
+  const std::set<PartPtr>& getRefinedParts(PartPtr base) const;
+
+  // Given a PartEdge implemented by the entire composer, returns the set of refined PartEdges implemented
+  // by the composer or the NULLPartEdge if this relationship was not tracked.
   const std::set<PartEdgePtr>& getRefinedPartEdges(PartEdgePtr base) const;
+
+  // Returns the number of Parts/PartEdges that refine the given base
+  unsigned int  numRefinedParts    (PartPtr     base) const;
+  unsigned int  numRefinedPartEdges(PartEdgePtr base) const;
 
   protected:
   // Maps base parts from the ATS on which this analysis runs to the parts implemented
@@ -515,7 +526,7 @@ class ChainComposer : public Composer, public UndirDataflow
   // when the connection between a given refined part and its base part is first established.
   // NOTE: Once we change ChainComposer to derive from ComposedAnalysis, we can modify
   //       this to implement that interface.
-  std::map<PartEdgePtr, boost::shared_ptr<std::set<PartEdgePtr> > > base2RefinedPartEdge;
+  //std::map<PartEdgePtr, boost::shared_ptr<std::set<PartEdgePtr> > > base2RefinedPartEdge;
 
   public:
   
@@ -692,13 +703,19 @@ class LooseParallelComposer : public Composer, public UndirDataflow
   
   std::set<PartPtr> GetStartOrEndAStates_Spec(callStartOrEndAStates& caller, std::string funcName);
   
-  // Returns all the edges implemented by the entire composer that refine the given
-  // base PartEdge
-  // NOTE: Once we change ChainComposer to derive from ComposedAnalysis, we can modify
-  //       this to implement that interface.
+  // Given a Part implemented by the entire composer, returns the set of refined Parts implemented
+  // by the composer or the NULLPart if this relationship was not tracked.
+  const std::set<PartPtr>& getRefinedParts(PartPtr base) const
+  { assert(0); }
+
+  // Given a PartEdge implemented by the entire composer, returns the set of refined PartEdges implemented
+  // by the composer or the NULLPartEdge if this relationship was not tracked.
   const std::set<PartEdgePtr>& getRefinedPartEdges(PartEdgePtr base) const
   { assert(0); }
 
+  // Returns the number of Parts/PartEdges that refine the given base
+  unsigned int  numRefinedParts    (PartPtr     base) const { return 0; }
+  unsigned int  numRefinedPartEdges(PartEdgePtr base) const { return 0; }
   // -----------------------------------------
   // ----- Methods from ComposedAnalysis -----
   // -----------------------------------------

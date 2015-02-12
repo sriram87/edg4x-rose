@@ -32,6 +32,13 @@ SSAMemLocObject::SSAMemLocObject(const SSAMemLocObject& that) : MemLocObject(tha
   access = that.access;
   phiID  = that.phiID;
 }
+// Function that generates FuseCFGNodes. Used in code regions that need to generate such nodes
+// but can't include fuse.h due to circular include dependencies
+FuseCFGNodePtr createFuseCFGNode(Fuse* fuseAnalysis, PartPtr part);
+
+// Return the FuseCFGNode of the given Fuse object that wraps the location Part of this SSAMemLocObject
+FuseCFGNodePtr SSAMemLocObject::getFuseCFGNodeLoc(Fuse* fuseAnalysis) const
+{ return createFuseCFGNode(fuseAnalysis, loc); }
 
 // pretty print
 string SSAMemLocObject::str(string indent) const {
@@ -246,9 +253,10 @@ SSAGraph::SSAGraph(Composer* comp, ComposedAnalysis* analysis) : comp(comp), ana
     cout << "    "<<s->str()<<endl;
   }*/
 
-  BOOST_FOREACH (const PartPtr& s, startStates) {
+  /*BOOST_FOREACH (const PartPtr& s, startStates) {
     buildCFG(s, nodesToVertices, nodesProcessed);
-  }
+  }*/
+  ssaBuilt=false;
 
   buildSSA();
 }
@@ -416,8 +424,17 @@ set<MemLocObjectPtr> SSAGraph::SSAMLSet2MLSet(const set<SSAMemLocObjectPtr>& s) 
 
 // Return the set of uses at this part
 const std::set<SSAMemLocObjectPtr>& SSAGraph::getUses(PartPtr part) const {
+  //scope s(txt()<<"SSAGraph::getUses("<<part->str()<<")");
+
+  /*{ scope s("uses", scope::high);
+  for(map<PartPtr, set<SSAMemLocObjectPtr> >::const_iterator u=uses.begin(); u!=uses.end(); ++u)
+    dbg << "part="<<u->first->str()<<", #uses="<<u->second.size()<<endl;
+  }*/
   std::map<PartPtr, std::set<SSAMemLocObjectPtr> >::const_iterator i=uses.find(part);
-  if(i!=uses.end()) return i->second;
+  if(i!=uses.end()) {
+    //dbg << "Return: #"<<i->second.size()<<endl;
+    return i->second;
+  }
   else              return emptySSAMemLocObjectSet;
 }
 
@@ -435,10 +452,76 @@ const std::set<SSAMemLocObjectPtr>& SSAGraph::getDefs(PartPtr part) const {
 std::set<MemLocObjectPtr> SSAGraph::getDefsML(PartPtr part) const
 { return SSAMLSet2MLSet(getDefs(part)); }
 
+// Returns all the SSAMemLocObjects within the given given set are definite defs rather than phi defs or uses
+bool allDefiniteDefs(const set<SSAMemLocObjectPtr>& defs) {
+  for(set<SSAMemLocObjectPtr>::const_iterator d=defs.begin(); d!=defs.end(); ++d) {
+    if((*d)->getAccess() != SSAMemLocObject::def) return false;
+  }
+  return true;
+}
+
+// Returns the defs that transitively reach the given use through zero or more phi nodes
+std::set<SSAMemLocObjectPtr> SSAGraph::getTransitiveDefs(SSAMemLocObjectPtr use) const {
+  //scope s(txt()<<"SSAGraph::getTransitiveDefs("<<use->str()<<")");
+  // The definite definitions that are the origin of the def-use chains that reach use
+  set<SSAMemLocObjectPtr> originDefs;
+
+  const set<SSAMemLocObjectPtr>& initialDefs = getDefs(use);
+  //dbg << "#initialDefs="<<initialDefs.size()<<endl;
+
+  // Set phiDefs to refer to the phi definitions in curDefs and add the rest of originDefs
+  set<SSAMemLocObjectPtr> phiDefs;
+  for(set<SSAMemLocObjectPtr>::const_iterator d=initialDefs.begin(); d!=initialDefs.end(); ++d) {
+    //indent ind; dbg << "d="<<(*d)->str()<<endl;
+    
+    if((*d)->getAccess() == SSAMemLocObject::def)         originDefs.insert(*d);
+    else if((*d)->getAccess() == SSAMemLocObject::phiDef) phiDefs.insert(*d);
+    else assert(0);
+  }
+
+  // Keep searching backwards through use->def relations until we're only left with definite defs
+  int counter=0;
+  // Tracks the phiDefs that have already been visited. These are are evaluated just once to avoid def cycles.
+  set<SSAMemLocObjectPtr> visitedPhiDefs;
+  while(phiDefs.size()>0) {
+    //scope s(txt()<<"#phiDefs="<<phiDefs.size());
+    // Iterate over the definitions that immediately reach the current set of phiDefs,
+    // adding the phiDefs to newPhiDefs and defs to originDefs
+    set<SSAMemLocObjectPtr> nextPhiDefs;
+    for(set<SSAMemLocObjectPtr>::const_iterator d=phiDefs.begin(); d!=phiDefs.end(); ++d) {
+      const set<SSAMemLocObjectPtr>& nextDefs = getReachingDefsAtPhiDef(*d);
+      //scope s("phiDef");
+      //dbg << "d="<<(*d)->str()<<", #nextDefs="<<nextDefs.size()<<endl;
+      for(set<SSAMemLocObjectPtr>::const_iterator nd=nextDefs.begin(); nd!=nextDefs.end(); ++nd) {
+        //scope s("nextDef");
+        //dbg << "nd="<<(*nd)->str()<<", def="<<((*nd)->getAccess() == SSAMemLocObject::def)<<", phiDef="<<((*nd)->getAccess() == SSAMemLocObject::phiDef)<<endl;
+        if((*nd)->getAccess() == SSAMemLocObject::def)         originDefs.insert(*nd);
+        else if((*nd)->getAccess() == SSAMemLocObject::phiDef) {
+          if(visitedPhiDefs.find(*nd) == visitedPhiDefs.end()) {
+            nextPhiDefs.insert(*nd);
+            visitedPhiDefs.insert(*nd);
+          }
+        }
+        else assert(0);
+      }
+    }
+
+    // Update phiDefs to refer to the phi defs that reach its original contents
+    phiDefs = nextPhiDefs;
+    counter++;
+    if(counter>10) exit(-1);
+  }
+
+  return originDefs;
+}
+
+std::set<MemLocObjectPtr> SSAGraph::getTransitiveDefsML(SSAMemLocObjectPtr use) const
+{ return SSAMLSet2MLSet(getTransitiveDefs(use)); }
+
 // Collects all the defs and uses at each Part and stores them into defs and uses
 void SSAGraph::collectDefsUses() {
   set<PartPtr> startStates = comp->GetStartAStates(analysis);
-  for(fw_partEdgeIterator state(startStates); !state.isEnd(); state++) {
+  for(fw_partEdgeIterator state(startStates, /*incrementalGraph*/ false); !state.isEnd(); state++) {
     PartPtr part = state.getPart();
     set<SSAMemLocObjectPtr>& partDefs = defs[part];
     set<SSAMemLocObjectPtr>& partUses = uses[part];
@@ -716,7 +799,7 @@ void SSAGraph::showPhiNodes() {
   {
     set<PartPtr> visited;
     set<PartPtr> worklist = startStates;
-    //for(fw_partEdgeIterator state(startStates); !state.isEnd(); state++) {
+    //for(fw_partEdgeIterator state(startStates, /*incrementalGraph*/ false); !state.isEnd(); state++) {
     while(worklist.size()>0) {
       //PartPtr part = state.getPart();
       PartPtr part = *worklist.begin();
@@ -787,7 +870,7 @@ void SSAGraph::showPhiNodes() {
   {
   set<PartPtr> visited;
   set<PartPtr> worklist = startStates;
-  //for(fw_partEdgeIterator state(startStates); !state.isEnd(); state++) {
+  //for(fw_partEdgeIterator state(startStates, /*incrementalGraph*/ false); !state.isEnd(); state++) {
   while(worklist.size()>0) {
     //PartPtr part = state.getPart();
     PartPtr part = *worklist.begin();
@@ -810,24 +893,24 @@ void SSAGraph::showPhiNodes() {
 }
 
 // Returns the mapping of phiDef MemLocs at the given phiNode before the given part
-  // to the defs and phiDefs that reach them.
-  const std::map<SSAMemLocObjectPtr, std::set<SSAMemLocObjectPtr> >& SSAGraph::getDefsUsesAtPhiNode(PartPtr part) const {
-    ROSE_ASSERT(isPhiNode(part));
-    std::map<PartPtr, std::map<SSAMemLocObjectPtr, std::set<SSAMemLocObjectPtr> > >::const_iterator i=phiDefs.find(part);
-    ROSE_ASSERT(i!=phiDefs.end());
-    return i->second;
-  }
+// to the defs and phiDefs that reach them.
+const std::map<SSAMemLocObjectPtr, std::set<SSAMemLocObjectPtr> >& SSAGraph::getDefsUsesAtPhiNode(PartPtr part) const {
+  ROSE_ASSERT(isPhiNode(part));
+  std::map<PartPtr, std::map<SSAMemLocObjectPtr, std::set<SSAMemLocObjectPtr> > >::const_iterator i=phiDefs.find(part);
+  ROSE_ASSERT(i!=phiDefs.end());
+  return i->second;
+}
 
-  // Returns the set of defs and phiDefs that reach the given phiDef
-  const std::set<SSAMemLocObjectPtr>& SSAGraph::getReachingDefsAtPhiDef(SSAMemLocObjectPtr pd) const {
-    ROSE_ASSERT(isPhiNode(pd->getLoc()));
-    std::map<PartPtr, std::map<SSAMemLocObjectPtr, std::set<SSAMemLocObjectPtr> > >::const_iterator i=phiDefs.find(pd->getLoc());
-    ROSE_ASSERT(i!=phiDefs.end());
-    std::map<SSAMemLocObjectPtr, std::set<SSAMemLocObjectPtr> >::const_iterator j=i->second.find(pd);
-    ROSE_ASSERT(j!=i->second.end());
+// Returns the set of defs and phiDefs that reach the given phiDef
+const std::set<SSAMemLocObjectPtr>& SSAGraph::getReachingDefsAtPhiDef(SSAMemLocObjectPtr pd) const {
+  ROSE_ASSERT(isPhiNode(pd->getLoc()));
+  std::map<PartPtr, std::map<SSAMemLocObjectPtr, std::set<SSAMemLocObjectPtr> > >::const_iterator i=phiDefs.find(pd->getLoc());
+  ROSE_ASSERT(i!=phiDefs.end());
+  std::map<SSAMemLocObjectPtr, std::set<SSAMemLocObjectPtr> >::const_iterator j=i->second.find(pd);
+  ROSE_ASSERT(j!=i->second.end());
 
-    return j->second;
-  }
+  return j->second;
+}
 
 /*
 // Returns the ID of the given phiNode part
@@ -898,7 +981,7 @@ void SSAGraph::eraseUsesFromU2D(PartPtr part) {
 // For each use->def link recorded in use2def and phiDefs, adds a corresponding
 // reverse link in def2use
 void SSAGraph::setDef2Use() {
-  // Reset def2use in preparation of it being synchornized with use2def and phiDefs
+  // Reset def2use in preparation of it being synchronized with use2def and phiDefs
   def2use.clear();
 
   for(map<SSAMemLocObjectPtr, set<SSAMemLocObjectPtr> >::iterator u=use2def.begin(); u!=use2def.end(); ++u) {
@@ -1279,8 +1362,8 @@ void SSAGraph::computeUse2Def() {
   // Iterate over the ATS forwards, looking for propagating defs to their corresponding phiDefs and uses
   set<PartPtr> startStates = comp->GetStartAStates(analysis);
 
-  //for(fw_partEdgeIterator state(startStates); !state.isEnd(); state++) {
-  fw_dataflowPartEdgeIterator state(selectIterOrderFromEnvironment());
+  //for(fw_partEdgeIterator state(startStates, /*incrementalGraph*/ false); !state.isEnd(); state++) {
+  fw_dataflowPartEdgeIterator state(/*incrementalGraph*/ false, selectIterOrderFromEnvironment());
   set<PartPtr> empty;
   state.init(startStates, empty);
   int iter=0;
@@ -1690,7 +1773,7 @@ void SSAGraph::showUse2Def() {
 
   { scope s2("def2use");
   for(map<SSAMemLocObjectPtr, set<SSAMemLocObjectPtr>  >::iterator i=def2use.begin(); i!=def2use.end(); i++) {
-    dbg << "i->first="<<i->first.get()<<endl;
+    //dbg << "i->first="<<i->first.get()<<endl;
     scope s(i->first->str());
     for(set<SSAMemLocObjectPtr>::iterator j=i->second.begin(); j!=i->second.end(); j++)
       dbg << "    "<<(*j)->str()<<endl;
@@ -1703,7 +1786,7 @@ void SSAGraph::showUse2Def() {
   set<PartPtr> startStates = comp->GetStartAStates(analysis);
   std::map<PartPtr, int> partID;
   set<PartPtr> visited;
-  for(fw_partEdgeIterator state(startStates); !state.isEnd(); state++) {
+  for(fw_partEdgeIterator state(startStates, /*incrementalGraph*/ false); !state.isEnd(); state++) {
     PartPtr part = state.getPart();
     if(visited.find(part) != visited.end()) continue;
     visited.insert(part);
@@ -1717,14 +1800,14 @@ void SSAGraph::showUse2Def() {
   }
 
   // Next, add transition system edges
-  /*for(fw_partEdgeIterator state(startStates); !state.isEnd(); state++) {
+  /*for(fw_partEdgeIterator state(startStates, / *incrementalGraph* / false); !state.isEnd(); state++) {
     PartPtr src = state.getPartEdge()->source();
     PartPtr tgt = state.getPartEdge()->target();
     dot << "node"<<partID[src]<<" -> node"<<partID[tgt]<<";"<<endl;
   }*/
   {
     set<PartPtr> visited;
-    for(fw_partEdgeIterator state(startStates); !state.isEnd(); state++) {
+    for(fw_partEdgeIterator state(startStates, /*incrementalGraph*/ false); !state.isEnd(); state++) {
       PartPtr part = state.getPart();
       if(visited.find(part) != visited.end()) continue;
       visited.insert(part);
@@ -1764,8 +1847,6 @@ void SSAGraph::showUse2Def() {
 }
 
 void SSAGraph::buildSSA() {
-  // Only run if the SSA has not yet been built
-  static bool ssaBuilt=false;
   if(ssaBuilt) return;
   ssaBuilt=true;
 

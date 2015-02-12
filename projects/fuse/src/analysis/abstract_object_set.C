@@ -304,7 +304,7 @@ void AbstractObjectSet::copy(Lattice* thatL)
 //    the keys in ml2ml are in scope on one side of Part, while the values on the other side. Specifically, it is
 //    guaranteed that the keys are in scope at fromPEdge while the values are in scope at the edge returned 
 //    by getPartEdge().
-// remapML must return a freshly-allocated object.
+// remapML must return a freshly-allocatedremapML object.
 // In must mode for each MemLocObject o in the set, if there exist any pairs <old, new> in ml2ml such that 
 //    o mustEquals old, then new will be included in the final set.
 // May mode is the same, except if for some pair <old, new> old mayEquals o but not mustEquals o then new is 

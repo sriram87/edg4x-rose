@@ -35,14 +35,15 @@ class LabelProperty {
    LabelProperty(SgNode* node, LabelType labelType);
    LabelProperty(SgNode* node, VariableIdMapping* variableIdMapping);
    LabelProperty(SgNode* node, LabelType labelType, VariableIdMapping* variableIdMapping);
-   string toString();
-   SgNode* getNode();
-   bool isFunctionCallLabel();
-   bool isFunctionCallReturnLabel();
-   bool isFunctionEntryLabel();
-   bool isFunctionExitLabel();
-   bool isBlockBeginLabel();
-   bool isBlockEndLabel();
+   string toString() const;
+   SgNode* getNode() const;
+   bool isFunctionCallLabel() const;
+   bool isFunctionCallReturnLabel() const;
+   bool isFunctionEntryLabel() const;
+   bool isFunctionExitLabel() const;
+   bool isBlockBeginLabel() const;
+   bool isBlockEndLabel() const;
+   LabelType getLabelType() const;
 
  public:
    void initializeIO(VariableIdMapping* variableIdMapping);
@@ -61,8 +62,8 @@ class LabelProperty {
    int getIOConst();
 
    void makeTerminationIrrelevant(bool t);
-   bool isTerminationRelevant();
-   bool isLTLRelevant();
+   bool isTerminationRelevant() const;
+   bool isLTLRelevant() const;
 
  private:
    bool _isValid;
@@ -123,10 +124,12 @@ LabelSet& operator+=(LabelSet& s2) {
   * \date 2012, 2013.
  */
 class Labeler {
- public:
+  SgNode* start;
+  public:
   Labeler();
   static const Label NO_LABEL=-1;
   Labeler(SgNode* start);
+  void init();
   static string labelToString(Label lab);
   int isLabelRelevantNode(SgNode* node);
   virtual void createLabels(SgNode* node);
@@ -176,7 +179,8 @@ class Labeler {
 
  protected:
   void computeNodeToLabelMapping();
-  void registerLabel(LabelProperty);
+  // Registers the given LabelProperty at a fresh label ID and returns this ID
+  Label registerLabel(LabelProperty);
   typedef vector<LabelProperty> LabelToLabelPropertyMapping;
   LabelToLabelPropertyMapping mappingLabelToLabelProperty;
   typedef  map<SgNode*,Label> NodeToLabelMapping;

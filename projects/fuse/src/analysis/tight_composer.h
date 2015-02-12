@@ -97,6 +97,19 @@ namespace fuse {
     std::string str(std::string indent="") const;
   };
 
+  class TightCompositionQueryManagerTest {
+    std::map<Expr2AnyKey, Expr2AnyState> queryStateMap;
+  public:
+    TightCompositionQueryManagerTest() { }
+    void initializeQuery(Expr2AnyKey key);
+    bool isQueryCached(Expr2AnyKey key);
+    const Expr2AnyState getQueryState(Expr2AnyKey key) const;
+    bool isLoopingQuery(Expr2AnyKey key, ComposedAnalysis* analysis);
+    void transToAnalState(Expr2AnyKey key, ComposedAnalysis* analysis);
+    void transToFinishedState(Expr2AnyKey key);
+    std::string str(std::string indent="") const;
+  };
+
   /*****************
    * TightComposer *
    *****************/
@@ -107,9 +120,10 @@ namespace fuse {
     direction dir;
 
     TightCompositionQueryManager tcqm;
+    TightCompositionQueryManagerTest tcqmTest;
     
   public:
-    TightComposer(const std::list<ComposedAnalysis*>& analyses, bool trackBase2RefinedPartEdgeMapping, bool useSSA);
+    TightComposer(const std::list<ComposedAnalysis*>& analyses, bool trackBase2RefinedPartEdgeMapping=true, bool useSSA=false);
     TightComposer(const TightComposer&);
   
     // Returns a shared pointer to a freshly-allocated copy of this ComposedAnalysis object
@@ -120,6 +134,16 @@ namespace fuse {
     void initializeQueryList(std::list<Expr2AnyKey>& queryList);
     bool recursiveQueries(std::list<Expr2AnyKey>& queryList, ComposedAnalysis* client);
     void finalizeQueryList(std::list<Expr2AnyKey>& queryList);
+
+    void initializeQueryListTest(std::list<Expr2AnyKey>& queryList);
+    bool recursiveQueriesTest(std::list<Expr2AnyKey>& queryList, ComposedAnalysis* client);
+    void finalizeQueryListTest(std::list<Expr2AnyKey>& queryList);
+
+    // Maps that cache the results of Expr2* queries
+    std::map<std::pair<SgNode*, PartEdgePtr>, CodeLocObjectPtr>   clCache;
+    std::map<std::pair<SgNode*, PartEdgePtr>, ValueObjectPtr>     vCache;
+    std::map<std::pair<SgNode*, PartEdgePtr>, MemRegionObjectPtr> mrCache;
+    std::map<std::pair<SgNode*, PartEdgePtr>, MemLocObjectPtr>    mlCache;
 
     //! Generic method for answering Expr2* queries.
     //! Consider two analysis A, B composed by TightComposer.
@@ -168,6 +192,15 @@ namespace fuse {
     //!
     template<class AOType, class FullAOType, class CombinedAOType, class AnalysisMapAOType>
     boost::shared_ptr<AOType> Expr2Any(std::string opName,
+                                       std::list<Expr2AnyKey> queryList,
+                                       PartEdgePtr pedge,
+                                       ComposedAnalysis* client,
+                                       boost::function<bool (ComposedAnalysis*)> implementsExpr2AnyOp,
+                                       boost::function<boost::shared_ptr<AOType> (ComposedAnalysis*, SgNode*, PartEdgePtr)> Expr2AnyOp,
+                                       boost::function<boost::shared_ptr<AOType> (SgNode*, PartEdgePtr)> ComposerExpr2AnyOp);
+
+    template<class AOType, class FullAOType, class CombinedAOType, class AnalysisMapAOType>
+    boost::shared_ptr<AOType> Expr2AnyTest(std::string opName,
                                        std::list<Expr2AnyKey> queryList,
                                        PartEdgePtr pedge,
                                        ComposedAnalysis* client,
@@ -309,11 +342,19 @@ namespace fuse {
     // Return an SSAGraph object that describes the overall structure of the transition system
     SSAGraph* GetSSAGraph(ComposedAnalysis* client);
 
-    // Returns all the edges implemented by the entire composer that refine the given
-    // base PartEdge
-    // NOTE: Once we change ChainComposer to derive from ComposedAnalysis, we can modify
-    //       this to implement that interface.
+    // Given a Part implemented by the entire composer, returns the set of refined Parts implemented
+    // by the composer or the NULLPart if this relationship was not tracked.
+    const std::set<PartPtr>& getRefinedParts(PartPtr base) const;
+
+    // Given a PartEdge implemented by the entire composer, returns the set of refined PartEdges implemented
+    // by the composer or the NULLPartEdge if this relationship was not tracked.
     const std::set<PartEdgePtr>& getRefinedPartEdges(PartEdgePtr base) const;
+
+    // Returns the number of Parts that refine the given base
+    unsigned int  numRefinedParts    (PartPtr     base) const;
+
+    // Returns the number of PartEdges that refine the given base
+    unsigned int  numRefinedPartEdges(PartEdgePtr base) const;
 
     // -----------------------------------------
     // ----- Methods from ComposedAnalysis -----

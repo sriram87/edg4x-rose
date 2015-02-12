@@ -135,7 +135,7 @@ class ComposedAnalysis : public virtual Dataflow
   
   // Returns whether the given pair of AbstractObjects are equal at the given PartEdge
   
-  private:
+  protected:
   // Keep track of whether GetStartAStates and GetEndAStates have already been called and their
   // results cached.
   bool startStatesInitialized;
@@ -145,21 +145,23 @@ class ComposedAnalysis : public virtual Dataflow
   std::set<PartPtr> StartAStates;
   std::set<PartPtr> EndAStates;
  
-  // Maps refined edges to the base edges they refine. Set inside convertPEdge()
-  // by caching the output of PartEdge->getParent
+  // Maps refined Parts and PartEdges to the base Parts and PartEdges they refine. Set inside
+  // convertPart() and convertPEdge() by caching the output of getSupersetPart()/getSupersetPartEdge()
+  std::map<PartPtr,     PartPtr>     refined2BasePart;
   std::map<PartEdgePtr, PartEdgePtr> refined2BasePedge;
 
-  // Maps base parts from the ATS on which this analysis runs to the parts implemented
-  // by this analysis that refine themto the edges that refine them. Set inside 
-  // registerBase2RefinedMapping(), which is called inside the PartEdge constructor
-  // when the connection between a given refined part and its base part is first established.
+  // Maps base Parts and PartEdges from the ATS on which this analysis runs to the parts implemented
+  // by this analysis that refine them. Set inside registerBase2RefinedMapping(), which is called
+  // inside the Part and PartEdge constructors when the connection between a given refined
+  // its base Parts and PartEdges is first established.
+  std::map<PartPtr,     std::set<PartPtr> >     base2RefinedPart;
   std::map<PartEdgePtr, std::set<PartEdgePtr> > base2RefinedPartEdge;
 
   protected:
-  // Records whether the base2RefinedPartEdge mapping should be tracked. It is not needed
-  // in most cases, so it should be used only when explicitly needed (e.g. when users need
-  // to ask for analysis results at AST nodes and we need to track down all analysis ATS
-  // PartEdges that correspond to each ATS SgNode*.
+  // Records whether the base2RefinedPart and base2RefinedPartEdge mappings should be tracked.
+  // They are not needed in all cases, so it should be used only when explicitly needed (e.g.
+  // when users need to ask for analysis results at AST nodes and we need to track down all
+  // analysis ATS Parts and PartEdges that correspond to each ATS SgNode*.
   bool trackBase2RefinedPartEdgeMapping;
   
   public:
@@ -176,18 +178,24 @@ class ComposedAnalysis : public virtual Dataflow
   // Returns whether this analysis implements an Abstract Transition System graph via the methods
   // GetStartAStates_Spec() and GetEndAStates_Spec()
   virtual bool implementsATSGraph() { return false; }
+
+  // Given a PartPtr part implemented by this ComposedAnalysis, returns the Part from its predecessor
+  // from which part was derived. This function caches the results.
+  PartPtr convertPart(PartPtr part);
   
-  // Given a PartEdge pedge implemented by this ComposedAnalysis, returns the part from its predecessor
-  // from which pedge was derived. This function caches the results if possible.
+  // Given a PartEdgePtr pedge implemented by this ComposedAnalysis, returns the PartEdge from its predecessor
+  // from which pedge was derived. This function caches the results.
   PartEdgePtr convertPEdge(PartEdgePtr pedge);
   
-  // Given a PartEdge base from the ATS on which this ComposedAnalysis runs and a PartEdge implemented
-  // by this composed analysis that refines base, records the mapping from the base PartEdge
-  // to the refined PartEdge.
+  // Given a Part/PartEdge base from the ATS on which this ComposedAnalysis runs and a Part/PartEdge implemented
+  // by this composed analysis that refines base, records the mapping from the base Part/PartEdge
+  // to the refined Part/PartEdge.
+  void registerBase2RefinedMapping(PartPtr     base, PartPtr     refined);
   void registerBase2RefinedMapping(PartEdgePtr base, PartEdgePtr refined);
   
   // Given a PartEdge implemented by this analysis, returns the set of refined PartEdges implemented
   // by this analysis or the NULLPart if this relationship was not tracked.
+  const std::set<PartPtr>&     getRefinedParts    (PartPtr     base) const;
   const std::set<PartEdgePtr>& getRefinedPartEdges(PartEdgePtr base) const;
 
   // Specific Composers implement this function

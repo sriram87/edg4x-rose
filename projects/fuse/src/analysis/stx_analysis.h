@@ -152,34 +152,17 @@ class StxPart : public Part
   StxPart(const StxPartPtr& part, bool (*f) (CFGNode) = defaultFilter): Part((const Part&)part), n(part->n), filter (f) {}
 
   public:
-  // PartEdges must be created via static construction methods to make it possible to separately
-  // initialize them. This is needed to allow PartEdges to register themselves with global directories,
+  // Parts must be created via static construction methods to make it possible to separately
+  // initialize them. This is needed to allow Parts to register themselves with global directories,
   // a process that requires the creation of a shared pointer to themselves.
-  static StxPartPtr create(CFGNode n, ComposedAnalysis* analysis, bool (*f) (CFGNode) = defaultFilter) {
-    StxPartPtr newPart(boost::shared_ptr<StxPart>(new StxPart(n, analysis, f)));
-    newPart->init();
-    return newPart;
-  }
-  static StxPartPtr create(const StxPart& part) {
-    StxPartPtr newPart(boost::shared_ptr<StxPart>(new StxPart(part, defaultFilter)));
-    newPart->init();
-    return newPart;
-  }
-  static StxPartPtr create(const StxPartPtr& part) {
-    StxPartPtr newPart(boost::shared_ptr<StxPart>(new StxPart(part, defaultFilter)));
-    newPart->init();
-    return newPart;
-  }
-  static StxPartPtr create(const StxPart& part,    bool (*f) (CFGNode) = defaultFilter) {
-    StxPartPtr newPart(boost::shared_ptr<StxPart>(new StxPart(part, f)));
-    newPart->init();
-    return newPart;
-  }
-  static StxPartPtr create(const StxPartPtr& part, bool (*f) (CFGNode) = defaultFilter) {
-    StxPartPtr newPart(boost::shared_ptr<StxPart>(new StxPart(part, f)));
-    newPart->init();
-    return newPart;
-  }
+  // These methods return a valid StxPartPtr if the CFNode is interesting and a NULLStxPart otherwise.
+  static StxPartPtr create(CFGNode n, ComposedAnalysis* analysis, bool (*f) (CFGNode) = defaultFilter);
+  static StxPartPtr create(const StxPart& part);
+  static StxPartPtr create(const StxPartPtr& part);
+  static StxPartPtr create(const StxPart& part,    bool (*f) (CFGNode) = defaultFilter);
+  static StxPartPtr create(const StxPartPtr& part, bool (*f) (CFGNode) = defaultFilter);
+
+  virtual void init();
   
   private:
   // Returns a shared pointer to this of type StxPartPtr
@@ -238,25 +221,18 @@ class StxPartEdge : public PartEdge
       PartEdge(analysis, NULLPartEdge), p(p), filter(f) {}
   StxPartEdge(const StxPartEdge& dfe): PartEdge((const PartEdge&)dfe), p(dfe.p), filter(dfe.filter) {}
   public:
+  virtual void init();
+
+  // Returns whether an edge from the given source to the given target corresponds to a valid
+  // edge in the Fuse portion of the Virtual CFG
+  static bool isValidEdge(CFGNode src, CFGNode tgt);
 
   // PartEdges must be created via static construction methods to make it possible to separately
   // initialize them. This is needed to allow PartEdges to register themselves with global directories,
   // a process that requires the creation of a shared pointer to themselves.
-  static StxPartEdgePtr create(CFGNode src, CFGNode tgt, ComposedAnalysis* analysis, bool (*f) (CFGNode) = defaultFilter) {
-    StxPartEdgePtr newEdge(boost::shared_ptr<StxPartEdge>(new StxPartEdge(src, tgt, analysis, f)));
-    newEdge->init();
-    return newEdge;
-  }
-  static StxPartEdgePtr create(CFGPath p, ComposedAnalysis* analysis, bool (*f) (CFGNode) = defaultFilter) {
-    StxPartEdgePtr newEdge(boost::shared_ptr<StxPartEdge>(new StxPartEdge(p, analysis, f)));
-    newEdge->init();
-    return newEdge;
-  }
-  static StxPartEdgePtr create(const StxPartEdge& dfe) {
-    StxPartEdgePtr newEdge(boost::shared_ptr<StxPartEdge>(new StxPartEdge(dfe)));
-    newEdge->init();
-    return newEdge;
-  }
+  static StxPartEdgePtr create(CFGNode src, CFGNode tgt, ComposedAnalysis* analysis, bool (*f) (CFGNode) = defaultFilter);
+  static StxPartEdgePtr create(CFGPath p, ComposedAnalysis* analysis, bool (*f) (CFGNode) = defaultFilter);
+  static StxPartEdgePtr create(const StxPartEdge& dfe);
   
   PartPtr source() const;
   StxPartPtr stxSource() const;
@@ -772,9 +748,13 @@ class StxAllMemRegionType : public StxMemRegionType
  ***** Utilities *****
  *********************/
 
+// Given a vector for base VirtualCFG Nodes, get the corresponding refined Parts from
+// this composer and add them to the given set of refined Parts
+void collectRefinedNodes(Composer* composer, std::set<PartPtr>& refined, const std::set<CFGNode>& base);
+
 // Given a vector for base VirtualCFG edges, get the corresponding refined edges from
 // this attributes composer and add them to the given set of refined edges
-void collectRefinedEdges(Composer* composer, std::set<PartEdgePtr>& refined, const std::vector<CFGEdge>& base);
+void collectRefinedEdges(Composer* composer, std::set<PartEdgePtr>& refined, const std::set<CFGEdge>& base);
 
 // Given CFGNode, get the refined edges that correspond to its incoming edges from
 // this attributes composer and add them to the given set of refined edges

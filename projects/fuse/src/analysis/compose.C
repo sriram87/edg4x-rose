@@ -15,7 +15,10 @@ using namespace sight;
 using namespace boost;
 namespace fuse
 {
-#define composerDebugLevel 1
+#define composerDebugLevel 0
+#if composerDebugDevel==0
+  #define DISABLE_SIGHT
+#endif
 
 //--------------------
 //----- Composer -----
@@ -757,6 +760,8 @@ MemRegionObjectPtr ChainComposer::Expr2MemRegion_ex(SgNode* n, PartEdgePtr pedge
            pedge, client, false);
 }
 MemRegionObjectPtr ChainComposer::Expr2MemRegion(SgNode* n, PartEdgePtr pedge, ComposedAnalysis* client) {
+  /*std::list<MemRegionObjectPtr > subObjs;
+  return boost::make_shared<CombinedMemRegionObject>(Union, client, subObjs);*/
   // Call Expr2MemRegion_ex() and wrap the results with a UnionMemRegionObject
   return boost::make_shared<CombinedMemRegionObject>(Union, client, Expr2MemRegion_ex(n, pedge, client));
 }
@@ -1211,8 +1216,8 @@ std::string PartSet2Str(const set<PartPtr>& parts, string indent) {
 }
 
 set<PartPtr> ChainComposer::GetStartAStates(ComposedAnalysis* client) {
-  scope s("ChainComposer::GetStartAStates");
-  set<PartPtr> baseParts =
+  //scope s("ChainComposer::GetStartAStates");
+  return
       callServerAnalysisFunc<set<PartPtr> >("GetStartAStates",
            CallWithCA<set<PartPtr> >(
                function<set<PartPtr> (ComposedAnalysis*)>(&ComposedAnalysis::GetStartAStates)),
@@ -1222,29 +1227,10 @@ set<PartPtr> ChainComposer::GetStartAStates(ComposedAnalysis* client) {
            function<string (const set<PartPtr>&, string)>(&PartSet2Str),
            function<set<PartPtr> (const map<ComposedAnalysis*, set<PartPtr> >&)>(createPartIntersection),
            NULLPartEdge, client, false);
-return baseParts;
-/*  { scope s("baseParts");
-    for(set<PartPtr>::iterator s=baseParts.begin(); s!=baseParts.end(); ++s)
-      dbg << (*s)->str()<<endl;
-  }
-
-  // Wrap the results with IdentityParts
-  set<PartPtr> wrappedParts;
-  for(set<PartPtr>::iterator bp=baseParts.begin(); bp!=baseParts.end(); ++bp) {
-    if(*bp) wrappedParts.insert(makePtr<IdentityPart>(*bp));
-    else    wrappedParts.insert(NULLPart);
-  }
-
-  { scope s("wrappedParts");
-    for(set<PartPtr>::iterator s=wrappedParts.begin(); s!=wrappedParts.end(); ++s)
-      dbg << (*s)->str()<<endl;
-  }
-
-  return wrappedParts;*/
 }
 
 set<PartPtr> ChainComposer::GetEndAStates(ComposedAnalysis* client) { 
-  set<PartPtr> baseParts =
+  return
       callServerAnalysisFunc<set<PartPtr> >("GetEndAStates",
            CallWithCA<set<PartPtr> >(
                function<set<PartPtr> (ComposedAnalysis*)>(&ComposedAnalysis::GetEndAStates, _1)),
@@ -1254,15 +1240,6 @@ set<PartPtr> ChainComposer::GetEndAStates(ComposedAnalysis* client) {
            function<string (const set<PartPtr>&, string)>(&PartSet2Str),
            function<set<PartPtr> (const map<ComposedAnalysis*, set<PartPtr> >&)>(createPartIntersection),
            NULLPartEdge, client, false);
-return baseParts;
-/*
-  // Wrap the results with IdentityParts
-  set<PartPtr> wrappedParts;
-  for(set<PartPtr>::iterator bp=baseParts.begin(); bp!=baseParts.end(); ++bp) {
-    if(*bp) wrappedParts.insert(makePtr<IdentityPart>(*bp));
-    else    wrappedParts.insert(NULLPart);
-  }
-  return wrappedParts;*/
 }
 
 // Return an SSAGraph object that describes the overall structure of the transition system
@@ -1277,43 +1254,92 @@ SSAGraph* ChainComposer::GetSSAGraph(ComposedAnalysis* client) {
   return SSAGraphCache[queryInfo[client].lastSSAGraphAnalysis];
 }
 
-// Returns all the edges implemented by the entire composer that refine the given
-// base PartEdge
-const set<PartEdgePtr>& ChainComposer::getRefinedPartEdges(PartEdgePtr base) const {
-  //scope s(txt()<<"ChainComposer::getRefinedPartEdges("<<base->str()<<")");
-  // If we don't yet have the edges that refine base in the cache, compute them and add one
-  if(base2RefinedPartEdge.find(base) == base2RefinedPartEdge.end()) {
+// Given a Part implemented by the entire composer, returns the set of refined Parts implemented
+// by the composer or the NULLPart if this relationship was not tracked.
+const set<PartPtr>& ChainComposer::getRefinedParts(PartPtr basePart) const {
+  //scope s(txt()<<"ChainComposer::getRefinedParts("<<basePart->str()<<")");
+  // If we don't ygetRefinedPartset have the edges that refine base in the cache, compute them and add one
+  map<PartPtr, std::set<PartPtr> >::const_iterator i=base2RefinedPart.find(basePart);
+  if(i == base2RefinedPart.end()) {
     //dbg << "    not cached. #doneAnalyses="<<doneAnalyses.size()<<endl;
-    boost::shared_ptr<std::set<PartEdgePtr> > baseEdges = boost::make_shared<std::set<PartEdgePtr> >(); 
-    baseEdges->insert(base);
+    boost::shared_ptr<std::set<PartPtr> > base = boost::make_shared<std::set<PartPtr> >();
+    base->insert(basePart);
 
     // Iterate through all the completed analyses that implement an ATS
-    for(std::list<ComposedAnalysis*>::const_iterator a=doneAnalyses.begin(); a!=doneAnalyses.end(); a++) {
+    for(std::list<ComposedAnalysis*>::const_iterator a=doneAnalyses.begin(); a!=doneAnalyses.end(); ++a) {
       if((*a)->implementsATSGraph() && *a!=SyntacticAnalysis::instance()) {
-        // Given all the base edges in *baseEdges (part of the ATS on which the current
-        // analysis ran), get the set edges that refine them gathering them into refinedEdges.
-        boost::shared_ptr<std::set<PartEdgePtr> > refinedEdges = boost::make_shared<std::set<PartEdgePtr> >();
-        //dbg << "        Analysis "<<(*a)->str()<<" implements the ATS, #baseEdges="<<baseEdges->size()<<endl;
-        for(std::set<PartEdgePtr>::iterator e=baseEdges->begin(); e!=baseEdges->end(); e++) {
-          const std::set<PartEdgePtr>& curRefinedEdges = (*a)->getRefinedPartEdges(*e);
-          //dbg << "          refined edge="<<(*e)->str()<<", #curRefinedEdges="<<curRefinedEdges.size()<<endl;
-          refinedEdges->insert(curRefinedEdges.begin(), curRefinedEdges.end());
+        // Given all the base edges in *base (part of the ATS on which the current
+        // analysis ran), get the set of edges that refine them, gathering them into refined.
+        boost::shared_ptr<std::set<PartPtr> > refined = boost::make_shared<std::set<PartPtr> >();
+        //dbg << "        Analysis "<<(*a)->str()<<" implements the ATS, #base="<<base->size()<<endl;
+        for(std::set<PartPtr>::iterator e=base->begin(); e!=base->end(); ++e) {
+          const std::set<PartPtr>& curRefined = (*a)->getRefinedParts(*e);
+          //dbg << "          refined edge="<<(*e)->str()<<", #curRefined="<<curRefined.size()<<endl;
+          refined->insert(curRefined.begin(), curRefined.end());
         }
         // Drop the prior set of edges and replace them with their corresponding refined edges
-        //dbg << "#baseEdges="<<baseEdges->size()<<", #refinedEdges="<<refinedEdges->size()<<endl;
-        baseEdges = refinedEdges;
+        //dbg << "#base="<<base->size()<<", #refined="<<refined->size()<<endl;
+        base = refined;
       }
     }
-    // Store the ultimate refined edges in the cache
-    //dbg << "    Setting base="<<base->str()<<" to "<<baseEdges->size()<<" edges = "<<baseEdges.get()<<endl;
-    //((std::map<PartEdgePtr, boost::shared_ptr<std::set<PartEdgePtr> > >)base2RefinedPartEdge)[base] = baseEdges;
-    ((ChainComposer*)this)->base2RefinedPartEdge[base] = baseEdges;
+    // Store the ultimate refined edges in the cache (the set is copied and the original will be destroyed on function exit)
+    //dbg << "    Setting base="<<basePart->str()<<" to "<<base->size()<<" edges = "<<base.get()<<endl;
+    //((std::map<PartPtr, boost::shared_ptr<std::set<PartPtr> > >)base2RefinedPart)[base] = base;
+    ((ChainComposer*)this)->base2RefinedPart[basePart] = *base.get();
+    //cout << "ChainComposer::getRefinedParts("<<basePart->str()<<")  NEW exists="<<(base2RefinedPart.find(basePart)!=base2RefinedPart.end())<<endl;
+    return ((ChainComposer*)this)->base2RefinedPart[basePart];
+  } else {
+    //cout << "ChainComposer::getRefinedParts("<<basePart->str()<<")  FOUND"<<endl;
+    return i->second;
   }
-  
-  // Return the set of edges that refine base from the cache
-  return *(((ChainComposer*)this)->base2RefinedPartEdge[base].get());
 }
 
+// Given a PartEdge implemented by the entire composer, returns the set of refined PartEdges implemented
+// by the composer or the NULLPartEdge if this relationship was not tracked.
+const set<PartEdgePtr>& ChainComposer::getRefinedPartEdges(PartEdgePtr basePedge) const {
+  //scope s(txt()<<"ChainComposer::getRefinedPartEdges("<<base->str()<<")");
+  map<PartEdgePtr, std::set<PartEdgePtr> >::const_iterator i=base2RefinedPartEdge.find(basePedge);
+  if(i == base2RefinedPartEdge.end()) {
+    //dbg << "    not cached. #doneAnalyses="<<doneAnalyses.size()<<endl;
+    boost::shared_ptr<std::set<PartEdgePtr> > base = boost::make_shared<std::set<PartEdgePtr> >();
+    base->insert(basePedge);
+
+    // Iterate through all the completed analyses that implement an ATS
+    for(std::list<ComposedAnalysis*>::const_iterator a=doneAnalyses.begin(); a!=doneAnalyses.end(); ++a) {
+      if((*a)->implementsATSGraph() && *a!=SyntacticAnalysis::instance()) {
+        // Given all the base edges in *base (part of the ATS on which the current
+        // analysis ran), get the set of edges that refine them, gathering them into refined.
+        boost::shared_ptr<std::set<PartEdgePtr> > refined = boost::make_shared<std::set<PartEdgePtr> >();
+        //dbg << "        Analysis "<<(*a)->str()<<" implements the ATS, #base="<<base->size()<<endl;
+        for(std::set<PartEdgePtr>::iterator e=base->begin(); e!=base->end(); ++e) {
+          const std::set<PartEdgePtr>& curRefined = (*a)->getRefinedPartEdges(*e);
+          //dbg << "          refined edge="<<(*e)->str()<<", #curRefined="<<curRefined.size()<<endl;
+          refined->insert(curRefined.begin(), curRefined.end());
+        }
+        // Drop the prior set of edges and replace them with their corresponding refined edges
+        //dbg << "#base="<<base->size()<<", #refined="<<refined->size()<<endl;
+        base = refined;
+      }
+    }
+    // Store the ultimate refined edges in the cache (the set is copied and the original will be destroyed on function exit)
+    //dbg << "    Setting base="<<base->str()<<" to "<<base->size()<<" edges = "<<base.get()<<endl;
+    //((std::map<PartPtr, boost::shared_ptr<std::set<PartPtr> > >)base2RefinedPartEdge)[base] = base;
+    ((ChainComposer*)this)->base2RefinedPartEdge[basePedge] = *base.get();
+    return ((ChainComposer*)this)->base2RefinedPartEdge[basePedge];
+  } else {
+    return i->second;
+  }
+}
+
+// Returns the number of Parts that refine the given base
+unsigned int  ChainComposer::numRefinedParts    (PartPtr     base) const {
+  return getRefinedParts(base).size();
+}
+
+// Returns the number of PartEdges that refine the given base
+unsigned int  ChainComposer::numRefinedPartEdges(PartEdgePtr base) const {
+  return getRefinedPartEdges(base).size();
+}
 // -----------------------------------------
 // ----- Methods from ComposedAnalysis -----
 // -----------------------------------------
@@ -1353,10 +1379,10 @@ void ChainComposer::runAnalysis()
 
     // Create a CCQueryServers object to route queries from the upcoming analysis to the corresponding servers 
     // If this is the first analysis to follow the syntactic analysis
-    dbg << "#doneAnalyses="<<doneAnalyses.size()<<endl;
+    //dbg << "#doneAnalyses="<<doneAnalyses.size()<<endl;
     if(doneAnalyses.size()==1) queryInfo[*a] = CCQueryServers(doneAnalyses.back());
     else                       queryInfo[*a] = CCQueryServers(queryInfo[doneAnalyses.back()], doneAnalyses.back());
-    dbg << "queryInfo[*a]="<<queryInfo[*a].str()<<endl;
+    //dbg << "queryInfo[*a]="<<queryInfo[*a].str()<<endl;
 
     // Initialize the current analysis before officially setting it as current by assigning currentAnalysis to it
     (*a)->initAnalysis();
@@ -1368,10 +1394,10 @@ void ChainComposer::runAnalysis()
     if(doneAnalyses.size()>0) {
       SIGHT_VERB_IF(1, composerDebugLevel)
       set<PartPtr> startStates = GetStartAStates(currentAnalysis);
-      { scope s("startStates");
+      /*{ scope s("startStates");
       for(set<PartPtr>::iterator s=startStates.begin(); s!=startStates.end(); ++s)
         dbg << (*s)->str()<<endl;
-      }
+      }*/
       set<PartPtr> endStates   = GetEndAStates(currentAnalysis);
       ostringstream fName; fName << "ats." << i << "." << doneAnalyses.back()->str();
       ats2dot(fName.str(), "ATS", startStates, endStates);
@@ -2189,7 +2215,7 @@ set<PartPtr> LooseParallelComposer::GetStartOrEndAStates_Spec(callStartOrEndASta
     // Convert all the Parts in parts into IntersectionParts to match the result of 
     set<PartPtr> interParts;
     for(map<PartPtr, map<ComposedAnalysis*, PartPtr> >::iterator i=intersection.begin(); i!=intersection.end(); i++) {
-      interParts.insert(makePtr<IntersectionPart>(i->second, i->first));
+      interParts.insert(makePtr<IntersectionPart>(i->second, i->first, this));
     }
     return interParts;
   }

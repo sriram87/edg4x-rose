@@ -14,6 +14,7 @@ INCLUDES = \
 #    -I${srcdir}/sparse
 
 include_HEADERS =\
+        fuse.h \
 	analysis/abstract_object.h \
 	analysis/abstract_object_map.h \
 	analysis/abstract_object_set.h \
@@ -23,7 +24,7 @@ include_HEADERS =\
 	analysis/tight_composer.h \
 	analysis/composed_analysis.h \
 	analysis/comp_shared_ptr.h \
-    analysis/data_structures.h \
+        analysis/data_structures.h \
 	analysis/factor_trans_system.h \
 	analysis/graphIterator.h \
 	analysis/partitions.h \
@@ -83,6 +84,7 @@ fuse_LDFLAGS = $(ROSE_LIBS) $(LIBS_WITH_RPATH) $(SIGHT_LINKFLAGS)
 fuse_DEPENDENCIES=fuseLayout
 
 fuse_SOURCES = \
+        fuse.C \
 	analysis/abstract_object.C \
 	analysis/abstract_object_map.C \
 	analysis/abstract_object_set.C \

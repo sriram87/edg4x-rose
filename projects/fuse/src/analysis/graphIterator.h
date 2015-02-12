@@ -33,13 +33,20 @@ template <class GraphEdgePtr, class GraphNodePtr>
 class graphEdgeIterator
 {
   public:
+  // Indicates whether the graph is being created incrementally as it is being traversed (true)
+  // or whether the graph has already been created (false). If the former, it is expected
+  // that nodes will implement method getSupersetPart() that returns the node that they are
+  // refining in a graph that is guaranteed to have already been created, and same for edges
+  // (method getSupersetPartEdge()).
+  bool incrementalGraph;
+
   typedef enum {fw, bw} iterDirection;
   iterDirection dir;
   
   graphIterOrderT iterOrder;
   
   public:
-          
+
   // Records whether this iterator has been initialized with some starting node(s)
   bool initialized;
   
@@ -48,9 +55,9 @@ class graphEdgeIterator
   std::set<GraphEdgePtr> visited;
 
   public:
-  graphEdgeIterator(iterDirection dir, graphIterOrderT iterOrder=succ_back, bool initialized=false);
-  graphEdgeIterator(const GraphNodePtr start, iterDirection dir, graphIterOrderT iterOrder=succ_back);
-  graphEdgeIterator(const std::set<GraphNodePtr>& start, iterDirection dir, graphIterOrderT iterOrder=succ_back);
+  graphEdgeIterator(bool incrementalGraph, iterDirection dir, graphIterOrderT iterOrder=succ_back, bool initialized=false);
+  graphEdgeIterator(const GraphNodePtr start, bool incrementalGraph, iterDirection dir, graphIterOrderT iterOrder=succ_back);
+  graphEdgeIterator(const std::set<GraphNodePtr>& start, bool incrementalGraph, iterDirection dir, graphIterOrderT iterOrder=succ_back);
   graphEdgeIterator(const graphEdgeIterator& that);
   virtual ~graphEdgeIterator() { }
   
@@ -173,9 +180,9 @@ template <class GraphEdgePtr, class GraphNodePtr>
 class fw_graphEdgeIterator : public virtual graphEdgeIterator<GraphEdgePtr, GraphNodePtr>
 {
   public:
-  fw_graphEdgeIterator(graphIterOrderT iterOrder=succ_back, bool initialized=false);
-  fw_graphEdgeIterator(const GraphNodePtr start, graphIterOrderT iterOrder=succ_back);
-  fw_graphEdgeIterator(const std::set<GraphNodePtr>& start, graphIterOrderT iterOrder=succ_back);
+  fw_graphEdgeIterator(bool incrementalGraph, graphIterOrderT iterOrder=succ_back, bool initialized=false);
+  fw_graphEdgeIterator(const GraphNodePtr start, bool incrementalGraph, graphIterOrderT iterOrder=succ_back);
+  fw_graphEdgeIterator(const std::set<GraphNodePtr>& start, bool incrementalGraph, graphIterOrderT iterOrder=succ_back);
   
   public:
   // Returns a fresh iterator that starts at node n
@@ -188,9 +195,9 @@ template <class GraphEdgePtr, class GraphNodePtr>
 class bw_graphEdgeIterator : public virtual graphEdgeIterator<GraphEdgePtr, GraphNodePtr>
 {
   public:
-  bw_graphEdgeIterator(graphIterOrderT iterOrder=succ_back, bool initialized=false);
-  bw_graphEdgeIterator(const GraphNodePtr start, graphIterOrderT iterOrder=succ_back);
-  bw_graphEdgeIterator(const std::set<GraphNodePtr>& start, graphIterOrderT iterOrder=succ_back);
+  bw_graphEdgeIterator(bool incrementalGraph, graphIterOrderT iterOrder=succ_back, bool initialized=false);
+  bw_graphEdgeIterator(const GraphNodePtr start, bool incrementalGraph, graphIterOrderT iterOrder=succ_back);
+  bw_graphEdgeIterator(const std::set<GraphNodePtr>& start, bool incrementalGraph, graphIterOrderT iterOrder=succ_back);
     
   public:
   // Returns a fresh iterator that starts at node n
@@ -207,11 +214,19 @@ class dataflowGraphEdgeIterator : public virtual graphEdgeIterator<GraphEdgePtr,
   public:
   //dataflow(): iterator() {}
   
-  dataflowGraphEdgeIterator(typename graphEdgeIterator<GraphEdgePtr, GraphNodePtr>::iterDirection dir, graphIterOrderT iterOrder);
-  dataflowGraphEdgeIterator(const GraphNodePtr& terminator_arg, typename graphEdgeIterator<GraphEdgePtr, GraphNodePtr>::iterDirection dir, graphIterOrderT iterOrder);
-  dataflowGraphEdgeIterator(const GraphNodePtr& start, const GraphNodePtr& terminator_arg, typename graphEdgeIterator<GraphEdgePtr, GraphNodePtr>::iterDirection dir, graphIterOrderT iterOrder);
-  dataflowGraphEdgeIterator(const std::set<GraphNodePtr>& terminators_arg, typename graphEdgeIterator<GraphEdgePtr, GraphNodePtr>::iterDirection dir, graphIterOrderT iterOrder);
-  dataflowGraphEdgeIterator(const GraphNodePtr& start, const std::set<GraphNodePtr>& terminators_arg, typename graphEdgeIterator<GraphEdgePtr, GraphNodePtr>::iterDirection dir, graphIterOrderT iterOrder);
+  dataflowGraphEdgeIterator(bool incrementalGraph, typename graphEdgeIterator<GraphEdgePtr, GraphNodePtr>::iterDirection dir, graphIterOrderT iterOrder);
+  dataflowGraphEdgeIterator(const GraphNodePtr& terminator_arg,
+                            bool incrementalGraph,
+                            typename graphEdgeIterator<GraphEdgePtr, GraphNodePtr>::iterDirection dir, graphIterOrderT iterOrder);
+  dataflowGraphEdgeIterator(const GraphNodePtr& start, const GraphNodePtr& terminator_arg,
+                            bool incrementalGraph,
+                            typename graphEdgeIterator<GraphEdgePtr, GraphNodePtr>::iterDirection dir, graphIterOrderT iterOrder);
+  dataflowGraphEdgeIterator(const std::set<GraphNodePtr>& terminators_arg,
+                            bool incrementalGraph,
+                            typename graphEdgeIterator<GraphEdgePtr, GraphNodePtr>::iterDirection dir, graphIterOrderT iterOrder);
+  dataflowGraphEdgeIterator(const GraphNodePtr& start, const std::set<GraphNodePtr>& terminators_arg,
+                            bool incrementalGraph,
+                            typename graphEdgeIterator<GraphEdgePtr, GraphNodePtr>::iterDirection dir, graphIterOrderT iterOrder);
   
   void init(const GraphNodePtr& start_arg, const GraphNodePtr& terminator_arg);
   void init(const GraphNodePtr& start_arg, const std::set<GraphNodePtr>& terminators_arg);
@@ -261,11 +276,11 @@ class fw_dataflowGraphEdgeIterator: public virtual dataflowGraphEdgeIterator<Gra
                                     public virtual fw_graphEdgeIterator<GraphEdgePtr, GraphNodePtr>
 {
   public: 
-  fw_dataflowGraphEdgeIterator(graphIterOrderT iterOrder);
-  fw_dataflowGraphEdgeIterator(const GraphNodePtr& terminator_arg, graphIterOrderT iterOrder);
-  fw_dataflowGraphEdgeIterator(const std::set<GraphNodePtr>& terminators_arg, graphIterOrderT iterOrder);
-  fw_dataflowGraphEdgeIterator(const GraphNodePtr end, const GraphNodePtr& terminator_arg, graphIterOrderT iterOrder);
-  fw_dataflowGraphEdgeIterator(const GraphNodePtr end, const std::set<GraphNodePtr>& terminators_arg, graphIterOrderT iterOrder);
+  fw_dataflowGraphEdgeIterator(bool incrementalGraph, graphIterOrderT iterOrder);
+  fw_dataflowGraphEdgeIterator(const GraphNodePtr& terminator_arg, bool incrementalGraph, graphIterOrderT iterOrder);
+  fw_dataflowGraphEdgeIterator(const std::set<GraphNodePtr>& terminators_arg, bool incrementalGraph, graphIterOrderT iterOrder);
+  fw_dataflowGraphEdgeIterator(const GraphNodePtr end, const GraphNodePtr& terminator_arg, bool incrementalGraph, graphIterOrderT iterOrder);
+  fw_dataflowGraphEdgeIterator(const GraphNodePtr end, const std::set<GraphNodePtr>& terminators_arg, bool incrementalGraph, graphIterOrderT iterOrder);
           
   //void operator ++ (int);
   
@@ -279,11 +294,11 @@ class bw_dataflowGraphEdgeIterator: public virtual dataflowGraphEdgeIterator<Gra
                                     public virtual bw_graphEdgeIterator<GraphEdgePtr, GraphNodePtr>
 {
   public: 
-  bw_dataflowGraphEdgeIterator(graphIterOrderT iterOrder);
-  bw_dataflowGraphEdgeIterator(const GraphNodePtr& terminator_arg, graphIterOrderT iterOrder);
-  bw_dataflowGraphEdgeIterator(const std::set<GraphNodePtr>& terminators_arg, graphIterOrderT iterOrder);
-  bw_dataflowGraphEdgeIterator(const GraphNodePtr end, const GraphNodePtr& terminator_arg, graphIterOrderT iterOrder);
-  bw_dataflowGraphEdgeIterator(const GraphNodePtr end, const std::set<GraphNodePtr>& terminators_arg, graphIterOrderT iterOrder);
+  bw_dataflowGraphEdgeIterator(bool incrementalGraph, graphIterOrderT iterOrder);
+  bw_dataflowGraphEdgeIterator(const GraphNodePtr& terminator_arg, bool incrementalGraph, graphIterOrderT iterOrder);
+  bw_dataflowGraphEdgeIterator(const std::set<GraphNodePtr>& terminators_arg, bool incrementalGraph, graphIterOrderT iterOrder);
+  bw_dataflowGraphEdgeIterator(const GraphNodePtr end, const GraphNodePtr& terminator_arg, bool incrementalGraph, graphIterOrderT iterOrder);
+  bw_dataflowGraphEdgeIterator(const GraphNodePtr end, const std::set<GraphNodePtr>& terminators_arg, bool incrementalGraph, graphIterOrderT iterOrder);
           
   //void operator ++ (int);
   
@@ -450,15 +465,22 @@ class GEFrontBackIteratorWorklist : public GEIteratorWorklist<GraphEdgePtr, Grap
 template <class GraphEdgePtr, class GraphNodePtr>
 class GETopoOrderIteratorWorklist : public GEIteratorWorklist<GraphEdgePtr, GraphNodePtr> {
   protected:
-  // Map from each edge's unique topological index to its object. This makes it possible
-  // to efficiently find the edge with the smallest index.
-  //std::map<int, GraphEdgePtr> worklist;
+  // Map from each edge's unique topological index to its object. If the graph is incremental
+  // these are edges in the superset graph that is already created. Otherwise, they are edges
+  // in the graph being traversed.
+  // This data structure makes it possible to efficiently find the edge with the smallest index.
   std::map<int, std::set<GraphEdgePtr> > worklist;
   
   // Maps each edge and node to its topological index to efficiently figure out where into the
   // worklist to place newly-observed edges.
+  // If the graph is incremental these are edges in the superset graph that is already created.
+  // Otherwise, they are edges in the graph being traversed.
   std::map<GraphEdgePtr, int> edge2Idx;
+  std::map<GraphNodePtr, std::set<GraphEdgePtr> > incomingEdges;
   std::map<GraphNodePtr, int> node2Idx;
+
+  // Records the targets of edges that have already been grabbed via grabNext
+  std::set<GraphNodePtr> visitedTargets;
   
   // The maximum topological index ever assigned to any edge or node
   int maxEdgeTopoIdx;
@@ -494,6 +516,10 @@ class GETopoOrderIteratorWorklist : public GEIteratorWorklist<GraphEdgePtr, Grap
   // Returns a topological index for the given edge, which may be freshly generated
   // or fetched from edge2Idx
   //int getEdgeTopoIdx(GraphEdgePtr edge);
+  // Remove the given edge from edge2Idx and worklist under its current index
+  // and place it back using an index that's larger than all the indexes generated
+  // thus far
+  void refreshEdgeIndex(GraphEdgePtr edge);
   
   // Add the given edge to the iterator's list of edges to follow
   void add(GraphEdgePtr next);

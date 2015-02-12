@@ -56,10 +56,20 @@ class VariableStateTransfer : public DFTransferVisitor
     SIGHT_VERB_FI()
     
     assert(sgn);
+
+    //struct timeval oStart, oEnd; gettimeofday(&oStart, NULL);
     //MemLocObjectPtr p = composer->OperandExpr2MemLoc(sgn, operand, part->inEdgeFromAny(), analysis);
     MemLocObjectPtr p = analysis->OperandExpr2MemLocUse(sgn, operand, part->inEdgeFromAny());
-    //SIGHT_VERB(dbg << "p="<<(p? p->str("&nbsp;&nbsp;&nbsp;&nbsp;"): "NULL")<<endl, 1, dLevel)
-    return getLattice(p);
+    //gettimeofday(&oEnd, NULL); cout << "getLatticeOperand OperandExpr2MemLocUse\t"<<(((oEnd.tv_sec*1000000 + oEnd.tv_usec) - (oStart.tv_sec*1000000 + oStart.tv_usec)) / 1000000.0)<<"\t"<<SgNode2Str(sgn)<<endl;
+
+    if(p) {
+      //struct timeval oStart, oEnd; gettimeofday(&oStart, NULL);
+      LatticePtr lat = getLattice(p);
+      //gettimeofday(&oEnd, NULL); cout << "getLatticeOperand getLattice\t"<<(((oEnd.tv_sec*1000000 + oEnd.tv_usec) - (oStart.tv_sec*1000000 + oStart.tv_usec)) / 1000000.0)<<"\t"<<SgNode2Str(sgn)<<endl;
+
+      return lat;
+    } else
+      return LatticePtr();
     
     /*ValueObjectPtr val = composer->OperandExpr2Val(sgn, operand, part->inEdgeFromAny(), analysis);
     if(dLevel()>=1) dbg << "VariableStateTransfer::getLatticeOperand() val="<<val->str("&nbsp;&nbsp;&nbsp;&nbsp;")<<endl;

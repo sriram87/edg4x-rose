@@ -21,8 +21,12 @@ using namespace sight;
 
 namespace fuse
 {
-#define composedAnalysisDebugLevel 2
+#define composedAnalysisDebugLevel 0
 #define moduleProfile false
+#if (composedAnalysisDebugLevel==0) && (moduleProfile==false)
+  #define DISABLE_SIGHT
+#endif
+
 /****************************
  ***** ComposedAnalysis *****
  ****************************/
@@ -201,19 +205,47 @@ std::set<PartPtr> ComposedAnalysis::GetEndAStates()
   return EndAStates;
 }
 
-// Given a PartEdgePtr pedge implemented by this ComposedAnalysis, returns the part from its predecessor
-// from which pedge was derived. This function caches the results if possible.
+// Given a PartPtr part implemented by this ComposedAnalysis, returns the Part from its predecessor
+// from which part was derived. This function caches the results.
+PartPtr ComposedAnalysis::convertPart(PartPtr part)
+{
+  // If the result of this function has been computed, return it
+  map<PartPtr, PartPtr>::iterator oldPart=refined2BasePart.find(part);
+  if(oldPart!= refined2BasePart.end()) return oldPart->second;
+
+  // Cache the result
+  PartPtr result = part->getSupersetPart();
+  refined2BasePart[part] = result;
+  return result;
+}
+
+// Given a PartEdgePtr pedge implemented by this ComposedAnalysis, returns the PartEdge from its predecessor
+// from which pedge was derived. This function caches the results.
 PartEdgePtr ComposedAnalysis::convertPEdge(PartEdgePtr pedge)
 {
   // If the result of this function has been computed, return it
-  map<PartEdgePtr, PartEdgePtr>::iterator oldPEdge;
-  if((oldPEdge=refined2BasePedge.find(pedge)) != refined2BasePedge.end()) return oldPEdge->second;
+  map<PartEdgePtr, PartEdgePtr>::iterator oldPEdge=refined2BasePedge.find(pedge);
+  if(oldPEdge != refined2BasePedge.end()) return oldPEdge->second;
   
   // Cache the result
-  //PartEdgePtr result = convertPEdge_Spec(pedge);
   PartEdgePtr result = pedge->getSupersetPartEdge();
   refined2BasePedge[pedge] = result;
   return result;
+}
+
+// Given a Part base from the ATS on which this ComposedAnalysis runs and a Part implemented
+// by this composed analysis that refines base, records the mapping from the base Part
+// to the refined Part.
+void ComposedAnalysis::registerBase2RefinedMapping(PartPtr base, PartPtr refined) {
+  // It should only be possible to call this function if this analysis implements an ATS
+  // since it should be the constructor of the Parts implemented by this analysis that call
+  // this function.
+  assert(implementsATSGraph());
+
+  // Register the mapping from base to refined if this is explicitly requested
+  //cout << "trackBase2RefinedPartMapping="<<trackBase2RefinedPartMapping<<", base="<<(base?base->str():"NULL")<<", refined="<<(refined?refined->str():"NULL")<<endl;
+  if(trackBase2RefinedPartEdgeMapping)
+    base2RefinedPart[base].insert(refined);
 }
 
 // Given a PartEdge base from the ATS on which this ComposedAnalysis runs and a PartEdge implemented
@@ -226,8 +258,18 @@ void ComposedAnalysis::registerBase2RefinedMapping(PartEdgePtr base, PartEdgePtr
   assert(implementsATSGraph());
 
   // Register the mapping from base to refined if this is explicitly requested
+  //cout << "trackBase2RefinedPartEdgeMapping="<<trackBase2RefinedPartEdgeMapping<<", base="<<(base?base->str():"NULL")<<", refined="<<(refined?refined->str():"NULL")<<endl;
   if(trackBase2RefinedPartEdgeMapping)
     base2RefinedPartEdge[base].insert(refined);
+}
+
+// Given a Part implemented by this analysis, returns the set of refined Parts implemented
+// by this analysis or the NULLPart if this relationship was not tracked.
+static set<PartPtr> emptyPartSet;
+const set<PartPtr>& ComposedAnalysis::getRefinedParts(PartPtr base) const {
+  std::map<PartPtr, std::set<PartPtr> >::const_iterator i = base2RefinedPart.find(base);
+  if(i==base2RefinedPart.end()) return emptyPartSet;
+  return i->second;
 }
 
 // Given a PartEdge implemented by this analysis, returns the set of refined PartEdges implemented
@@ -391,6 +433,7 @@ void ComposedAnalysis::runAnalysisDense()
   do {
     while(curNodeIt && !curNodeIt->isEnd())
     {
+      SIGHT_VERB(dbg << "curNodeIt="<<curNodeIt->str()<<endl, 2, composedAnalysisDebugLevel)
       PartPtr part = curNodeIt->grabPart();
       bool firstVisit = visited.find(part) == visited.end();
       if(firstVisit) visited.insert(part);
@@ -401,7 +444,7 @@ void ComposedAnalysis::runAnalysisDense()
                                    port(context("part",        part->str(),
                                                 "firstVisit",  firstVisit,
                                                 "SgNode*",     sgn,
-                                                "#desc",       (int)getDescendants(part).size(),
+                                                "#desc",       (int)getDescendants(part->getSupersetPart()).size(),
                                                 "outFuncCall", part->mayOutgoingFuncCall(matches),
                                                 "inFuncCall",  part->mayIncomingFuncCall(matches)))), moduleProfile)
 
@@ -485,26 +528,37 @@ void ComposedAnalysis::runAnalysisDense()
       }
 
       // Propagate the transferred dataflow information to all of this part's descendants
+      //{ struct timeval tfStart, tfEnd; gettimeofday(&tfStart, NULL);
       propagateDF2DescDense(part, part, visited, initialized, curNodeIt,
                             scopeAnchor, worklistGraph, toAnchors, fromAnchors);
+      //gettimeofday(&tfEnd, NULL); cout << "propagateDF2DescDense\t"<<(((tfEnd.tv_sec*1000000 + tfEnd.tv_usec) - (tfStart.tv_sec*1000000 + tfStart.tv_usec)) / 1000000.0)<<endl;
+      //}
 
       // Set the PartEdges of all the transfered Lattices
+      //{struct timeval tfStart, tfEnd; gettimeofday(&tfStart, NULL);
       setDescendantLatticeLocationsDense(part, part);
+      //gettimeofday(&tfEnd, NULL); cout << "setDescendantLatticeLocationsDense\t"<<(((tfEnd.tv_sec*1000000 + tfEnd.tv_usec) - (tfStart.tv_sec*1000000 + tfStart.tv_usec)) / 1000000.0)<<endl;
+      //}
+
+      SIGHT_VERB(dbg << "curNodeIt="<<curNodeIt->str()<<endl, 1, composedAnalysisDebugLevel)
     } // end worklist iteration
 
     // If unmatchedCallReturnParts is not empty, add all the parts within it to the worklist
     // and resume processing
     SIGHT_VERB_IF(2, composedAnalysisDebugLevel)
     scope s("unmatchedCallReturnParts");
-    for(set<PartPtr>::iterator p=unmatchedCallReturnParts.begin(); p!=unmatchedCallReturnParts.end(); p++)
+    for(set<PartPtr>::iterator p=unmatchedCallReturnParts.begin(); p!=unmatchedCallReturnParts.end(); p++) {
       dbg << "p="<<(*p)->str()<<endl;
+      dbg << "adding edge "<<(*p).get()->inEdgeFromAny()<<endl;
+    }
     SIGHT_VERB_FI()
 
     unmatchedCallReturnPartsEmpty = unmatchedCallReturnParts.size()==0;
-    for(set<PartPtr>::iterator p=unmatchedCallReturnParts.begin(); p!=unmatchedCallReturnParts.end(); p++)
+    for(set<PartPtr>::iterator p=unmatchedCallReturnParts.begin(); p!=unmatchedCallReturnParts.end(); p++) {
       curNodeIt->add((*p).get()->inEdgeFromAny());
+    }
     unmatchedCallReturnParts.clear();
-    SIGHT_VERB(dbg << "curNodeIt="<<curNodeIt->str()<<endl, 2, composedAnalysisDebugLevel)
+    SIGHT_VERB(dbg << "curNodeIt="<<curNodeIt->str()<<endl, 1, composedAnalysisDebugLevel)
   } while(!unmatchedCallReturnPartsEmpty);
 }
 
@@ -625,6 +679,7 @@ void ComposedAnalysis::transferAStateDense(ComposedAnalysis* analysis,
                                            // Maps each Abstract state to the anchors of the Parts that lead to it, as well as the Parts themselves
                                            map<PartPtr, set<pair<anchor, PartPtr> > >& fromAnchors)
 {
+  //struct timeval tfStart, tfEnd; gettimeofday(&tfStart, NULL);
   // The NodeState associated with this part
   NodeState* state = NodeState::getNodeState(analysis, part);
 
@@ -648,13 +703,13 @@ void ComposedAnalysis::transferAStateDense(ComposedAnalysis* analysis,
 
   // Wildcard edge in the superset ATS that comes into supersetPar in the direction of the analysis
   PartEdgePtr wildCardSuperPartEdge = getDirection() == fw? supersetPart->inEdgeFromAny() : supersetPart->outEdgeToAny();
-dbg << "wildCardSuperPartEdge="<<wildCardSuperPartEdge->str()<<endl;
 
   // Iterate over all the CFGNodes associated with this part and merge the result of applying to transfer function
   // to all of them
   set<CFGNode> v=part->CFGNodes();
   for(set<CFGNode>::iterator c=v.begin(); c!=v.end(); c++) {
     SgNode* sgn = c->getNode();
+    //struct timeval preStart, preEnd; gettimeofday(&preStart, NULL);
 
     SIGHT_VERB_DECL(scope, (txt()<<"Current CFGNode "<<CFGNode2Str(*c), scope::medium), 1, composedAnalysisDebugLevel)
 
@@ -695,6 +750,7 @@ dbg << "wildCardSuperPartEdge="<<wildCardSuperPartEdge->str()<<endl;
 
       NodeState::copyLatticesOW(dfInfoPost, dfInfoAnte);
     }
+    //gettimeofday(&preEnd, NULL); cout << "transferAStateDense pre\t"<<(((preEnd.tv_sec*1000000 + preEnd.tv_usec) - (preStart.tv_sec*1000000 + preStart.tv_usec)) / 1000000.0)<<endl;
 
     // <<<<<<<<<<<<<<<<<<< TRANSFER FUNCTION <<<<<<<<<<<<<<<<<<<
     modified = transferCFGNodeDense(analysis, part, supersetPart, *c, sgn,
@@ -703,6 +759,7 @@ dbg << "wildCardSuperPartEdge="<<wildCardSuperPartEdge->str()<<endl;
                                     descSupersetEdges, wildCardSuperPartEdge) || modified;
     // >>>>>>>>>>>>>>>>>>> TRANSFER FUNCTION >>>>>>>>>>>>>>>>>>>
 
+    //struct timeval postStart, postEnd; gettimeofday(&postStart, NULL);
     SIGHT_VERB_IF(1, composedAnalysisDebugLevel)
       {scope s("Transferred: outgoing Lattice=", scope::low); dbg <<NodeState::str(dfInfoPost)<<endl; }
       //{scope s("state=", scope::low));
@@ -737,6 +794,7 @@ dbg << "wildCardSuperPartEdge="<<wildCardSuperPartEdge->str()<<endl;
         {indent ind; dbg <<NodeState::str(analysis->getLatticePost(state)); }
       SIGHT_VERB_FI()
     }
+    //gettimeofday(&postEnd, NULL); cout << "transferAStateDense post\t"<<(((postEnd.tv_sec*1000000 + postEnd.tv_usec) - (postStart.tv_sec*1000000 + postStart.tv_usec)) / 1000000.0)<<endl;
   } // for(vector<CFGNode>::iterator c=v.begin(); c!=v.end(); c++) {
 
   // Now that we've computed all the transfered Lattices for each CFGNode within part and unioned
@@ -744,7 +802,7 @@ dbg << "wildCardSuperPartEdge="<<wildCardSuperPartEdge->str()<<endl;
   // part. Thus, any analyses that implement the ATS definitely have their state available to them
   // and we're free to get their edges in the direction of analysis flow.
 
-  dbg <<"state="<<state<<"="<<state->str()<<endl;
+  //dbg <<"state="<<state<<"="<<state->str()<<endl;
 
 /*!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
  *   // Set the PartEdges of all the transfered Lattices
@@ -770,6 +828,7 @@ dbg << "wildCardSuperPartEdge="<<wildCardSuperPartEdge->str()<<endl;
         dbg << (*df)->str()<<endl;
     SIGHT_VERB_FI()
   }*/
+  //gettimeofday(&tfEnd, NULL); cout << "transferAStateDense\t"<<(((tfEnd.tv_sec*1000000 + tfEnd.tv_usec) - (tfStart.tv_sec*1000000 + tfStart.tv_usec)) / 1000000.0)<<endl;
 }
 
 void ComposedAnalysis::transferPropagateAStateSSA(ComposedAnalysis* analysis,
@@ -885,12 +944,16 @@ bool ComposedAnalysis::propagateStateToNextNode(
   // Compute the meet of the dataflow information along the curPart->nextPart edge with the
   // next node's current state one Lattice at a time and save the result above the next node.
 
-  // If nextNodeState is non-empty, we union curNodeState into it
-  SIGHT_VERB(dbg << " #nextNodeState="<<nextNodeState.size()<<endl, 1, composedAnalysisDebugLevel)
-  if(nextNodeState.size()>0)
+  // If nextNodeState is non-empty and the number of the next node's predecessors is >1,
+  // we union curNodeState into it.
+  SIGHT_VERB(dbg << " #nextNodeState="<<nextNodeState.size()<<", #nextPart->inEdges()="<<nextPart->inEdges().size()<<endl, 1, composedAnalysisDebugLevel)
+  if(nextNodeState.size()>0 && nextPart->inEdges().size()>1) {
+    SIGHT_VERB(dbg << "Unioning with next state"<<endl, 1, composedAnalysisDebugLevel)
+
     modified = NodeState::unionLatticeMaps(nextNodeState, curNodeState) || modified;
   // Otherwise, we copy curNodeState[NULLPartEdge] over it
-  else {
+  } else {
+    SIGHT_VERB(dbg << "Copying over next state"<<endl, 1, composedAnalysisDebugLevel)
     PartEdgePtr nextPartWildCardPartEdge      = getDirection() == fw? nextPart->inEdgeFromAny() :         nextPart->outEdgeToAny();
     PartEdgePtr nextSuperPartWildCardPartEdge = getDirection() == fw? nextSupersetPart->inEdgeFromAny() : nextSupersetPart->outEdgeToAny();
     NodeState::copyLatticesOW(nextNodeState, /*toDepartEdge*/   nextPartWildCardPartEdge, nextSuperPartWildCardPartEdge, 
@@ -925,13 +988,14 @@ bool ComposedAnalysis::transferCFGNodeDense(ComposedAnalysis* analysis,
                                             // Wildcard edge in the superset ATS that comes into supersetPar in the direction of the analysis
                                             PartEdgePtr wildCardSuperPartEdge)
 {
+  //struct timeval tfStart, tfEnd; gettimeofday(&tfStart, NULL);
+  //cout << std::scientific;
   SIGHT_DECL(module, (instance("transferCFGNodeDense", 1, 0),
                                      port(context("CFGNode",     CFGNode2Str(cn),
-                                                  "SgNode*",     sgn,
-                                                  "#desc",       (int)getEdgesToDescendants(part).size()))), moduleProfile)
+                                                  "SgNode*",     sgn))), moduleProfile)
   SIGHT_VERB_DECL(scope, ("Transferring", scope::medium), 1, composedAnalysisDebugLevel);
   bool modified = false;
-{ indent ind; dbg <<"dfInfo="<<NodeState::str(dfInfo)<<endl; }
+/*{ indent ind; dbg <<"dfInfo="<<NodeState::str(dfInfo)<<endl; }
 
 { scope s("dfInfo");
   dbg << "wildCardSuperPartEdge="<<wildCardSuperPartEdge->str()<<endl;
@@ -939,7 +1003,7 @@ bool ComposedAnalysis::transferCFGNodeDense(ComposedAnalysis* analysis,
     dbg << i->first->str()<<endl;
     dbg << "== wildCardSuperPartEdge="<<(i->first == wildCardSuperPartEdge)<<endl;
   }
-}
+}*/
 
   // When a dfInfo map goes into a transfer function it must only have one key: the wildcard edge
   assert(dfInfo.size()==1);
@@ -950,8 +1014,7 @@ bool ComposedAnalysis::transferCFGNodeDense(ComposedAnalysis* analysis,
   {
     SIGHT_DECL(module, (instance("Transfer", 1, 0),
                         port(context("CFGNode",     CFGNode2Str(cn),
-                                     "SgNode*",     sgn,
-                                     "#desc",       (int)getEdgesToDescendants(part).size()))), moduleProfile)
+                                     "SgNode*",     sgn))), moduleProfile)
 
     boost::shared_ptr<DFTransferVisitor> transferVisitor = analysis->getTransferVisitor(part, supersetPart, cn, state, dfInfo);
     sgn->accept(*transferVisitor);
@@ -959,6 +1022,10 @@ bool ComposedAnalysis::transferCFGNodeDense(ComposedAnalysis* analysis,
   }
   // >>>>>>>>>>>>>>>>>>>>>>>>>>>>
 
+  {
+  SIGHT_DECL(module, (instance("After Transfer", 1, 0),
+                          port(context("CFGNode",     CFGNode2Str(cn),
+                                       "SgNode*",     sgn))), moduleProfile)
   // The transfer function must have either left dfInfo's NULL edge key alone or created one key for each
   // descendant edge
 
@@ -992,6 +1059,10 @@ bool ComposedAnalysis::transferCFGNodeDense(ComposedAnalysis* analysis,
       {
         //list<PartEdgePtr>::iterator e=first, eSuper=firstSuper;
         //for(++e, ++eSuper; eSuper!=descSupersetEdges.end(); ++eSuper, ++e) {
+        SIGHT_DECL(module, (instance("CopyLattices", 1, 0),
+                                port(context("CFGNode",     CFGNode2Str(cn),
+                                             "SgNode*",     sgn))), moduleProfile)
+
         list<PartEdgePtr>::const_iterator eSuper=firstSuper;
         for(++eSuper; eSuper!=descSupersetEdges.end(); ++eSuper) {
           NodeState::copyLatticesOW(dfInfo, /*toDepartEdge*/   NULLPartEdge, *eSuper,
@@ -1007,6 +1078,9 @@ bool ComposedAnalysis::transferCFGNodeDense(ComposedAnalysis* analysis,
     for(list<PartEdgePtr>::const_iterator eSuper=descSupersetEdges.begin(); eSuper!=descSupersetEdges.end(); ++eSuper)
       assert(dfInfo.find(*eSuper) != dfInfo.end());
   }
+  }
+  //gettimeofday(&tfEnd, NULL); double tfElapsed = ((tfEnd.tv_sec*1000000 + tfEnd.tv_usec) - (tfStart.tv_sec*1000000 + tfStart.tv_usec)) / 1000000.0;
+  //cout << "transferCFGNodeDense\t"<<tfElapsed<<"\t"<<CFGNode2Str(cn)<<"\t"<<analysis->str()<<endl;
 
   return modified;
 }
@@ -1061,17 +1135,12 @@ void ComposedAnalysis::propagateDF2DescDense(ComposedAnalysis* analysis,
 //  dbg << "#descEdges="<<descEdges.size()<<endl;
   for(d = descendants.begin(), de = descEdges.begin()/*, deSuper = descSupersetEdges.begin()*/;
       de != descEdges.end(); ++d, ++de/*, ++deSuper*/) {
-    dbg << "*d="<<(*d? (*d)->str(): "NULLPart")<<endl;
     PartEdgePtr nextPartEdge         = *de;
-    dbg << "nextPartEdge="<<nextPartEdge->str()<<endl;
     PartEdgePtr nextSupersetPartEdge = nextPartEdge->getSupersetPartEdge();
-    dbg << "nextSupersetPartEdge="<<nextSupersetPartEdge->str()<<endl;
     PartPtr nextPart         = (getDirection() == fw? nextPartEdge->target():         nextPartEdge->source());
-    dbg << "nextPart="<<(nextPart? nextPartEdge->str(): "NULLPart")<<endl;
     PartPtr nextSupersetPart = (getDirection() == fw? nextSupersetPartEdge->target(): nextSupersetPartEdge->source());
-    dbg << "nextSupersetPart="<<(nextSupersetPart? nextSupersetPart->str(): "NULLPart")<<endl;
 
-    SIGHT_VERB_IF(1, composedAnalysisDebugLevel)
+    SIGHT_VERB_IF(2, composedAnalysisDebugLevel)
       dbg << "*d="<<(*d? (*d)->str(): "NULLPart")<<endl;
       dbg << "nextPartEdge="<<nextPartEdge->str()<<endl;
       dbg << "nextSupersetPartEdge="<<nextSupersetPartEdge->str()<<endl;
@@ -1081,7 +1150,7 @@ void ComposedAnalysis::propagateDF2DescDense(ComposedAnalysis* analysis,
     assert(nextPart);
 
     SIGHT_VERB_DECL(scope, (txt()<<"Descendant: "<<nextPart->str(), scope::low), 1, composedAnalysisDebugLevel)
-    {scope s("dfInfo"); dbg <<NodeState::str(dfInfo)<<endl; }
+    //{scope s("dfInfo"); dbg <<NodeState::str(dfInfo)<<endl; }
 
     // Make sure that dfInfo has a key for this descendant
     assert(dfInfo.find(nextSupersetPartEdge) != dfInfo.end());
@@ -1360,6 +1429,19 @@ void ComposedAnalysis::setDescendantLatticeLocationsDense(
       SIGHT_VERB(dbg<<"lattice "<<(*l)->str()<<endl, 1, composedAnalysisDebugLevel)
     }
   }
+
+  // Remap the MemLocs inside each edge's Lattice to account for this PartEdge's changes in scope
+  for(list<PartEdgePtr>::iterator e=descEdges.begin(); e!=descEdges.end(); ++e) {
+    PartEdgePtr supersetPartEdge = (*e)->getSupersetPartEdge();
+    analysis->remapML((getDirection()==fw? supersetPart->inEdgeFromAny():
+                                           supersetPart->outEdgeToAny()), dfInfoPost[supersetPartEdge]);
+
+    SIGHT_VERB_IF(1, composedAnalysisDebugLevel)
+      scope mpsReg("Remapped DFState", scope::low);
+      for(vector<Lattice*>::iterator df=dfInfoPost[supersetPartEdge].begin(); df!=dfInfoPost[supersetPartEdge].end(); df++)
+        dbg << (*df)->str()<<endl;
+    SIGHT_VERB_FI()
+  }
 }
 
 /*************************
@@ -1481,9 +1563,9 @@ std::set<PartPtr> BWDataflow::getUltimateSupersetParts()
 
 
 dataflowPartEdgeIterator* FWDataflow::getIterator()
-{ return new fw_dataflowPartEdgeIterator(selectIterOrderFromEnvironment()); }
+{ return new fw_dataflowPartEdgeIterator(/*incrementalGraph*/ false, selectIterOrderFromEnvironment()); }
 dataflowPartEdgeIterator* BWDataflow::getIterator()
-{ return new bw_dataflowPartEdgeIterator(selectIterOrderFromEnvironment()); }
+{ return new bw_dataflowPartEdgeIterator(/*incrementalGraph*/ false, selectIterOrderFromEnvironment()); }
 
 // Remaps the given Lattice across the scope transition (if any) of the given edge, updating the lat vector
 // with pointers to the updated Lattice objects and deleting old Lattice objects as needed.
@@ -1491,12 +1573,14 @@ void FWDataflow::remapML(PartEdgePtr fromPEdge, vector<Lattice*>& lat) {
   SIGHT_VERB_DECL(scope, ("FWDataflow::remapML", scope::high), 1, composedAnalysisDebugLevel)
   for(unsigned int i=0; i<lat.size(); i++) {
     SIGHT_VERB(dbg << "lat["<<i<<"]="<<(lat[i]? lat[i]->str(): "NULL")<<endl, 1, composedAnalysisDebugLevel)
+/*cout << "FWDataflow::remapML() lat[i]->getPartEdge()="<<lat[i]->getPartEdge()->str()<<endl;
+cout << "FWDataflow::remapML() fromPEdge="<<fromPEdge->str()<<endl;*/
     Lattice* newL = lat[i]->getPartEdge()->forwardRemapML(lat[i], fromPEdge, this);
     SIGHT_VERB(dbg << "newL="<<(newL? newL->str(): "NULL")<<endl, 1, composedAnalysisDebugLevel)
     // If any remapping was done, update lat
     if(newL) {
-      delete lat[i];
-      lat[i] = newL;
+      lat[i]->copy(newL);
+      delete newL;
     }
   }
 }
@@ -1510,8 +1594,8 @@ void BWDataflow::remapML(PartEdgePtr fromPEdge, vector<Lattice*>& lat) {
     Lattice* newL = lat[i]->getPartEdge()->backwardRemapML(lat[i], fromPEdge, this);
     // If any remapping was done, update lat
     if(newL) {
-      delete lat[i];
-      lat[i] = newL;
+      lat[i]->copy(newL);
+      delete newL;
     }
   }
 }

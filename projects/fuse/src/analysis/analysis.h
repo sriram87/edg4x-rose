@@ -21,9 +21,6 @@ class Analysis;
 
 namespace fuse {
 
-// Initializes Fuse
-void FuseInit(int argc, char **argv);
-
 // Returns a boost shared pointers to variables that should be
 // deallocated when the shared_ptr's reference count drops. Useful
 // for passing unmanaged memory to code that takes boost shared 

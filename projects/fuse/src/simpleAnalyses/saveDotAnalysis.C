@@ -406,7 +406,12 @@ std::ostream & ats2dot(std::ostream &o, std::string graphName, set<PartPtr>& sta
   cout << "end=("<<&end<<")="<< end.str() << endl;
   
   for(fw_partEdgeIterator state(startParts); state!=fw_partEdgeIterator::end(); state++) {*/
-  for(fw_partEdgeIterator state(startParts); !state.isEnd(); state++) {
+  { scope s("startParts");
+  for(set<PartPtr>::const_iterator p=startParts.begin(); p!=startParts.end(); ++p)
+    dbg << (*p)->str()<<endl;
+  }
+
+  for(fw_partEdgeIterator state(startParts, /*incrementalGraph*/ false); !state.isEnd(); state++) {
     PartPtr part = state.getPart();
     scope reg2(txt()<<"ats2dot: part="<<getPartUID(partInfo, part)<<"="<<part->str(), scope::medium, attrGE("saveDotAnalysisDebugLevel", 1));
     if(saveDotAnalysisDebugLevel()>=1) {
@@ -511,9 +516,9 @@ std::ostream & ats2dot_bw(std::ostream &o, std::string graphName, set<PartPtr>& 
                                   boost::make_shared<Ctxt2PartsMap_Leaf_Generator_Base>());
   
   //for(bw_partEdgeIterator state(endParts); state!=bw_partEdgeIterator::end(); state++) {
-  for(bw_partEdgeIterator state(endParts); !state.isEnd(); state++) {
+  for(bw_partEdgeIterator state(endParts, /*incrementalGraph*/ false); !state.isEnd(); state++) {
     PartPtr part = state.getPart();
-cout << "==== part="<<part->str()<<endl;
+//cout << "==== part="<<part->str()<<endl;
     scope reg(txt()<<"ats2dot: part="<<getPartUID(partInfo, part)<<"="<<part->str(), scope::medium, attrGE("saveDotAnalysisDebugLevel", 1));
     if(saveDotAnalysisDebugLevel()>=1) {
       dbg << "state="<<state.str()<<endl;

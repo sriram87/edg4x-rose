@@ -12,6 +12,7 @@ using namespace std;
 AstAnnotator::AstAnnotator(Labeler* labeler):_labeler(labeler) {
 }
 
+
 void AstAnnotator::annotateAstAttributesAsCommentsBeforeStatements(SgNode* node, string attributeName) {
   annotateAstAttributesAsComments(node,attributeName,PreprocessingInfo::before);
 }

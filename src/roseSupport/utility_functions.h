@@ -22,6 +22,12 @@ std::string rose_scm_version_id();
 //! SCM version date-identifier for ROSE (Unix timestamp)
 time_t rose_scm_version_date();
 
+//! Boost version identifier (numeric)
+unsigned int rose_boost_version_id();
+
+//! Boost version path
+std::string rose_boost_version_path();
+
 // DQ (7/3/2013): Added support to output pre-defined macro settings.
 //! Output at least some of the predefined macro settings.
 void outputPredefinedMacros();
@@ -42,6 +48,9 @@ ROSE_DLL_API SgProject* frontendShell ( const std::vector<std::string>& argv);
 // objects to control the formatting of code generation and the use of alternative code generation
 // techniques (e.g. copy-based code generation).
 // int backend ( SgProject* project );
+//
+// WARNING: If a non-null unparseFormatHelp is specified then backend will unconditionally delete it.  Therefore, the caller
+// must have allocated it on the heap or else strange errors will result.
 ROSE_DLL_API int backend ( SgProject* project, UnparseFormatHelp *unparseFormatHelp = NULL, UnparseDelegate* unparseDelagate = NULL );
 
 // DQ (8/24/2009): This backend calls the backend compiler using the original input source file list.

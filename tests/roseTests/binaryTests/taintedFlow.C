@@ -79,23 +79,24 @@
 #include <sawyer/Map.h>
 #include <sawyer/Message.h>
 
-using namespace BinaryAnalysis;
+using namespace rose;
+using namespace rose::BinaryAnalysis;
 using namespace Sawyer::Message::Common;
 
-// Diagnostic output for this tool
-Sawyer::Message::Facility mlog("taintedFlow");
+// Diagnostic output for this tool; initialized in main()
+Sawyer::Message::Facility mlog;
 
 // Template function to build a control flow graph whose vertices are either instructions or basic blocks
 template<class SageNode>
-void buildControlFlowGraph(SgNode *ast, Sawyer::Container::Graph<SageNode*, int> &cfg /*out*/);
+void buildControlFlowGraph(SgNode *ast, Sawyer::Container::Graph<SageNode*> &cfg /*out*/);
 
 template<>
-void buildControlFlowGraph<SgAsmInstruction>(SgNode *ast, Sawyer::Container::Graph<SgAsmInstruction*, int> &cfg /*out*/) {
+void buildControlFlowGraph<SgAsmInstruction>(SgNode *ast, Sawyer::Container::Graph<SgAsmInstruction*> &cfg /*out*/) {
     ControlFlow().build_insn_cfg_from_ast(ast, cfg);
 }
 
 template<>
-void buildControlFlowGraph<SgAsmBlock>(SgNode *ast, Sawyer::Container::Graph<SgAsmBlock*, int> &cfg /*out*/) {
+void buildControlFlowGraph<SgAsmBlock>(SgNode *ast, Sawyer::Container::Graph<SgAsmBlock*> &cfg /*out*/) {
     ControlFlow().build_block_cfg_from_ast(ast, cfg);
 }
 
@@ -117,9 +118,8 @@ static void analyze(SgAsmFunction *specimen, TaintedFlow::Approximation approxim
     // Control flow graph.  Any graph implementing the Boost Graph Library API is permissible. We use Sawyer's implementation
     // because it has a nicer interface for the rest of this file to use.  We could use basic blocks or instructions as the
     // vertices.  The edge value is irrelevant -- we don't use them.
-    // FIXME[Robb P. Matzke 2014-06-02]: edge type could be "void", but Sawyer doesn't specialize for that yet
     mlog[TRACE] <<"Obtaining control flow graph...\n";
-    typedef Sawyer::Container::Graph<SageNode*, int> CFG;
+    typedef Sawyer::Container::Graph<SageNode*> CFG;
     CFG cfg;
     buildControlFlowGraph(specimen, cfg);
 
@@ -141,7 +141,7 @@ static void analyze(SgAsmFunction *specimen, TaintedFlow::Approximation approxim
     // location -- symbolic values are instantiated as variables when needed.
     //
     // So we create a symbolic domain and link it into an instruction dispatcher that knows about Intel x86 instructions.  The
-    // BinaryAnalysis::DataFlow object provides the API for discovering intra-function or intra-block data flows.
+    // rose::BinaryAnalysis::DataFlow object provides the API for discovering intra-function or intra-block data flows.
     BaseSemantics::RiscOperatorsPtr symbolicOps = SymbolicSemantics::RiscOperators::instance(regdict);
     DispatcherX86Ptr cpu = DispatcherX86::instance(symbolicOps); // assuming the specimen is x86-based
 #if 0
@@ -150,7 +150,7 @@ static void analyze(SgAsmFunction *specimen, TaintedFlow::Approximation approxim
 #endif
     BaseSemantics::SValuePtr esp_0 = symbolicOps->readRegister(cpu->REG_ESP); // initial value of stack pointer
 
-    // The BinaryAnalysis::TaintedFlow class encapsulates all the methods we need to perform tainted flow analysis.
+    // The rose::BinaryAnalysis::TaintedFlow class encapsulates all the methods we need to perform tainted flow analysis.
     TaintedFlow taintAnalysis(cpu);
     taintAnalysis.approximation(approximation);
 #if defined(ROSE_HAVE_LIBYICES) || defined(ROSE_YICES)
@@ -224,12 +224,13 @@ int main(int argc, char *argv[])
 {
     // Configure diagnostic output
     rose::Diagnostics::initialize();
-    mlog.initStreams(rose::Diagnostics::destination);
-    rose::Diagnostics::facilities.insertAndAdjust(mlog);
-    rose::Diagnostics::facilities.control("taintedFlow(>=where)"); // the default
+    mlog = Sawyer::Message::Facility("taintedFlow", rose::Diagnostics::destination);
+    rose::Diagnostics::mfacilities.insertAndAdjust(mlog);
+    rose::Diagnostics::mfacilities.control("taintedFlow(>=where)"); // the default
 
     // Describe the command-line
     using namespace Sawyer::CommandLine;
+    SwitchGroup generic = CommandlineProcessing::genericSwitches();
     SwitchGroup switches("Tainted flow switches");
     std::vector<rose_addr_t> functionAddresses;
     switches.insert(Switch("address")
@@ -248,9 +249,6 @@ int main(int argc, char *argv[])
                          "less able to determine when global variables and local variables are distinct because it "
                          "reasons that a stack-offset expression could be equal to some arbitrary constant.  The @v{mode} "
                          "can be the word \"under\" (the default) or \"over\"."));
-    switches.insert(Switch("help", 'h')
-                    .action(showHelpAndExit(0))
-                    .doc("Emits the documentation for these switches and then exits."));
     bool useInstructions = false;
     switches.insert(Switch("instructions")
                     .intrinsicValue(true, useInstructions)
@@ -263,20 +261,12 @@ int main(int argc, char *argv[])
                     .whichValue(SAVE_ONE)               // blocks and instructions are mutually exclusive
                     .intrinsicValue(false, useInstructions)
                     .hidden(true));
-    switches.insert(Switch("log", 'L')
-                    .action(Sawyer::CommandLine::configureDiagnostics("log", rose::Diagnostics::facilities))
-                    .argument("logspec")
-                    .whichValue(Sawyer::CommandLine::SAVE_ALL)
-                    .doc("Controls diagnostic logging.  Invoke with \"@s{log}=help\" for more information."));
     std::vector<std::string> functionNameRegexList;
     switches.insert(Switch("names")
                     .whichValue(SAVE_ALL)
                     .argument("regex", anyParser(functionNameRegexList))
                     .doc("Specifies a regular expression for function names that will be analyzed.  If more than one regular "
                          "expression is given then a function is analyzed if it's name matches any of the expressions."));
-    switches.insert(Switch("version", 'V')
-                    .action(showVersionAndExit(version_message(), 0))
-                    .doc("Shows version information for various ROSE components and then exits."));
 
     Sawyer::CommandLine::Parser cmdline_parser;
     cmdline_parser.errorStream(mlog[FATAL]);
@@ -298,7 +288,7 @@ int main(int argc, char *argv[])
                        "\"@prop{programName} -- -rose:help @v{specimen}\").");
 
     // Parse the command line.
-    ParserResult cmdline = cmdline_parser.with(switches).parse(argc, argv).apply();
+    ParserResult cmdline = cmdline_parser.with(generic).with(switches).parse(argc, argv).apply();
     
     // Parse the binary container (ELF, PE, etc) and disassemble instructions using the default disassembler.  Organize
     // (partition) the instructions into basic blocks and functions using the default partitioner.  The disassembler and
@@ -357,36 +347,36 @@ int main(int argc, char *argv[])
 // should be moved to a different test eventually.
 void compileTests(SgAsmInterpretation *interp) {
     typedef Sawyer::Container::Graph<SgAsmBlock*, int> CFG1;
-    CFG1 cfg1 = BinaryAnalysis::ControlFlow().build_block_cfg_from_ast<CFG1>(interp);
+    CFG1 cfg1 = ControlFlow().build_block_cfg_from_ast<CFG1>(interp);
     typedef Sawyer::Container::Graph<SgAsmInstruction*, int> CFG2;
-    CFG2 cfg2 = BinaryAnalysis::ControlFlow().build_insn_cfg_from_ast<CFG2>(interp);
-    typedef BinaryAnalysis::ControlFlow::BlockGraph CFG3;
-    CFG3 cfg3 = BinaryAnalysis::ControlFlow().build_block_cfg_from_ast<CFG3>(interp);
-    typedef BinaryAnalysis::ControlFlow::InsnGraph CFG4;
-    CFG4 cfg4 = BinaryAnalysis::ControlFlow().build_insn_cfg_from_ast<CFG4>(interp);
-    BinaryAnalysis::ControlFlow().fixup_fcall_fret(cfg2, false);
-    BinaryAnalysis::ControlFlow().fixup_fcall_fret(cfg4, false);
-    BinaryAnalysis::ControlFlow().build_cg_from_ast<CFG1>(interp);
-    BinaryAnalysis::ControlFlow().build_cg_from_ast<CFG3>(interp);
-    BinaryAnalysis::ControlFlow().copy(cfg1);
-    BinaryAnalysis::ControlFlow().copy(cfg2);
-    BinaryAnalysis::ControlFlow().copy(cfg3);
-    BinaryAnalysis::ControlFlow().copy(cfg4);
+    CFG2 cfg2 = ControlFlow().build_insn_cfg_from_ast<CFG2>(interp);
+    typedef ControlFlow::BlockGraph CFG3;
+    CFG3 cfg3 = ControlFlow().build_block_cfg_from_ast<CFG3>(interp);
+    typedef ControlFlow::InsnGraph CFG4;
+    CFG4 cfg4 = ControlFlow().build_insn_cfg_from_ast<CFG4>(interp);
+    ControlFlow().fixup_fcall_fret(cfg2, false);
+    ControlFlow().fixup_fcall_fret(cfg4, false);
+    ControlFlow().build_cg_from_ast<CFG1>(interp);
+    ControlFlow().build_cg_from_ast<CFG3>(interp);
+    ControlFlow().copy(cfg1);
+    ControlFlow().copy(cfg2);
+    ControlFlow().copy(cfg3);
+    ControlFlow().copy(cfg4);
 
     typedef Sawyer::Container::Graph<SgAsmFunction*, int> CG1;
-    CG1 cg1 = BinaryAnalysis::FunctionCall().build_cg_from_ast<CG1>(interp);
-    BinaryAnalysis::FunctionCall().build_cg_from_cfg<CG1>(cfg1);
-    BinaryAnalysis::FunctionCall().build_cg_from_cfg<CG1>(cfg2);
-    BinaryAnalysis::FunctionCall().build_cg_from_cfg<CG1>(cfg3);
-    BinaryAnalysis::FunctionCall().build_cg_from_cfg<CG1>(cfg4);
-    BinaryAnalysis::FunctionCall().copy(cg1);
+    CG1 cg1 = FunctionCall().build_cg_from_ast<CG1>(interp);
+    FunctionCall().build_cg_from_cfg<CG1>(cfg1);
+    FunctionCall().build_cg_from_cfg<CG1>(cfg2);
+    FunctionCall().build_cg_from_cfg<CG1>(cfg3);
+    FunctionCall().build_cg_from_cfg<CG1>(cfg4);
+    FunctionCall().copy(cg1);
 
-    typedef BinaryAnalysis::FunctionCall::Graph CG2;
-    CG2 cg2 = BinaryAnalysis::FunctionCall().build_cg_from_ast<CG2>(interp);
-    BinaryAnalysis::FunctionCall().build_cg_from_cfg<CG2>(cfg1);
-    BinaryAnalysis::FunctionCall().build_cg_from_cfg<CG2>(cfg2);
-    BinaryAnalysis::FunctionCall().build_cg_from_cfg<CG2>(cfg3);
-    BinaryAnalysis::FunctionCall().build_cg_from_cfg<CG2>(cfg4);
-    BinaryAnalysis::FunctionCall().copy(cg2);
+    typedef FunctionCall::Graph CG2;
+    CG2 cg2 = FunctionCall().build_cg_from_ast<CG2>(interp);
+    FunctionCall().build_cg_from_cfg<CG2>(cfg1);
+    FunctionCall().build_cg_from_cfg<CG2>(cfg2);
+    FunctionCall().build_cg_from_cfg<CG2>(cfg3);
+    FunctionCall().build_cg_from_cfg<CG2>(cfg4);
+    FunctionCall().copy(cg2);
 }
 

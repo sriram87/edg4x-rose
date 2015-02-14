@@ -24,6 +24,7 @@
 #include <string.h>
 #if _MSC_VER
 #include <direct.h>
+#include <process.h>
 #endif
 
 #include "IncludedFilesUnparser.h"
@@ -320,6 +321,7 @@ Unparser::unparseFile ( SgSourceFile* file, SgUnparse_Info& info, SgScopeStateme
      printf ("In Unparser::unparseFile(): SageInterface::is_Cxx_language()     = %s \n",SageInterface::is_Cxx_language() ? "true" : "false");
      printf ("In Unparser::unparseFile(): SageInterface::is_Fortran_language() = %s \n",SageInterface::is_Fortran_language() ? "true" : "false");
      printf ("In Unparser::unparseFile(): SageInterface::is_Java_language()    = %s \n",SageInterface::is_Java_language() ? "true" : "false");
+     printf ("In Unparser::unparseFile(): SageInterface::is_X10_language()    = %s \n",SageInterface::is_X10_language() ? "true" : "false");
      printf ("In Unparser::unparseFile(): file->get_outputLanguage()           = %s \n",file->get_outputLanguage() == SgFile::e_C_output_language ? "C" : 
                                   file->get_outputLanguage() == SgFile::e_Fortran_output_language ? "Fortran" : 
                                   file->get_outputLanguage() == SgFile::e_Java_output_language ? "Java" : "unknown");
@@ -373,10 +375,11 @@ Unparser::unparseFile ( SgSourceFile* file, SgUnparse_Info& info, SgScopeStateme
 
   // DQ (10/27/2013): Adding support for token stream use in unparser. We might want to only turn this of when -rose:unparse_tokens is specified.
   // if (SageInterface::is_C_language() == true)
-     if (SageInterface::is_C_language() == true && file->get_unparse_tokens() == true)
+  // if (SageInterface::is_C_language() == true && file->get_unparse_tokens() == true)
+     if ( ( (SageInterface::is_C_language() == true) || (SageInterface::is_Cxx_language() == true) ) && file->get_unparse_tokens() == true)
         {
        // This is only currently being tested and evaluated for C language (should also work for C++, but not yet for Fortran).
-#if 0
+#if 1
           printf ("Building token stream mapping map! \n");
 #endif
        // This function builds the data base (STL map) for the different subsequences ranges of the token stream.
@@ -387,11 +390,11 @@ Unparser::unparseFile ( SgSourceFile* file, SgUnparse_Info& info, SgScopeStateme
 #if 1
           if ( SgProject::get_verbose() > 0 )
              {
-               printf ("In Unparser::unparseFile(): SgTokenPtrList token_list: token_list.size() = %zu \n",file->get_token_list().size());
+               printf ("In Unparser::unparseFile(): SgTokenPtrList token_list: token_list.size() = %" PRIuPTR " \n",file->get_token_list().size());
              }
 #endif
 
-#if 0
+#if 1
           printf ("DONE: Building token stream mapping map! \n");
 #endif
         }
@@ -413,7 +416,8 @@ Unparser::unparseFile ( SgSourceFile* file, SgUnparse_Info& info, SgScopeStateme
             // This now unparses the raw token stream as a seperate file with the prefix "rose_tokens_"
 
             // This is just unparsing the token stream WITHOUT using the mapping information that relates it to the AST.
-#if 0
+//MH-20140701 removed comment-out
+#if 1
                printf ("In Unparser::unparseFile(): Detected case of file->get_unparse_tokens() == true \n");
 #endif
             // Note that this is not yet using the SgTokenPtrList of SgToken IR nodes (this is using a lower level data structure).
@@ -525,7 +529,12 @@ Unparser::unparseFile ( SgSourceFile* file, SgUnparse_Info& info, SgScopeStateme
                               if (file->get_X10_only())
                               {
                                    Unparse_X10 unparser(this, file->getFileName());
+// MH (7/2/2014) : disabled unparseStatement() and instead invoke unparseX10File()
+#if 0
                                    unparser.unparseStatement(globalScope, info);
+#else
+                                   unparser.unparseX10File(file, info);
+#endif
                               }
                               else
                               {
@@ -550,6 +559,7 @@ Unparser::unparseFile ( SgSourceFile* file, SgUnparse_Info& info, SgScopeStateme
   // cur << "\n\n\n";
      cur.flush();
 
+//MH-20140701 removed comment-out
 #if 0
      printf ("Leaving Unparser::unparseFile(): file = %s = %s \n",file->get_sourceFileNameWithPath().c_str(),file->get_sourceFileNameWithoutPath().c_str());
      printf ("Leaving Unparser::unparseFile(): SageInterface::is_Cxx_language()     = %s \n",SageInterface::is_Cxx_language() ? "true" : "false");
@@ -658,7 +668,7 @@ Unparser::unparseFileUsingTokenStream ( SgSourceFile* file )
 
      string fileNameForTokenStream = file->getFileName();
 
-#if 0
+#if 1
      printf ("In Unparser::unparseFile(): fileNameForTokenStream = %s \n",fileNameForTokenStream.c_str());
 #endif
 
@@ -666,7 +676,7 @@ Unparser::unparseFileUsingTokenStream ( SgSourceFile* file )
      ROSEAttributesListContainerPtr filePreprocInfo = file->get_preprocessorDirectivesAndCommentsList();
 
 #if 0
-     printf ("filePreprocInfo->getList().size() = %zu \n",filePreprocInfo->getList().size());
+     printf ("filePreprocInfo->getList().size() = %" PRIuPTR " \n",filePreprocInfo->getList().size());
 #endif
 
   // We should at least have the current files CPP/Comment/Token information (even if it is an empty file).
@@ -676,7 +686,7 @@ Unparser::unparseFileUsingTokenStream ( SgSourceFile* file )
      ROSE_ASSERT(mapFilenameToAttributes.empty() == true);
 
 #if 0
-     printf ("Evaluate what files are processed in map (filePreprocInfo->getList().size() = %zu) \n",filePreprocInfo->getList().size());
+     printf ("Evaluate what files are processed in map (filePreprocInfo->getList().size() = %" PRIuPTR ") \n",filePreprocInfo->getList().size());
      std::map<std::string,ROSEAttributesList* >::iterator map_iterator = filePreprocInfo->getList().begin();
      while (map_iterator != filePreprocInfo->getList().end())
         {
@@ -685,7 +695,7 @@ Unparser::unparseFileUsingTokenStream ( SgSourceFile* file )
 
           map_iterator++;
         }
-     printf ("DONE: Evaluate what files are processed in map (filePreprocInfo->getList().size() = %zu) \n",filePreprocInfo->getList().size());
+     printf ("DONE: Evaluate what files are processed in map (filePreprocInfo->getList().size() = %" PRIuPTR ") \n",filePreprocInfo->getList().size());
 #endif
 
   // std::map<std::string,ROSEAttributesList* >::iterator currentFileItr = mapFilenameToAttributes.find(fileNameForTokenStream);
@@ -711,7 +721,7 @@ Unparser::unparseFileUsingTokenStream ( SgSourceFile* file )
 
 #if 0
      printf ("Output token list (number of CPP directives and comments = %d): \n",existingListOfAttributes->size());
-     printf ("Output token list (number of tokens = %zu): \n",tokenList.size());
+     printf ("Output token list (number of tokens = %" PRIuPTR "): \n",tokenList.size());
 #endif
 
 #if 0
@@ -824,7 +834,7 @@ Unparser::unparseFileUsingTokenStream ( SgSourceFile* file )
   // DQ (10/27/2013): Use a different filename for the output of the raw token stream (not associated with individual statements).
      string outputFilename = "rose_raw_tokens_" + file->get_sourceFileNameWithoutPath();
 
-#if 0
+#if 1
      printf ("In Unparser::unparseFileUsingTokenStream(): Output tokens stream to file: %s \n",outputFilename.c_str());
 #endif
 
@@ -2187,10 +2197,13 @@ unparseFile ( SgFile* file, UnparseFormatHelp *unparseHelp, UnparseDelegate* unp
             outFolder += package_name;
             outFolder += (package_name.size() > 0 ? "/" : "");
             // Create package folder structure
-            string mkdirCommand = string("mkdir -p ") + outFolder;
-            int status = system (mkdirCommand.c_str());
-            ROSE_ASSERT(status == 0);
+            boost::filesystem::create_directories(outFolder);
+            ROSE_ASSERT(boost::filesystem::exists(outFolder));
             outputFilename = outFolder + file -> get_sourceFileNameWithoutPath();
+            // Convert Windows-style paths to POSIX-style.
+            #ifdef _MSC_VER
+            boost::replace_all(outputFilename, "\\", "/");
+            #endif
 #if 0
             printf ("In unparseFile(): generated Java outputFilename = %s \n",outputFilename.c_str());
 #endif
@@ -2205,7 +2218,31 @@ unparseFile ( SgFile* file, UnparseFormatHelp *unparseHelp, UnparseDelegate* unp
         {
             // X10 is Java source code; see Java file/class naming conventions.
             // Filenames are based on the Java Class name contained in the file.
-            outputFilename = file->get_sourceFileNameWithPath();
+            SgSourceFile *sourcefile = isSgSourceFile(file);
+            ROSE_ASSERT(sourcefile && "Try to unparse an SgFile not being an SgSourceFile using the x10 unparser");
+
+            SgProject *project = sourcefile -> get_project();
+            ROSE_ASSERT(project != NULL);
+
+            SgJavaPackageStatement *package_statement = sourcefile -> get_package();
+            string package_name = (package_statement ? package_statement -> get_name().getString() : "");
+            //NOTE: Default package equals the empty string ""
+            //ROSE_ASSERT((packageDecl != NULL) && "Couldn't find the package definition of the java source file");
+            string outFolder = "";
+            string ds = project -> get_Java_source_destdir();
+            if (ds != "") {
+                outFolder = ds;
+                outFolder += "/";
+            }
+            outFolder += "rose-output/";
+            boost::replace_all(package_name, ".", "/");
+            outFolder += package_name;
+            outFolder += (package_name.size() > 0 ? "/" : "");
+            // Create package folder structure
+            string mkdirCommand = string("mkdir -p ") + outFolder;
+            int status = system (mkdirCommand.c_str());
+            ROSE_ASSERT(status == 0);
+            outputFilename = outFolder + file -> get_sourceFileNameWithoutPath();
         }
         else
         {
@@ -2295,7 +2332,26 @@ unparseFile ( SgFile* file, UnparseFormatHelp *unparseHelp, UnparseDelegate* unp
 
                          outputFilename = alternative_filename;
                        }
+                 // Pei-Hung (8/6/2014) appending PID as alternative name to avoid collision
+                    else
+                       {
+                         if (project->get_appendPID() == true)
+                            {
+                              ostringstream os;
+                              #ifdef _MSC_VER 
+                              os << _getpid(); 
+                              #else 
+                              os << getpid(); 
+                              #endif 
+                              unsigned dot = outputFilename.find_last_of(".");
+                              outputFilename = outputFilename.substr(0,dot) + "_" + os.str() + outputFilename.substr(dot);
+                              if ( SgProject::get_verbose() > 0 )
+                                   printf ("Generate test output name with PID = %s \n",outputFilename.c_str());
+
+                            }
+                       }
                   }
+               file->set_unparse_output_filename(outputFilename);
              }
 
           fstream ROSE_OutputFile(outputFilename.c_str(),ios::out);
@@ -2425,6 +2481,15 @@ unparseFile ( SgFile* file, UnparseFormatHelp *unparseHelp, UnparseDelegate* unp
        // And finally we need to close the file (to flush everything out!)
           ROSE_OutputFile.close();
 
+       // Invoke post-output user-defined callbacks if any.  We must pass the absolute output name because the build system may
+       // have changed directories by now and the callback might need to know how this name compares to the top of the build
+       // tree.
+          if (unparseHelp != NULL) {
+              rose::FileSystem::Path fullOutputName = rose::FileSystem::makeAbsolute(outputFilename);
+              UnparseFormatHelp::PostOutputCallback::Args args(file, fullOutputName);
+              unparseHelp->postOutputCallbacks.apply(true, args);
+          }
+
        // DQ (3/19/2014): If -rose:noclobber_if_different_output, then test the generated file against the original file.
           if (trigger_file_comparision == true)
              {
@@ -2456,7 +2521,7 @@ unparseFile ( SgFile* file, UnparseFormatHelp *unparseHelp, UnparseDelegate* unp
 
                     if ( SgProject::get_verbose() > 0 )
                        {
-                         printf ("   --- files are the same size = %zu (checking contents) \n",filesize);
+                         printf ("   --- files are the same size = %" PRIuPTR " (checking contents) \n",filesize);
                        }
 
                      size_t counter = 0;
@@ -2484,7 +2549,7 @@ unparseFile ( SgFile* file, UnparseFormatHelp *unparseHelp, UnparseDelegate* unp
                        {
                          size_t saved_filesize       = file_size(saved_output_file);
                          size_t alternative_filesize = file_size(alternative_output_file);
-                         printf ("   --- files are not the same size saved_filesize = %zu alternative_filesize = %zu \n",saved_filesize,alternative_filesize);
+                         printf ("   --- files are not the same size saved_filesize = %" PRIuPTR " alternative_filesize = %" PRIuPTR " \n",saved_filesize,alternative_filesize);
                        }
 
                     files_are_identical = false;

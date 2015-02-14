@@ -309,7 +309,7 @@ RegisterDictionary::dictionary_i8086() {
         regs->insert("di", x86_regclass_gpr, x86_gpr_di, 0, 16);
         regs->insert("dil", x86_regclass_gpr, x86_gpr_di, 0, 8);
 
-        /* Flags. Reserved flags have no names but can be accessed by reading the entire "flags" register. */
+        /* Flags with official names. */
         regs->insert("flags", x86_regclass_flags, x86_flags_status,  0, 16); /* all flags */
         regs->insert("cf",    x86_regclass_flags, x86_flags_status,  0,  1); /* carry status flag */
         regs->insert("pf",    x86_regclass_flags, x86_flags_status,  2,  1); /* parity status flag */
@@ -321,6 +321,14 @@ RegisterDictionary::dictionary_i8086() {
         regs->insert("df",    x86_regclass_flags, x86_flags_status, 10,  1); /* direction control flag */
         regs->insert("of",    x86_regclass_flags, x86_flags_status, 11,  1); /* overflow status flag */
         regs->insert("nt",    x86_regclass_flags, x86_flags_status, 14,  1); /* nested task system flag */
+
+        /* Flags without names */
+        regs->insert("f1",    x86_regclass_flags, x86_flags_status,  1,  1);
+        regs->insert("f3",    x86_regclass_flags, x86_flags_status,  3,  1);
+        regs->insert("f5",    x86_regclass_flags, x86_flags_status,  5,  1);
+        regs->insert("f12",   x86_regclass_flags, x86_flags_status, 12,  1);
+        regs->insert("f13",   x86_regclass_flags, x86_flags_status, 13,  1);
+        regs->insert("f15",   x86_regclass_flags, x86_flags_status, 15,  1);
     }
     return regs;
 }
@@ -389,6 +397,10 @@ RegisterDictionary::dictionary_i386()
         regs->insert("rf", x86_regclass_flags, x86_flags_status, 16, 1); /* resume system flag */
         regs->insert("vm", x86_regclass_flags, x86_flags_status, 17, 1); /* virtual 8086 mode flag */
 
+        /* Additional flag bits that have no official names */
+        for (unsigned i=18; i<32; ++i)
+            regs->insert("f"+StringUtility::numberToString(i), x86_regclass_flags, x86_flags_status, i, 1);
+        
         /* Control registers */
         regs->insert("cr0", x86_regclass_cr, 0, 0, 32);
         regs->insert("cr1", x86_regclass_cr, 1, 0, 32);
@@ -618,6 +630,10 @@ RegisterDictionary::dictionary_amd64()
             regs->insert(std::string("xmm")+StringUtility::numberToString(i),
                          x86_regclass_xmm, i, 0, 128);
         }
+
+        /* Additional flag bits with no official names */
+        for (unsigned i=32; i<64; ++i)
+            regs->insert("f"+StringUtility::numberToString(i), x86_regclass_flags, x86_flags_status, i, 1);
 
         /* Control registers become 64 bits, and cr8 is added */
         regs->resize("cr0", 64);
@@ -971,7 +987,6 @@ RegisterDictionary::dictionary_m68000()
         regs->insert("sr_i",  m68k_regclass_spr, m68k_spr_sr, 8,  3);           // interrupt priority mask
         regs->insert("sr_s",  m68k_regclass_spr, m68k_spr_sr, 13, 1);           // status register user mode bit
         regs->insert("sr_t",  m68k_regclass_spr, m68k_spr_sr, 14, 2);           // status register trace mode bits
-        regs->insert("vbr",   m68k_regclass_spr, m68k_spr_vbr, 0, 32);          // vector base register
 
         // Floating point data registers
         // These registers hold 96-bit extended-precision real format ("X") values. However, since the X format has
@@ -1023,7 +1038,8 @@ RegisterDictionary::dictionary_m68000()
         regs->insert("fpiar", m68k_regclass_spr,   m68k_spr_fpiar,   0, 32);    // floating-point instruction address reg
         
         // Supervisor registers (SR register is listed above since its CCR bits are available in user mode)
-        regs->insert("ssp",     m68k_regclass_sup, m68k_sup_ssp,     0, 32);    // supervisor A7 stack pointer
+        regs->insert("ssp",      m68k_regclass_sup, m68k_sup_ssp,       0, 32); // supervisor A7 stack pointer
+        regs->insert("vbr",      m68k_regclass_sup, m68k_sup_vbr,       0, 32); // vector base register
     }
     return regs;
 }
@@ -1069,6 +1085,35 @@ RegisterDictionary::dictionary_coldfire()
         regs->insert("macsr_omc", m68k_regclass_mac, m68k_mac_macsr, 7,  1);    //   Overflow/saturation mode
         regs->insert("acc",       m68k_regclass_mac, m68k_mac_acc0,  0, 32);    // MAC accumulator
         regs->insert("mask",      m68k_regclass_mac, m68k_mac_mask,  0, 32);    // MAC mask register (upper 16 bits are set)
+
+        // Supervisor registers
+        regs->insert("cacr",     m68k_regclass_sup, m68k_sup_cacr,      0, 32); // cache control register
+        regs->insert("asid",     m68k_regclass_sup, m68k_sup_asid,      0, 32); // address space ID register
+        regs->insert("acr0",     m68k_regclass_sup, m68k_sup_acr0,      0, 32); // access control register 0 (data)
+        regs->insert("acr1",     m68k_regclass_sup, m68k_sup_acr1,      0, 32); // access control register 1 (data)
+        regs->insert("acr2",     m68k_regclass_sup, m68k_sup_acr2,      0, 32); // access control register 2 (instruction)
+        regs->insert("acr3",     m68k_regclass_sup, m68k_sup_acr3,      0, 32); // access control register 3 (instruction)
+        regs->insert("mmubar",   m68k_regclass_sup, m68k_sup_mmubar,    0, 32); // MMU base address register
+        regs->insert("rombar0",  m68k_regclass_sup, m68k_sup_rombar0,   0, 32); // ROM base address register 0
+        regs->insert("rombar1",  m68k_regclass_sup, m68k_sup_rombar1,   0, 32); // ROM base address register 1
+        regs->insert("rambar0",  m68k_regclass_sup, m68k_sup_rambar0,   0, 32); // RAM base address register 0
+        regs->insert("rambar1",  m68k_regclass_sup, m68k_sup_rambar1,   0, 32); // RAM base address register 1
+        regs->insert("mbar",     m68k_regclass_sup, m68k_sup_mbar,      0, 32); // module base address register
+        regs->insert("mpcr",     m68k_regclass_sup, m68k_sup_mpcr,      0, 32); // multiprocessor control register
+        regs->insert("edrambar", m68k_regclass_sup, m68k_sup_edrambar,  0, 32); // embedded DRAM base address register
+        regs->insert("secmbar",  m68k_regclass_sup, m68k_sup_secmbar,   0, 32); // secondary module base address register
+        regs->insert("pcr1u0",   m68k_regclass_sup, m68k_sup_0_pcr1,   32, 32); // 32 msbs of RAM 0 permutation control reg 1
+        regs->insert("pcr1l0",   m68k_regclass_sup, m68k_sup_0_pcr1,    0, 32); // 32 lsbs of RAM 0 permutation control reg 1
+        regs->insert("pcr2u0",   m68k_regclass_sup, m68k_sup_0_pcr2,   32, 32); // 32 msbs of RAM 0 permutation control reg 2
+        regs->insert("pcr2l0",   m68k_regclass_sup, m68k_sup_0_pcr2,    0, 32); // 32 lsbs of RAM 0 permutation control reg 2
+        regs->insert("pcr3u0",   m68k_regclass_sup, m68k_sup_0_pcr3,   32, 32); // 32 msbs of RAM 0 permutation control reg 3
+        regs->insert("pcr3l0",   m68k_regclass_sup, m68k_sup_0_pcr3,    0, 32); // 32 lsbs of RAM 0 permutation control reg 3
+        regs->insert("pcr1u1",   m68k_regclass_sup, m68k_sup_1_pcr1,   32, 32); // 32 msbs of RAM 1 permutation control reg 1
+        regs->insert("pcr1l1",   m68k_regclass_sup, m68k_sup_1_pcr1,    0, 32); // 32 lsbs of RAM 1 permutation control reg 1
+        regs->insert("pcr2u1",   m68k_regclass_sup, m68k_sup_1_pcr2,   32, 32); // 32 msbs of RAM 1 permutation control reg 2
+        regs->insert("pcr2l1",   m68k_regclass_sup, m68k_sup_1_pcr2,    0, 32); // 32 lsbs of RAM 1 permutation control reg 2
+        regs->insert("pcr3u1",   m68k_regclass_sup, m68k_sup_1_pcr3,   32, 32); // 32 msbs of RAM 1 permutation control reg 3
+        regs->insert("pcr3l1",   m68k_regclass_sup, m68k_sup_1_pcr3,    0, 32); // 32 lsbs of RAM 1 permutation control reg 3
     }
     return regs;
 }

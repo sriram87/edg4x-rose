@@ -1,4 +1,4 @@
-#include "rose.h"
+#include "sage3basic.h"
 
 // This file contains the function definitions required within ROSE if Binary Analysis 
 // support is NOT enabled.  In each case I can't eliminate the function (usually the 
@@ -65,7 +65,7 @@ void SgAsmElfNoteEntry::dump(FILE *f, const char *prefix, ssize_t idx) const {}
 void SgAsmElfNoteSection::dump(FILE *f, const char *prefix, ssize_t idx) const {}
 void SgAsmPEImportDirectory::dump(FILE *f, const char *prefix, ssize_t idx) const {}
 void SgAsmPEImportSection::dump(FILE *f, const char *prefix, ssize_t idx) const {}
-bool SgAsmPEImportSection::reallocate(){}
+bool SgAsmPEImportSection::reallocate() { return false; }
 void SgAsmElfSectionTableEntry::dump(FILE *f, const char *prefix, ssize_t idx) const {}
 void SgAsmElfSectionTable::dump(FILE *f, const char *prefix, ssize_t idx) const {}
 void SgAsmElfStringSection::dump(FILE *f, const char *prefix, ssize_t idx) const {}
@@ -174,6 +174,7 @@ std::ostream & operator<< ( std::ostream & os, const SgAsmNERelocEntry::iname_ty
 std::ostream & operator<< ( std::ostream & os, const SgAsmNERelocEntry::osfixup_type & x ) { return os; }
 std::ostream & operator<< ( std::ostream & os, const RegisterDescriptor & x ) { return os; }
 std::ostream & operator<< ( std::ostream & os, const rose_rva_t & x ) { return os; }
+std::ostream& operator<<(std::ostream &os, const AddressIntervalSet&) { return os; }
 
 bool SgAsmDOSFileHeader::reallocate() { return false; }
 void SgAsmPEStringSection::set_size(rose_addr_t) {}
@@ -185,8 +186,6 @@ rose_addr_t SgAsmElfStrtab::get_storage_size(SgAsmStringStorage const*) { return
 void SgAsmElfStrtab::allocate_overlap(SgAsmStringStorage*) {}
 bool SgAsmElfSegmentTable::reallocate() { return false; }
 
-// rose_addr_t SgAsmElfSymverDefinedSection::calculate_sizes(unsigned long*, unsigned long*, unsigned long*, unsigned long*) const { return NULL;}
-// rose_addr_t SgAsmElfSection::calculate_sizes(unsigned long*, unsigned long*, unsigned long*, unsigned long*) const { return NULL;}
 rose_addr_t SgAsmElfSymverDefinedSection::calculate_sizes(size_t*, size_t*, size_t*, size_t*) const { return 0;}
 rose_addr_t SgAsmElfSection::calculate_sizes(size_t*, size_t*, size_t*, size_t*) const { return 0;}
 
@@ -195,7 +194,6 @@ SgAsmStringStorage* SgAsmElfStrtab::create_storage(rose_addr_t, bool) { return N
 void SgAsmElfDynamicSection::finish_parsing() {}
 SgAsmNERelocEntry::osfixup_type::osfixup_type() {}
 
-// rose_addr_t SgAsmElfRelocSection::calculate_sizes(unsigned long*, unsigned long*, unsigned long*, unsigned long*) const { return NULL;}
 rose_addr_t SgAsmElfRelocSection::calculate_sizes(size_t*, size_t*, size_t*, size_t*) const { return 0;}
 
 std::string SgAsmStoredString::get_string(bool escape) const { return ""; }
@@ -205,18 +203,15 @@ bool SgAsmPEStringSection::reallocate() { return false; }
 SgAsmStringStorage* SgAsmCoffStrtab::create_storage(rose_addr_t, bool) { return NULL;}
 SgAsmNERelocEntry::iname_type::iname_type() {}
 
-// rose_addr_t SgAsmElfSymbolSection::calculate_sizes(unsigned long*, unsigned long*, unsigned long*, unsigned long*) const { return NULL;}
 rose_addr_t SgAsmElfSymbolSection::calculate_sizes(size_t*, size_t*, size_t*, size_t*) const { return 0;}
 
 rose_addr_t SgAsmCoffStrtab::get_storage_size(SgAsmStringStorage const*) { return 0;}
 bool SgAsmElfDynamicSection::reallocate() { return false; }
 
-// rose_addr_t SgAsmElfEHFrameSection::calculate_sizes(unsigned long*, unsigned long*, unsigned long*, unsigned long*) const { return NULL;}
 rose_addr_t SgAsmElfEHFrameSection::calculate_sizes(size_t*, size_t*, size_t*, size_t*) const { return 0;}
 
 const char* SgAsmLEFileHeader::format_name() const { return NULL;}
 
-// rose_addr_t SgAsmElfDynamicSection::calculate_sizes(unsigned long*, unsigned long*, unsigned long*, unsigned long*) const { return NULL;}
 rose_addr_t SgAsmElfDynamicSection::calculate_sizes(size_t*, size_t*, size_t*, size_t*) const { return 0;}
 
 void SgAsmBasicString::set_string(rose_addr_t) {}
@@ -240,14 +235,33 @@ void SgAsmStoredString::set_string(rose_addr_t) {}
 bool SgAsmGenericHeader::reallocate() { return false; }
 bool SgAsmElfSectionTable::reallocate() { return false; }
 
-// rose_addr_t SgAsmElfSymverNeededSection::calculate_sizes(unsigned long*, unsigned long*, unsigned long*, unsigned long*) const { return NULL;}
 rose_addr_t SgAsmElfSymverNeededSection::calculate_sizes(size_t*, size_t*, size_t*, size_t*) const { return 0;}
 
 bool SgAsmElfSymbolSection::reallocate() { return false; }
 
-// rose_addr_t SgAsmElfSymverSection::calculate_sizes(unsigned long*, unsigned long*, unsigned long*, unsigned long*) const { return NULL;}
 rose_addr_t SgAsmElfSymverSection::calculate_sizes(size_t*, size_t*, size_t*, size_t*) const { return 0;}
 
 void SgAsmGenericSection::set_size(rose_addr_t) {}
-SgAsmGenericString* SgAsmElfNoteEntry::get_name() const {}
-SgAsmGenericString* SgAsmGenericSymbol::get_name() const {}
+SgAsmGenericString* SgAsmElfNoteEntry::get_name() const { return NULL; }
+SgAsmGenericString* SgAsmGenericSymbol::get_name() const { return NULL; }
+
+rose_rva_t::rose_rva_t() {
+    addr = 0;
+    section = NULL;
+}
+
+rose_rva_t::rose_rva_t(rose_addr_t rva, SgAsmGenericSection*) {
+    addr = rva;
+    section = NULL;
+}
+
+rose_rva_t::rose_rva_t(const rose_rva_t &other) {
+    addr = other.addr;
+    section = other.section;
+}
+
+rose_rva_t rose_rva_t::operator=(const rose_rva_t &other) {
+    addr = other.addr;
+    section = other.section;
+    return *this;
+}

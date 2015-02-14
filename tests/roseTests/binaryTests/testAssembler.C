@@ -6,6 +6,8 @@
 
 #include "rose.h"
 
+using namespace rose::BinaryAnalysis;
+
 /* Collects all instructions from all basic blocks into a map by instruction address. */
 class InstructionCollector: public SgSimpleProcessing {
 public:
@@ -14,7 +16,7 @@ public:
         traverse(ast, preorder);
     }
     void visit(SgNode *node) {
-        SgAsmx86Instruction *insn = isSgAsmx86Instruction(node);
+        SgAsmX86Instruction *insn = isSgAsmX86Instruction(node);
         if (insn)
             insns[insn->get_address()] = insn;
     }
@@ -36,7 +38,7 @@ assemble_all(SgAsmInterpretation *interp)
          * We're leaving this implementation for later. For now, just assume that instructions don't move in memory. */
         rose_addr_t new_va = original_va;
 
-        SgAsmx86Instruction *insn = isSgAsmx86Instruction(ii->second);
+        SgAsmX86Instruction *insn = isSgAsmX86Instruction(ii->second);
         ROSE_ASSERT(insn!=NULL);
         SgUnsignedCharList machine_code;
         try {
@@ -75,6 +77,13 @@ assemble_all(SgAsmInterpretation *interp)
     std::cout <<"Assembled " <<nassembled <<" instruction" <<(1==nassembled?"":"s") <<"\n";
     delete assembler;
 }
+
+class MyUnparser: public AsmUnparser {
+public:
+    MyUnparser() {
+        insn_callbacks.pre.erase(&insnStackDelta);
+    }
+};
 
 int
 main(int argc, char *argv[])
@@ -120,7 +129,7 @@ main(int argc, char *argv[])
     for (size_t i=0; i<interps.size(); ++i) {
         std::cout <<"\n\n\n==================== Interpretation Listing ====================\n\n";
         interps[i]->get_map()->dump(stdout);
-        AsmUnparser unparser;
+        MyUnparser unparser;
         unparser.set_organization(AsmUnparser::ORGANIZED_BY_ADDRESS);
         unparser.unparse(std::cout, interps[i]);
         assemble_all(interps[i]);

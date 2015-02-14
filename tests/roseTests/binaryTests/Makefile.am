@@ -349,6 +349,14 @@ noinst_PROGRAMS += cory002
 cory002_SOURCES = cory002.C
 cory002_LDADD = $(LIBS_WITH_RPATH) $(ROSE_SEPARATE_LIBS)
 
+# Test certain RegisterStateGeneric stuff
+noinst_PROGRAMS += cory003
+cory003_SOURCES = cory003.C
+cory003_LDADD = $(LIBS_WITH_RPATH) $(ROSE_SEPARATE_LIBS)
+TEST_TARGETS += cory003.passed
+cory003.passed: $(TEST_EXIT_STATUS) cory003
+	@$(RTH_RUN) CMD=./cory003 $< $@
+
 # Test symbolic semantics memory read-after-write
 noinst_PROGRAMS += testSymReadWrite
 testSymReadWrite_SOURCES = testSymReadWrite.C
@@ -778,19 +786,77 @@ noinst_PROGRAMS += llvmTranscoder
 llvmTranscoder_SOURCES = llvmTranscoder.C
 llvmTranscoder_LDADD = $(ROSE_LIBS_WITH_PATH) $(ROSE_SEPARATE_LIBS) $(RT_LIBS)
 
+#-------------- basic test to make sure we can transcode each pre-compiled 32-bit x86 specimen
+
 llvmTranscoder_Specimens = $(elf_exe_x86_specimens) $(pe_exe_x86_specimens)
-llvmTranscoder_TestTargets = $(addprefix llvm_, $(addsuffix .passed, $(llvmTranscoder_Specimens)))
+llvmTranscoder_TestTargets = $(addprefix llvm-xcode-, $(addsuffix .passed, $(llvmTranscoder_Specimens)))
 TEST_TARGETS += $(llvmTranscoder_TestTargets)
 EXTRA_DIST += llvmTranscoder.conf
 
-$(llvmTranscoder_TestTargets): llvm_%.passed: $(BINARY_SAMPLES)/% llvmTranscoder llvmTranscoder.conf
+$(llvmTranscoder_TestTargets): llvm-xcode-%.passed: $(BINARY_SAMPLES)/% llvmTranscoder llvmTranscoder.conf
 	@$(RTH_RUN) \
 		TITLE="LLVM transcoder for $* [$@]" \
 		SPECIMEN="$(abspath $<)" \
 		$(srcdir)/llvmTranscoder.conf $@
 
+.PHONY: check-llvm-xcode
+check-llvm-xcode: $(llvmTranscoder_TestTargets)
+
+#--------------- tests that run LLVM analysis passes using LLVM's "opt" command
+
+llvmAnalysis_SpecimenDir = $(srcdir)/llvmAnalysisSpecimens
+llvmAnalysis_Specimens =			\
+	basicaa.c				\
+	basiccg.c				\
+	count-aa.c				\
+	domfrontier.c				\
+	domtree.c				\
+	dot-callgraph.c				\
+	dot-cfg-only.c				\
+	dot-cfg.c				\
+	globalsmodref-aa.c			\
+	instcount.c				\
+	intervals.c				\
+	iv-users.c				\
+	libcall-aa.c				\
+	loops.c					\
+	memdep.c				\
+	postdomfrontier.c			\
+	postdomtree.c				\
+	print-callgraph-sccs.c			\
+	print-cfg-sccs.c			\
+	print-dom-info.c			\
+	print-used-types.c			\
+	scalar-evolution.c
+
+llvmAnalysis_TestTargets = $(addprefix llvm-analysis-, $(addsuffix .passed, $(basename $(llvmAnalysis_Specimens))))
+EXTRA_DIST += $(addprefix $(llvmAnalysis_SpecimenDir), $(llvmAnalysis_Specimens))
+EXTRA_DIST += llvmAnalysis.conf
+
+# Do not run these tests automatically by "make check" because LLVM is not always installed.  Therefore, we
+# also need to mention the outputs in MOSTLYCLEANFILES.
+#TEST_TARGETS += $(llvmAnalysis_TestTargets)
+MOSTLYCLEANFILES += $(llvmAnalysis_TestTargets) $(llvmAnalysis_TestTargets:.passed=.failed)
+
+$(llvmAnalysis_TestTargets): llvm-analysis-%.passed: $(llvmAnalysis_SpecimenDir)/%.c llvmTranscoder disassemble
+	@$(RTH_RUN)											\
+		TITLE="LLVM analysis for $(notdir $<) [$@]"						\
+		USE_SUBDIR=yes										\
+		SPECIMEN="$<"										\
+		OPT_PASSES="$(shell perl -ne '/OPT:\s*(.*?)\s*(\*\/\s*)?$$/ and print qq{$$1\n}' $<)"	\
+		DISASSEMBLER=$(abspath disassemble)							\
+		TRANSCODER="$(abspath llvmTranscoder)"							\
+		$(srcdir)/llvmAnalysis.conf $@
+
+.PHONY: check-llvm-analysis
+check-llvm-analysis: $(llvmAnalysis_TestTargets)
+
+#-------------- all LLVM-specific tests
+
 .PHONY: check-llvm
-check-llvm: $(llvmTranscoder_TestTargets)
+check-llvm: $(llvmTranscoder_TestTargets) $(llvmAnalysis_TestTargets)
+
+
 
 ###############################################################################################################################
 # Binary tainted flow analysis

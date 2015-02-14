@@ -349,11 +349,21 @@ FortranCodeGeneration_locatedNode::unparseFortranIncludeLine (SgStatement* stmt,
 
   // DQ (10/3/2008): Added special case code generation to support an inconsistant 
   // behavior between gfortran 4.2 and previous versions in the Fortran include mechanism.
-     string fortranCompilerName = BACKEND_FORTRAN_COMPILER_NAME_WITH_PATH;
      string includeFileName = includeLine->get_filename();
 
 #if USE_GFORTRAN_IN_ROSE
-     if (fortranCompilerName == "gfortran")
+
+     bool usingGfortran = false;
+     #ifdef USE_CMAKE
+       #ifdef CMAKE_COMPILER_IS_GNUG77
+         usingGfortran = true;
+       #endif
+     #else
+       string fortranCompilerName = BACKEND_FORTRAN_COMPILER_NAME_WITH_PATH;
+       usingGfortran = (fortranCompilerName == "gfortran");
+     #endif
+
+     if (usingGfortran)
         {
           if ( (BACKEND_FORTRAN_COMPILER_MAJOR_VERSION_NUMBER == 3) || 
                ( (BACKEND_FORTRAN_COMPILER_MAJOR_VERSION_NUMBER >= 4) && (BACKEND_FORTRAN_COMPILER_MINOR_VERSION_NUMBER <= 1) ) )
@@ -802,7 +812,7 @@ unparseDimensionStatement(SgStatement* stmt)
 #if 0
      SgDimensionObjectPtrList & dimensionObjectList = attributeSpecificationStatement->get_dimension_object_list();
 
-  // printf ("dimensionObjectList.size() = %zu \n",dimensionObjectList.size());
+  // printf ("dimensionObjectList.size() = %" PRIuPTR " \n",dimensionObjectList.size());
 
      SgDimensionObjectPtrList::iterator i_object = dimensionObjectList.begin();
      while (i_object != dimensionObjectList.end())
@@ -1202,7 +1212,7 @@ FortranCodeGeneration_locatedNode::unparseAttributeSpecificationStatement(SgStat
 
           SgDimensionObjectPtrList & dimensionObjectList = attributeSpecificationStatement->get_dimension_object_list();
 
-       // printf ("dimensionObjectList.size() = %zu \n",dimensionObjectList.size());
+       // printf ("dimensionObjectList.size() = %" PRIuPTR " \n",dimensionObjectList.size());
 
           SgDimensionObjectPtrList::iterator i_object = dimensionObjectList.begin();
           while (i_object != dimensionObjectList.end())
@@ -1248,7 +1258,7 @@ FortranCodeGeneration_locatedNode::unparseAttributeSpecificationStatement(SgStat
 
   // We need to recognize the commonblockobject in the list
      Rose_STL_Container<SgNode*> commonBlockList = NodeQuery::querySubTree (attributeSpecificationStatement->get_scope(),V_SgCommonBlockObject);
-  // printf ("In unparseAttributeSpecificationStatement(): localList size = %zu \n",localList.size());
+  // printf ("In unparseAttributeSpecificationStatement(): localList size = %" PRIuPTR " \n",localList.size());
 
      SgStringList::const_iterator i = localList.begin();
      string outputName = "";
@@ -2345,7 +2355,7 @@ FortranCodeGeneration_locatedNode::unparseIfStmt(SgStatement* stmt, SgUnparse_In
                     SgStatementPtrList & statementList = if_stmt->get_false_body()->get_statements();
                     if (statementList.size() != 1)
                        {
-                         printf ("statementList.size() = %zu \n",statementList.size());
+                         printf ("statementList.size() = %" PRIuPTR " \n",statementList.size());
                          if_stmt->get_file_info()->display("statementList.size() != 1");
                        }
                     ROSE_ASSERT(statementList.size() == 1);
@@ -4858,7 +4868,7 @@ FortranCodeGeneration_locatedNode::unparseFunctionArgs(SgFunctionDeclaration* fu
      ROSE_ASSERT (funcdecl_stmt != NULL);
 
 #if 0
-     printf ("funcdecl_stmt->get_args().size() = %zu \n",funcdecl_stmt->get_args().size());
+     printf ("funcdecl_stmt->get_args().size() = %" PRIuPTR " \n",funcdecl_stmt->get_args().size());
      curprint( "\n/* funcdecl_stmt->get_args().size() = " << (int)(funcdecl_stmt->get_args().size()) << " */ \n");
 #endif
 

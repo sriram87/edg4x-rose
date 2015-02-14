@@ -213,7 +213,7 @@ SageInterface::get_value( SgAsmValueExpression* asmValueExpression )
              {
                SgAsmIntegerValueExpression* asmIntegerValueExpression = isSgAsmIntegerValueExpression(asmValueExpression);
                value = asmIntegerValueExpression->get_value();
-            // printf ("structure field assigned (Byte) value = %zu \n",value);
+            // printf ("structure field assigned (Byte) value = %" PRIuPTR " \n",value);
                break;
              }
 
@@ -249,7 +249,7 @@ SageInterface::isInstructionKind ( SgAsmInstruction* asmInstruction, X86Instruct
 
      bool foundInstructionKind = false;
 
-     SgAsmx86Instruction *x86instruction = isSgAsmx86Instruction(asmInstruction);
+     SgAsmX86Instruction *x86instruction = isSgAsmX86Instruction(asmInstruction);
      ROSE_ASSERT(x86instruction != NULL);
 
   // Detect a "mov" instruction as in "mov edx, 0x8048868"
@@ -279,11 +279,11 @@ SageInterface::equivalenceTest(SgNode* x, SgNode* y)
 
      switch (x->variantT())
         {
-          case V_SgAsmx86Instruction:
+          case V_SgAsmX86Instruction:
              {
             // Look at the instruction kind only.
-               SgAsmx86Instruction* x_instruction = isSgAsmx86Instruction(x);
-               SgAsmx86Instruction* y_instruction = isSgAsmx86Instruction(y);
+               SgAsmX86Instruction* x_instruction = isSgAsmX86Instruction(x);
+               SgAsmX86Instruction* y_instruction = isSgAsmX86Instruction(y);
 
                bool isSameKind = (x_instruction->get_kind() == y_instruction->get_kind());
 
@@ -401,7 +401,7 @@ SageInterface::matchAST ( SgNode* node, vector<SgNode*> & listOfNodes, Equivalen
 
                  // This is the first level of equivalence testing (quick but not deep enough)
 #if 0
-                    printf ("Testing match: listOfNodes[%zu] = %s node = %s \n",index,listOfNodes[index]->class_name().c_str(),node->class_name().c_str());
+                    printf ("Testing match: listOfNodes[%" PRIuPTR "] = %s node = %s \n",index,listOfNodes[index]->class_name().c_str(),node->class_name().c_str());
 #endif
                     if (listOfNodes[index]->variantT() == node->variantT())
                        {
@@ -414,18 +414,18 @@ SageInterface::matchAST ( SgNode* node, vector<SgNode*> & listOfNodes, Equivalen
 #endif
                             }
 #if 0
-                         printf ("Found a possible matching IR position index = %zu node = %p = %s \n",index,node,node->class_name().c_str());
+                         printf ("Found a possible matching IR position index = %" PRIuPTR " node = %p = %s \n",index,node,node->class_name().c_str());
 #endif
                       // Now we do a deeper and more custom test of equivalence (looking for matching data members, as required).
 #if 0
-                         printf ("Index = %zu of %zu: comparing target to currentInstruction = %s at address = %p \n",index,listOfNodes.size(),unparseInstruction(currentInstruction).c_str(),(void*)currentInstruction->get_address());
+                         printf ("Index = %" PRIuPTR " of %" PRIuPTR ": comparing target to currentInstruction = %s at address = %p \n",index,listOfNodes.size(),unparseInstruction(currentInstruction).c_str(),(void*)currentInstruction->get_address());
 #endif
                          bool isAMatch = equivalenceTestFunction(listOfNodes[index],node);
 
                          if (isAMatch == true)
                             {
 #if 0
-                              printf ("Found a more exact match at index = %zu of %zu at node = %p = %s \n",index,listOfNodes.size(),node,node->class_name().c_str());
+                              printf ("Found a more exact match at index = %" PRIuPTR " of %" PRIuPTR " at node = %p = %s \n",index,listOfNodes.size(),node,node->class_name().c_str());
 #endif
                               if (index == 0)
                                  {
@@ -461,7 +461,7 @@ SageInterface::matchAST ( SgNode* node, vector<SgNode*> & listOfNodes, Equivalen
                   }
         };
 
-     printf ("Input target listOfNodes.size() = %zu \n",listOfNodes.size());
+     printf ("Input target listOfNodes.size() = %" PRIuPTR " \n",listOfNodes.size());
 
      MatchAST matchAST(listOfNodes,equivalenceTest);
 
@@ -483,19 +483,19 @@ SageInterface::find ( SgNode* astNode, SgNode* target, EquivalenceTestFunctionTy
 
      vector<SgNode*> flattenedTargetList = flattenAST(target);
 
-     printf ("flattenedTargetList.size() = %zu \n",flattenedTargetList.size());
+     printf ("flattenedTargetList.size() = %" PRIuPTR " \n",flattenedTargetList.size());
      SgAsmInstruction* instruction = isSgAsmInstruction(flattenedTargetList[0]);
      if (instruction != NULL)
           printf ("   instruction = %s \n",unparseInstructionWithAddress(instruction).c_str());
      for (size_t i=0; i < flattenedTargetList.size(); i++)
         {
           ROSE_ASSERT(flattenedTargetList[i] != NULL);
-          printf ("flattenedTargetList[%zu] = %s \n",i,flattenedTargetList[i]->class_name().c_str());
+          printf ("flattenedTargetList[%" PRIuPTR "] = %s \n",i,flattenedTargetList[i]->class_name().c_str());
         }
 
      vector<SgNode*> matchList = matchAST (astNode,flattenedTargetList,equivalenceTest);
 
-     printf ("Matching subtrees (matchList.size() = %zu) \n",matchList.size());
+     printf ("Matching subtrees (matchList.size() = %" PRIuPTR ") \n",matchList.size());
      for (size_t i=0; i < matchList.size(); i++)
         {
           ROSE_ASSERT(matchList[i] != NULL);
@@ -511,27 +511,27 @@ SageInterface::find ( SgNode* astNode, SgNode* target, EquivalenceTestFunctionTy
 
 // DQ (4/28/2010): Added support for interface to detect NOP's.  This function is for a single instruction.
 // Not only detects x86 NOP instructions, but any instruction whose only effect is to advance the instruction
-// pointer to the fall-through address.  Works for any architecture. See SgAsmx86Instruction::has_effect() for details.
+// pointer to the fall-through address.  Works for any architecture. See SgAsmX86Instruction::hasEffect() for details.
 bool
 SageInterface::isNOP ( SgAsmInstruction* asmInstruction )
    {
-       return !asmInstruction->has_effect();
+       return !asmInstruction->hasEffect();
    }
 
 // DQ (4/28/2010): Added support for interface to detect NOP's.  This function is for a list of instructions.
 // Not only detects x86 NOP instructions, but any sequence of instructions whose only effect is to advance the instruction
-// pointer to the fall-through address.  Works for any architecture. See SgAsmx86Instruction::has_effect() for details.
+// pointer to the fall-through address.  Works for any architecture. See SgAsmX86Instruction::hasEffect() for details.
 bool
 SageInterface::isNOP ( const std::vector<SgAsmInstruction*> & asmInstructionList )
    {
        if (asmInstructionList.empty())
            return true;
-       return !asmInstructionList.front()->has_effect(asmInstructionList);
+       return !asmInstructionList.front()->hasEffect(asmInstructionList);
    }
 
 // DQ (4/28/2010): Added support for interface to detect NOP's.  This function detects NOP sequences in a SgAsmBlock.
 // Not only detects x86 NOP instructions, but any subsequence of instructions whose only effect is to advance the instruction
-// pointer to the fall-through address.  Works for any architecture. See SgAsmx86Instruction::find_noop_subsequences()
+// pointer to the fall-through address.  Works for any architecture. See SgAsmX86Instruction::findNoopSubsequences()
 // for details.
 std::vector<std::vector<SgAsmInstruction*> >
 SageInterface::find_NOP_sequences (SgAsmBlock* asmBlock)
@@ -542,7 +542,7 @@ SageInterface::find_NOP_sequences (SgAsmBlock* asmBlock)
 
        /* Find the subsequences (index,size pairs) */
        typedef std::vector<std::pair<size_t, size_t> > Subsequences;
-       Subsequences sequences = insns.front()->find_noop_subsequences(insns);
+       Subsequences sequences = insns.front()->findNoopSubsequences(insns);
 
        /* Build the return value */
        retval.reserve(sequences.size());

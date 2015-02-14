@@ -187,10 +187,15 @@ private:
             }
         }
 
-        void showInfo(std::ostream &out) const {
+        size_t showInfo(std::ostream &out) const {
             const size_t nCells = chunkSize / cellSize_;
-            BOOST_FOREACH (const ChunkInfo &info, chunkInfo().values())
+            size_t totalUsed=0;
+            ChunkInfoMap cim = chunkInfo();
+            BOOST_FOREACH (const ChunkInfo &info, cim.values()) {
                 out <<"  chunk " <<info.chunk <<"\t" <<info.nUsed <<"/" <<nCells <<"\t= " <<100.0*info.nUsed/nCells <<"%\n";
+                totalUsed += info.nUsed;
+            }
+            return totalUsed;
         }
     };
 
@@ -277,6 +282,22 @@ public:
         return pn < nPools ? pools_[pn].aquire() : ::operator new(size);
     }
 
+    /** Number of objects allocated and reserved.
+     *
+     *  Returns a pair containing the number of objects currently allocated in the pool, and the number of objects that the
+     *  pool can hold (including those that are allocated) before the pool must request more memory from the system. */
+    std::pair<size_t, size_t> nAllocated() const {
+        size_t nAllocated = 0, nReserved = 0;
+        for (size_t pn=0; pn<nPools; ++pn) {
+            ChunkInfoMap cim = pools_[pn].chunkInfo();
+            nReserved += nCells(pn) * cim.nIntervals();
+            BOOST_FOREACH (const ChunkInfo &info, cim.values()) {
+                nAllocated += info.nUsed;
+            }
+        }
+        return std::make_pair(nAllocated, nReserved);
+    }
+    
     /** Deallocate an object of specified size.
      *
      *  The @p addr must be an object address that was previously returned by the @ref allocate method and which hasn't been
@@ -312,7 +333,8 @@ public:
         for (size_t pn=0; pn<nPools; ++pn) {
             if (!pools_[pn].isEmpty()) {
                 out <<"  pool #" <<pn <<"; cellSize = " <<cellSize(pn) <<" bytes:\n";
-                pools_[pn].showInfo(out);
+                size_t nUsed = pools_[pn].showInfo(out);
+                out <<"    total objects in use: " <<nUsed <<"\n";
             }
         }
     }

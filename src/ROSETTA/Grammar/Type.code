@@ -730,10 +730,12 @@ HEADER_FUNCTION_TYPE_START
       //! Performs final initialization of data members (called by constructors)
           void post_construction_initialization ();
 
-      //! Get a const list of input types (types of the parameters list) to this function type (from a cost functionType object)
+      // Get a const list of input types (types of the parameters list) to this function type (from a cost functionType object)
+      //! This is a const convience access function to the STL container of types in the child IR node (SgFunctionParameterTypeList* p_argument_list).
           const SgTypePtrList & get_arguments() const;
 
-      //! Get the list of input types (types of the parameters list) to this function type
+      // Get the list of input types (types of the parameters list) to this function type
+      //! This is a non-const convience access function to the STL container of types in the child IR node (SgFunctionParameterTypeList* p_argument_list).
           SgTypePtrList & get_arguments();
 
        // WAS: void append_argument(const SgTypePtr& what);
@@ -1151,7 +1153,7 @@ SgTypeString::get_mangled (void) const
                   << mangled_length_name.str () // length
                   << "__" << "MANGLED_ID_STRING" << "e__"; // end tag
 
-  // printf ("LEAVING: In SgTypeString::get_mangled(): definedUsingScalarLength = %s lengthScalar = %zu lengthExpression = %p mangled_name = %s \n",p_definedUsingScalarLength ? "true" : "false",p_lengthScalar,p_lengthExpression,mangled_name.str());
+  // printf ("LEAVING: In SgTypeString::get_mangled(): definedUsingScalarLength = %s lengthScalar = %" PRIuPTR " lengthExpression = %p mangled_name = %s \n",p_definedUsingScalarLength ? "true" : "false",p_lengthScalar,p_lengthExpression,mangled_name.str());
 
      return mangled_name;
 #endif
@@ -1515,7 +1517,7 @@ SgType::isUnsignedType() const
           case T_UNSIGNED_CHAR:
           case T_UNSIGNED_SHORT:
           case T_UNSIGNED_INT:
-
+          case T_UNSIGNED_LONG:
        // DQ (3/24/2014): Added support for 128 bit integers.
           case T_UNSIGNED_LONG_LONG:
           case T_UNSIGNED_128BIT_INTEGER:
@@ -1798,7 +1800,7 @@ SgType::stripType(unsigned char bit_array) const
      while (true)
         {
 #if 0
-          printf ("In loop of SgType::stripType(bit_array = %u): counter = %zu this = %p = %s \n",bit_array,counter,currentType,currentType->class_name().c_str());
+          printf ("In loop of SgType::stripType(bit_array = %u): counter = %" PRIuPTR " this = %p = %s \n",bit_array,counter,currentType,currentType->class_name().c_str());
 #endif
           if ( (bit_array & STRIP_MODIFIER_TYPE) && (modType = isSgModifierType(currentType)) )
              {
@@ -1861,12 +1863,12 @@ SgType::stripType(unsigned char bit_array) const
        // DQ (7/4/2013): This should be a reasonable limit.
           if (counter >= 80)
              {
-               printf ("In loop of SgType::stripType(bit_array = %u): counter = %zu this = %p = %s \n",bit_array,counter,currentType,currentType->class_name().c_str());
+               printf ("In loop of SgType::stripType(bit_array = %u): counter = %" PRIuPTR " this = %p = %s \n",bit_array,counter,currentType,currentType->class_name().c_str());
              }
           if (counter >= 100)
              {
             // Exit loop and return the currentType... 
-               printf ("In loop of SgType::stripType(bit_array = %u): exiting loop using currentType (counter = %zu) this = %p = %s \n",bit_array,counter,currentType,currentType->class_name().c_str());
+               printf ("In loop of SgType::stripType(bit_array = %u): exiting loop using currentType (counter = %" PRIuPTR ") this = %p = %s \n",bit_array,counter,currentType,currentType->class_name().c_str());
 #if 0
                break;
 #endif
@@ -3189,8 +3191,8 @@ SgJavaUnionType::SgJavaUnionType ( const SgJavaUnionType & X )
 SgName
 SgJavaUnionType::get_name() const {
     string name = "";
-    for (size_t i = 0; i < p_type_list.size(); i++) {// SgTypePtrList::iterator i = p_type_list.begin(); i != p_type_list.end(); i++) {
-      if (i > 0) { // != p_type_list.begin())
+    for (size_t i = 0; i < p_type_list.size(); i++) {
+      if (i > 0) {
             name += " | ";
         }
         name += isSgClassDeclaration(isSgNamedType(p_type_list[i]) -> getAssociatedDeclaration()) -> get_name();
@@ -3208,8 +3210,8 @@ $CLASSNAME::get_mangled(void) const
 
      SgName mangled_name;
 
-     for (size_t i = 0; i < p_type_list.size(); i++) {// SgTypePtrList::iterator i = p_type_list.begin(); i != p_type_list.end(); i++) {
-         if (i > 0) { // != p_type_list.begin())
+     for (size_t i = 0; i < p_type_list.size(); i++) {
+         if (i > 0) {
              mangled_name += "_|_";
          }
          mangled_name += p_type_list[i] -> get_mangled();
@@ -3745,7 +3747,7 @@ SgFunctionType::SgFunctionType(SgPartialFunctionType *ft)
 #endif
 
      SgTypePtrList::iterator p = ft->get_arguments().begin();
-  // printf ("PartialFunctionType->get_arguments().size() = %zu \n",ft->get_arguments().size());
+  // printf ("PartialFunctionType->get_arguments().size() = %" PRIuPTR " \n",ft->get_arguments().size());
      while(p != ft->get_arguments().end())
         {
        // printf ("     function argument = %p = %s \n",*p,(*p)->sage_class_name());

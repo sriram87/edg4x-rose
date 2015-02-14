@@ -763,7 +763,7 @@ Unparse_MOD_SAGE::isOneElementList(SgConstructorInitializer* con_init)
                   }
 #else
             // DQ (4/1/2005): This is a simpler implementation
-            // printf ("In Unparse_MOD_SAGE::isOneElementList: expr_list->get_expressions().size() = %zu \n",expr_list->get_expressions().size());
+            // printf ("In Unparse_MOD_SAGE::isOneElementList: expr_list->get_expressions().size() = %" PRIuPTR " \n",expr_list->get_expressions().size());
                if (expr_list->get_expressions().size() == 1)
                     return true;
 #endif
@@ -1548,7 +1548,9 @@ Unparse_MOD_SAGE::printSpecifier2(SgDeclarationStatement* decl_stmt, SgUnparse_I
      ROSE_ASSERT(decl_stmt->get_declarationModifier().get_storageModifier().get_modifier() >= 0);
 
 #if 0
-     printf ("In printSpecifier2(): decl_stmt = %p decl_stmt->get_declarationModifier().get_storageModifier().isStatic() = %s \n",decl_stmt,decl_stmt->get_declarationModifier().get_storageModifier().isStatic() ? "true" : "false");
+     printf ("In printSpecifier2(): decl_stmt = %p decl_stmt->get_declarationModifier().get_storageModifier().isStatic()  = %s \n",decl_stmt,decl_stmt->get_declarationModifier().get_storageModifier().isStatic() ? "true" : "false");
+     printf ("In printSpecifier2(): decl_stmt = %p decl_stmt->get_declarationModifier().get_storageModifier().isExtern()  = %s \n",decl_stmt,decl_stmt->get_declarationModifier().get_storageModifier().isExtern() ? "true" : "false");
+     printf ("In printSpecifier2(): decl_stmt = %p decl_stmt->get_declarationModifier().get_storageModifier().isDefault() = %s \n",decl_stmt,decl_stmt->get_declarationModifier().get_storageModifier().isDefault() ? "true" : "false");
 #endif
 
      if (decl_stmt->get_declarationModifier().get_storageModifier().isStatic())
@@ -1564,6 +1566,9 @@ Unparse_MOD_SAGE::printSpecifier2(SgDeclarationStatement* decl_stmt, SgUnparse_I
 #if 0
           printf ("In Unparse_MOD_SAGE::printSpecifier2(): Output the extern keyword \n");
 #endif
+       // DQ (7/23/2014): Looking for greater precision in the control of the output of the "extern" keyword.
+          ROSE_ASSERT(decl_stmt->get_declarationModifier().get_storageModifier().isDefault() == false);
+
           curprint( "extern ");
         }
 

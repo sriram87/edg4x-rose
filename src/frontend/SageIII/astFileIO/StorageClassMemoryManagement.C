@@ -1667,17 +1667,17 @@ PreprocessingInfo* EasyStorage<PreprocessingInfo*>::rebuildDataStoredInEasyStora
            ROSE_ASSERT(returnInfo != NULL);
         // JH (04/21/2006): Adding the storing of the Sg_File_Info pointer
         // returnInfo->setFile_Info((Sg_File_Info*)(AST_FILE_IO::getSgClassPointerFromGlobalIndex(fileInfoIndex);
-        // printf ("Using fileInfoIndex = %zu to get Sg_File_Info object \n",fileInfoIndex);
+        // printf ("Using fileInfoIndex = %" PRIuPTR " to get Sg_File_Info object \n",fileInfoIndex);
            returnInfo->set_file_info((Sg_File_Info*)(AST_FILE_IO::getSgClassPointerFromGlobalIndex(fileInfoIndex)));
 #if 0
            printf ("Check the file Info object just read... \n");
            printf ("returnInfo = %p \n",returnInfo);
         // We will be calling the unpacked() functions for attributes later, so at this point the string will be empty.
-           printf ("returnInfo->getString().size() = %zu (ok if empty string: unpacked() functions for attributes called later) \n",returnInfo->getString().size());
+           printf ("returnInfo->getString().size() = %" PRIuPTR " (ok if empty string: unpacked() functions for attributes called later) \n",returnInfo->getString().size());
            printf ("returnInfo->getString() = %s (ok if empty string: unpacked() functions for attributes called later) \n",returnInfo->getString().c_str());
            printf ("returnInfo->get_file_info() = %p \n",returnInfo->get_file_info());
            printf ("returnInfo->get_file_info()->get_freepointer() = %p \n",returnInfo->get_file_info()->get_freepointer());
-           printf ("returnInfo->get_file_info()->get_freepointer() = %zu \n",(size_t)returnInfo->get_file_info()->get_freepointer());
+           printf ("returnInfo->get_file_info()->get_freepointer() = %" PRIuPTR " \n",(size_t)returnInfo->get_file_info()->get_freepointer());
 #endif
         // if there is any data in the pool at all
            if ( Base::actual != NULL  && 0 < Base::getSizeOfData() )
@@ -2029,7 +2029,7 @@ void EasyStorage <AttachedPreprocessingInfoType*> :: storeDataInEasyStorageClass
                printf ("(*copy_)->getString() = %s \n",(*copy_)->getString().c_str());
                printf ("(*copy_)->get_file_info() = %p \n",(*copy_)->get_file_info());
                printf ("(*copy_)->get_file_info()->get_freepointer() = %p \n",(*copy_)->get_file_info()->get_freepointer());
-               printf ("(*copy_)->get_file_info()->get_freepointer() = %zu \n",(size_t)(*copy_)->get_file_info()->get_freepointer());
+               printf ("(*copy_)->get_file_info()->get_freepointer() = %" PRIuPTR " \n",(size_t)(*copy_)->get_file_info()->get_freepointer());
 #endif
                Base::actual->storeDataInEasyStorageClass(*copy_);
              }
@@ -4375,4 +4375,74 @@ ExtentMap EasyStorage<ExtentMap>::rebuildDataStoredInEasyStorageClass() const
 
      return emap;
    }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Implementations for AddressIntervalSet
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+void
+EasyStorage<AddressIntervalSet>::storeDataInEasyStorageClass(const AddressIntervalSet &set)
+{
+    // Since the set's elements are of type Sawyer::Container::Interval<rose_addr_t> we can store the interval endpoints
+    // in a single pool that is twice as large as the number of intervals in the set.
+    std::vector<rose_addr_t> data_;
+    BOOST_FOREACH (const AddressInterval &interval, set.intervals()) {
+        assert(!interval.isEmpty());
+        data_.push_back(interval.least());
+        data_.push_back(interval.greatest());
+    }
+
+    std::vector<rose_addr_t>::const_iterator dat = data_.begin();
+    long offset = Base::setPositionAndSizeAndReturnOffset(data_.size());
+    if (0 < offset) {
+        /* The new data does not fit in the actual block, but store what we can in the actual block. */
+        if (offset < Base::getSizeOfData() && Base::actual != NULL) {
+            for (/*void*/;
+                 (unsigned long)(Base::actual - Base::getBeginningOfActualBlock()) < Base::blockSize;
+                 ++Base::actual, ++dat) {
+                *Base::actual = *dat;
+            }
+        }
+
+        /* Put data in additional blocks if it did not fit in the previous block. */
+        while (Base::blockSize < (unsigned long)(offset)) {
+            Base::actual = Base::getNewMemoryBlock();
+            for (/*void*/;
+                 (unsigned long)(Base::actual - Base::getBeginningOfActualBlock()) < Base::blockSize;
+                 ++Base::actual, ++dat) {
+                *Base::actual = *dat;
+            }
+            offset -= Base::blockSize;
+        }
+
+        /* get a new memory block because we've filled up previous blocks */
+        Base::actual = Base::getNewMemoryBlock();
+    }
+
+    /* put (the rest of) the data in a (new) memory block */
+    for (/*void*/; dat != data_.end(); ++dat, ++Base::actual)
+        *Base::actual = *dat;
+}
+
+AddressIntervalSet
+EasyStorage<AddressIntervalSet>::rebuildDataStoredInEasyStorageClass() const
+{
+#if STORAGE_CLASS_MEMORY_MANAGEMENT_CHECK
+    assert(Base::actualBlock <= 1);
+    assert((0 < Base::getSizeOfData() && Base::actual!= NULL) || (Base::getSizeOfData() == 0));
+    assert(0 == Base::getSizeOfData() % 2);             // vector holds interval endpoints or
+#endif
+
+    AddressIntervalSet retval;
+    if (Base::actual!=NULL && Base::getSizeOfData()>0) {
+        rose_addr_t *pointer = Base::getBeginningOfDataBlock();
+        for (long i=0; i<Base::getSizeOfData(); i+=2) {
+            rose_addr_t lo = pointer[i+0];
+            rose_addr_t hi = pointer[i+1];
+            assert(lo <= hi);
+            retval.insert(AddressInterval::hull(lo, hi));
+        }
+    }
+    return retval;
+}
 

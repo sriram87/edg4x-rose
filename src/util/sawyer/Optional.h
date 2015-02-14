@@ -17,7 +17,15 @@ namespace Sawyer {
  *  Optional<int> opt3 = 123;
  *  opt3 = Nothing();
  * @endcode */
-class Nothing {};
+class Nothing {                                         // final
+public:
+    bool operator==(const Nothing&) const { return true; }
+    bool operator!=(const Nothing&) const { return false; }
+    bool operator>(const Nothing&) const { return false; }
+    bool operator>=(const Nothing&) const { return true; }
+    bool operator<(const Nothing&) const { return false; }
+    bool operator<=(const Nothing&) const { return true; }
+};
 
 /** Holds a value or nothing.
  *
@@ -69,6 +77,16 @@ public:
             const Value &otherValue = *other;
             new (address()) Value(otherValue);
        }
+    }
+
+    /** Destructor.
+     *
+     *  The destructor invokes the destructor for the value if a value is stored, otherwise it does nothing. */
+    ~Optional() {
+        if (!isEmpty_) {
+            Value &thisValue = **this;
+            thisValue.~Value();
+        }
     }
 
     /** Value assignment.
@@ -147,23 +165,52 @@ public:
     }
     /** @} */
 
+    /** Obtain a pointer to the value.
+     *
+     *  If this optional contains a value then a pointer to the value is returned. Otherwise an <code>std::domain_error</code>
+     *  is thrown (the value is not in the container's domain).
+     *
+     *  @{ */
+    const Value* operator->() const {
+        return &get();
+    }
+    Value* operator->() {
+        return &get();
+    }
+    /** @} */
+
     /** Obtain value or something else.
      *
      *  Returns a reference to the contained value if it exists, otherwise returns a reference to the argument.
      *
+     * @code
+     *  Object bar = ...;
+     *  Object foo = objects.getOptional(key).orElse(bar);
+     *  Optional<Object> baz = ...;
+     *  std::cerr <<"baz is " <<baz.orElse(bar) <<"\n";
+     * @endcode
+     *
      *  @{ */
-    const Value& getOrElse(const Value &dflt) const {
+    const Value& orElse(const Value &dflt) const {
         return isEmpty_ ? dflt : **this;
     }
-    const Value& getOrElse(Value &dflt) {
+    const Value& orElse(Value &dflt) {
         return isEmpty_ ? dflt : **this;
     }
     /** @} */
 
     /** Obtain a value or a default.
      *
-     *  Returns a copy of the contained value if it exists, otherwise returns a default constructed value. */
-    Value getOrDefault() const {
+     *  Returns a copy of the contained value if it exists, otherwise returns a default constructed value.
+     *  
+     * @code
+     *  Object bar = ...;
+     *  Object foo = objects.getOptional(key).orDefault();
+     *  Optional<Object> baz = ...;
+     *  std::cerr <<"baz is " <<baz.orDefault() <<"\n";
+     * @endcode
+     */
+    Value orDefault() const {
         return isEmpty_ ? Value() : **this;
     }
 
@@ -177,7 +224,7 @@ public:
      *  unsigned key = ...;
      *  std::string value;
      *  IntervalMap<Interval<unsigned>, std::string> imap = ...;
-     *  while (imap.getOptional(key).apply(value)) ...
+     *  while (imap.getOptional(key).assignTo(value)) ...
      * @endcode
      *
      *  where the alternative would be
@@ -188,7 +235,7 @@ public:
      *  while (Optional<std::string> opt = imap.getOptional(key)) {
      *      std::string value = *opt;
      * @endcode */
-    bool apply(Value &out) const {
+    bool assignTo(Value &out) const {
         if (isEmpty_) {
             return false;
         } else {
@@ -196,9 +243,27 @@ public:
             return true;
         }
     }
+
+    /** Compare two values.
+     *
+     *  Compares two optionals and returns true if they are both empty or if neither is empty and their values compare equal.
+     *  This method should be used instead of <code>==</code>. The <code>==</code> operator is disabled because it is prone to
+     *  misuse in the presense of implicit conversion to @c bool.
+     *
+     * @{ */
+    bool isEqual(const Optional &other) const {
+        return (isEmpty_ && other.isEmpty_) || (!isEmpty_ && !other.isEmpty_ && get()==other.get());
+    }
+    bool isEqual(const Value &other) const {
+        return !isEmpty_ && get()==other;
+    }
+    bool isEqual(const Nothing&) const {
+        return isEmpty_;
+    }
+    /** @} */
     
     // The following trickery is to allow things like "if (x)" to work but without having an implicit
-    // conversion to bool which would cause no end of other problems.
+    // conversion to bool which would cause no end of other problems. This is fixed in C++11.
 private:
     typedef void(Optional::*unspecified_bool)() const;
     void this_type_does_not_support_comparisons() const {}
@@ -220,7 +285,13 @@ public:
 };
 
 
-// These functions intentionally do not compile. They are to prevent comparisons.
+// These functions intentionally do not compile. They are to prevent comparisons and thus save users from making
+// mistakes like this:
+//    Optional<int> x = 0;
+//    int y = 1;
+//    if (x == y)       // won't compile
+//    if (x && *x == y) // what they really meant
+//    if (x.isEqual(y)) // another valid way to write it
 template<typename T, typename U>
 bool operator==(const Optional<T> &lhs, const U &rhs) {
     lhs.this_type_does_not_support_comparisons();

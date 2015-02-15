@@ -185,8 +185,8 @@ string Fuse::output_nested_results::composerType2Str(composerType type)
 // fuseCmd is the string representation of the composition of analyses that should be executed.
 // Returns 0 on success and a non-zero error code on failure.
 int Fuse::run(SgProject* project, const std::string& fuseCmd) {
-  smatch what;
-  if(regex_match(fuseCmd, what, compSpec)) {
+  boost::xpressive::smatch what;
+  if(boost::xpressive::regex_match(fuseCmd, what, compSpec)) {
     //cout << "MATCH composer\n";
     list<ComposedAnalysis*>  mySubAnalyses;
     output_nested_results::composerType rootComposerType = output_nested_results::unknown;
@@ -653,7 +653,7 @@ const std::set<Label>& FuseLabeler::getLabels(FuseCFGNodePtr n) const {
 LabelProperty& FuseLabeler::getLabelProperty(const Label& l) {
   assert(l < mappingLabelToLabelProperty.size());
 
-  return mappingLabelToLabelProperty[l];
+  return Labeler::mappingLabelToLabelProperty[l.getId()];
 }
 
 

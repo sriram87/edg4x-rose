@@ -29,6 +29,7 @@ using namespace sight;
 using namespace boost::xpressive;
 using namespace SageBuilder;
 using namespace SageInterface;
+using namespace SPRAY;
 //using namespace scc_private;
 
 namespace fuse {
@@ -233,7 +234,7 @@ class Fuse /*: public AliasAnalysisInterface*/ {
     string composerType2Str(composerType type);
 
     template< typename BidiIterT >
-    void operator ()( match_results< BidiIterT > const &what )
+    void operator ()( boost::xpressive::match_results< BidiIterT > const &what )
     {
       //scope s("operator ()");
       // first, do some indenting
@@ -243,20 +244,20 @@ class Fuse /*: public AliasAnalysisInterface*/ {
       string match = what[0];
 
       // If this term is an analysis rather than a composer
-      smatch subWhat;
+      boost::xpressive::smatch subWhat;
       //dbg << "match="<<match<<", parentComposerType="<<composerType2Str(parentComposerType)<<", parentComposer="<<parentComposer<<endl;
-      if(regex_match(match, subWhat, analysis)) {
+      if(boost::xpressive::regex_match(match, subWhat, analysis)) {
         /*cout << "analysis match="<<match<<", smatch="<<subWhat<<endl;
-        cout << "regex_match(match, subWhat, cpAnalysis)="<<regex_match(match, subWhat, cpAnalysis)<<endl;
-        cout << "regex_match(match, subWhat, ssacpAnalysis)="<<regex_match(match, subWhat, ssacpAnalysis)<<endl;*/
+        cout << "regex_match(match, subWhat, cpAnalysis)="<<boost::xpressive::regex_match(match, subWhat, cpAnalysis)<<endl;
+        cout << "regex_match(match, subWhat, ssacpAnalysis)="<<boost::xpressive::regex_match(match, subWhat, ssacpAnalysis)<<endl;*/
         // Create the selected analysis and add it to the parent's sub-analysis list
-             if(regex_match(match, subWhat, cpAnalysis))      { parentSubAnalyses.push_back(new ConstantPropagationAnalysis(/*useSSA*/false)); }
-        else if(regex_match(match, subWhat, ssacpAnalysis))   { parentSubAnalyses.push_back(new ConstantPropagationAnalysis(/*useSSA*/true)); }
-        else if(regex_match(match, subWhat, ldAnalysis))      { parentSubAnalyses.push_back(new LiveDeadMemAnalysis()); }
-        else if(regex_match(match, subWhat, ssaldAnalysis))   { parentSubAnalyses.push_back(new LiveDeadMemAnalysis()); }
-        else if(regex_match(match, subWhat, dpAnalysis))      { parentSubAnalyses.push_back(new DeadPathElimAnalysis(false)); }
-        else if(regex_match(match, subWhat, ssadpAnalysis))   { parentSubAnalyses.push_back(new DeadPathElimAnalysis(true)); }
-        else if(regex_match(match, subWhat, ccsAnalysis))  {
+             if(boost::xpressive::regex_match(match, subWhat, cpAnalysis))      { parentSubAnalyses.push_back(new ConstantPropagationAnalysis(/*useSSA*/false)); }
+        else if(boost::xpressive::regex_match(match, subWhat, ssacpAnalysis))   { parentSubAnalyses.push_back(new ConstantPropagationAnalysis(/*useSSA*/true)); }
+        else if(boost::xpressive::regex_match(match, subWhat, ldAnalysis))      { parentSubAnalyses.push_back(new LiveDeadMemAnalysis()); }
+        else if(boost::xpressive::regex_match(match, subWhat, ssaldAnalysis))   { parentSubAnalyses.push_back(new LiveDeadMemAnalysis()); }
+        else if(boost::xpressive::regex_match(match, subWhat, dpAnalysis))      { parentSubAnalyses.push_back(new DeadPathElimAnalysis(false)); }
+        else if(boost::xpressive::regex_match(match, subWhat, ssadpAnalysis))   { parentSubAnalyses.push_back(new DeadPathElimAnalysis(true)); }
+        else if(boost::xpressive::regex_match(match, subWhat, ccsAnalysis))  {
           parentSubAnalyses.push_back(new CallContextSensitivityAnalysis(1, CallContextSensitivityAnalysis::callSite, /*trackBase2RefinedPartEdgeMapping*/ true));
 
   /*        list<ComposedAnalysis*> mySubAnalyses;
@@ -267,24 +268,24 @@ class Fuse /*: public AliasAnalysisInterface*/ {
               subWhat.nested_results().end(),
               ons);*/
         }
-        else if(regex_match(match, subWhat, ssaccsAnalysis))  { parentSubAnalyses.push_back(new CallContextSensitivityAnalysis(1, CallContextSensitivityAnalysis::callSite, /*trackBase2RefinedPartEdgeMapping*/ true)); }
-        else if(regex_match(match, subWhat, ptAnalysis))      { parentSubAnalyses.push_back(new PointsToAnalysis(/*useSSA*/false)); }
-        else if(regex_match(match, subWhat, ssaptAnalysis))   { parentSubAnalyses.push_back(new PointsToAnalysis(/*useSSA*/true)); }
-        else if(regex_match(match, subWhat, vmAnalysis))      { parentSubAnalyses.push_back(new VirtualMethodAnalysis(/*useSSA*/false)); }
-        else if(regex_match(match, subWhat, ssavmAnalysis))   { parentSubAnalyses.push_back(new VirtualMethodAnalysis(/*useSSA*/true)); }
-        else if(regex_match(match, subWhat, dynMonitor))      { parentSubAnalyses.push_back(new DynamicMonitor()); }
+        else if(boost::xpressive::regex_match(match, subWhat, ssaccsAnalysis))  { parentSubAnalyses.push_back(new CallContextSensitivityAnalysis(1, CallContextSensitivityAnalysis::callSite, /*trackBase2RefinedPartEdgeMapping*/ true)); }
+        else if(boost::xpressive::regex_match(match, subWhat, ptAnalysis))      { parentSubAnalyses.push_back(new PointsToAnalysis(/*useSSA*/false)); }
+        else if(boost::xpressive::regex_match(match, subWhat, ssaptAnalysis))   { parentSubAnalyses.push_back(new PointsToAnalysis(/*useSSA*/true)); }
+        else if(boost::xpressive::regex_match(match, subWhat, vmAnalysis))      { parentSubAnalyses.push_back(new VirtualMethodAnalysis(/*useSSA*/false)); }
+        else if(boost::xpressive::regex_match(match, subWhat, ssavmAnalysis))   { parentSubAnalyses.push_back(new VirtualMethodAnalysis(/*useSSA*/true)); }
+        else if(boost::xpressive::regex_match(match, subWhat, dynMonitor))      { parentSubAnalyses.push_back(new DynamicMonitor()); }
 
-        //else if(regex_match(match, subWhat, spcpAnalysis)) { parentSubAnalyses.push_back(new SparseConstantAnalysis()); }
-        //else if(regex_match(match, subWhat, spvnAnalysis)) { parentSubAnalyses.push_back(new SparseValueNumbering()); }
+        //else if(boost::xpressive::regex_match(match, subWhat, spcpAnalysis)) { parentSubAnalyses.push_back(new SparseConstantAnalysis()); }
+        //else if(boost::xpressive::regex_match(match, subWhat, spvnAnalysis)) { parentSubAnalyses.push_back(new SparseValueNumbering()); }
 
       // Otherwise, if this is a composer, create the analyses in its sub-analysis list and then create the composer
-      } else if(regex_match(match, subWhat, lcComposer)) {
+      } else if(boost::xpressive::regex_match(match, subWhat, lcComposer)) {
         //std::fill_n( std::ostream_iterator<char_type>( std::cout ), tabs_ * 4, space_ch ); cout << "LOOSE SEQUENTIAL\n"<<endl;
         parentComposerType = looseSeq;
-      } else if(regex_match(match, subWhat, lpComposer)) {
+      } else if(boost::xpressive::regex_match(match, subWhat, lpComposer)) {
         //std::fill_n( std::ostream_iterator<char_type>( std::cout ), tabs_ * 4, space_ch ); cout << "LOOSE PARALLEL\n"<<endl;
         parentComposerType = loosePar;
-      } else if(regex_match(match, subWhat, tComposer)) {
+      } else if(boost::xpressive::regex_match(match, subWhat, tComposer)) {
         parentComposerType = tight;
       // Finally, if this is a list of analyses for a given parent composer
       } else if(parentComposerType != unknown) {

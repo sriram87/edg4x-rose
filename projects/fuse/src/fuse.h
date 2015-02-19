@@ -25,7 +25,8 @@ using namespace sight;
 #include "stx_analysis.h"
 #include "VariableIdMapping.h"
 #include "AstAnnotator.h"
-#include "AnalysisInterface.h"
+//#include "AnalysisInterface.h"
+#include "AliasAnalysis.h"
 using namespace boost::xpressive;
 using namespace SageBuilder;
 using namespace SageInterface;
@@ -154,7 +155,7 @@ class FuseSSA;
 
 class FuseLabeler;
 
-class Fuse /*: public AliasAnalysisInterface*/ {
+class Fuse : public SPRAY::AliasAnalysis {
   // Regex expressions for the composition command, defined globally so that they can be used inside main
   // (where they're initialized) as well as inside output_nested_results()
   static sregex
@@ -365,6 +366,7 @@ class Fuse /*: public AliasAnalysisInterface*/ {
   // Given a CFGNode from the VirtualCFG, returns the set of FuseCFGNodes that represent
   // the nodes in the Abstract Transition System implemented by the given composer
   // that refine this CFGNode.
+  std::set<FuseCFGNodePtr> GetATSNodes(SgNode* sgn, Composer* composer);
   std::set<FuseCFGNodePtr> GetATSNodes(const CFGNode& cn);
   std::set<FuseCFGNodePtr> GetATSNodes(const CFGNode& cn, Composer* composer);
 
@@ -418,10 +420,13 @@ class Fuse /*: public AliasAnalysisInterface*/ {
   // process lifetime no SgVarRefExp pointer can ever correspond to multiple symbols.
   static SgVarRefExp* varSymbol2Ref(SgVariableSymbol* sym);
 
-  /***********************************
-   ****** AliasAnalysisInterface *****
-   ***********************************/
-  //bool may_alias(AstInterface& fa, const AstNodePtr& r1, const AstNodePtr& r2) = 0;
+  /************************************
+   ****** AliasAnalysis Interface *****
+   ************************************/
+  bool isMayAlias(SgExpression* e1, SgExpression* e2);
+  bool isMustAlias(SgExpression* e1, SgExpression* e2);
+  void initialize() {}
+  void run() { run(getProject(), "lc(pt)"); }
 }; // class Fuse
 } // namespace fuse
 
@@ -682,6 +687,9 @@ class FuseCFGEdge : public boost::enable_shared_from_this<FuseCFGEdge> {
   std::string toStringFuse() const;
   //! ID to use for Dot, etc.
   std::string id() const;
+
+  //! The Fuse PartEdge object this FuseCFGEdge wraps
+  PartEdgePtr getPartEdge() const { return pedge; }
 
   //! The source (beginning) CFG node
   FuseCFGNodePtr source() const;

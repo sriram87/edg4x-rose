@@ -8,7 +8,7 @@ using namespace sight;
 using namespace SageInterface;
 
 namespace fuse {
-#define VirtualMethodAnalysisDebugLevel 1
+#define VirtualMethodAnalysisDebugLevel 2
 
 /********************************
  ***** ClassInheritanceTree *****
@@ -656,13 +656,87 @@ bool VirtualMethodPart::isPossibleFunctionCall(const Function& calleeFunc, SgFun
   return false;
 }
 
+// Given baseEdges, a list of edges from the server analysis' ATS, set cache_Edges to contain the edges in
+// the VMAnalysis' ATS that wrap them
+void VirtualMethodPart::wrapEdges(std::list<PartEdgePtr>& cache_Edges, const std::list<PartEdgePtr>& baseEdges)
+{
+  SIGHT_VERB(dbg << "#baseEdges="<<baseEdges.size()<<endl, 2, VirtualMethodAnalysisDebugLevel)
+
+  // Consider all the VirtualMethodParts along all of this part's outgoing edges. Since this is a forward
+  // analysis, they are maintained separately
+  for(list<PartEdgePtr>::const_iterator be=baseEdges.begin(); be!=baseEdges.end(); be++) {
+    SIGHT_VERB(scope beS(txt()<<"be="<<be->str(), scope::low), 2, VirtualMethodAnalysisDebugLevel)
+      
+    // If this edge enters a function
+    set<CFGNode> matchNodes;
+    if((*be)->source()->mustOutgoingFuncCall(matchNodes)) {
+      // The entry point of the called function
+      SgFunctionParameterList* calleeEntry = (*be)->target()->mustSgNodeAll<SgFunctionParameterList>();
+      ROSE_ASSERT(calleeEntry);
+      // The descriptor of the called function
+      Function curCalleeFunc(SageInterface::getEnclosingFunctionDeclaration(calleeEntry));
+      SIGHT_VERB(dbg << "edge is call to function "<<curCalleeFunc.str()<<endl, 2, VirtualMethodAnalysisDebugLevel)
+
+      NodeState* callPartState = NodeState::getNodeState(analysis, (*be)->source());
+      AbstractObjectMap* curPartAOM = dynamic_cast<AbstractObjectMap*>(callPartState->getLatticeBelow(analysis, *be, 0)); ROSE_ASSERT(curPartAOM);
+        
+      set<CFGNode> nodes=(*be)->source()->CFGNodes();
+      for(set<CFGNode>::iterator n=nodes.begin(); n!=nodes.end(); n++) {
+        SIGHT_VERB(dbg << "    n="<<CFGNode2Str(*n)<<endl, 2, VirtualMethodAnalysisDebugLevel)
+        SgFunctionCallExp* call = isSgFunctionCallExp(n->getNode());
+        if(call && n->getIndex()==2 && isPossibleFunctionCall(curCalleeFunc, call, curPartAOM, *be))
+          cache_Edges.push_back(VirtualMethodPartEdge::create(*be, analysis));
+      }
+      
+    // If this edge exits a function
+    } else if((*be)->target()->mustIncomingFuncCall(matchNodes)) {
+      // The definition of the function being exited
+      SgFunctionDefinition* calleeExit = (*be)->source()->mustSgNodeAll<SgFunctionDefinition>();
+      ROSE_ASSERT(calleeExit);
+      // The descriptor of the function being exited
+      Function curCalleeFunc(calleeExit);
+      SIGHT_VERB(dbg << "edge is an exit from function "<<curCalleeFunc.str()<<endl, 2, VirtualMethodAnalysisDebugLevel)
+        
+      // The parts that denote the call site of the function being exited
+      std::set<PartPtr> callParts = (*be)->target()->matchingCallParts();
+      assert(callParts.size()==1); 
+      PartPtr callPart = *callParts.begin();        
+      // The NodeState at the call part of this exit edge
+      NodeState* callPartState = NodeState::getNodeState(analysis, callPart);
+      //dbg << "callPartState="<<callPartState->str(analysis)<<endl;
+      SIGHT_VERB(dbg << "callPartState="<<callPartState->str(analysis)<<endl, 2, VirtualMethodAnalysisDebugLevel)
+      AbstractObjectMap* callPartAOM = dynamic_cast<AbstractObjectMap*>(callPartState->getLatticeAbove(analysis, callPart->inEdgeFromAny(), 0)); ROSE_ASSERT(callPartAOM);
+
+      // Iterate over all the CFG nodes at the function exit
+      set<CFGNode> nodes=(*be)->target()->CFGNodes();
+      for(set<CFGNode>::iterator n=nodes.begin(); n!=nodes.end(); n++) {
+        SIGHT_VERB(dbg << "    n="<<CFGNode2Str(*n)<<endl, 2, VirtualMethodAnalysisDebugLevel)
+        SgFunctionCallExp* call = isSgFunctionCallExp(n->getNode());
+        // If this exit corresponds to a possible function call according to the VMAnalysis, add it to the cache_Edges
+        if(call && n->getIndex()==3 && isPossibleFunctionCall(curCalleeFunc, call, callPartAOM, *be))
+          cache_Edges.push_back(VirtualMethodPartEdge::create(*be, analysis));
+        }
+      // Not a function call, so we leave this edge as it is  
+      } else 
+        cache_Edges.push_back(VirtualMethodPartEdge::create(*be, analysis));
+    }
+    
+    SIGHT_VERB_IF(VirtualMethodAnalysisDebugLevel, 2)
+      scope s("cache_Edges");
+      for(list<PartEdgePtr>::iterator e=cache_Edges.begin(); e!=cache_Edges.end(); e++)
+        dbg << "    "<<(*e)->str()<<endl;
+    SIGHT_VERB_FI()
+}
+
 list<PartEdgePtr> VirtualMethodPart::outEdges()
 {
   if(!cacheInitialized_outEdges) {
-    SIGHT_VERB(scope reg(txt()<<"VirtualMethodPart::outEdges()", scope::medium), 2, VirtualMethodAnalysisDebugLevel)
+    SIGHT_VERB_DECL(scope, (txt()<<"VirtualMethodPart::outEdges()", scope::medium), 2, VirtualMethodAnalysisDebugLevel)
     list<PartEdgePtr> baseEdges = getSupersetPart()->outEdges();
 
-    SIGHT_VERB(dbg << "#baseEdges="<<baseEdges.size()<<endl, 2, VirtualMethodAnalysisDebugLevel)
+    wrapEdges(cache_outEdges, baseEdges);
+
+/*    SIGHT_VERB(dbg << "#baseEdges="<<baseEdges.size()<<endl, 2, VirtualMethodAnalysisDebugLevel)
 
     // The NodeState at the current part
     NodeState* curPartState = NodeState::getNodeState(analysis, getSupersetPart());
@@ -725,7 +799,7 @@ list<PartEdgePtr> VirtualMethodPart::outEdges()
       scope s("cache_outEdges");
       for(list<PartEdgePtr>::iterator e=cache_outEdges.begin(); e!=cache_outEdges.end(); e++)
         dbg << "    "<<(*e)->str()<<endl;
-    SIGHT_VERB_FI()
+    SIGHT_VERB_FI()*/
     
     cacheInitialized_outEdges=true;
   }
@@ -735,33 +809,16 @@ list<PartEdgePtr> VirtualMethodPart::outEdges()
 
 list<PartEdgePtr> VirtualMethodPart::inEdges()
 {
-  assert(0);
-/*  if(!cacheInitialized_inEdges) {
+  if(!cacheInitialized_inEdges) {
+    SIGHT_VERB_DECL(scope, (txt()<<"VirtualMethodPart::inEdges()", scope::medium), 2, VirtualMethodAnalysisDebugLevel)
     list<PartEdgePtr> baseEdges = getSupersetPart()->inEdges();
 
-  //  scope reg(txt()<<"VirtualMethodPart::inEdges() #baseEdges="<<baseEdges.size(), scope::medium, attrGE("VirtualMethodAnalysisDebugLevel", 2));
-
-    // Since this is a forward analysis, information from preceding parts is aggregated under the NULL edge
-    // of this part. As such, to get the parts that lead to this part we need to iterate over the incoming edges
-    // and then look at the parts they arrive from.
-    for(list<PartEdgePtr>::iterator be=baseEdges.begin(); be!=baseEdges.end(); be++) {
-      if(VirtualMethodAnalysisDebugLevel()>=2) dbg << "be="<<be->str()<<endl;
-      NodeState* inState = NodeState::getNodeState(analysis, (*be)->source());
-      { scope inscope("inState", scope::low, attrGE("VirtualMethodAnalysisDebugLevel", 2)); if(VirtualMethodAnalysisDebugLevel()>=2) dbg << inState->str()<<endl; }
-      VirtualMethodPartEdge* inPartEdge = dynamic_cast<VirtualMethodPartEdge*>(inState->getLatticeBelow(analysis, *be, 0));
-      assert(inPartEdge);
-      if(VirtualMethodAnalysisDebugLevel()>=2) dbg << "inPartEdge="<<inPartEdge->str()<<endl;
-
-      if(inPartEdge->level==live)
-        // Create a new VirtualMethodPartEdgePtr from an existing inPartEdge. To ensure that the 
-        // original is not deallocated when the shared pointer goes out of scope, we keep the shared
-        // pointer in a cache data structure that persists.
-        //cache_inEdges.push_back(initPtr(dynamic_cast<VirtualMethodPartEdge*>(inPartEdge->copy())));
-        cache_inEdges.push_back(VirtualMethodPartEdge::raw2shared(dynamic_cast<VirtualMethodPartEdge*>(inPartEdge)));
-    }
+    wrapEdges(cache_inEdges, baseEdges);
+    
     cacheInitialized_inEdges=true;
   }
-  return cache_inEdges;*/
+  
+  return cache_inEdges;
 }
 
 set<CFGNode> VirtualMethodPart::CFGNodes() const
@@ -976,9 +1033,10 @@ std::string VirtualMethodPartEdge::str(std::string indent) const
   ostringstream oss;
   oss << "[VMPEdge: "<<
                       (src ? src->str(indent+"&nbsp;&nbsp;&nbsp;&nbsp;"): "NULL")<<" ==&gt; " <<
-                      (tgt ? tgt->str(indent+"&nbsp;&nbsp;&nbsp;&nbsp;"): "NULL")<<
+                      (tgt ? tgt->str(indent+"&nbsp;&nbsp;&nbsp;&nbsp;"): "NULL");/*<<
                       ", "<<endl;
-  oss << indent /*<<", parent=<"<<getSupersetPartEdge()->str()*/<<"]";
+  oss << indent <<", parent=<"<<getSupersetPartEdge()->str()*/
+  oss <<"]";
   return oss.str();
 }
 
@@ -987,7 +1045,7 @@ std::string VirtualMethodPartEdge::str(std::string indent) const
  *********************************/
 
 VirtualMethodAnalysis::VirtualMethodAnalysis(bool trackBase2RefinedPartEdgeMapping) : 
-      FWDataflow(trackBase2RefinedPartEdgeMapping, /*useSSA*/ useSSA) {
+      FWDataflow(trackBase2RefinedPartEdgeMapping, /*useSSA*/ false) {
   cacheInitialized_GetStartAStates_Spec = false;
   cacheInitialized_GetEndAStates_Spec = false;
 }

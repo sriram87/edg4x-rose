@@ -15,7 +15,7 @@ using namespace sight;
 using namespace boost;
 namespace fuse
 {
-#define composerDebugLevel 0
+#define composerDebugLevel 1
 #if composerDebugDevel==0
   #define DISABLE_SIGHT
 #endif
@@ -537,27 +537,28 @@ RetType ChainComposer::callServerAnalysisFunc(
   SIGHT(dbg << "server="<<server->str()<<", pedgeUnrollCnt="<<pedgeUnrollCnt<<endl, verbose)
   
   // Set pedge to the PartEdge of the ATS graph on which the server analysis ran
+  PartEdgePtr unrolledPEdge = pedge;
   for(int i=0; i<pedgeUnrollCnt; i++)
-    pedge = pedge->getSupersetPartEdge();
+    unrolledPEdge = unrolledPEdge->getSupersetPartEdge();
   
   //endMeasure(opMeasure);
   //cout << "server="<<server->str()<<endl;
   SIGHT(dbg << "pedge="<<pedge->str()<<endl, verbose);
-  RetType v = callOp(pedge, server, type);
+  SIGHT(dbg << "unrolledPEdge="<<unrolledPEdge->str()<<endl, verbose);
+  RetType v = callOp(unrolledPEdge, server, type);
 
   // If the current analysis is non-NULL and implements the desired operation tightly, call its implementation
   if(client && checkTightness(client)) {
     //endMeasure(opMeasure);
-    /*RetType v2 = callOp(pedge, client, type);
+    /**/RetType v2 = callOp(pedge, client, type);
     map<ComposedAnalysis*, RetType> both;
     both[server] = v;
     both[client] = v2;
-    v = createIntersection(both);*/
-    v = callOp(pedge, client, type);
-  }
-  if(client==NULL && currentAnalysis && checkTightness(currentAnalysis)) {
+    v = createIntersection(both);/**/
+    //v = callOp(pedge, client, type);
+  } else if(client==NULL && currentAnalysis && checkTightness(currentAnalysis)) {
     //endMeasure(opMeasure);
-    RetType v2 = callOp(pedge, currentAnalysis, type);
+    RetType v2 = callOp(unrolledPEdge, currentAnalysis, type);
     map<ComposedAnalysis*, RetType> both;
     both[server] = v;
     both[currentAnalysis] = v2;
@@ -757,7 +758,7 @@ MemRegionObjectPtr ChainComposer::Expr2MemRegion_ex(SgNode* n, PartEdgePtr pedge
            function<string (MemRegionObjectPtr, string)>(
                  CallGet2Arg<MemRegionObject, MemRegionObjectPtr>(function<string (MemRegionObject*, string)>(bind( &MemRegionObject::str, _1, _2)))),
            function<MemRegionObjectPtr (const map<ComposedAnalysis*, MemRegionObjectPtr>&)>(bind(createMemRegionIntersection, client, _1)),
-           pedge, client, false);
+           pedge, client, true);
 }
 MemRegionObjectPtr ChainComposer::Expr2MemRegion(SgNode* n, PartEdgePtr pedge, ComposedAnalysis* client) {
   /*std::list<MemRegionObjectPtr > subObjs;
@@ -788,7 +789,7 @@ MemLocObjectPtr ChainComposer::Expr2MemLoc_ex(SgNode* n, PartEdgePtr pedge, Comp
              function<string (MemLocObjectPtr, string)>(
                  CallGet2Arg<MemLocObject, MemLocObjectPtr>(function<string (MemLocObject*, string)>(bind( &MemLocObject::str, _1, _2)))),
              function<MemLocObjectPtr (const map<ComposedAnalysis*, MemLocObjectPtr>&)>(bind(createMemLocIntersection, client, _1)),
-             pedge, client, false);
+             pedge, client, true);
 }
 MemLocObjectPtr ChainComposer::Expr2MemLoc(SgNode* n, PartEdgePtr pedge, ComposedAnalysis* client) {
   // Call Expr2MemLoc_ex() and wrap the results with a UnionMemLocObject

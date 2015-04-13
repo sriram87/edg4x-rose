@@ -14,7 +14,7 @@ using namespace SageInterface;
 
 #include <cwchar>
 
-#define CPDebugLevel 0
+#define CPDebugLevel 1
 #if CPDebugDevel==0
   #define DISABLE_SIGHT
 #endif
@@ -4004,7 +4004,8 @@ ConstantPropagationAnalysis::ConstantPropagationAnalysis(bool useSSA) : FWDatafl
 // more precise information.
 CPMemLocObjectPtr ConstantPropagationAnalysis::createBasicCPML(SgNode* n, PartEdgePtr pedge) {
 //  struct timeval gopeStart, gopeEnd; gettimeofday(&gopeStart, NULL);
-   //scope s("ConstantPropagationAnalysis::createBasicCPML");
+  scope s("ConstantPropagationAnalysis::createBasicCPML");
+  dbg << "pedge="<<pedge->str()<<endl;
   MemRegionObjectPtr curMR = composer->Expr2MemRegion(n, pedge, this);
   //dbg << "curMR="<<curMR->str()<<endl;
 //  gettimeofday(&gopeEnd, NULL); cout << "              ConstantPropagationAnalysis::createBasicCPML Expr2MemRegion\t"<<(((gopeEnd.tv_sec*1000000 + gopeEnd.tv_usec) - (gopeStart.tv_sec*1000000 + gopeStart.tv_usec)) / 1000000.0)<<endl;

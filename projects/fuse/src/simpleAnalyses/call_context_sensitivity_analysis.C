@@ -7,7 +7,7 @@ using namespace sight;
 namespace fuse
 {
 
-#define callContextSensitivityDebugLevel 0
+#define callContextSensitivityDebugLevel 1
 
 /* ###########################
    ##### CallPartContext #####
@@ -711,11 +711,15 @@ string CallCtxSensML::str(string indent) const {
   return oss.str();
 }
 
-// copy this object and return a pointer to it
-MemLocObjectPtr CallCtxSensML::copyML() const 
+// Allocates a copy of this object and returns a regular pointer to it
+MemLocObject* CallCtxSensML::copyMLPtr() const
+{ return new CallCtxSensML(*this); }
+
+// Allocates a copy of this object and returns a pointer to it
+MemLocObjectPtr CallCtxSensML::copyAOType() const
 { return boost::make_shared<CallCtxSensML>(*this); }
 
-bool CallCtxSensML::mayEqual(MemLocObjectPtr that_arg, PartEdgePtr pedge_arg, Composer* comp, ComposedAnalysis* analysis) {
+bool CallCtxSensML::mayEqualAO(MemLocObjectPtr that_arg, PartEdgePtr pedge_arg) {
   CallCtxSensMLPtr that = boost::dynamic_pointer_cast<CallCtxSensML>(that_arg);
   assert(that);
   CallCtxSensPartEdgePtr pedge = dynamicConstPtrCast<CallCtxSensPartEdge>(pedge_arg);
@@ -727,13 +731,13 @@ bool CallCtxSensML::mayEqual(MemLocObjectPtr that_arg, PartEdgePtr pedge_arg, Co
   dbg << "context.setOverlap(that->context)="<<context.setOverlap(that->context)<<endl;*/
   // If there exist sub-executions where this and that MemLocObjects may have existed together
   if(context.setOverlap(that->context))
-    return baseML->mayEqual(that->baseML, pedge->getSupersetPartEdge(), comp, analysis);
+    return baseML->mayEqual(that->baseML, pedge->getSupersetPartEdge(), ccsa->getComposer(), ccsa);
   // Otherwise, they may not be equal
   else
     return false;
 }
 
-bool CallCtxSensML::mustEqual(MemLocObjectPtr that_arg, PartEdgePtr pedge_arg, Composer* comp, ComposedAnalysis* analysis) {
+bool CallCtxSensML::mustEqualAO(MemLocObjectPtr that_arg, PartEdgePtr pedge_arg) {
   CallCtxSensMLPtr that = boost::dynamic_pointer_cast<CallCtxSensML>(that_arg);
   assert(that);
   CallCtxSensPartEdgePtr pedge = dynamicConstPtrCast<CallCtxSensPartEdge>(pedge_arg);
@@ -742,14 +746,14 @@ bool CallCtxSensML::mustEqual(MemLocObjectPtr that_arg, PartEdgePtr pedge_arg, C
   // If there exist sub-executions where this and that MemLocObjects may have existed together
   //dbg << "CallCtxSensML::mustEqualML overlap="<<context.setOverlap(that->context)<<endl;
   if(context.setOverlap(that->context))
-    return baseML->mustEqual(that->baseML, pedge->getSupersetPartEdge(), comp, analysis);
+    return baseML->mustEqual(that->baseML, pedge->getSupersetPartEdge(), ccsa->getComposer(), ccsa);
   // Otherwise, they are not must-equal
   else
     return false;
 }
 
 // Returns whether the two abstract objects denote the same set of concrete objects
-bool CallCtxSensML::equalSet(MemLocObjectPtr that_arg, PartEdgePtr pedge_arg, Composer* comp, ComposedAnalysis* analysis) {
+bool CallCtxSensML::equalSetAO(MemLocObjectPtr that_arg, PartEdgePtr pedge_arg) {
   CallCtxSensMLPtr that = boost::dynamic_pointer_cast<CallCtxSensML>(that_arg);
   assert(that);
   CallCtxSensPartEdgePtr pedge = dynamicConstPtrCast<CallCtxSensPartEdge>(pedge_arg);
@@ -757,7 +761,7 @@ bool CallCtxSensML::equalSet(MemLocObjectPtr that_arg, PartEdgePtr pedge_arg, Co
   
   // If there exist sub-executions where this and that MemLocObjects may have existed together
   if(context.setOverlap(that->context))
-    return baseML->equalSet(that->baseML, pedge->getSupersetPartEdge(), comp, analysis);
+    return baseML->equalSet(that->baseML, pedge->getSupersetPartEdge(), ccsa->getComposer(), ccsa);
   // Otherwise, their sets must not be equal
   else
     return false;
@@ -765,7 +769,7 @@ bool CallCtxSensML::equalSet(MemLocObjectPtr that_arg, PartEdgePtr pedge_arg, Co
 
 // Returns whether this abstract object denotes a non-strict subset (the sets may be equal) of the set denoted
 // by the given abstract object.
-bool CallCtxSensML::subSet(MemLocObjectPtr that_arg, PartEdgePtr pedge_arg, Composer* comp, ComposedAnalysis* analysis) {
+bool CallCtxSensML::subSetAO(MemLocObjectPtr that_arg, PartEdgePtr pedge_arg) {
   CallCtxSensMLPtr that = boost::dynamic_pointer_cast<CallCtxSensML>(that_arg);
   assert(that);
   CallCtxSensPartEdgePtr pedge = dynamicConstPtrCast<CallCtxSensPartEdge>(pedge_arg);
@@ -773,13 +777,17 @@ bool CallCtxSensML::subSet(MemLocObjectPtr that_arg, PartEdgePtr pedge_arg, Comp
   
   // If there exist sub-executions where this and that MemLocObjects may have existed together
   if(context.setOverlap(that->context))
-    return baseML->subSet(that->baseML, pedge->getSupersetPartEdge(), comp, analysis);
+    return baseML->subSet(that->baseML, pedge->getSupersetPartEdge(), ccsa->getComposer(), ccsa);
   // Otherwise, this is not a subset of that
   else
     return false;
 }
 
-bool CallCtxSensML::isLive(PartEdgePtr pedge_arg, Composer* comp, ComposedAnalysis* analysis) {
+bool CallCtxSensML::isLiveAO(PartEdgePtr pedge_arg) {
+  scope reg("CallCtxSensML::isLiveML()", scope::low);
+  dbg << "this="<<str()<<endl;  
+  dbg << "pedge_arg="<<pedge_arg->str()<<endl;
+
   CallCtxSensPartEdgePtr pedge = dynamicConstPtrCast<CallCtxSensPartEdge>(pedge_arg);
   assert(pedge);
   
@@ -788,19 +796,18 @@ bool CallCtxSensML::isLive(PartEdgePtr pedge_arg, Composer* comp, ComposedAnalys
   // Note: we use either the source or the target context, whichever is available since 
   //       MemLocs can't be generated at context switch points, meaning that the contexts
   //       at each edge's source and destination must be identical.
-  /*scope reg("CallCtxSensML::isLiveML()", scope::low);
-  dbg << "this="<<str()<<endl;
+  
   dbg << "context="<<context.str()<<endl;
   if(pedge->src) dbg << "pedge->src->context="<<pedge->src->context.str()<<endl;
   else           dbg << "pedge->tgt->context="<<pedge->tgt->context.str()<<endl;
-  dbg << "overlap="<<context.setOverlap(pedge->src? pedge->src->context: pedge->tgt->context)<<endl;*/
+  dbg << "overlap="<<context.setOverlap(pedge->src? pedge->src->context: pedge->tgt->context)<<endl;
   return context.setOverlap(pedge->src? pedge->src->context: pedge->tgt->context) &&
-         baseML->isLive(pedge->getSupersetPartEdge(), comp, analysis);
+         baseML->isLive(pedge->getSupersetPartEdge(), ccsa->getComposer(), ccsa);
 }
 
 // Computes the meet of this and that and saves the result in this
 // returns true if this causes this to change and false otherwise
-bool CallCtxSensML::meetUpdate(MemLocObjectPtr that_arg, PartEdgePtr pedge_arg, Composer* comp, ComposedAnalysis* analysis) {
+bool CallCtxSensML::meetUpdateAO(MemLocObjectPtr that_arg, PartEdgePtr pedge_arg) {
   CallCtxSensMLPtr that = boost::dynamic_pointer_cast<CallCtxSensML>(that_arg);
   assert(that);
   CallCtxSensPartEdgePtr pedge = dynamicConstPtrCast<CallCtxSensPartEdge>(pedge_arg);
@@ -809,18 +816,36 @@ bool CallCtxSensML::meetUpdate(MemLocObjectPtr that_arg, PartEdgePtr pedge_arg, 
   bool modified = false;
   modified = context.meetUpdate(that->context, pedge) || modified;
   //modified = ccsa->getComposer()->meetUpdateMemLoc(baseML, that->baseML, pedge->getSupersetPartEdge(), ccsa) || modified;
-  modified = baseML->meetUpdate(that->baseML, pedge->getSupersetPartEdge(), comp, analysis) || modified;
+  modified = baseML->meetUpdate(that->baseML, pedge->getSupersetPartEdge(), ccsa->getComposer(), ccsa) || modified;
   return modified;
 }
 
+// Computes the intersection of this and that and saves the result in this
+// returns true if this causes this to change and false otherwise
+bool CallCtxSensML::intersectUpdateAO(MemLocObjectPtr that_arg, PartEdgePtr pedge_arg) {
+  CallCtxSensMLPtr that = boost::dynamic_pointer_cast<CallCtxSensML>(that_arg);
+  assert(that);
+  CallCtxSensPartEdgePtr pedge = dynamicConstPtrCast<CallCtxSensPartEdge>(pedge_arg);
+  assert(pedge);
+  
+  bool modified = false;
+  assert(0); // No intersection for contexts yet
+//  modified = context.meetUpdate(that->context, pedge) || modified;
+  
+  //modified = ccsa->getComposer()->meetUpdateMemLoc(baseML, that->baseML, pedge->getSupersetPartEdge(), ccsa) || modified;
+  modified = baseML->intersectUpdate(that->baseML, pedge->getSupersetPartEdge(), ccsa->getComposer(), ccsa) || modified;
+  return modified;
+}
+
+
 // Returns whether this AbstractObject denotes the set of all possible execution prefixes.
-bool CallCtxSensML::isFull(PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis) {
-  return context.isFull(pedge) && baseML->isFull(pedge->getSupersetPartEdge(), comp, analysis);
+bool CallCtxSensML::isFullAO(PartEdgePtr pedge) {
+  return context.isFull(pedge) && baseML->isFull(pedge->getSupersetPartEdge(), ccsa->getComposer(), ccsa);
 }
 
 // Returns whether this AbstractObject denotes the empty set.
-bool CallCtxSensML::isEmpty(PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis) {
-  return context.isEmpty(pedge) || baseML->isEmpty(pedge->getSupersetPartEdge(), comp, analysis);
+bool CallCtxSensML::isEmptyAO(PartEdgePtr pedge) {
+  return context.isEmpty(pedge) || baseML->isEmpty(pedge->getSupersetPartEdge(), ccsa->getComposer(), ccsa);
 }
 
 // Set this object to represent the set of all possible MemLocs
@@ -1598,7 +1623,8 @@ set<CallCtxSensPartPtr> CallContextSensitivityAnalysis::createFuncExitEdge(PartE
 }
 
 MemRegionObjectPtr CallContextSensitivityAnalysis::Expr2MemRegion(SgNode* n, PartEdgePtr pedge_arg) {
-  SIGHT_VERB(dbg << "CallContextSensitivityAnalysis::Expr2MemRegion() pedge_arg="<<pedge_arg->str()<<endl, 1, callContextSensitivityDebugLevel)
+  SIGHT_VERB_DECL(scope, (txt() << "CallContextSensitivityAnalysis::Expr2MemRegion()"), 1, callContextSensitivityDebugLevel)
+  SIGHT_VERB(dbg << "pedge_arg="<<pedge_arg->str()<<endl, 1, callContextSensitivityDebugLevel)
   CallCtxSensPartEdgePtr pedge = dynamicConstPtrCast<CallCtxSensPartEdge>(pedge_arg);
   assert(pedge);
   
@@ -1611,7 +1637,8 @@ MemRegionObjectPtr CallContextSensitivityAnalysis::Expr2MemRegion(SgNode* n, Par
 }
 
 MemLocObjectPtr CallContextSensitivityAnalysis::Expr2MemLoc(SgNode* n, PartEdgePtr pedge_arg) {
-  SIGHT_VERB(dbg << "CallContextSensitivityAnalysis::Expr2MemLoc() pedge_arg="<<pedge_arg->str()<<endl, 1, callContextSensitivityDebugLevel)
+  SIGHT_VERB_DECL(scope, (txt() << "CallContextSensitivityAnalysis::Expr2MemLoc()"), 1, callContextSensitivityDebugLevel)
+  SIGHT_VERB(dbg << "pedge_arg="<<pedge_arg->str()<<endl, 1, callContextSensitivityDebugLevel)
   CallCtxSensPartEdgePtr pedge = dynamicConstPtrCast<CallCtxSensPartEdge>(pedge_arg);
   assert(pedge);
   

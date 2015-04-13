@@ -384,29 +384,36 @@ class CallCtxSensML : public MemLocObject
     //std::string str(std::string indent="") const;
     std::string str(std::string indent="") const;// { return ((const CallCtxSensML*)this)->str(indent); }
 
-    // copy this object and return a pointer to it
-    MemLocObjectPtr copyML() const;
+    // Allocates a copy of this object and returns a regular pointer to it
+    MemLocObject* copyMLPtr() const;
 
-    bool mayEqual(MemLocObjectPtr that, PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis);
-    bool mustEqual(MemLocObjectPtr that, PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis);
+    // Allocates a copy of this object and returns a pointer to it
+    MemLocObjectPtr copyAOType() const;
+
+    bool mayEqualAO(MemLocObjectPtr that, PartEdgePtr pedge);
+    bool mustEqualAO(MemLocObjectPtr that, PartEdgePtr pedge);
     
     // Returns whether the two abstract objects denote the same set of concrete objects
-    bool equalSet(MemLocObjectPtr o, PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis);
+    bool equalSetAO(MemLocObjectPtr o, PartEdgePtr pedge);
     
     // Returns whether this abstract object denotes a non-strict subset (the sets may be equal) of the set denoted
     // by the given abstract object.
-    bool subSet(MemLocObjectPtr o, PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis);
+    bool subSetAO(MemLocObjectPtr o, PartEdgePtr pedge);
     
-    bool isLive(PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis);
+    bool isLiveAO(PartEdgePtr pedge);
     
     // Computes the meet of this and that and saves the result in this
     // returns true if this causes this to change and false otherwise
-    bool meetUpdate(MemLocObjectPtr that, PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis);
+    bool meetUpdateAO(MemLocObjectPtr that, PartEdgePtr pedge);
+
+    // Computes the intersection of this and that and saves the result in this
+    // returns true if this causes this to change and false otherwise
+    bool intersectUpdateAO(MemLocObjectPtr that, PartEdgePtr pedge);
     
     // Returns whether this AbstractObject denotes the set of all possible execution prefixes.
-    bool isFull(PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis);
+    bool isFullAO(PartEdgePtr pedge);
     // Returns whether this AbstractObject denotes the empty set.
-    bool isEmpty(PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis);
+    bool isEmptyAO(PartEdgePtr pedge);
     
     // Set this object to represent the set of all possible MemLocs
     // Return true if this causes the object to change and false otherwise.

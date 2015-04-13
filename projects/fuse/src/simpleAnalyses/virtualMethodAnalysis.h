@@ -226,6 +226,11 @@ class VirtualMethodPart : public Part
   // Returns whether the given function call according to the available information
   // about object types
   bool isPossibleFunctionCall(const Function& calleeFunc, SgFunctionCallExp* call, AbstractObjectMap* aom, PartEdgePtr baseEdge);
+
+  // Given baseEdges, a list of edges from the server analysis' ATS, set cache_Edges to contain the edges in
+  // the VMAnalysis' ATS that wrap them
+  void wrapEdges(std::list<PartEdgePtr>& cache_Edges, const std::list<PartEdgePtr>& baseEdges);
+
   public: 
   std::list<PartEdgePtr> outEdges();
   std::list<PartEdgePtr> inEdges();

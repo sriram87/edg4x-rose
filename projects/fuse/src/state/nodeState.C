@@ -26,7 +26,7 @@ bool NodeState::isInitialized(Analysis* analysis)
 // void NodeState::setLattices(Analysis* analysis, vector<Lattice*>& lattices)
 // {
 //   map<PartEdgePtr, vector<Lattice*> > tmp;
-  
+
 //   if(dfInfoAbove.find((Analysis*)analysis) != dfInfoAbove.end())
 //     dfInfoAbove[(Analysis*)analysis].clear();
 //   else
@@ -41,7 +41,7 @@ bool NodeState::isInitialized(Analysis* analysis)
 //   dfInfoAbove[(Analysis*)analysis][NULLPartEdge] = lattices;
 //   // copy dfInfoAbove to dfInfoBelow (including copies of all the lattices)
 //   //dbg << "NodeState::setLattices()"<<endl;
-//   for(vector<Lattice*>::iterator it = dfInfoAbove[(Analysis*)analysis][NULLPartEdge].begin(); 
+//   for(vector<Lattice*>::iterator it = dfInfoAbove[(Analysis*)analysis][NULLPartEdge].begin();
 //       it!=dfInfoAbove[(Analysis*)analysis][NULLPartEdge].end(); it++)
 //   {
 //     //indent ind;
@@ -50,7 +50,7 @@ bool NodeState::isInitialized(Analysis* analysis)
 //     //dbg << "NodeState::setLattices pushing dfInfoBelow: "<<l->str("")<<"\n";
 //     dfInfoBelow[(Analysis*)analysis][NULLPartEdge].push_back(l);
 //   }
-  
+
 //   // Records that this analysis has initialized its state at this node
 //   initialized((Analysis*)analysis);
 // }
@@ -86,7 +86,7 @@ static vector<Lattice*> emptyLatVec;
 // Returns the map containing all the lattices above the node from the given analysis along the all edges
 // (read-only access)
 const std::map<PartEdgePtr, std::vector<Lattice*> >& NodeState::getLatticeAboveAll(Analysis* analysis) const
-{ 
+{
   assert(dfInfoAbove.find(analysis) != dfInfoAbove.end());
   return dfInfoAbove.find(analysis)->second;
 }
@@ -94,7 +94,7 @@ const std::map<PartEdgePtr, std::vector<Lattice*> >& NodeState::getLatticeAboveA
 // Returns the map containing all the lattices below the node from the given analysis along the all edges
 // (read-only access)
 const std::map<PartEdgePtr, std::vector<Lattice*> >& NodeState::getLatticeBelowAll(Analysis* analysis) const
-{ 
+{
   assert(dfInfoBelow.find(analysis) != dfInfoBelow.end());
   return dfInfoBelow.find(analysis)->second;
 }
@@ -140,7 +140,7 @@ Lattice* NodeState::meetLatticeMapInfo(const LatticeMap& dfMap,
       return eLM->second[latticeName];
     else return NULL;
   }
-  
+
   // edges are all concrete at this point
   eLM = edgeToLatticeMap.begin();
   PartEdgePtr pedge = eLM->first;
@@ -148,7 +148,7 @@ Lattice* NodeState::meetLatticeMapInfo(const LatticeMap& dfMap,
   // Info is associated with concrete edges
   // pedge should never be NULL here
   // pedges should be concrete at this point
-  assert(pedge && pedge->source() && pedge->target()); 
+  assert(pedge && pedge->source() && pedge->target());
   retLattice = (eLM->second)[latticeName]->copy();
   SIGHT_VERB_IF(2, nodeStateDebugLevel)
     dbg << "pedge=" << pedge->str()
@@ -187,15 +187,15 @@ Lattice* NodeState::meetLatticeMapInfo(const LatticeMap& dfMap,
 //   assert(0);
 //   return NULL;
 // }
-  
+
 // Returns the given lattice above the node from the given analysis along the given departing edge
 Lattice* NodeState::getLatticeAbove(Analysis* analysis, PartEdgePtr departEdge, int latticeName) const
 {
   SIGHT_VERB_DECL(scope, ("NodeState::getLatticeAbove", scope::medium), 2, nodeStateDebugLevel);
   SIGHT_VERB_IF(2, nodeStateDebugLevel)
-    dbg << "analysis=" << dynamic_cast<ComposedAnalysis*>(analysis)->str() 
+    dbg << "analysis=" << dynamic_cast<ComposedAnalysis*>(analysis)->str()
         << ", PartEdge=" << (departEdge? departEdge->str() : "NULL")
-        << ", latticeName=" << latticeName << endl;    
+        << ", latticeName=" << latticeName << endl;
   SIGHT_VERB_FI()
 
   // We must get either a concrete edge or inEdgeFromAny
@@ -204,20 +204,20 @@ Lattice* NodeState::getLatticeAbove(Analysis* analysis, PartEdgePtr departEdge, 
   // If the analysis has data mapped abode this part
   if(analysisDataExists(dfInfoAbove, analysis)) {
     Lattice* retLattice;
-    
+
     /* // given concrete edge or inEdgeFromAny verify that the state queried upon (this)
     // and the state associated with the edge are same
     // otherwise the given departEdge is invalid for this state
     assert(this==getNodeState(dynamic_cast<ComposedAnalysis*>(analysis), departEdge->target()));*/
-  
+
     // departEdge is either inEdgeFromAny or concrete here
     retLattice = getLattice_ex(dfInfoAbove, analysis, departEdge, latticeName);
-  
+
     // If departEdge is concrete and the info above is at inEdgeFromAny, we'll return that info
     // If departEdge is inEdgeFromAny, and the info above is stored separately among concrete edges, we merge their lattices
-    if(!retLattice/* && departEdge->source()==NULLPart*/) 
+    if(!retLattice/* && departEdge->source()==NULLPart*/)
       retLattice = meetLatticeMapInfo(dfInfoAbove, analysis, latticeName, true);
-  
+
     SIGHT_VERB(dbg << "retLattice=" << (retLattice? retLattice->str() : "NULL") << endl, 2, nodeStateDebugLevel)
     return retLattice;
   } else
@@ -229,7 +229,7 @@ Lattice* NodeState::getLatticeBelow(Analysis* analysis, PartEdgePtr departEdge, 
 {
   SIGHT_VERB_DECL(scope, ("NodeState::getLatticeBelow", scope::medium), 2, nodeStateDebugLevel);
   SIGHT_VERB_IF(2, nodeStateDebugLevel)
-    dbg << "analysis=" << dynamic_cast<ComposedAnalysis*>(analysis)->str() 
+    dbg << "analysis=" << dynamic_cast<ComposedAnalysis*>(analysis)->str()
         << ", PartEdge=" << (departEdge? departEdge->str() : "NULL")
         << ", latticeName=" << latticeName << endl;
   SIGHT_VERB_FI()
@@ -319,20 +319,20 @@ void NodeState::deleteLatticeBelow(Analysis* analysis)
 { delete_ex(dfInfoBelow, analysis); }
 
 // General lattice setter function
-void NodeState::setLattice_ex(LatticeMap& dfMap, Analysis* analysis, PartEdgePtr departEdge, 
+void NodeState::setLattice_ex(LatticeMap& dfMap, Analysis* analysis, PartEdgePtr departEdge,
                               std::vector<Lattice*>& lattices)
 {
   // If the analysis currently has a mapping in dfInfoB
   std::map<PartEdgePtr, std::vector<Lattice*> >::iterator w;
-  if((dfMap.find((Analysis*)analysis)) != dfMap.end() && 
+  if((dfMap.find((Analysis*)analysis)) != dfMap.end() &&
      ((w = dfMap[((Analysis*)analysis)].find(departEdge)) != dfMap[((Analysis*)analysis)].end()))
   {
     // Empty out the current mapping of analysis in dfInfo
-    for(vector<Lattice*>::iterator it = w->second.begin(); 
+    for(vector<Lattice*>::iterator it = w->second.begin();
         it != w->second.end(); it++)
     { delete *it; }
     w->second.clear();
-    
+
     // Create the new mapping
     w->second = lattices;
   }
@@ -341,7 +341,7 @@ void NodeState::setLattice_ex(LatticeMap& dfMap, Analysis* analysis, PartEdgePtr
     // Create the new mapping
     dfMap[(Analysis*)analysis][departEdge] = lattices;
   }
-  
+
   // Records that this analysis has initialized its state at this node
   initialized((Analysis*)analysis);
 }
@@ -352,7 +352,7 @@ bool NodeState::analysisDataExists(const LatticeMap& dfMap, Analysis* analysis) 
 }
 
 // General lattice getter function
-Lattice* NodeState::getLattice_ex(const LatticeMap& dfMap, Analysis* analysis, 
+Lattice* NodeState::getLattice_ex(const LatticeMap& dfMap, Analysis* analysis,
                                   PartEdgePtr departEdge, int latticeName) const
 {
   LatticeMap::const_iterator a;
@@ -380,9 +380,9 @@ Lattice* NodeState::getLattice_ex(const LatticeMap& dfMap, Analysis* analysis,
     std::map<PartEdgePtr, vector<Lattice*> > b = a->second;
     dbg << str(b)<<endl;
   }*/
-  
+
   // If this analysis has registered some Lattices at this node/edge combination
-  if((a=dfMap.find((Analysis*)analysis)) != dfMap.end() && 
+  if((a=dfMap.find((Analysis*)analysis)) != dfMap.end() &&
      ((w = a->second.find(departEdge)) != a->second.end())) {
       //dbg << "w->second.size()="<<w->second.size()<<" latticeName="<<latticeName<<endl;
     if(w->second.size()>=(unsigned int)latticeName)
@@ -390,19 +390,19 @@ Lattice* NodeState::getLattice_ex(const LatticeMap& dfMap, Analysis* analysis,
     else
       return NULL;
   }
-  
+
   return NULL;
 }
 
 // General read-only lattice vector getter function
-const vector<Lattice*>& NodeState::getLattice_ex(const LatticeMap& dfMap, Analysis* analysis, 
+const vector<Lattice*>& NodeState::getLattice_ex(const LatticeMap& dfMap, Analysis* analysis,
                                                 PartEdgePtr departEdge) const
 {
   LatticeMap::const_iterator a;
   std::map<PartEdgePtr, std::vector<Lattice*> >::const_iterator w;
-  
+
   // If this analysis has registered some Lattices at this node/edge combination
-  if((a=dfMap.find((Analysis*)analysis)) != dfMap.end() && 
+  if((a=dfMap.find((Analysis*)analysis)) != dfMap.end() &&
      ((w = a->second.find(departEdge)) != a->second.end())) {
       //printf("dfLattices->first=%p, dfLattices->second.size()=%d\n", dfLattices->first, dfLattices->second.size());
     return w->second;
@@ -411,13 +411,13 @@ const vector<Lattice*>& NodeState::getLattice_ex(const LatticeMap& dfMap, Analys
 }
 
 // General read/write lattice vector getter function
-vector<Lattice*>& NodeState::getLatticeMod_ex(LatticeMap& dfMap, Analysis* analysis, 
+vector<Lattice*>& NodeState::getLatticeMod_ex(LatticeMap& dfMap, Analysis* analysis,
                                               PartEdgePtr departEdge)
 {
   std::map<PartEdgePtr, std::vector<Lattice*> >::iterator w;
-  
+
   // If this analysis has registered some Lattices at this node/edge combination
-  if((dfMap.find((Analysis*)analysis)) != dfMap.end() && 
+  if((dfMap.find((Analysis*)analysis)) != dfMap.end() &&
      ((w = dfMap[((Analysis*)analysis)].find(departEdge)) != dfMap[((Analysis*)analysis)].end())) {
       //printf("dfLattices->first=%p, dfLattices->second.size()=%d\n", dfLattices->first, dfLattices->second.size());
     return w->second;
@@ -447,7 +447,7 @@ bool NodeState::equivLattices(const std::vector<Lattice*>& latticesA,
   //printf("    latticesA.size()=%d latticesB.size()=%d\n", latticesA.size(), latticesB.size());
   if(latticesA.size() != latticesB.size())
     return false;
-  
+
   vector<Lattice*>::const_iterator itA, itB;
   for(itA = latticesA.begin(), itB = latticesB.begin();
       itA != latticesA.end(), itB != latticesB.end();
@@ -455,7 +455,7 @@ bool NodeState::equivLattices(const std::vector<Lattice*>& latticesA,
   {
     if(!((*itA)->equiv(*itB))) return false;
   }
-  
+
   return true;
 }
 
@@ -467,17 +467,17 @@ void NodeState::cloneAnalysisState(Analysis* srcA, Analysis* tgtA)
   //const map <int, NodeFact*>& srcFacts = getFacts(srcA);
   const vector<NodeFact*>& srcFacts = getFacts(srcA);
   //printf("srcFacts.size()=%d\n", srcFacts.size());
-  
+
   vector<NodeFact*> tgtFacts;
   for(vector<NodeFact*>::const_iterator f = srcFacts.begin();
       f != srcFacts.end(); f++)
   { tgtFacts.push_back((*f)->copy()); }
   // Associate analysis tgtA with the copied facts
   setFacts(tgtA, tgtFacts);
-  
+
   // Copy srcA's lattices into tgtLatAbv and tgtLatBel
   const map<PartEdgePtr, vector<Lattice*> >& srcLatAbv = getLatticeAboveAll(srcA);
-  
+
   for(map<PartEdgePtr, vector<Lattice*> >::const_iterator e=srcLatAbv.begin(); e!=srcLatAbv.end(); e++) {
     vector<Lattice*> tgtLatAbv;
     for(vector<Lattice*>::const_iterator l=e->second.begin(); l!=e->second.end(); l++)
@@ -485,7 +485,7 @@ void NodeState::cloneAnalysisState(Analysis* srcA, Analysis* tgtA)
     // Associate analysis tgtA with the copied lattices
     setLatticeAbove(tgtA, e->first, tgtLatAbv);
   }
-  
+
   const map<PartEdgePtr, vector<Lattice*> >& srcLatBel = getLatticeBelowAll(srcA);
   for(map<PartEdgePtr, vector<Lattice*> >::const_iterator e=srcLatBel.begin(); e!=srcLatBel.end(); e++) {
     vector<Lattice*> tgtLatBel;
@@ -496,8 +496,8 @@ void NodeState::cloneAnalysisState(Analysis* srcA, Analysis* tgtA)
   }
 }
 
-// Given a set of analyses, one of which is designated as a master, unions together the 
-// lattices associated with each of these analyses. The results are associated on each 
+// Given a set of analyses, one of which is designated as a master, unions together the
+// lattices associated with each of these analyses. The results are associated on each
 // CFG node with the master analysis.
 void NodeState::unionLattices(set<Analysis*>& unionSet, Analysis* master)
 {
@@ -517,7 +517,7 @@ void NodeState::unionLattices(set<Analysis*>& unionSet, Analysis* master)
 
 // Unions the dataflow information in Lattices held by the from map into the to map
 // Returns true if this causes a change in the lattices in to and false otherwise
-bool NodeState::unionLatticeMaps(map<PartEdgePtr, vector<Lattice*> >& to, 
+bool NodeState::unionLatticeMaps(map<PartEdgePtr, vector<Lattice*> >& to,
                                  const map<PartEdgePtr, vector<Lattice*> >& from)
 {
   SIGHT_VERB_DECL(scope, ("NodeState::unionLatticeMaps()", scope::medium), 2, nodeStateDebugLevel);
@@ -525,16 +525,16 @@ bool NodeState::unionLatticeMaps(map<PartEdgePtr, vector<Lattice*> >& to,
   assert(to.size() == from.size());
 
   bool modified = false;
-  
+
   map<PartEdgePtr, vector<Lattice*> >::iterator       eTo;
   map<PartEdgePtr, vector<Lattice*> >::const_iterator eFrom;
   SIGHT_VERB(dbg << "#from="<<from.size()<<", #to="<<to.size()<<endl, 1, nodeStateDebugLevel)
-  
+
   for(eTo=to.begin(), eFrom=from.begin(); eTo!=to.end(); eTo++, eFrom++) {
     // All the analyses in unionSet must have the same number of lattices associated with each edge
     assert(eTo->second.size() == eFrom->second.size());
 
-    // Union the Above lattices 
+    // Union the Above lattices
     vector<Lattice*>::iterator       lTo;
     vector<Lattice*>::const_iterator lFrom;
     SIGHT_VERB_IF(2, nodeStateDebugLevel)
@@ -553,18 +553,18 @@ bool NodeState::unionLatticeMaps(map<PartEdgePtr, vector<Lattice*> >& to,
       } else {
         InfiniteLattice* meetResult = dynamic_cast<InfiniteLattice*>((*lTo)->copy());
         assert(meetResult);
-        meetResult->meetUpdate(*lFrom); 
+        meetResult->meetUpdate(*lFrom);
         // Widen the resulting meet
         modified =  dynamic_cast<InfiniteLattice*>(*lTo)->widenUpdate(meetResult) | modified;
         delete meetResult;
       }
     }
   }
-  
+
   return modified;
 }
 
-// associates the given analysis/fact name with the given NodeFact, 
+// associates the given analysis/fact name with the given NodeFact,
 // deleting any previous association (the previous NodeFact is freed)
 void NodeState::addFact(Analysis* analysis, int factName, NodeFact* f)
 {
@@ -617,7 +617,7 @@ void NodeState::setFacts(Analysis* analysis, const vector<NodeFact*>& newFacts)
     // Associate newFacts with the analysis
     facts[(Analysis*)analysis] = newFacts;
   }
-  
+
   // Records that this analysis has initialized its state at this node
   initialized((Analysis*)analysis);
 }
@@ -667,7 +667,7 @@ vector<NodeFact*>& NodeState::getFactsMod(Analysis* analysis)
 void NodeState::deleteFacts(Analysis* analysis)
 {
   vector<NodeFact*>& f = getFactsMod(analysis);
-  
+
   // delete the individual facts associated with this analysis
   for(vector<NodeFact*>::iterator it = f.begin(); it!=f.end(); it++)
     //delete it->second;
@@ -700,7 +700,7 @@ NodeState* NodeState::getNodeState(ComposedAnalysis* analysis, PartPtr p)
       dbg << i->first->str()<<endl;
     }
   }*/
-  
+
   if(nodeStateMap.find(analysis)    == nodeStateMap.end() ||
      nodeStateMap[analysis].find(p) == nodeStateMap[analysis].end()) {
     /*dbg << "NodeState::getNodeState() Creating new state. analysis="<<analysis<<"(found="<<(nodeStateMap.find(analysis) != nodeStateMap.end())<< ") #nodeStateMap="<<nodeStateMap.size()<<" p="<<p->str()<<endl;
@@ -708,8 +708,8 @@ NodeState* NodeState::getNodeState(ComposedAnalysis* analysis, PartPtr p)
     for(std::map<ComposedAnalysis*, std::map<PartPtr, NodeState*> >::iterator i=nodeStateMap.begin(); i!=nodeStateMap.end(); i++)
       dbg << "("<<i->first<<" | "<<i->first->str()<<") ";
     dbg << endl;
-            
-    if(nodeStateMap.find(analysis) != nodeStateMap.end()) 
+
+    if(nodeStateMap.find(analysis) != nodeStateMap.end())
       dbg<<"(found="<<(nodeStateMap[analysis].find(p) == nodeStateMap[analysis].end())<<")"<<endl;
     */
     /*dbg << "&nbsp;&nbsp;&nbsp;&nbsp;Creating new state, #nodeStateMap[analysis]="<<nodeStateMap[analysis].size()<<" p="<<p->str()<<endl;
@@ -721,15 +721,15 @@ NodeState* NodeState::getNodeState(ComposedAnalysis* analysis, PartPtr p)
       PartPtr nsf = ns->first;
       dbg << ns->first.get()->str() << " <: "<<(ns->first < p) << " ==: "<<(ns->first == p)  << endl;
     }*/
-    
+
     nodeStateMap[analysis][p] = new NodeState();
     //dbg << "state="<<nodeStateMap[analysis][p]<<endl;
-    
+
   }
   /*dbg << "&nbsp;&nbsp;&nbsp;&nbsp;#nodeStateMap[analysis]="<<nodeStateMap[analysis].size()<<endl;
   indent ind;
   for(map<PartPtr, NodeState*>::iterator ns=nodeStateMap[analysis].begin(); ns!=nodeStateMap[analysis].end(); ns++) {
-    PartPtr nsf = ns->first; 
+    PartPtr nsf = ns->first;
     dbg << nsf->str() << endl;
   }
   for(map<PartPtr, NodeState*>::iterator ns=nodeStateMap[analysis].begin(); ns!=nodeStateMap[analysis].end(); ns++) {
@@ -737,7 +737,7 @@ NodeState* NodeState::getNodeState(ComposedAnalysis* analysis, PartPtr p)
     dbg << nsf->str() << " <: "<<(ns->first < p)  << endl;
   }
   dbg << "&nbsp;&nbsp;&nbsp;&nbsp;state="<<nodeStateMap[analysis][p]->str(analysis, "&nbsp;&nbsp;&nbsp;&nbsp;")<<endl;*/
-  
+
   return nodeStateMap[analysis][p];
 }
 
@@ -753,7 +753,7 @@ void NodeState::copyLattices_aEQa(Analysis* analysis, NodeState& to,   PartEdgeP
   assert(to.dfInfoAbove.find(analysis)   != to.dfInfoAbove.end());
   assert(from.dfInfoAbove.find(analysis) != from.dfInfoAbove.end());
   copyLattices(to.dfInfoAbove.find(analysis)->second,   toDepartEdge,   toSuperDepartEdge,
-               from.dfInfoAbove.find(analysis)->second, fromDepartEdge, fromSuperDepartEdge); 
+               from.dfInfoAbove.find(analysis)->second, fromDepartEdge, fromSuperDepartEdge);
 }
 
 // Copies from's above lattices for analysis to to's below lattices for the same analysis, both along the NULL edge.
@@ -762,13 +762,13 @@ void NodeState::copyLattices_aEQa(Analysis* analysis, NodeState& to,   PartEdgeP
 //   copyLattices_bEQa(analysis, to, NULLPartEdge, from, NULLPartEdge);
 // }
 // Copies along the given departing edges
-void NodeState::copyLattices_bEQa(Analysis* analysis, NodeState& to,   PartEdgePtr toDepartEdge,   PartEdgePtr toSuperDepartEdge, 
+void NodeState::copyLattices_bEQa(Analysis* analysis, NodeState& to,   PartEdgePtr toDepartEdge,   PartEdgePtr toSuperDepartEdge,
                                                 const NodeState& from, PartEdgePtr fromDepartEdge, PartEdgePtr fromSuperDepartEdge)
 {
   assert(to.dfInfoBelow.find(analysis)   != to.dfInfoBelow.end());
   assert(from.dfInfoAbove.find(analysis) != from.dfInfoAbove.end());
   copyLattices(to.dfInfoBelow.find(analysis)->second,   toDepartEdge,   toSuperDepartEdge,
-               from.dfInfoAbove.find(analysis)->second, fromDepartEdge, fromSuperDepartEdge); 
+               from.dfInfoAbove.find(analysis)->second, fromDepartEdge, fromSuperDepartEdge);
 }
 
 // Copies from's below lattices for analysis to to's below lattices for the same analysis, both along the NULL edge.
@@ -777,7 +777,7 @@ void NodeState::copyLattices_bEQa(Analysis* analysis, NodeState& to,   PartEdgeP
 //   copyLattices_bEQb(analysis, to, NULLPartEdge, from, NULLPartEdge);
 // }
 // Copies along the given departing edges
-void NodeState::copyLattices_bEQb(Analysis* analysis, NodeState& to,   PartEdgePtr toDepartEdge,   PartEdgePtr toSuperDepartEdge, 
+void NodeState::copyLattices_bEQb(Analysis* analysis, NodeState& to,   PartEdgePtr toDepartEdge,   PartEdgePtr toSuperDepartEdge,
                                                 const NodeState& from, PartEdgePtr fromDepartEdge, PartEdgePtr fromSuperDepartEdge)
 {
   assert(to.dfInfoBelow.find(analysis)   != to.dfInfoBelow.end());
@@ -793,13 +793,13 @@ void NodeState::copyLattices_bEQb(Analysis* analysis, NodeState& to,   PartEdgeP
 //   copyLattices_aEQb(analysis, to, NULLPartEdge, from, NULLPartEdge);
 // }
 // Copies along the given departing edges
-void NodeState::copyLattices_aEQb(Analysis* analysis, NodeState& to,   PartEdgePtr toDepartEdge,   PartEdgePtr toSuperDepartEdge, 
+void NodeState::copyLattices_aEQb(Analysis* analysis, NodeState& to,   PartEdgePtr toDepartEdge,   PartEdgePtr toSuperDepartEdge,
                                                 const NodeState& from, PartEdgePtr fromDepartEdge, PartEdgePtr fromSuperDepartEdge)
 {
   assert(to.dfInfoAbove.find(analysis)   != to.dfInfoAbove.end());
   assert(from.dfInfoBelow.find(analysis) != from.dfInfoBelow.end());
   copyLattices(to.dfInfoAbove.find(analysis)->second, toDepartEdge,     toSuperDepartEdge,
-               from.dfInfoBelow.find(analysis)->second, fromDepartEdge, fromSuperDepartEdge); 
+               from.dfInfoBelow.find(analysis)->second, fromDepartEdge, fromSuperDepartEdge);
 }
 
 // Makes dfInfoTo[*] a copy of dfInfoFrom[*], ensuring that they both have the same structure
@@ -807,36 +807,36 @@ void NodeState::copyLattices(map<PartEdgePtr, vector<Lattice*> >& dfInfoTo,
                        const map<PartEdgePtr, vector<Lattice*> >& dfInfoFrom)
 {
   assert(dfInfoTo.size() == dfInfoFrom.size());
-  
+
   // Copy lattices
   //dbg << "    copyLattices()\n";
   map<PartEdgePtr, vector<Lattice*> >::iterator eTo;
   map<PartEdgePtr, vector<Lattice*> >::const_iterator eFrom;
   for(eTo=dfInfoTo.begin(), eFrom=dfInfoFrom.begin(); eTo!=dfInfoTo.end(); eTo++, eFrom++) {
     assert(eTo->first == eFrom->first);
-    
+
     vector<Lattice*>::iterator lTo;
     vector<Lattice*>::const_iterator lFrom;
-    
+
     for(lTo=eTo->second.begin(), lFrom=eFrom->second.begin(); lTo!=eTo->second.end(); lTo++, lFrom++) {
       (*lTo)->copy(*lFrom);
     }
   }
 }
 
-// Makes dfInfoTo[*] a copy of dfInfoFrom[*]. If dfInfoTo is not initially empty, it is cleared and its 
+// Makes dfInfoTo[*] a copy of dfInfoFrom[*]. If dfInfoTo is not initially empty, it is cleared and its
 // Lattices are deallocated.
 void NodeState::copyLatticesOW(map<PartEdgePtr, vector<Lattice*> >& dfInfoTo,
                          const map<PartEdgePtr, vector<Lattice*> >& dfInfoFrom)
 {
   // First, empty out dfInfoTo if needed
-  for(map<PartEdgePtr, vector<Lattice*> >::iterator eTo=dfInfoTo.begin(); eTo!=dfInfoTo.end(); eTo++) {  
+  for(map<PartEdgePtr, vector<Lattice*> >::iterator eTo=dfInfoTo.begin(); eTo!=dfInfoTo.end(); eTo++) {
     for(vector<Lattice*>::iterator lTo=eTo->second.begin(); lTo!=eTo->second.end(); lTo++) {
       delete *lTo;
     }
   }
   dfInfoTo.clear();
-  
+
   //scope s("copyLatticesOW");
   for(map<PartEdgePtr, vector<Lattice*> >::const_iterator eFrom=dfInfoFrom.begin(); eFrom!=dfInfoFrom.end(); eFrom++) {
     for(vector<Lattice*>::const_iterator lFrom=eFrom->second.begin(); lFrom!=eFrom->second.end(); lFrom++) {
@@ -851,16 +851,16 @@ void NodeState::copyLatticesOW(map<PartEdgePtr, vector<Lattice*> >& dfInfoTo,
 
 // Makes dfInfoTo[toDepartEdge] a copy of dfInfoFrom[fromDepartEdge]
 // If adjustPEdge is true, calls Lattice::setPartEdge() on the copied lattices in dfInfoTo to associate them with this edge.
-void NodeState::copyLattices(map<PartEdgePtr, vector<Lattice*> >& dfInfoTo,   
+void NodeState::copyLattices(map<PartEdgePtr, vector<Lattice*> >& dfInfoTo,
                              PartEdgePtr toDepartEdge, PartEdgePtr toSuperDepartEdge,
-                             const map<PartEdgePtr, vector<Lattice*> >& dfInfoFrom, 
+                             const map<PartEdgePtr, vector<Lattice*> >& dfInfoFrom,
                              PartEdgePtr fromDepartEdge, PartEdgePtr fromSuperDepartEdge,
                              bool adjustPEdge)
 {
   assert(dfInfoTo.size() == dfInfoFrom.size());
   assert(dfInfoTo.find(toSuperDepartEdge) != dfInfoTo.end());
   assert(dfInfoFrom.find(fromSuperDepartEdge) != dfInfoFrom.end());
-  
+
   // Copy lattices
   //dbg << "    copyLattices()\n";
   map<PartEdgePtr, vector<Lattice*> >::iterator       eSuperTo   = dfInfoTo.find(toSuperDepartEdge);
@@ -877,24 +877,24 @@ void NodeState::copyLattices(map<PartEdgePtr, vector<Lattice*> >& dfInfoTo,
   }
 }
 
-// Makes dfInfoTo[toDepartEdge] a copy of dfInfoFrom[fromDepartEdge]. If dfInfoTo[toDepartEdge] is not initially empty, 
+// Makes dfInfoTo[toDepartEdge] a copy of dfInfoFrom[fromDepartEdge]. If dfInfoTo[toDepartEdge] is not initially empty,
 // it is cleared and its Lattices are deallocated.
-void NodeState::copyLatticesOW(map<PartEdgePtr, vector<Lattice*> >& dfInfoTo,   
+void NodeState::copyLatticesOW(map<PartEdgePtr, vector<Lattice*> >& dfInfoTo,
                                PartEdgePtr toDepartEdge,   PartEdgePtr toSuperDepartEdge,
-                               const map<PartEdgePtr, vector<Lattice*> >& dfInfoFrom, 
+                               const map<PartEdgePtr, vector<Lattice*> >& dfInfoFrom,
                                PartEdgePtr fromDepartEdge, PartEdgePtr fromSuperDepartEdge,
                                bool adjustPEdge)
 {
   /*SIGHT_VERB_DECL(scope, ("NodeState::copyLatticesOW()", scope::medium, 1, 1);
   dbg << "toDepartEdge="<<(toDepartEdge?toDepartEdge->str():"NULLPtr")<<" fromDepartEdge="<<(fromDepartEdge?fromDepartEdge->str():"NULLPtr")<<endl;*/
-  
+
   assert(dfInfoFrom.find(fromSuperDepartEdge) != dfInfoFrom.end());
-  
+
   // First, empty out dfInfoTo[toDepartEdge] if needed
   for(vector<Lattice*>::iterator lTo=dfInfoTo[toSuperDepartEdge].begin(); lTo!=dfInfoTo[toSuperDepartEdge].end(); lTo++)
     delete *lTo;
   dfInfoTo[toSuperDepartEdge].clear();
-  
+
   map<PartEdgePtr, vector<Lattice*> >::const_iterator eSuperFrom = dfInfoFrom.find(fromSuperDepartEdge);
   for(vector<Lattice*>::const_iterator lFrom=eSuperFrom->second.begin(); lFrom!=eSuperFrom->second.end(); lFrom++) {
     Lattice* lTo = (*lFrom)->copy();
@@ -910,7 +910,7 @@ void NodeState::copyLatticesOW(map<PartEdgePtr, vector<Lattice*> >& dfInfoTo,
 string NodeState::str(string indent) const
 {
   ostringstream oss;
-  
+
   oss << "[";
   for(BoolMap::const_iterator i=initializedAnalyses.begin(); i!=initializedAnalyses.end(); ) {
     oss << str(i->first, indent+"&nbsp;&nbsp;&nbsp;&nbsp;");
@@ -919,7 +919,7 @@ string NodeState::str(string indent) const
       oss << endl;
   }
   oss << "]";
-  
+
   return oss.str();
 }
 
@@ -930,7 +930,7 @@ string NodeState::str(Analysis* analysis, string indent) const
   else                                          analysisName << analysis;
 
   ostringstream oss;
-  
+
   // If the analysis has not yet been initialized, say so
   if(initializedAnalyses.find(analysis) == initializedAnalyses.end()) {
     oss << "[NodeState ("<<this<<"): NONE for Analysis"<<analysisName.str()<<"]\n";
@@ -952,11 +952,11 @@ string NodeState::str(Analysis* analysis, string indent) const
     else oss << indent << "Lattices Above: \n"<<indent <<"NULL"<<endl;
 
     if(dfInfoBelow.find(analysis) != dfInfoBelow.end()) {
-      const std::map<PartEdgePtr, std::vector<Lattice*> >& dfInfoB = dfInfoBelow.find(analysis)->second;    
+      const std::map<PartEdgePtr, std::vector<Lattice*> >& dfInfoB = dfInfoBelow.find(analysis)->second;
       oss << indent << "Lattices Below: \n"<<indent << str(dfInfoB, indent+"&nbsp;&nbsp;&nbsp;&nbsp;") <<endl;
     }
     else oss << indent << "Lattices Below: \n"<<indent <<"NULL"<<endl;
-   
+
     assert(facts.find(analysis) != facts.end());
     i=0;
     const vector<NodeFact*>& aFacts = facts.find(analysis)->second;
@@ -964,15 +964,15 @@ string NodeState::str(Analysis* analysis, string indent) const
       oss << indent << "    Fact "<<i<<": "<<(*fact? (*fact)->str(indent+"  ") : "NULL")<<"\n";
     oss << indent << "]";
   }
-  
+
   return oss.str();
 }
 
 // Returns the string representation of the Lattices stored in the given map
-string NodeState::str(const map<PartEdgePtr, vector<Lattice*> >& dfInfo, string indent)
+std::string NodeState::str(const std::map<PartEdgePtr, std::vector<Lattice*> >& dfInfo, std::string indent)
 {
   ostringstream oss;
-  
+
   for(map<PartEdgePtr, vector<Lattice*> >::const_iterator e=dfInfo.begin(); e!=dfInfo.end(); e++) {
     PartEdgePtr edg = e->first;
     oss << indent << "edge "<<(edg? edg->str(): "NULL")<<endl;
@@ -983,7 +983,21 @@ string NodeState::str(const map<PartEdgePtr, vector<Lattice*> >& dfInfo, string 
                       (*l? (*l)->str(indent+"&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;") : "NULL")<<"\n";
     }
   }
-  
+
+  return oss.str();
+}
+
+// Returns the string representation of the Lattices stored in the given map along the given edge
+string NodeState::str(const vector<Lattice*>& dfLatInfo, string indent)
+{
+  ostringstream oss;
+
+  int i=0;
+  for(vector<Lattice*>::const_iterator l=dfLatInfo.begin(); l!=dfLatInfo.end(); l++, i++) {
+    oss << indent << i<<" = "<<
+                    (*l? (*l)->str(indent+"&nbsp;&nbsp;&nbsp;&nbsp;") : "NULL")<<"\n";
+  }
+
   return oss.str();
 }
 

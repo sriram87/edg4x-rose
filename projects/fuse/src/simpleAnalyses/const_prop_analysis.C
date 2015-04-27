@@ -14,126 +14,126 @@ using namespace SageInterface;
 
 #include <cwchar>
 
-#define CPDebugLevel 1
+#define CPDebugLevel 0
 #if CPDebugDevel==0
   #define DISABLE_SIGHT
 #endif
 
 // Define type conversions for lambda operators that are not supported by Boost::Lambda
-namespace boost { 
+namespace boost {
 namespace lambda {
-  
-template<class Act> 
+
+template<class Act>
 struct plain_return_type_2<arithmetic_action<Act>, long long int, long long int> {
   typedef long long type;
 };
 
-template<class Act> 
+template<class Act>
 struct plain_return_type_2<arithmetic_action<Act>, long long int, char> {
   typedef long long type;
 };
 
-template<class Act> 
+template<class Act>
 struct plain_return_type_2<arithmetic_action<Act>, char, long long int> {
   typedef long long type;
 };
 
-template<class Act> 
+template<class Act>
 struct plain_return_type_2<arithmetic_action<Act>, long long int, short> {
   typedef long long type;
 };
 
-template<class Act> 
+template<class Act>
 struct plain_return_type_2<arithmetic_action<Act>, short, long long int> {
   typedef long long type;
 };
 
-template<class Act> 
+template<class Act>
 struct plain_return_type_2<arithmetic_action<Act>, long long int, int> {
   typedef long long type;
 };
 
-template<class Act> 
+template<class Act>
 struct plain_return_type_2<arithmetic_action<Act>, int, long long int> {
   typedef long long type;
 };
 
-template<class Act> 
+template<class Act>
 struct plain_return_type_2<arithmetic_action<Act>, long long int, long> {
   typedef long long type;
 };
 
-template<class Act> 
+template<class Act>
 struct plain_return_type_2<arithmetic_action<Act>, long, long long int> {
   typedef long long type;
 };
 
-template<class Act> 
+template<class Act>
 struct plain_return_type_2<arithmetic_action<Act>, long long int, unsigned char> {
   typedef long long type;
 };
 
-template<class Act> 
+template<class Act>
 struct plain_return_type_2<arithmetic_action<Act>, unsigned char, long long int> {
   typedef long long type;
 };
 
-template<class Act> 
+template<class Act>
 struct plain_return_type_2<arithmetic_action<Act>, long long int, unsigned short> {
   typedef long long type;
 };
 
-template<class Act> 
+template<class Act>
 struct plain_return_type_2<arithmetic_action<Act>, unsigned short, long long int> {
   typedef long long type;
 };
 
-template<class Act> 
+template<class Act>
 struct plain_return_type_2<arithmetic_action<Act>, long long int, unsigned int> {
   typedef long long type;
 };
 
-template<class Act> 
+template<class Act>
 struct plain_return_type_2<arithmetic_action<Act>, unsigned int, long long int> {
   typedef long long type;
 };
 
-template<class Act> 
+template<class Act>
 struct plain_return_type_2<arithmetic_action<Act>, long long int, unsigned long> {
   typedef long long type;
 };
 
-template<class Act> 
+template<class Act>
 struct plain_return_type_2<arithmetic_action<Act>, unsigned long, long long int> {
   typedef long long type;
 };
 
-template<class Act> 
+template<class Act>
 struct plain_return_type_2<arithmetic_action<Act>, long long int, float> {
   typedef long long type;
 };
 
-template<class Act> 
+template<class Act>
 struct plain_return_type_2<arithmetic_action<Act>, float, long long int> {
   typedef long long type;
 };
 
-template<class Act> 
+template<class Act>
 struct plain_return_type_2<arithmetic_action<Act>, long long int, double> {
   typedef long long type;
 };
 
-template<class Act> 
+template<class Act>
 struct plain_return_type_2<arithmetic_action<Act>, double, long long int> {
   typedef long long type;
 };
 
-template<class Act> 
+template<class Act>
 struct plain_return_type_2<arithmetic_action<Act>, long long int, long double> {
   typedef long long type;
 };
 
-template<class Act> 
+template<class Act>
 struct plain_return_type_2<arithmetic_action<Act>, long double, long long int> {
   typedef long long type;
 };
@@ -141,128 +141,128 @@ struct plain_return_type_2<arithmetic_action<Act>, long double, long long int> {
 //////////////////////////////////////
 
 
-template<class Act> 
+template<class Act>
 struct plain_return_type_2<arithmetic_action<Act>, unsigned long long int, unsigned long long int> {
   typedef long long type;
 };
 
-template<class Act> 
+template<class Act>
 struct plain_return_type_2<arithmetic_action<Act>, unsigned long long int, char> {
   typedef long long type;
 };
 
-template<class Act> 
+template<class Act>
 struct plain_return_type_2<arithmetic_action<Act>, char, unsigned long long int> {
   typedef long long type;
 };
 
-template<class Act> 
+template<class Act>
 struct plain_return_type_2<arithmetic_action<Act>, unsigned long long int, short> {
   typedef long long type;
 };
 
-template<class Act> 
+template<class Act>
 struct plain_return_type_2<arithmetic_action<Act>, short, unsigned long long int> {
   typedef long long type;
 };
 
-template<class Act> 
+template<class Act>
 struct plain_return_type_2<arithmetic_action<Act>, unsigned long long int, int> {
   typedef long long type;
 };
 
-template<class Act> 
+template<class Act>
 struct plain_return_type_2<arithmetic_action<Act>, int, unsigned long long int> {
   typedef long long type;
 };
 
-template<class Act> 
+template<class Act>
 struct plain_return_type_2<arithmetic_action<Act>, unsigned long long int, long> {
   typedef long long type;
 };
 
-template<class Act> 
+template<class Act>
 struct plain_return_type_2<arithmetic_action<Act>, long, unsigned long long int> {
   typedef long long type;
 };
 
-template<class Act> 
+template<class Act>
 struct plain_return_type_2<arithmetic_action<Act>, unsigned long long int, long long int> {
   typedef long long type;
 };
 
-template<class Act> 
+template<class Act>
 struct plain_return_type_2<arithmetic_action<Act>, long long int, unsigned long long int> {
   typedef long long type;
 };
 
 
-template<class Act> 
+template<class Act>
 struct plain_return_type_2<arithmetic_action<Act>, unsigned long long int, unsigned char> {
   typedef long long type;
 };
 
-template<class Act> 
+template<class Act>
 struct plain_return_type_2<arithmetic_action<Act>, unsigned char, unsigned long long int> {
   typedef long long type;
 };
 
-template<class Act> 
+template<class Act>
 struct plain_return_type_2<arithmetic_action<Act>, unsigned long long int, unsigned short> {
   typedef long long type;
 };
 
-template<class Act> 
+template<class Act>
 struct plain_return_type_2<arithmetic_action<Act>, unsigned short, unsigned long long int> {
   typedef long long type;
 };
 
-template<class Act> 
+template<class Act>
 struct plain_return_type_2<arithmetic_action<Act>, unsigned long long int, unsigned int> {
   typedef long long type;
 };
 
-template<class Act> 
+template<class Act>
 struct plain_return_type_2<arithmetic_action<Act>, unsigned int, unsigned long long int> {
   typedef long long type;
 };
 
-template<class Act> 
+template<class Act>
 struct plain_return_type_2<arithmetic_action<Act>, unsigned long long int, unsigned long> {
   typedef long long type;
 };
 
-template<class Act> 
+template<class Act>
 struct plain_return_type_2<arithmetic_action<Act>, unsigned long, unsigned long long int> {
   typedef long long type;
 };
 
-template<class Act> 
+template<class Act>
 struct plain_return_type_2<arithmetic_action<Act>, unsigned long long int, float> {
   typedef long long type;
 };
 
-template<class Act> 
+template<class Act>
 struct plain_return_type_2<arithmetic_action<Act>, float, unsigned long long int> {
   typedef long long type;
 };
 
-template<class Act> 
+template<class Act>
 struct plain_return_type_2<arithmetic_action<Act>, unsigned long long int, double> {
   typedef long long type;
 };
 
-template<class Act> 
+template<class Act>
 struct plain_return_type_2<arithmetic_action<Act>, double, unsigned long long int> {
   typedef long long type;
 };
 
-template<class Act> 
+template<class Act>
 struct plain_return_type_2<arithmetic_action<Act>, unsigned long long int, long double> {
   typedef long long type;
 };
 
-template<class Act> 
+template<class Act>
 struct plain_return_type_2<arithmetic_action<Act>, long double, unsigned long long int> {
   typedef long long type;
 };
@@ -271,137 +271,137 @@ struct plain_return_type_2<arithmetic_action<Act>, long double, unsigned long lo
 
 
 
-template<class Act> 
+template<class Act>
 struct plain_return_type_2<arithmetic_action<Act>, wchar_t, wchar_t> {
   typedef long long type;
 };
 
-template<class Act> 
+template<class Act>
 struct plain_return_type_2<arithmetic_action<Act>, wchar_t, char> {
   typedef long long type;
 };
 
-template<class Act> 
+template<class Act>
 struct plain_return_type_2<arithmetic_action<Act>, char, wchar_t> {
   typedef long long type;
 };
 
-template<class Act> 
+template<class Act>
 struct plain_return_type_2<arithmetic_action<Act>, wchar_t, short> {
   typedef long long type;
 };
 
-template<class Act> 
+template<class Act>
 struct plain_return_type_2<arithmetic_action<Act>, short, wchar_t> {
   typedef long long type;
 };
 
-template<class Act> 
+template<class Act>
 struct plain_return_type_2<arithmetic_action<Act>, wchar_t, int> {
   typedef long long type;
 };
 
-template<class Act> 
+template<class Act>
 struct plain_return_type_2<arithmetic_action<Act>, int, wchar_t> {
   typedef long long type;
 };
 
-template<class Act> 
+template<class Act>
 struct plain_return_type_2<arithmetic_action<Act>, wchar_t, long> {
   typedef long long type;
 };
 
-template<class Act> 
+template<class Act>
 struct plain_return_type_2<arithmetic_action<Act>, long, wchar_t> {
   typedef long long type;
 };
 
-template<class Act> 
+template<class Act>
 struct plain_return_type_2<arithmetic_action<Act>, wchar_t, unsigned char> {
   typedef long long type;
 };
 
-template<class Act> 
+template<class Act>
 struct plain_return_type_2<arithmetic_action<Act>, unsigned char, wchar_t> {
   typedef long long type;
 };
 
-template<class Act> 
+template<class Act>
 struct plain_return_type_2<arithmetic_action<Act>, wchar_t, unsigned short> {
   typedef long long type;
 };
 
-template<class Act> 
+template<class Act>
 struct plain_return_type_2<arithmetic_action<Act>, unsigned short, wchar_t> {
   typedef long long type;
 };
 
-template<class Act> 
+template<class Act>
 struct plain_return_type_2<arithmetic_action<Act>, wchar_t, unsigned int> {
   typedef long long type;
 };
 
-template<class Act> 
+template<class Act>
 struct plain_return_type_2<arithmetic_action<Act>, unsigned int, wchar_t> {
   typedef long long type;
 };
 
-template<class Act> 
+template<class Act>
 struct plain_return_type_2<arithmetic_action<Act>, wchar_t, unsigned long> {
   typedef long long type;
 };
 
-template<class Act> 
+template<class Act>
 struct plain_return_type_2<arithmetic_action<Act>, unsigned long, wchar_t> {
   typedef long long type;
 };
 
-template<class Act> 
+template<class Act>
 struct plain_return_type_2<arithmetic_action<Act>, wchar_t, long long int> {
   typedef long long type;
 };
 
-template<class Act> 
+template<class Act>
 struct plain_return_type_2<arithmetic_action<Act>, long long int, wchar_t> {
   typedef long long type;
 };
 
-template<class Act> 
+template<class Act>
 struct plain_return_type_2<arithmetic_action<Act>, wchar_t, unsigned long long int> {
   typedef long long type;
 };
 
-template<class Act> 
+template<class Act>
 struct plain_return_type_2<arithmetic_action<Act>, unsigned long long int, wchar_t> {
   typedef long long type;
 };
 
-template<class Act> 
+template<class Act>
 struct plain_return_type_2<arithmetic_action<Act>, wchar_t, float> {
   typedef long long type;
 };
 
-template<class Act> 
+template<class Act>
 struct plain_return_type_2<arithmetic_action<Act>, float, wchar_t> {
   typedef long long type;
 };
 
-template<class Act> 
+template<class Act>
 struct plain_return_type_2<arithmetic_action<Act>, wchar_t, double> {
   typedef long long type;
 };
 
-template<class Act> 
+template<class Act>
 struct plain_return_type_2<arithmetic_action<Act>, double, wchar_t> {
   typedef long long type;
 };
 
-template<class Act> 
+template<class Act>
 struct plain_return_type_2<arithmetic_action<Act>, wchar_t, long double> {
   typedef long long type;
 };
 
-template<class Act> 
+template<class Act>
 struct plain_return_type_2<arithmetic_action<Act>, long double, wchar_t> {
   typedef long long type;
 };
@@ -488,7 +488,7 @@ CPValueLattice::operator==(Lattice* X) /*const*/
 
 // Computes the meet of this and that and saves the result in this
 // Returns true if this causes this to change and false otherwise
-bool 
+bool
 CPValueLattice::meetUpdate(Lattice* X)
 {
   CPValueLattice* that = dynamic_cast<CPValueLattice*>(X);
@@ -502,10 +502,10 @@ CPValueLattice::meetUpdate(CPValueLattice* that)
   pair<bool, CPValueKindPtr> ret = kind->meetUpdateAO(that->kind);
   // Update kind
   kind = ret.second;
-  
+
   // Return whether kind was modified
   return ret.first;
-  
+
 /*  if(this->kind->getKind()==CPValueKind::uninitialized && )
   if (this->level == emptySet) {
     if(that->level == emptySet) {
@@ -535,7 +535,7 @@ CPValueLattice::meetUpdate(CPValueLattice* that)
       return true;
     }
     assert(0); // We should never get here
-  } else if (this->level == fullSet) { 
+  } else if (this->level == fullSet) {
     // Already at the fullSet. Cannot go up further.
     return false;
   }
@@ -616,9 +616,9 @@ CPValueLattice::str(string indent) const
 
 // Applies the given unary or binary operation to this and the given CPValueKind
 // Returns:
-//    - if this CPValueKind can be updated to incorporate the result of the addition, 
+//    - if this CPValueKind can be updated to incorporate the result of the addition,
 //       return a freshly-allocated CPValueKind that holds the result.
-//    - if the two objects could not be merged and therefore that must be placed after 
+//    - if the two objects could not be merged and therefore that must be placed after
 //       this in the parent CPValueLattice's list, return that.
 CPValueLatticePtr CPValueLattice::op(SgUnaryOp* op) {
   SIGHT_VERB_DECL(scope, (txt()<<"CPValueLattice::op(SgUnaryOp "<<SgNode2Str(op)<<")", scope::medium), 1, CPDebugLevel)
@@ -746,12 +746,12 @@ set<boost::shared_ptr<SgValueExp> > CPValueObject::getConcreteValue()
   return concreteVals;
 }
 
-// Returns a key that uniquely identifies this particular AbstractObject in the 
+// Returns a key that uniquely identifies this particular AbstractObject in the
 // set hierarchy.
 const AbstractionHierarchy::hierKeyPtr& CPValueObject::getHierKey() const {
   if(!isHierKeyCached) {
     ((CPValueObject*)this)->cachedHierKey = boost::make_shared<AOSHierKey>(((CPValueObject*)this)->shared_from_this());
-    
+
     // The all object gets an empty key since it contains all the object types
     if(ground->getKind()->getKind()==CPValueKind::unknown) { }
     else {
@@ -878,10 +878,10 @@ CPValueKindPtr CPConcreteKind::createCPValueKindFromVal(char val)
 
 CPValueKindPtr CPConcreteKind::createCPValueKindFromVal(short val)
 { return boost::make_shared<CPConcreteKind>(boost::shared_ptr<SgValueExp>(SageBuilder::buildShortVal(val))); }
-  
+
 CPValueKindPtr CPConcreteKind::createCPValueKindFromVal(int val)
 { return boost::make_shared<CPConcreteKind>(boost::shared_ptr<SgValueExp>(SageBuilder::buildIntVal(val))); }
-  
+
 CPValueKindPtr CPConcreteKind::createCPValueKindFromVal(long val)
 { return boost::make_shared<CPConcreteKind>(boost::shared_ptr<SgValueExp>(SageBuilder::buildLongIntVal(val))); }
 
@@ -896,7 +896,7 @@ CPValueKindPtr CPConcreteKind::createCPValueKindFromVal(unsigned short val)
 
 CPValueKindPtr CPConcreteKind::createCPValueKindFromVal(unsigned int val)
 { return boost::make_shared<CPConcreteKind>(boost::shared_ptr<SgValueExp>(SageBuilder::buildUnsignedIntVal(val))); }
-  
+
 CPValueKindPtr CPConcreteKind::createCPValueKindFromVal(unsigned long val)
 { return boost::make_shared<CPConcreteKind>(boost::shared_ptr<SgValueExp>(SageBuilder::buildUnsignedLongVal(val))); }
 
@@ -920,33 +920,33 @@ CPValueKindPtr CPConcreteKind::createCPValueKindFromVal(long double val)
 template<class DoOpType>
 	CPValueKindPtr CPConcreteKind::doUnaryOp(DoOpType& doOp) {
 	  switch(exp.get()->variantT()) {
-	    case V_SgBoolValExp:             
-	    case V_SgCharVal:                
-	    case V_SgShortVal:                
-	    case V_SgIntVal:                 
-	    case V_SgLongIntVal:             
-	    case V_SgLongLongIntVal:         
-	    case V_SgUnsignedCharVal:        
-	    case V_SgUnsignedIntVal:         
-	    case V_SgUnsignedLongVal:        
-	    case V_SgUnsignedLongLongIntVal: 
-	    case V_SgUnsignedShortVal:       
-	    case V_SgUpcMythread:            
-	    case V_SgUpcThreads:             
-	    case V_SgWcharVal:               
+	    case V_SgBoolValExp:
+	    case V_SgCharVal:
+	    case V_SgShortVal:
+	    case V_SgIntVal:
+	    case V_SgLongIntVal:
+	    case V_SgLongLongIntVal:
+	    case V_SgUnsignedCharVal:
+	    case V_SgUnsignedIntVal:
+	    case V_SgUnsignedLongVal:
+	    case V_SgUnsignedLongLongIntVal:
+	    case V_SgUnsignedShortVal:
+	    case V_SgUpcMythread:
+	    case V_SgUpcThreads:
+	    case V_SgWcharVal:
 	    case V_SgEnumVal:
 	      return doUnaryIntegralOp(doOp);
-	    
+
 	    case V_SgDoubleVal: case V_SgFloatVal: case V_SgLongDoubleVal: case V_SgComplexVal:
 	      return doUnaryFloatOp(doOp);
-	    
+
 	    default:
 	      // We've enumerated all cases so we should never get here
 	      assert(0);
-	  }  
+	  }
 	}
 
-	// Applies the given operation functor to the expression in this ConcreteKind, whoch is assumed to be an integral type 
+	// Applies the given operation functor to the expression in this ConcreteKind, whoch is assumed to be an integral type
 	// and returns the resulting CPKind
 	template<class DoOpType>
 	CPValueKindPtr CPConcreteKind::doUnaryIntegralOp(DoOpType& doOp) {
@@ -979,34 +979,34 @@ template<class DoOpType>
 	    case V_SgUpcThreads:             return boost::make_shared<CPUnknownKind>();
 	    case V_SgWcharVal:               return createCPValueKindFromVal(doOp(isSgWcharVal              (exp.get())->get_value()));
 
-	    
-	    case V_SgEnumVal:    
+
+	    case V_SgEnumVal:
 	      //return boost::make_shared<CPConcreteKind>(boost::shared_ptr<SgValueExp>(SageBuilder::buildEnumVal               (isSgEnusmVal               (exp.get())->get_value()-1)));
 	      // NOTE: Need to write code to get the value of the Enum Val and create a new one
 	      assert(0);
 	    default:
 	      // We've enumerated all cases so we should never get here
 	      assert(0);
-	  }  
+	  }
 	}
 
-	// Applies the given operation functor to the expression in this ConcreteKind, which is assumed to a floating point type 
+	// Applies the given operation functor to the expression in this ConcreteKind, which is assumed to a floating point type
 	// and returns the resulting CPKind
 	template<class DoOpType>
 	CPValueKindPtr CPConcreteKind::doUnaryFloatOp(DoOpType& doOp) {
 	  switch(exp.get()->variantT()) {
-	    case V_SgComplexVal:             return boost::make_shared<CPUnknownKind>();                        
+	    case V_SgComplexVal:             return boost::make_shared<CPUnknownKind>();
 	    /*case V_SgDoubleVal:              return boost::make_shared<CPConcreteKind>(boost::shared_ptr<SgValueExp>(SageBuilder::buildDoubleVal             (doOp(isSgDoubleVal             (exp.get())->get_value()))));
 	    case V_SgFloatVal:               return boost::make_shared<CPConcreteKind>(boost::shared_ptr<SgValueExp>(SageBuilder::buildFloatVal              (doOp(isSgFloatVal              (exp.get())->get_value()))));
 	    case V_SgLongDoubleVal:          return boost::make_shared<CPConcreteKind>(boost::shared_ptr<SgValueExp>(SageBuilder::buildLongDoubleVal         (doOp(isSgLongDoubleVal         (exp.get())->get_value()))));*/
 	    case V_SgDoubleVal:              return createCPValueKindFromVal(doOp(isSgDoubleVal             (exp.get())->get_value()));
 	    case V_SgFloatVal:               return createCPValueKindFromVal(doOp(isSgFloatVal              (exp.get())->get_value()));
 	    case V_SgLongDoubleVal:          return createCPValueKindFromVal(doOp(isSgLongDoubleVal         (exp.get())->get_value()));
-	    
+
 	    default:
 	      // We've enumerated all cases so we should never get here
 	      assert(0);
-	  }  
+	  }
 }
 
 // Applies the given unary or binary operation to this and the given CPValueKind
@@ -1017,9 +1017,9 @@ template<class DoOpType>
 //       this in the parent CPValueObject's list, return that.
 CPValueKindPtr CPConcreteKind::op(SgUnaryOp* op) {
   if(isSgBitComplementOp(op)) {
-    if(isSgBoolValExp(exp.get())) 
+    if(isSgBoolValExp(exp.get()))
       switch(exp.get()->variantT()) {
-      case V_SgBoolValExp: case V_SgComplexVal: case V_SgUpcMythread: case V_SgUpcThreads: 
+      case V_SgBoolValExp: case V_SgComplexVal: case V_SgUpcMythread: case V_SgUpcThreads:
       case V_SgFloatVal: case V_SgDoubleVal: case V_SgLongDoubleVal:
         return boost::make_shared<CPUnknownKind>();
       default: return doUnaryIntegralOp(~ boost::lambda::_1);
@@ -1031,12 +1031,12 @@ CPValueKindPtr CPConcreteKind::op(SgUnaryOp* op) {
       t = tt->get_base_type();
 
     switch(t->variantT()) {
-      case V_SgTypeBool:               return doUnaryOp(boost::lambda::ll_static_cast<bool>              (boost::lambda::_1)); 
-      case V_SgTypeComplex:            assert(0);             
+      case V_SgTypeBool:               return doUnaryOp(boost::lambda::ll_static_cast<bool>              (boost::lambda::_1));
+      case V_SgTypeComplex:            assert(0);
       case V_SgTypeFloat:              return doUnaryOp(boost::lambda::ll_static_cast<float>             (boost::lambda::_1));
       case V_SgTypeDouble:             return doUnaryOp(boost::lambda::ll_static_cast<double>            (boost::lambda::_1));
       case V_SgTypeLongDouble:         return doUnaryOp(boost::lambda::ll_static_cast<long double>       (boost::lambda::_1));
-      case V_SgTypeChar:               return doUnaryOp(boost::lambda::ll_static_cast<char>              (boost::lambda::_1)); 
+      case V_SgTypeChar:               return doUnaryOp(boost::lambda::ll_static_cast<char>              (boost::lambda::_1));
       case V_SgTypeInt:                return doUnaryOp(boost::lambda::ll_static_cast<int>               (boost::lambda::_1));
       case V_SgTypeLong:               return doUnaryOp(boost::lambda::ll_static_cast<long>              (boost::lambda::_1));
       case V_SgTypeLongLong:           return doUnaryOp(boost::lambda::ll_static_cast<long long>         (boost::lambda::_1));
@@ -1048,15 +1048,15 @@ CPValueKindPtr CPConcreteKind::op(SgUnaryOp* op) {
       case V_SgTypeUnsignedShort:      return doUnaryOp(boost::lambda::ll_static_cast<unsigned short>    (boost::lambda::_1));
       case V_SgTypeSignedChar:         return doUnaryOp(boost::lambda::ll_static_cast<char>              (boost::lambda::_1));
       case V_SgTypeSignedInt:          return doUnaryOp(boost::lambda::ll_static_cast<int>               (boost::lambda::_1));
-      case V_SgTypeSignedLong:         return doUnaryOp(boost::lambda::ll_static_cast<long>              (boost::lambda::_1));      
+      case V_SgTypeSignedLong:         return doUnaryOp(boost::lambda::ll_static_cast<long>              (boost::lambda::_1));
       case V_SgTypeSignedLongLong:     return doUnaryOp(boost::lambda::ll_static_cast<long long>         (boost::lambda::_1));
       case V_SgTypeSignedShort:        return doUnaryOp(boost::lambda::ll_static_cast<short>             (boost::lambda::_1));
       case V_SgTypeWchar:              return doUnaryOp(boost::lambda::ll_static_cast<wchar_t>           (boost::lambda::_1));
-        
-      case V_SgArrayType: case V_SgFunctionType: case V_SgJavaWildcardType: case V_SgModifierType: 
-      case V_SgNamedType: case V_SgPointerType: case V_SgQualifiedNameType: case V_SgReferenceType: 
-      case V_SgTemplateType: case V_SgTypeCAFTeam: case V_SgTypeCrayPointer: case V_SgTypeDefault: 
-      case V_SgTypeEllipse: case V_SgTypeGlobalVoid: case V_SgTypeImaginary: case V_SgTypeLabel: 
+
+      case V_SgArrayType: case V_SgFunctionType: case V_SgJavaWildcardType: case V_SgModifierType:
+      case V_SgNamedType: case V_SgPointerType: case V_SgQualifiedNameType: case V_SgReferenceType:
+      case V_SgTemplateType: case V_SgTypeCAFTeam: case V_SgTypeCrayPointer: case V_SgTypeDefault:
+      case V_SgTypeEllipse: case V_SgTypeGlobalVoid: case V_SgTypeImaginary: case V_SgTypeLabel:
       case V_SgTypeVoid:
       default:
         cerr << "ERROR: unknown cast expression type. unwrapped type="<<SgNode2Str(t)<<" full type="<<SgNode2Str(isSgCastExp(op)->get_type())<<", op="<<SgNode2Str(op)<<endl;
@@ -1064,7 +1064,7 @@ CPValueKindPtr CPConcreteKind::op(SgUnaryOp* op) {
     }
   } else if(isSgConjugateOp(op)) {
     // TO DO
-    /*if(isSgComplexVal(exp.get())) 
+    /*if(isSgComplexVal(exp.get()))
       return boost::make_shared<CPConcreteKind>(boost::shared_ptr<SgValueExp>(SageBuilder::buildComplexVal(
                isSgComplexVal(exp.get())->get_real_value(),
               -isSgComplexVal(exp.get())->get_imaginary_value())));
@@ -1073,12 +1073,12 @@ CPValueKindPtr CPConcreteKind::op(SgUnaryOp* op) {
   } else if(isSgExpressionRoot(op)) {
     // What is this?
   } else if(isSgImagPartOp(op)) {
-    if(isSgComplexVal(exp.get())) 
+    if(isSgComplexVal(exp.get()))
       return boost::make_shared<CPConcreteKind>(boost::shared_ptr<SgValueExp>(isSgComplexVal(exp.get())->get_imaginary_value()));
     else
       return boost::make_shared<CPUnknownKind>();
   } else if(isSgRealPartOp(op)) {
-    if(isSgComplexVal(exp.get())) 
+    if(isSgComplexVal(exp.get()))
       return boost::make_shared<CPConcreteKind>(boost::shared_ptr<SgValueExp>(isSgComplexVal(exp.get())->get_real_value()));
     else
       return boost::make_shared<CPUnknownKind>();
@@ -1102,27 +1102,27 @@ CPValueKindPtr CPConcreteKind::op(SgUnaryOp* op) {
       case V_SgComplexVal: case V_SgUpcMythread: case V_SgUpcThreads: return boost::make_shared<CPUnknownKind>();
       default: return doUnaryOp(!boost::lambda::_1);
     }
-     
+
   } else if(isSgThrowOp(op)) {
     return boost::make_shared<CPUnknownKind>();
     // TODO: control flow effects
-  
+
   } else if(isSgUnaryAddOp(op)) {
     // What is this?
-    
+
   } else if(isSgUserDefinedUnaryOp(op)) {
     // What is this?
-  
+
   } else if(isSgAddressOfOp(op)) {
     // TODO
     return boost::make_shared<CPUnknownKind>();
-    
-    
+
+
   } else if(isSgPointerDerefExp(op)) {
     // This should be handled inside CPMemLocObjects
     assert(0);
   }
-  
+
   // We've enumerated all cases so we should never get here
   cerr << "ERROR: no support for "<<SgNode2Str(op)<<"!";
   assert(0);
@@ -1198,18 +1198,18 @@ DoOpRetType CPConcreteKind::bindDoOpArgs1(DoOpType doOp) {
     case V_SgUnsignedLongVal:        return boost::bind(doOp, isSgUnsignedLongVal       (exp.get())->get_value(), _1);
     case V_SgUnsignedLongLongIntVal: return boost::bind(doOp, isSgUnsignedLongLongIntVal(exp.get())->get_value(), _1);
     case V_SgUnsignedShortVal:       return boost::bind(doOp, isSgUnsignedShortVal      (exp.get())->get_value(), _1);
-    case V_SgUpcMythread:  case V_SgUpcThreads: 
+    case V_SgUpcMythread:  case V_SgUpcThreads:
       assert(0);
-    
+
     case V_SgWcharVal:               return boost::bind(doOp, isSgWcharVal              (exp.get())->get_value(), _1);
     case V_SgEnumVal:
       assert(0);
     case V_SgDoubleVal:              return boost::bind(doOp, isSgDoubleVal             (exp.get())->get_value(), _1);
     case V_SgFloatVal:               return boost::bind(doOp, isSgFloatVal              (exp.get())->get_value(), _1);
     case V_SgLongDoubleVal:          return boost::bind(doOp, isSgLongDoubleVal         (exp.get())->get_value(), _1);
-    case V_SgComplexVal:             
+    case V_SgComplexVal:
       assert(0);
-    
+
     default:
       // We've enumerated all cases so we should never get here
       assert(0);
@@ -1229,18 +1229,18 @@ DoOpRetType CPConcreteKind::bindDoOpArgs2(DoOpType doOp) {
     case V_SgUnsignedLongVal:        return boost::bind(doOp, isSgUnsignedLongVal       (exp.get())->get_value());
     case V_SgUnsignedLongLongIntVal: return boost::bind(doOp, isSgUnsignedLongLongIntVal(exp.get())->get_value());
     case V_SgUnsignedShortVal:       return boost::bind(doOp, isSgUnsignedShortVal      (exp.get())->get_value());
-    case V_SgUpcMythread:  case V_SgUpcThreads: 
+    case V_SgUpcMythread:  case V_SgUpcThreads:
       assert(0);
-    
+
     case V_SgWcharVal:               return boost::bind(doOp, isSgWcharVal              (exp.get())->get_value());
-    case V_SgEnumVal:                
+    case V_SgEnumVal:
       assert(0);
     case V_SgDoubleVal:              return boost::bind(doOp, isSgDoubleVal             (exp.get())->get_value());
     case V_SgFloatVal:               return boost::bind(doOp, isSgFloatVal              (exp.get())->get_value());
     case V_SgLongDoubleVal:          return boost::bind(doOp, isSgLongDoubleVal         (exp.get())->get_value());
-    case V_SgComplexVal:             
+    case V_SgComplexVal:
       assert(0);
-    
+
     default:
       // We've enumerated all cases so we should never get here
       assert(0);
@@ -1250,26 +1250,26 @@ DoOpRetType CPConcreteKind::bindDoOpArgs2(DoOpType doOp) {
 // Returns whether v denotes an integral (as opposed to floating point) value
 bool isIntegralVal(SgValueExp* v) {
   switch(v->variantT()) {
-    case V_SgBoolValExp:             
-    case V_SgCharVal:                
-    case V_SgShortVal:               
-    case V_SgIntVal:                 
-    case V_SgLongIntVal:             
-    case V_SgLongLongIntVal:         
-    case V_SgUnsignedCharVal:        
-    case V_SgUnsignedShortVal:       
-    case V_SgUnsignedIntVal:         
-    case V_SgUnsignedLongVal:        
-    case V_SgUnsignedLongLongIntVal: 
-    case V_SgWcharVal:               
-    case V_SgUpcMythread: case V_SgUpcThreads: 
-    case V_SgEnumVal:    
+    case V_SgBoolValExp:
+    case V_SgCharVal:
+    case V_SgShortVal:
+    case V_SgIntVal:
+    case V_SgLongIntVal:
+    case V_SgLongLongIntVal:
+    case V_SgUnsignedCharVal:
+    case V_SgUnsignedShortVal:
+    case V_SgUnsignedIntVal:
+    case V_SgUnsignedLongVal:
+    case V_SgUnsignedLongLongIntVal:
+    case V_SgWcharVal:
+    case V_SgUpcMythread: case V_SgUpcThreads:
+    case V_SgEnumVal:
       return true;
 
-    case V_SgFloatVal:               
-    case V_SgDoubleVal:              
-    case V_SgLongDoubleVal:          
-    case V_SgComplexVal: 
+    case V_SgFloatVal:
+    case V_SgDoubleVal:
+    case V_SgLongDoubleVal:
+    case V_SgComplexVal:
       return false;
 
     default:
@@ -1388,9 +1388,9 @@ long long getPntrArrRefOffset(SgPntrArrRefExp* ref, CPConcreteKindPtr that) {
   // the next array index (that value), which is a multiple of the next level's sub-array
   long long sRefIdx;
   unsigned long long usRefIdx;
-  if(IsSignedConstInt(that->getVal().get(), sRefIdx)) 
+  if(IsSignedConstInt(that->getVal().get(), sRefIdx))
     return subArraySize * sRefIdx;
-  else if(IsUnsignedConstInt(that->getVal().get(), usRefIdx)) 
+  else if(IsUnsignedConstInt(that->getVal().get(), usRefIdx))
     return subArraySize * usRefIdx;
   else
     // The index in the array's reference expression must be an integer of some sort
@@ -1416,7 +1416,7 @@ CPValueKindPtr CPConcreteKind::doBinaryOpIntInt(DoOpType& doOp, CPConcreteKindPt
   }
   assert(0);
   /*switch(exp.get()->variantT()) {
-    case V_SgBoolValExp:              
+    case V_SgBoolValExp:
       switch(that->exp.get()->variantT()) {
         case V_SgBoolValExp:             return createCPValueKindFromVal(doOp(isSgBoolValExp(exp.get())->get_value(), isSgBoolValExp            (that->exp.get())->get_value()));
         case V_SgCharVal:                return createCPValueKindFromVal(doOp(isSgBoolValExp(exp.get())->get_value(), isSgCharVal               (that->exp.get())->get_value()));
@@ -1430,9 +1430,9 @@ CPValueKindPtr CPConcreteKind::doBinaryOpIntInt(DoOpType& doOp, CPConcreteKindPt
         case V_SgUnsignedLongVal:        return createCPValueKindFromVal(doOp(isSgBoolValExp(exp.get())->get_value(), isSgUnsignedLongVal       (that->exp.get())->get_value()));
         case V_SgUnsignedLongLongIntVal: return createCPValueKindFromVal(doOp(isSgBoolValExp(exp.get())->get_value(), isSgUnsignedLongLongIntVal(that->exp.get())->get_value()));
         case V_SgWcharVal:               return createCPValueKindFromVal(doOp(isSgBoolValExp(exp.get())->get_value(), isSgWcharVal              (that->exp.get())->get_value()));
-        case V_SgUpcMythread: case V_SgUpcThreads: 
+        case V_SgUpcMythread: case V_SgUpcThreads:
           return boost::make_shared<CPUnknownKind>();
-        case V_SgEnumVal:    
+        case V_SgEnumVal:
           //return boost::make_shared<CPConcreteKind>(boost::shared_ptr<SgValueExp>(SageBuilder::buildEnumVal               (isSgEnumVal               (exp.get())->get_value()-1)));
           // NOTE: Need to write code to get the value of the Enum Val and create a new one
           assert(0);
@@ -1440,7 +1440,7 @@ CPValueKindPtr CPConcreteKind::doBinaryOpIntInt(DoOpType& doOp, CPConcreteKindPt
           // We've enumerated all cases so we should never get here
           assert(0);
       }
-    
+
     case V_SgCharVal:
       switch(that->exp.get()->variantT()) {
         case V_SgBoolValExp:             return createCPValueKindFromVal(doOp(isSgCharVal(exp.get())->get_value(), isSgBoolValExp            (that->exp.get())->get_value()));
@@ -1455,9 +1455,9 @@ CPValueKindPtr CPConcreteKind::doBinaryOpIntInt(DoOpType& doOp, CPConcreteKindPt
         case V_SgUnsignedLongVal:        return createCPValueKindFromVal(doOp(isSgCharVal(exp.get())->get_value(), isSgUnsignedLongVal       (that->exp.get())->get_value()));
         case V_SgUnsignedLongLongIntVal: return createCPValueKindFromVal(doOp(isSgCharVal(exp.get())->get_value(), isSgUnsignedLongLongIntVal(that->exp.get())->get_value()));
         case V_SgWcharVal:               return createCPValueKindFromVal(doOp(isSgCharVal(exp.get())->get_value(), isSgWcharVal              (that->exp.get())->get_value()));
-        case V_SgUpcMythread: case V_SgUpcThreads: 
+        case V_SgUpcMythread: case V_SgUpcThreads:
           return boost::make_shared<CPUnknownKind>();
-        case V_SgEnumVal:    
+        case V_SgEnumVal:
           //return boost::make_shared<CPConcreteKind>(boost::shared_ptr<SgValueExp>(SageBuilder::buildEnumVal               (isSgEnumVal               (exp.get())->get_value()-1)));
           // NOTE: Need to write code to get the value of the Enum Val and create a new one
           assert(0);
@@ -1480,9 +1480,9 @@ CPValueKindPtr CPConcreteKind::doBinaryOpIntInt(DoOpType& doOp, CPConcreteKindPt
         case V_SgUnsignedLongVal:        return createCPValueKindFromVal(doOp(isSgShortVal(exp.get())->get_value(), isSgUnsignedLongVal       (that->exp.get())->get_value()));
         case V_SgUnsignedLongLongIntVal: return createCPValueKindFromVal(doOp(isSgShortVal(exp.get())->get_value(), isSgUnsignedLongLongIntVal(that->exp.get())->get_value()));
         case V_SgWcharVal:               return createCPValueKindFromVal(doOp(isSgShortVal(exp.get())->get_value(), isSgWcharVal              (that->exp.get())->get_value()));
-        case V_SgUpcMythread: case V_SgUpcThreads: 
+        case V_SgUpcMythread: case V_SgUpcThreads:
           return boost::make_shared<CPUnknownKind>();
-        case V_SgEnumVal:    
+        case V_SgEnumVal:
           //return boost::make_shared<CPConcreteKind>(boost::shared_ptr<SgValueExp>(SageBuilder::buildEnumVal               (isSgEnumVal               (exp.get())->get_value()-1)));
           // NOTE: Need to write code to get the value of the Enum Val and create a new one
           assert(0);
@@ -1490,7 +1490,7 @@ CPValueKindPtr CPConcreteKind::doBinaryOpIntInt(DoOpType& doOp, CPConcreteKindPt
           // We've enumerated all cases so we should never get here
           assert(0);
       }
-      
+
     case V_SgIntVal:
       switch(that->exp.get()->variantT()) {
         case V_SgBoolValExp:             return createCPValueKindFromVal(doOp(isSgIntVal(exp.get())->get_value(), isSgBoolValExp            (that->exp.get())->get_value()));
@@ -1505,9 +1505,9 @@ CPValueKindPtr CPConcreteKind::doBinaryOpIntInt(DoOpType& doOp, CPConcreteKindPt
         case V_SgUnsignedLongVal:        return createCPValueKindFromVal(doOp(isSgIntVal(exp.get())->get_value(), isSgUnsignedLongVal       (that->exp.get())->get_value()));
         case V_SgUnsignedLongLongIntVal: return createCPValueKindFromVal(doOp(isSgIntVal(exp.get())->get_value(), isSgUnsignedLongLongIntVal(that->exp.get())->get_value()));
         case V_SgWcharVal:               return createCPValueKindFromVal(doOp(isSgIntVal(exp.get())->get_value(), isSgWcharVal              (that->exp.get())->get_value()));
-        case V_SgUpcMythread: case V_SgUpcThreads: 
+        case V_SgUpcMythread: case V_SgUpcThreads:
           return boost::make_shared<CPUnknownKind>();
-        case V_SgEnumVal:    
+        case V_SgEnumVal:
           //return boost::make_shared<CPConcreteKind>(boost::shared_ptr<SgValueExp>(SageBuilder::buildEnumVal               (isSgEnumVal               (exp.get())->get_value()-1)));
           // NOTE: Need to write code to get the value of the Enum Val and create a new one
           assert(0);
@@ -1516,7 +1516,7 @@ CPValueKindPtr CPConcreteKind::doBinaryOpIntInt(DoOpType& doOp, CPConcreteKindPt
           assert(0);
       }
 
-    case V_SgLongIntVal:             
+    case V_SgLongIntVal:
       switch(that->exp.get()->variantT()) {
         case V_SgBoolValExp:             return createCPValueKindFromVal(doOp(isSgLongIntVal(exp.get())->get_value(), isSgBoolValExp            (that->exp.get())->get_value()));
         case V_SgCharVal:                return createCPValueKindFromVal(doOp(isSgLongIntVal(exp.get())->get_value(), isSgCharVal               (that->exp.get())->get_value()));
@@ -1530,9 +1530,9 @@ CPValueKindPtr CPConcreteKind::doBinaryOpIntInt(DoOpType& doOp, CPConcreteKindPt
         case V_SgUnsignedLongVal:        return createCPValueKindFromVal(doOp(isSgLongIntVal(exp.get())->get_value(), isSgUnsignedLongVal       (that->exp.get())->get_value()));
         case V_SgUnsignedLongLongIntVal: return createCPValueKindFromVal(doOp(isSgLongIntVal(exp.get())->get_value(), isSgUnsignedLongLongIntVal(that->exp.get())->get_value()));
         case V_SgWcharVal:               return createCPValueKindFromVal(doOp(isSgLongIntVal(exp.get())->get_value(), isSgWcharVal              (that->exp.get())->get_value()));
-        case V_SgUpcMythread: case V_SgUpcThreads: 
+        case V_SgUpcMythread: case V_SgUpcThreads:
           return boost::make_shared<CPUnknownKind>();
-        case V_SgEnumVal:    
+        case V_SgEnumVal:
           //return boost::make_shared<CPConcreteKind>(boost::shared_ptr<SgValueExp>(SageBuilder::buildEnumVal               (isSgEnumVal               (exp.get())->get_value()-1)));
           // NOTE: Need to write code to get the value of the Enum Val and create a new one
           assert(0);
@@ -1540,8 +1540,8 @@ CPValueKindPtr CPConcreteKind::doBinaryOpIntInt(DoOpType& doOp, CPConcreteKindPt
           // We've enumerated all cases so we should never get here
           assert(0);
       }
-      
-    case V_SgLongLongIntVal:              
+
+    case V_SgLongLongIntVal:
       switch(that->exp.get()->variantT()) {
         case V_SgBoolValExp:             return createCPValueKindFromVal(doOp(isSgLongLongIntVal(exp.get())->get_value(), isSgBoolValExp            (that->exp.get())->get_value()));
         case V_SgCharVal:                return createCPValueKindFromVal(doOp(isSgLongLongIntVal(exp.get())->get_value(), isSgCharVal               (that->exp.get())->get_value()));
@@ -1555,9 +1555,9 @@ CPValueKindPtr CPConcreteKind::doBinaryOpIntInt(DoOpType& doOp, CPConcreteKindPt
         case V_SgUnsignedLongVal:        return createCPValueKindFromVal(doOp(isSgLongLongIntVal(exp.get())->get_value(), isSgUnsignedLongVal       (that->exp.get())->get_value()));
         case V_SgUnsignedLongLongIntVal: return createCPValueKindFromVal(doOp(isSgLongLongIntVal(exp.get())->get_value(), isSgUnsignedLongLongIntVal(that->exp.get())->get_value()));
         case V_SgWcharVal:               return createCPValueKindFromVal(doOp(isSgLongLongIntVal(exp.get())->get_value(), isSgWcharVal              (that->exp.get())->get_value()));
-        case V_SgUpcMythread: case V_SgUpcThreads: 
+        case V_SgUpcMythread: case V_SgUpcThreads:
           return boost::make_shared<CPUnknownKind>();
-        case V_SgEnumVal:    
+        case V_SgEnumVal:
           //return boost::make_shared<CPConcreteKind>(boost::shared_ptr<SgValueExp>(SageBuilder::buildEnumVal               (isSgEnumVal               (exp.get())->get_value()-1)));
           // NOTE: Need to write code to get the value of the Enum Val and create a new one
           assert(0);
@@ -1565,8 +1565,8 @@ CPValueKindPtr CPConcreteKind::doBinaryOpIntInt(DoOpType& doOp, CPConcreteKindPt
           // We've enumerated all cases so we should never get here
           assert(0);
       }
-      
-    case V_SgUnsignedCharVal:        
+
+    case V_SgUnsignedCharVal:
       switch(that->exp.get()->variantT()) {
         case V_SgBoolValExp:             return createCPValueKindFromVal(doOp(isSgUnsignedCharVal(exp.get())->get_value(), isSgBoolValExp            (that->exp.get())->get_value()));
         case V_SgCharVal:                return createCPValueKindFromVal(doOp(isSgUnsignedCharVal(exp.get())->get_value(), isSgCharVal               (that->exp.get())->get_value()));
@@ -1580,9 +1580,9 @@ CPValueKindPtr CPConcreteKind::doBinaryOpIntInt(DoOpType& doOp, CPConcreteKindPt
         case V_SgUnsignedLongVal:        return createCPValueKindFromVal(doOp(isSgUnsignedCharVal(exp.get())->get_value(), isSgUnsignedLongVal       (that->exp.get())->get_value()));
         case V_SgUnsignedLongLongIntVal: return createCPValueKindFromVal(doOp(isSgUnsignedCharVal(exp.get())->get_value(), isSgUnsignedLongLongIntVal(that->exp.get())->get_value()));
         case V_SgWcharVal:               return createCPValueKindFromVal(doOp(isSgUnsignedCharVal(exp.get())->get_value(), isSgWcharVal              (that->exp.get())->get_value()));
-        case V_SgUpcMythread: case V_SgUpcThreads: 
+        case V_SgUpcMythread: case V_SgUpcThreads:
           return boost::make_shared<CPUnknownKind>();
-        case V_SgEnumVal:    
+        case V_SgEnumVal:
           //return boost::make_shared<CPConcreteKind>(boost::shared_ptr<SgValueExp>(SageBuilder::buildEnumVal               (isSgEnumVal               (exp.get())->get_value()-1)));
           // NOTE: Need to write code to get the value of the Enum Val and create a new one
           assert(0);
@@ -1590,8 +1590,8 @@ CPValueKindPtr CPConcreteKind::doBinaryOpIntInt(DoOpType& doOp, CPConcreteKindPt
           // We've enumerated all cases so we should never get here
           assert(0);
       }
-      
-    case V_SgUnsignedShortVal:                    
+
+    case V_SgUnsignedShortVal:
       switch(that->exp.get()->variantT()) {
         case V_SgBoolValExp:             return createCPValueKindFromVal(doOp(isSgUnsignedShortVal(exp.get())->get_value(), isSgBoolValExp            (that->exp.get())->get_value()));
         case V_SgCharVal:                return createCPValueKindFromVal(doOp(isSgUnsignedShortVal(exp.get())->get_value(), isSgCharVal               (that->exp.get())->get_value()));
@@ -1605,9 +1605,9 @@ CPValueKindPtr CPConcreteKind::doBinaryOpIntInt(DoOpType& doOp, CPConcreteKindPt
         case V_SgUnsignedLongVal:        return createCPValueKindFromVal(doOp(isSgUnsignedShortVal(exp.get())->get_value(), isSgUnsignedLongVal       (that->exp.get())->get_value()));
         case V_SgUnsignedLongLongIntVal: return createCPValueKindFromVal(doOp(isSgUnsignedShortVal(exp.get())->get_value(), isSgUnsignedLongLongIntVal(that->exp.get())->get_value()));
         case V_SgWcharVal:               return createCPValueKindFromVal(doOp(isSgUnsignedShortVal(exp.get())->get_value(), isSgWcharVal              (that->exp.get())->get_value()));
-        case V_SgUpcMythread: case V_SgUpcThreads: 
+        case V_SgUpcMythread: case V_SgUpcThreads:
           return boost::make_shared<CPUnknownKind>();
-        case V_SgEnumVal:    
+        case V_SgEnumVal:
           //return boost::make_shared<CPConcreteKind>(boost::shared_ptr<SgValueExp>(SageBuilder::buildEnumVal               (isSgEnumVal               (exp.get())->get_value()-1)));
           // NOTE: Need to write code to get the value of the Enum Val and create a new one
           assert(0);
@@ -1615,8 +1615,8 @@ CPValueKindPtr CPConcreteKind::doBinaryOpIntInt(DoOpType& doOp, CPConcreteKindPt
           // We've enumerated all cases so we should never get here
           assert(0);
       }
-      
-    case V_SgUnsignedIntVal:                            
+
+    case V_SgUnsignedIntVal:
       switch(that->exp.get()->variantT()) {
         case V_SgBoolValExp:             return createCPValueKindFromVal(doOp(isSgUnsignedIntVal(exp.get())->get_value(), isSgBoolValExp            (that->exp.get())->get_value()));
         case V_SgCharVal:                return createCPValueKindFromVal(doOp(isSgUnsignedIntVal(exp.get())->get_value(), isSgCharVal               (that->exp.get())->get_value()));
@@ -1630,9 +1630,9 @@ CPValueKindPtr CPConcreteKind::doBinaryOpIntInt(DoOpType& doOp, CPConcreteKindPt
         case V_SgUnsignedLongVal:        return createCPValueKindFromVal(doOp(isSgUnsignedIntVal(exp.get())->get_value(), isSgUnsignedLongVal       (that->exp.get())->get_value()));
         case V_SgUnsignedLongLongIntVal: return createCPValueKindFromVal(doOp(isSgUnsignedIntVal(exp.get())->get_value(), isSgUnsignedLongLongIntVal(that->exp.get())->get_value()));
         case V_SgWcharVal:               return createCPValueKindFromVal(doOp(isSgUnsignedIntVal(exp.get())->get_value(), isSgWcharVal              (that->exp.get())->get_value()));
-        case V_SgUpcMythread: case V_SgUpcThreads: 
+        case V_SgUpcMythread: case V_SgUpcThreads:
           return boost::make_shared<CPUnknownKind>();
-        case V_SgEnumVal:    
+        case V_SgEnumVal:
           //return boost::make_shared<CPConcreteKind>(boost::shared_ptr<SgValueExp>(SageBuilder::buildEnumVal               (isSgEnumVal               (exp.get())->get_value()-1)));
           // NOTE: Need to write code to get the value of the Enum Val and create a new one
           assert(0);
@@ -1640,8 +1640,8 @@ CPValueKindPtr CPConcreteKind::doBinaryOpIntInt(DoOpType& doOp, CPConcreteKindPt
           // We've enumerated all cases so we should never get here
           assert(0);
       }
-      
-    case V_SgUnsignedLongVal:                     
+
+    case V_SgUnsignedLongVal:
       switch(that->exp.get()->variantT()) {
         case V_SgBoolValExp:             return createCPValueKindFromVal(doOp(isSgUnsignedLongVal(exp.get())->get_value(), isSgBoolValExp            (that->exp.get())->get_value()));
         case V_SgCharVal:                return createCPValueKindFromVal(doOp(isSgUnsignedLongVal(exp.get())->get_value(), isSgCharVal               (that->exp.get())->get_value()));
@@ -1655,9 +1655,9 @@ CPValueKindPtr CPConcreteKind::doBinaryOpIntInt(DoOpType& doOp, CPConcreteKindPt
         case V_SgUnsignedLongVal:        return createCPValueKindFromVal(doOp(isSgUnsignedLongVal(exp.get())->get_value(), isSgUnsignedLongVal       (that->exp.get())->get_value()));
         case V_SgUnsignedLongLongIntVal: return createCPValueKindFromVal(doOp(isSgUnsignedLongVal(exp.get())->get_value(), isSgUnsignedLongLongIntVal(that->exp.get())->get_value()));
         case V_SgWcharVal:               return createCPValueKindFromVal(doOp(isSgUnsignedLongVal(exp.get())->get_value(), isSgWcharVal              (that->exp.get())->get_value()));
-        case V_SgUpcMythread: case V_SgUpcThreads: 
+        case V_SgUpcMythread: case V_SgUpcThreads:
           return boost::make_shared<CPUnknownKind>();
-        case V_SgEnumVal:    
+        case V_SgEnumVal:
           //return boost::make_shared<CPConcreteKind>(boost::shared_ptr<SgValueExp>(SageBuilder::buildEnumVal               (isSgEnumVal               (exp.get())->get_value()-1)));
           // NOTE: Need to write code to get the value of the Enum Val and create a new one
           assert(0);
@@ -1665,8 +1665,8 @@ CPValueKindPtr CPConcreteKind::doBinaryOpIntInt(DoOpType& doOp, CPConcreteKindPt
           // We've enumerated all cases so we should never get here
           assert(0);
       }
-      
-    case V_SgUnsignedLongLongIntVal:              
+
+    case V_SgUnsignedLongLongIntVal:
       switch(that->exp.get()->variantT()) {
         case V_SgBoolValExp:             return createCPValueKindFromVal(doOp(isSgUnsignedLongLongIntVal(exp.get())->get_value(), isSgBoolValExp            (that->exp.get())->get_value()));
         case V_SgCharVal:                return createCPValueKindFromVal(doOp(isSgUnsignedLongLongIntVal(exp.get())->get_value(), isSgCharVal               (that->exp.get())->get_value()));
@@ -1680,9 +1680,9 @@ CPValueKindPtr CPConcreteKind::doBinaryOpIntInt(DoOpType& doOp, CPConcreteKindPt
         case V_SgUnsignedLongVal:        return createCPValueKindFromVal(doOp(isSgUnsignedLongLongIntVal(exp.get())->get_value(), isSgUnsignedLongVal       (that->exp.get())->get_value()));
         case V_SgUnsignedLongLongIntVal: return createCPValueKindFromVal(doOp(isSgUnsignedLongLongIntVal(exp.get())->get_value(), isSgUnsignedLongLongIntVal(that->exp.get())->get_value()));
         case V_SgWcharVal:               return createCPValueKindFromVal(doOp(isSgUnsignedLongLongIntVal(exp.get())->get_value(), isSgWcharVal              (that->exp.get())->get_value()));
-        case V_SgUpcMythread: case V_SgUpcThreads: 
+        case V_SgUpcMythread: case V_SgUpcThreads:
           return boost::make_shared<CPUnknownKind>();
-        case V_SgEnumVal:    
+        case V_SgEnumVal:
           //return boost::make_shared<CPConcreteKind>(boost::shared_ptr<SgValueExp>(SageBuilder::buildEnumVal               (isSgEnumVal               (exp.get())->get_value()-1)));
           // NOTE: Need to write code to get the value of the Enum Val and create a new one
           assert(0);
@@ -1690,8 +1690,8 @@ CPValueKindPtr CPConcreteKind::doBinaryOpIntInt(DoOpType& doOp, CPConcreteKindPt
           // We've enumerated all cases so we should never get here
           assert(0);
       }
-      
-    case V_SgWcharVal:            
+
+    case V_SgWcharVal:
       switch(that->exp.get()->variantT()) {
         case V_SgBoolValExp:             return createCPValueKindFromVal(doOp(isSgWcharVal(exp.get())->get_value(), isSgBoolValExp            (that->exp.get())->get_value()));
         case V_SgCharVal:                return createCPValueKindFromVal(doOp(isSgWcharVal(exp.get())->get_value(), isSgCharVal               (that->exp.get())->get_value()));
@@ -1705,9 +1705,9 @@ CPValueKindPtr CPConcreteKind::doBinaryOpIntInt(DoOpType& doOp, CPConcreteKindPt
         case V_SgUnsignedLongVal:        return createCPValueKindFromVal(doOp(isSgWcharVal(exp.get())->get_value(), isSgUnsignedLongVal       (that->exp.get())->get_value()));
         case V_SgUnsignedLongLongIntVal: return createCPValueKindFromVal(doOp(isSgWcharVal(exp.get())->get_value(), isSgUnsignedLongLongIntVal(that->exp.get())->get_value()));
         case V_SgWcharVal:               return createCPValueKindFromVal(doOp(isSgWcharVal(exp.get())->get_value(), isSgWcharVal              (that->exp.get())->get_value()));
-        case V_SgUpcMythread: case V_SgUpcThreads: 
+        case V_SgUpcMythread: case V_SgUpcThreads:
           return boost::make_shared<CPUnknownKind>();
-        case V_SgEnumVal:    
+        case V_SgEnumVal:
           //return boost::make_shared<CPConcreteKind>(boost::shared_ptr<SgValueExp>(SageBuilder::buildEnumVal               (isSgEnumVal               (exp.get())->get_value()-1)));
           // NOTE: Need to write code to get the value of the Enum Val and create a new one
           assert(0);
@@ -1715,11 +1715,11 @@ CPValueKindPtr CPConcreteKind::doBinaryOpIntInt(DoOpType& doOp, CPConcreteKindPt
           // We've enumerated all cases so we should never get here
           assert(0);
       }
-      
+
     case V_SgUpcMythread: case V_SgUpcThreads:
       return boost::make_shared<CPUnknownKind>();
-    
-    case V_SgEnumVal:    
+
+    case V_SgEnumVal:
       //return boost::make_shared<CPConcreteKind>(boost::shared_ptr<SgValueExp>(SageBuilder::buildEnumVal               (isSgEnumVal               (exp.get())->get_value()-1)));
       // NOTE: Need to write code to get the value of the Enum Val and create a new one
       assert(0);
@@ -1735,7 +1735,7 @@ template<class DoOpType>
 CPValueKindPtr CPConcreteKind::doBinaryOp(DoOpType& doOp, CPConcreteKindPtr that) {
   long long sVal1, sVal2;
   unsigned long long usVal1, usVal2;
-  
+
   if(IsSignedConstInt(exp.get(), sVal1)) {
     if(IsSignedConstInt(that->getVal().get(), sVal2))
       return createCPValueKindFromVal(doOp(sVal1, sVal2));
@@ -1755,7 +1755,7 @@ CPValueKindPtr CPConcreteKind::doBinaryOp(DoOpType& doOp, CPConcreteKindPtr that
   assert(0);
   /*
   switch(exp.get()->variantT()) {
-    case V_SgBoolValExp:              
+    case V_SgBoolValExp:
       switch(that->exp.get()->variantT()) {
         case V_SgBoolValExp:             return createCPValueKindFromVal(doOp(isSgBoolValExp(exp.get())->get_value(), isSgBoolValExp            (that->exp.get())->get_value()));
         case V_SgCharVal:                return createCPValueKindFromVal(doOp(isSgBoolValExp(exp.get())->get_value(), isSgCharVal               (that->exp.get())->get_value()));
@@ -1771,10 +1771,10 @@ CPValueKindPtr CPConcreteKind::doBinaryOp(DoOpType& doOp, CPConcreteKindPtr that
         case V_SgWcharVal:               return createCPValueKindFromVal(doOp(isSgBoolValExp(exp.get())->get_value(), isSgWcharVal              (that->exp.get())->get_value()));
         case V_SgFloatVal:               return createCPValueKindFromVal(doOp(isSgBoolValExp(exp.get())->get_value(), isSgFloatVal              (that->exp.get())->get_value()));
         case V_SgDoubleVal:              return createCPValueKindFromVal(doOp(isSgBoolValExp(exp.get())->get_value(), isSgDoubleVal             (that->exp.get())->get_value()));
-        case V_SgLongDoubleVal:          return createCPValueKindFromVal(doOp(isSgBoolValExp(exp.get())->get_value(), isSgLongDoubleVal         (that->exp.get())->get_value()));       
-        case V_SgComplexVal: case V_SgUpcMythread: case V_SgUpcThreads: 
+        case V_SgLongDoubleVal:          return createCPValueKindFromVal(doOp(isSgBoolValExp(exp.get())->get_value(), isSgLongDoubleVal         (that->exp.get())->get_value()));
+        case V_SgComplexVal: case V_SgUpcMythread: case V_SgUpcThreads:
           return boost::make_shared<CPUnknownKind>();
-        case V_SgEnumVal:    
+        case V_SgEnumVal:
           //return boost::make_shared<CPConcreteKind>(boost::shared_ptr<SgValueExp>(SageBuilder::buildEnumVal               (isSgEnumVal               (exp.get())->get_value()-1)));
           // NOTE: Need to write code to get the value of the Enum Val and create a new one
           assert(0);
@@ -1782,7 +1782,7 @@ CPValueKindPtr CPConcreteKind::doBinaryOp(DoOpType& doOp, CPConcreteKindPtr that
           // We've enumerated all cases so we should never get here
           assert(0);
       }
-    
+
     case V_SgCharVal:
       switch(that->exp.get()->variantT()) {
         case V_SgBoolValExp:             return createCPValueKindFromVal(doOp(isSgCharVal(exp.get())->get_value(), isSgBoolValExp            (that->exp.get())->get_value()));
@@ -1799,10 +1799,10 @@ CPValueKindPtr CPConcreteKind::doBinaryOp(DoOpType& doOp, CPConcreteKindPtr that
         case V_SgWcharVal:               return createCPValueKindFromVal(doOp(isSgCharVal(exp.get())->get_value(), isSgWcharVal              (that->exp.get())->get_value()));
         case V_SgFloatVal:               return createCPValueKindFromVal(doOp(isSgCharVal(exp.get())->get_value(), isSgFloatVal              (that->exp.get())->get_value()));
         case V_SgDoubleVal:              return createCPValueKindFromVal(doOp(isSgCharVal(exp.get())->get_value(), isSgDoubleVal             (that->exp.get())->get_value()));
-        case V_SgLongDoubleVal:          return createCPValueKindFromVal(doOp(isSgCharVal(exp.get())->get_value(), isSgLongDoubleVal         (that->exp.get())->get_value()));       
-        case V_SgComplexVal: case V_SgUpcMythread: case V_SgUpcThreads: 
+        case V_SgLongDoubleVal:          return createCPValueKindFromVal(doOp(isSgCharVal(exp.get())->get_value(), isSgLongDoubleVal         (that->exp.get())->get_value()));
+        case V_SgComplexVal: case V_SgUpcMythread: case V_SgUpcThreads:
           return boost::make_shared<CPUnknownKind>();
-        case V_SgEnumVal:    
+        case V_SgEnumVal:
           //return boost::make_shared<CPConcreteKind>(boost::shared_ptr<SgValueExp>(SageBuilder::buildEnumVal               (isSgEnumVal               (exp.get())->get_value()-1)));
           // NOTE: Need to write code to get the value of the Enum Val and create a new one
           assert(0);
@@ -1827,10 +1827,10 @@ CPValueKindPtr CPConcreteKind::doBinaryOp(DoOpType& doOp, CPConcreteKindPtr that
         case V_SgWcharVal:               return createCPValueKindFromVal(doOp(isSgShortVal(exp.get())->get_value(), isSgWcharVal              (that->exp.get())->get_value()));
         case V_SgFloatVal:               return createCPValueKindFromVal(doOp(isSgShortVal(exp.get())->get_value(), isSgFloatVal              (that->exp.get())->get_value()));
         case V_SgDoubleVal:              return createCPValueKindFromVal(doOp(isSgShortVal(exp.get())->get_value(), isSgDoubleVal             (that->exp.get())->get_value()));
-        case V_SgLongDoubleVal:          return createCPValueKindFromVal(doOp(isSgShortVal(exp.get())->get_value(), isSgLongDoubleVal         (that->exp.get())->get_value()));       
-        case V_SgComplexVal: case V_SgUpcMythread: case V_SgUpcThreads: 
+        case V_SgLongDoubleVal:          return createCPValueKindFromVal(doOp(isSgShortVal(exp.get())->get_value(), isSgLongDoubleVal         (that->exp.get())->get_value()));
+        case V_SgComplexVal: case V_SgUpcMythread: case V_SgUpcThreads:
           return boost::make_shared<CPUnknownKind>();
-        case V_SgEnumVal:    
+        case V_SgEnumVal:
           //return boost::make_shared<CPConcreteKind>(boost::shared_ptr<SgValueExp>(SageBuilder::buildEnumVal               (isSgEnumVal               (exp.get())->get_value()-1)));
           // NOTE: Need to write code to get the value of the Enum Val and create a new one
           assert(0);
@@ -1838,7 +1838,7 @@ CPValueKindPtr CPConcreteKind::doBinaryOp(DoOpType& doOp, CPConcreteKindPtr that
           // We've enumerated all cases so we should never get here
           assert(0);
       }
-      
+
     case V_SgIntVal:
       switch(that->exp.get()->variantT()) {
         case V_SgBoolValExp:             return createCPValueKindFromVal(doOp(isSgIntVal(exp.get())->get_value(), isSgBoolValExp            (that->exp.get())->get_value()));
@@ -1855,10 +1855,10 @@ CPValueKindPtr CPConcreteKind::doBinaryOp(DoOpType& doOp, CPConcreteKindPtr that
         case V_SgWcharVal:               return createCPValueKindFromVal(doOp(isSgIntVal(exp.get())->get_value(), isSgWcharVal              (that->exp.get())->get_value()));
         case V_SgFloatVal:               return createCPValueKindFromVal(doOp(isSgIntVal(exp.get())->get_value(), isSgFloatVal              (that->exp.get())->get_value()));
         case V_SgDoubleVal:              return createCPValueKindFromVal(doOp(isSgIntVal(exp.get())->get_value(), isSgDoubleVal             (that->exp.get())->get_value()));
-        case V_SgLongDoubleVal:          return createCPValueKindFromVal(doOp(isSgIntVal(exp.get())->get_value(), isSgLongDoubleVal         (that->exp.get())->get_value()));       
-        case V_SgComplexVal: case V_SgUpcMythread: case V_SgUpcThreads: 
+        case V_SgLongDoubleVal:          return createCPValueKindFromVal(doOp(isSgIntVal(exp.get())->get_value(), isSgLongDoubleVal         (that->exp.get())->get_value()));
+        case V_SgComplexVal: case V_SgUpcMythread: case V_SgUpcThreads:
           return boost::make_shared<CPUnknownKind>();
-        case V_SgEnumVal:    
+        case V_SgEnumVal:
           //return boost::make_shared<CPConcreteKind>(boost::shared_ptr<SgValueExp>(SageBuilder::buildEnumVal               (isSgEnumVal               (exp.get())->get_value()-1)));
           // NOTE: Need to write code to get the value of the Enum Val and create a new one
           assert(0);
@@ -1867,7 +1867,7 @@ CPValueKindPtr CPConcreteKind::doBinaryOp(DoOpType& doOp, CPConcreteKindPtr that
           assert(0);
       }
 
-    case V_SgLongIntVal:             
+    case V_SgLongIntVal:
       switch(that->exp.get()->variantT()) {
         case V_SgBoolValExp:             return createCPValueKindFromVal(doOp(isSgLongIntVal(exp.get())->get_value(), isSgBoolValExp            (that->exp.get())->get_value()));
         case V_SgCharVal:                return createCPValueKindFromVal(doOp(isSgLongIntVal(exp.get())->get_value(), isSgCharVal               (that->exp.get())->get_value()));
@@ -1883,10 +1883,10 @@ CPValueKindPtr CPConcreteKind::doBinaryOp(DoOpType& doOp, CPConcreteKindPtr that
         case V_SgWcharVal:               return createCPValueKindFromVal(doOp(isSgLongIntVal(exp.get())->get_value(), isSgWcharVal              (that->exp.get())->get_value()));
         case V_SgFloatVal:               return createCPValueKindFromVal(doOp(isSgLongIntVal(exp.get())->get_value(), isSgFloatVal              (that->exp.get())->get_value()));
         case V_SgDoubleVal:              return createCPValueKindFromVal(doOp(isSgLongIntVal(exp.get())->get_value(), isSgDoubleVal             (that->exp.get())->get_value()));
-        case V_SgLongDoubleVal:          return createCPValueKindFromVal(doOp(isSgLongIntVal(exp.get())->get_value(), isSgLongDoubleVal         (that->exp.get())->get_value()));       
-        case V_SgComplexVal: case V_SgUpcMythread: case V_SgUpcThreads: 
+        case V_SgLongDoubleVal:          return createCPValueKindFromVal(doOp(isSgLongIntVal(exp.get())->get_value(), isSgLongDoubleVal         (that->exp.get())->get_value()));
+        case V_SgComplexVal: case V_SgUpcMythread: case V_SgUpcThreads:
           return boost::make_shared<CPUnknownKind>();
-        case V_SgEnumVal:    
+        case V_SgEnumVal:
           //return boost::make_shared<CPConcreteKind>(boost::shared_ptr<SgValueExp>(SageBuilder::buildEnumVal               (isSgEnumVal               (exp.get())->get_value()-1)));
           // NOTE: Need to write code to get the value of the Enum Val and create a new one
           assert(0);
@@ -1894,8 +1894,8 @@ CPValueKindPtr CPConcreteKind::doBinaryOp(DoOpType& doOp, CPConcreteKindPtr that
           // We've enumerated all cases so we should never get here
           assert(0);
       }
-      
-    case V_SgLongLongIntVal:              
+
+    case V_SgLongLongIntVal:
       switch(that->exp.get()->variantT()) {
         case V_SgBoolValExp:             return createCPValueKindFromVal(doOp(isSgLongLongIntVal(exp.get())->get_value(), isSgBoolValExp            (that->exp.get())->get_value()));
         case V_SgCharVal:                return createCPValueKindFromVal(doOp(isSgLongLongIntVal(exp.get())->get_value(), isSgCharVal               (that->exp.get())->get_value()));
@@ -1911,10 +1911,10 @@ CPValueKindPtr CPConcreteKind::doBinaryOp(DoOpType& doOp, CPConcreteKindPtr that
         case V_SgWcharVal:               return createCPValueKindFromVal(doOp(isSgLongLongIntVal(exp.get())->get_value(), isSgWcharVal              (that->exp.get())->get_value()));
         case V_SgFloatVal:               return createCPValueKindFromVal(doOp(isSgLongLongIntVal(exp.get())->get_value(), isSgFloatVal              (that->exp.get())->get_value()));
         case V_SgDoubleVal:              return createCPValueKindFromVal(doOp(isSgLongLongIntVal(exp.get())->get_value(), isSgDoubleVal             (that->exp.get())->get_value()));
-        case V_SgLongDoubleVal:          return createCPValueKindFromVal(doOp(isSgLongLongIntVal(exp.get())->get_value(), isSgLongDoubleVal         (that->exp.get())->get_value()));       
-        case V_SgComplexVal: case V_SgUpcMythread: case V_SgUpcThreads: 
+        case V_SgLongDoubleVal:          return createCPValueKindFromVal(doOp(isSgLongLongIntVal(exp.get())->get_value(), isSgLongDoubleVal         (that->exp.get())->get_value()));
+        case V_SgComplexVal: case V_SgUpcMythread: case V_SgUpcThreads:
           return boost::make_shared<CPUnknownKind>();
-        case V_SgEnumVal:    
+        case V_SgEnumVal:
           //return boost::make_shared<CPConcreteKind>(boost::shared_ptr<SgValueExp>(SageBuilder::buildEnumVal               (isSgEnumVal               (exp.get())->get_value()-1)));
           // NOTE: Need to write code to get the value of the Enum Val and create a new one
           assert(0);
@@ -1922,8 +1922,8 @@ CPValueKindPtr CPConcreteKind::doBinaryOp(DoOpType& doOp, CPConcreteKindPtr that
           // We've enumerated all cases so we should never get here
           assert(0);
       }
-      
-    case V_SgUnsignedCharVal:        
+
+    case V_SgUnsignedCharVal:
       switch(that->exp.get()->variantT()) {
         case V_SgBoolValExp:             return createCPValueKindFromVal(doOp(isSgUnsignedCharVal(exp.get())->get_value(), isSgBoolValExp            (that->exp.get())->get_value()));
         case V_SgCharVal:                return createCPValueKindFromVal(doOp(isSgUnsignedCharVal(exp.get())->get_value(), isSgCharVal               (that->exp.get())->get_value()));
@@ -1939,10 +1939,10 @@ CPValueKindPtr CPConcreteKind::doBinaryOp(DoOpType& doOp, CPConcreteKindPtr that
         case V_SgWcharVal:               return createCPValueKindFromVal(doOp(isSgUnsignedCharVal(exp.get())->get_value(), isSgWcharVal              (that->exp.get())->get_value()));
         case V_SgFloatVal:               return createCPValueKindFromVal(doOp(isSgUnsignedCharVal(exp.get())->get_value(), isSgFloatVal              (that->exp.get())->get_value()));
         case V_SgDoubleVal:              return createCPValueKindFromVal(doOp(isSgUnsignedCharVal(exp.get())->get_value(), isSgDoubleVal             (that->exp.get())->get_value()));
-        case V_SgLongDoubleVal:          return createCPValueKindFromVal(doOp(isSgUnsignedCharVal(exp.get())->get_value(), isSgLongDoubleVal         (that->exp.get())->get_value()));       
-        case V_SgComplexVal: case V_SgUpcMythread: case V_SgUpcThreads: 
+        case V_SgLongDoubleVal:          return createCPValueKindFromVal(doOp(isSgUnsignedCharVal(exp.get())->get_value(), isSgLongDoubleVal         (that->exp.get())->get_value()));
+        case V_SgComplexVal: case V_SgUpcMythread: case V_SgUpcThreads:
           return boost::make_shared<CPUnknownKind>();
-        case V_SgEnumVal:    
+        case V_SgEnumVal:
           //return boost::make_shared<CPConcreteKind>(boost::shared_ptr<SgValueExp>(SageBuilder::buildEnumVal               (isSgEnumVal               (exp.get())->get_value()-1)));
           // NOTE: Need to write code to get the value of the Enum Val and create a new one
           assert(0);
@@ -1950,8 +1950,8 @@ CPValueKindPtr CPConcreteKind::doBinaryOp(DoOpType& doOp, CPConcreteKindPtr that
           // We've enumerated all cases so we should never get here
           assert(0);
       }
-      
-    case V_SgUnsignedShortVal:                    
+
+    case V_SgUnsignedShortVal:
       switch(that->exp.get()->variantT()) {
         case V_SgBoolValExp:             return createCPValueKindFromVal(doOp(isSgUnsignedShortVal(exp.get())->get_value(), isSgBoolValExp            (that->exp.get())->get_value()));
         case V_SgCharVal:                return createCPValueKindFromVal(doOp(isSgUnsignedShortVal(exp.get())->get_value(), isSgCharVal               (that->exp.get())->get_value()));
@@ -1967,10 +1967,10 @@ CPValueKindPtr CPConcreteKind::doBinaryOp(DoOpType& doOp, CPConcreteKindPtr that
         case V_SgWcharVal:               return createCPValueKindFromVal(doOp(isSgUnsignedShortVal(exp.get())->get_value(), isSgWcharVal              (that->exp.get())->get_value()));
         case V_SgFloatVal:               return createCPValueKindFromVal(doOp(isSgUnsignedShortVal(exp.get())->get_value(), isSgFloatVal              (that->exp.get())->get_value()));
         case V_SgDoubleVal:              return createCPValueKindFromVal(doOp(isSgUnsignedShortVal(exp.get())->get_value(), isSgDoubleVal             (that->exp.get())->get_value()));
-        case V_SgLongDoubleVal:          return createCPValueKindFromVal(doOp(isSgUnsignedShortVal(exp.get())->get_value(), isSgLongDoubleVal         (that->exp.get())->get_value()));       
-        case V_SgComplexVal: case V_SgUpcMythread: case V_SgUpcThreads: 
+        case V_SgLongDoubleVal:          return createCPValueKindFromVal(doOp(isSgUnsignedShortVal(exp.get())->get_value(), isSgLongDoubleVal         (that->exp.get())->get_value()));
+        case V_SgComplexVal: case V_SgUpcMythread: case V_SgUpcThreads:
           return boost::make_shared<CPUnknownKind>();
-        case V_SgEnumVal:    
+        case V_SgEnumVal:
           //return boost::make_shared<CPConcreteKind>(boost::shared_ptr<SgValueExp>(SageBuilder::buildEnumVal               (isSgEnumVal               (exp.get())->get_value()-1)));
           // NOTE: Need to write code to get the value of the Enum Val and create a new one
           assert(0);
@@ -1978,8 +1978,8 @@ CPValueKindPtr CPConcreteKind::doBinaryOp(DoOpType& doOp, CPConcreteKindPtr that
           // We've enumerated all cases so we should never get here
           assert(0);
       }
-      
-    case V_SgUnsignedIntVal:                            
+
+    case V_SgUnsignedIntVal:
       switch(that->exp.get()->variantT()) {
         case V_SgBoolValExp:             return createCPValueKindFromVal(doOp(isSgUnsignedIntVal(exp.get())->get_value(), isSgBoolValExp            (that->exp.get())->get_value()));
         case V_SgCharVal:                return createCPValueKindFromVal(doOp(isSgUnsignedIntVal(exp.get())->get_value(), isSgCharVal               (that->exp.get())->get_value()));
@@ -1995,10 +1995,10 @@ CPValueKindPtr CPConcreteKind::doBinaryOp(DoOpType& doOp, CPConcreteKindPtr that
         case V_SgWcharVal:               return createCPValueKindFromVal(doOp(isSgUnsignedIntVal(exp.get())->get_value(), isSgWcharVal              (that->exp.get())->get_value()));
         case V_SgFloatVal:               return createCPValueKindFromVal(doOp(isSgUnsignedIntVal(exp.get())->get_value(), isSgFloatVal              (that->exp.get())->get_value()));
         case V_SgDoubleVal:              return createCPValueKindFromVal(doOp(isSgUnsignedIntVal(exp.get())->get_value(), isSgDoubleVal             (that->exp.get())->get_value()));
-        case V_SgLongDoubleVal:          return createCPValueKindFromVal(doOp(isSgUnsignedIntVal(exp.get())->get_value(), isSgLongDoubleVal         (that->exp.get())->get_value()));       
-        case V_SgComplexVal: case V_SgUpcMythread: case V_SgUpcThreads: 
+        case V_SgLongDoubleVal:          return createCPValueKindFromVal(doOp(isSgUnsignedIntVal(exp.get())->get_value(), isSgLongDoubleVal         (that->exp.get())->get_value()));
+        case V_SgComplexVal: case V_SgUpcMythread: case V_SgUpcThreads:
           return boost::make_shared<CPUnknownKind>();
-        case V_SgEnumVal:    
+        case V_SgEnumVal:
           //return boost::make_shared<CPConcreteKind>(boost::shared_ptr<SgValueExp>(SageBuilder::buildEnumVal               (isSgEnumVal               (exp.get())->get_value()-1)));
           // NOTE: Need to write code to get the value of the Enum Val and create a new one
           assert(0);
@@ -2006,8 +2006,8 @@ CPValueKindPtr CPConcreteKind::doBinaryOp(DoOpType& doOp, CPConcreteKindPtr that
           // We've enumerated all cases so we should never get here
           assert(0);
       }
-      
-    case V_SgUnsignedLongVal:                     
+
+    case V_SgUnsignedLongVal:
       switch(that->exp.get()->variantT()) {
         case V_SgBoolValExp:             return createCPValueKindFromVal(doOp(isSgUnsignedLongVal(exp.get())->get_value(), isSgBoolValExp            (that->exp.get())->get_value()));
         case V_SgCharVal:                return createCPValueKindFromVal(doOp(isSgUnsignedLongVal(exp.get())->get_value(), isSgCharVal               (that->exp.get())->get_value()));
@@ -2023,10 +2023,10 @@ CPValueKindPtr CPConcreteKind::doBinaryOp(DoOpType& doOp, CPConcreteKindPtr that
         case V_SgWcharVal:               return createCPValueKindFromVal(doOp(isSgUnsignedLongVal(exp.get())->get_value(), isSgWcharVal              (that->exp.get())->get_value()));
         case V_SgFloatVal:               return createCPValueKindFromVal(doOp(isSgUnsignedLongVal(exp.get())->get_value(), isSgFloatVal              (that->exp.get())->get_value()));
         case V_SgDoubleVal:              return createCPValueKindFromVal(doOp(isSgUnsignedLongVal(exp.get())->get_value(), isSgDoubleVal             (that->exp.get())->get_value()));
-        case V_SgLongDoubleVal:          return createCPValueKindFromVal(doOp(isSgUnsignedLongVal(exp.get())->get_value(), isSgLongDoubleVal         (that->exp.get())->get_value()));       
-        case V_SgComplexVal: case V_SgUpcMythread: case V_SgUpcThreads: 
+        case V_SgLongDoubleVal:          return createCPValueKindFromVal(doOp(isSgUnsignedLongVal(exp.get())->get_value(), isSgLongDoubleVal         (that->exp.get())->get_value()));
+        case V_SgComplexVal: case V_SgUpcMythread: case V_SgUpcThreads:
           return boost::make_shared<CPUnknownKind>();
-        case V_SgEnumVal:    
+        case V_SgEnumVal:
           //return boost::make_shared<CPConcreteKind>(boost::shared_ptr<SgValueExp>(SageBuilder::buildEnumVal               (isSgEnumVal               (exp.get())->get_value()-1)));
           // NOTE: Need to write code to get the value of the Enum Val and create a new one
           assert(0);
@@ -2034,8 +2034,8 @@ CPValueKindPtr CPConcreteKind::doBinaryOp(DoOpType& doOp, CPConcreteKindPtr that
           // We've enumerated all cases so we should never get here
           assert(0);
       }
-      
-    case V_SgUnsignedLongLongIntVal:              
+
+    case V_SgUnsignedLongLongIntVal:
       switch(that->exp.get()->variantT()) {
         case V_SgBoolValExp:             return createCPValueKindFromVal(doOp(isSgUnsignedLongLongIntVal(exp.get())->get_value(), isSgBoolValExp            (that->exp.get())->get_value()));
         case V_SgCharVal:                return createCPValueKindFromVal(doOp(isSgUnsignedLongLongIntVal(exp.get())->get_value(), isSgCharVal               (that->exp.get())->get_value()));
@@ -2051,10 +2051,10 @@ CPValueKindPtr CPConcreteKind::doBinaryOp(DoOpType& doOp, CPConcreteKindPtr that
         case V_SgWcharVal:               return createCPValueKindFromVal(doOp(isSgUnsignedLongLongIntVal(exp.get())->get_value(), isSgWcharVal              (that->exp.get())->get_value()));
         case V_SgFloatVal:               return createCPValueKindFromVal(doOp(isSgUnsignedLongLongIntVal(exp.get())->get_value(), isSgFloatVal              (that->exp.get())->get_value()));
         case V_SgDoubleVal:              return createCPValueKindFromVal(doOp(isSgUnsignedLongLongIntVal(exp.get())->get_value(), isSgDoubleVal             (that->exp.get())->get_value()));
-        case V_SgLongDoubleVal:          return createCPValueKindFromVal(doOp(isSgUnsignedLongLongIntVal(exp.get())->get_value(), isSgLongDoubleVal         (that->exp.get())->get_value()));       
-        case V_SgComplexVal: case V_SgUpcMythread: case V_SgUpcThreads: 
+        case V_SgLongDoubleVal:          return createCPValueKindFromVal(doOp(isSgUnsignedLongLongIntVal(exp.get())->get_value(), isSgLongDoubleVal         (that->exp.get())->get_value()));
+        case V_SgComplexVal: case V_SgUpcMythread: case V_SgUpcThreads:
           return boost::make_shared<CPUnknownKind>();
-        case V_SgEnumVal:    
+        case V_SgEnumVal:
           //return boost::make_shared<CPConcreteKind>(boost::shared_ptr<SgValueExp>(SageBuilder::buildEnumVal               (isSgEnumVal               (exp.get())->get_value()-1)));
           // NOTE: Need to write code to get the value of the Enum Val and create a new one
           assert(0);
@@ -2062,8 +2062,8 @@ CPValueKindPtr CPConcreteKind::doBinaryOp(DoOpType& doOp, CPConcreteKindPtr that
           // We've enumerated all cases so we should never get here
           assert(0);
       }
-      
-    case V_SgWcharVal:            
+
+    case V_SgWcharVal:
       switch(that->exp.get()->variantT()) {
         case V_SgBoolValExp:             return createCPValueKindFromVal(doOp(isSgWcharVal(exp.get())->get_value(), isSgBoolValExp            (that->exp.get())->get_value()));
         case V_SgCharVal:                return createCPValueKindFromVal(doOp(isSgWcharVal(exp.get())->get_value(), isSgCharVal               (that->exp.get())->get_value()));
@@ -2079,10 +2079,10 @@ CPValueKindPtr CPConcreteKind::doBinaryOp(DoOpType& doOp, CPConcreteKindPtr that
         case V_SgWcharVal:               return createCPValueKindFromVal(doOp(isSgWcharVal(exp.get())->get_value(), isSgWcharVal              (that->exp.get())->get_value()));
         case V_SgFloatVal:               return createCPValueKindFromVal(doOp(isSgWcharVal(exp.get())->get_value(), isSgFloatVal              (that->exp.get())->get_value()));
         case V_SgDoubleVal:              return createCPValueKindFromVal(doOp(isSgWcharVal(exp.get())->get_value(), isSgDoubleVal             (that->exp.get())->get_value()));
-        case V_SgLongDoubleVal:          return createCPValueKindFromVal(doOp(isSgWcharVal(exp.get())->get_value(), isSgLongDoubleVal         (that->exp.get())->get_value()));       
-        case V_SgComplexVal: case V_SgUpcMythread: case V_SgUpcThreads: 
+        case V_SgLongDoubleVal:          return createCPValueKindFromVal(doOp(isSgWcharVal(exp.get())->get_value(), isSgLongDoubleVal         (that->exp.get())->get_value()));
+        case V_SgComplexVal: case V_SgUpcMythread: case V_SgUpcThreads:
           return boost::make_shared<CPUnknownKind>();
-        case V_SgEnumVal:    
+        case V_SgEnumVal:
           //return boost::make_shared<CPConcreteKind>(boost::shared_ptr<SgValueExp>(SageBuilder::buildEnumVal               (isSgEnumVal               (exp.get())->get_value()-1)));
           // NOTE: Need to write code to get the value of the Enum Val and create a new one
           assert(0);
@@ -2090,8 +2090,8 @@ CPValueKindPtr CPConcreteKind::doBinaryOp(DoOpType& doOp, CPConcreteKindPtr that
           // We've enumerated all cases so we should never get here
           assert(0);
       }
-    
-    case V_SgFloatVal:            
+
+    case V_SgFloatVal:
       switch(that->exp.get()->variantT()) {
         case V_SgBoolValExp:             return createCPValueKindFromVal(doOp(isSgFloatVal(exp.get())->get_value(), isSgBoolValExp            (that->exp.get())->get_value()));
         case V_SgCharVal:                return createCPValueKindFromVal(doOp(isSgFloatVal(exp.get())->get_value(), isSgCharVal               (that->exp.get())->get_value()));
@@ -2107,10 +2107,10 @@ CPValueKindPtr CPConcreteKind::doBinaryOp(DoOpType& doOp, CPConcreteKindPtr that
         case V_SgWcharVal:               return createCPValueKindFromVal(doOp(isSgFloatVal(exp.get())->get_value(), isSgWcharVal              (that->exp.get())->get_value()));
         case V_SgFloatVal:               return createCPValueKindFromVal(doOp(isSgFloatVal(exp.get())->get_value(), isSgFloatVal              (that->exp.get())->get_value()));
         case V_SgDoubleVal:              return createCPValueKindFromVal(doOp(isSgFloatVal(exp.get())->get_value(), isSgDoubleVal             (that->exp.get())->get_value()));
-        case V_SgLongDoubleVal:          return createCPValueKindFromVal(doOp(isSgFloatVal(exp.get())->get_value(), isSgLongDoubleVal         (that->exp.get())->get_value()));       
-        case V_SgComplexVal: case V_SgUpcMythread: case V_SgUpcThreads: 
+        case V_SgLongDoubleVal:          return createCPValueKindFromVal(doOp(isSgFloatVal(exp.get())->get_value(), isSgLongDoubleVal         (that->exp.get())->get_value()));
+        case V_SgComplexVal: case V_SgUpcMythread: case V_SgUpcThreads:
           return boost::make_shared<CPUnknownKind>();
-        case V_SgEnumVal:    
+        case V_SgEnumVal:
           //return boost::make_shared<CPConcreteKind>(boost::shared_ptr<SgValueExp>(SageBuilder::buildEnumVal               (isSgEnumVal               (exp.get())->get_value()-1)));
           // NOTE: Need to write code to get the value of the Enum Val and create a new one
           assert(0);
@@ -2118,8 +2118,8 @@ CPValueKindPtr CPConcreteKind::doBinaryOp(DoOpType& doOp, CPConcreteKindPtr that
           // We've enumerated all cases so we should never get here
           assert(0);
       }
-    
-    case V_SgDoubleVal:            
+
+    case V_SgDoubleVal:
       switch(that->exp.get()->variantT()) {
         case V_SgBoolValExp:             return createCPValueKindFromVal(doOp(isSgDoubleVal(exp.get())->get_value(), isSgBoolValExp            (that->exp.get())->get_value()));
         case V_SgCharVal:                return createCPValueKindFromVal(doOp(isSgDoubleVal(exp.get())->get_value(), isSgCharVal               (that->exp.get())->get_value()));
@@ -2135,10 +2135,10 @@ CPValueKindPtr CPConcreteKind::doBinaryOp(DoOpType& doOp, CPConcreteKindPtr that
         case V_SgWcharVal:               return createCPValueKindFromVal(doOp(isSgDoubleVal(exp.get())->get_value(), isSgWcharVal              (that->exp.get())->get_value()));
         case V_SgFloatVal:               return createCPValueKindFromVal(doOp(isSgDoubleVal(exp.get())->get_value(), isSgFloatVal              (that->exp.get())->get_value()));
         case V_SgDoubleVal:              return createCPValueKindFromVal(doOp(isSgDoubleVal(exp.get())->get_value(), isSgDoubleVal             (that->exp.get())->get_value()));
-        case V_SgLongDoubleVal:          return createCPValueKindFromVal(doOp(isSgDoubleVal(exp.get())->get_value(), isSgLongDoubleVal         (that->exp.get())->get_value()));       
-        case V_SgComplexVal: case V_SgUpcMythread: case V_SgUpcThreads: 
+        case V_SgLongDoubleVal:          return createCPValueKindFromVal(doOp(isSgDoubleVal(exp.get())->get_value(), isSgLongDoubleVal         (that->exp.get())->get_value()));
+        case V_SgComplexVal: case V_SgUpcMythread: case V_SgUpcThreads:
           return boost::make_shared<CPUnknownKind>();
-        case V_SgEnumVal:    
+        case V_SgEnumVal:
           //return boost::make_shared<CPConcreteKind>(boost::shared_ptr<SgValueExp>(SageBuilder::buildEnumVal               (isSgEnumVal               (exp.get())->get_value()-1)));
           // NOTE: Need to write code to get the value of the Enum Val and create a new one
           assert(0);
@@ -2146,8 +2146,8 @@ CPValueKindPtr CPConcreteKind::doBinaryOp(DoOpType& doOp, CPConcreteKindPtr that
           // We've enumerated all cases so we should never get here
           assert(0);
       }
-    
-    case V_SgLongDoubleVal:            
+
+    case V_SgLongDoubleVal:
       switch(that->exp.get()->variantT()) {
         case V_SgBoolValExp:             return createCPValueKindFromVal(doOp(isSgLongDoubleVal(exp.get())->get_value(), isSgBoolValExp            (that->exp.get())->get_value()));
         case V_SgCharVal:                return createCPValueKindFromVal(doOp(isSgLongDoubleVal(exp.get())->get_value(), isSgCharVal               (that->exp.get())->get_value()));
@@ -2163,10 +2163,10 @@ CPValueKindPtr CPConcreteKind::doBinaryOp(DoOpType& doOp, CPConcreteKindPtr that
         case V_SgWcharVal:               return createCPValueKindFromVal(doOp(isSgLongDoubleVal(exp.get())->get_value(), isSgWcharVal              (that->exp.get())->get_value()));
         case V_SgFloatVal:               return createCPValueKindFromVal(doOp(isSgLongDoubleVal(exp.get())->get_value(), isSgFloatVal              (that->exp.get())->get_value()));
         case V_SgDoubleVal:              return createCPValueKindFromVal(doOp(isSgLongDoubleVal(exp.get())->get_value(), isSgDoubleVal             (that->exp.get())->get_value()));
-        case V_SgLongDoubleVal:          return createCPValueKindFromVal(doOp(isSgLongDoubleVal(exp.get())->get_value(), isSgLongDoubleVal         (that->exp.get())->get_value()));       
-        case V_SgComplexVal: case V_SgUpcMythread: case V_SgUpcThreads: 
+        case V_SgLongDoubleVal:          return createCPValueKindFromVal(doOp(isSgLongDoubleVal(exp.get())->get_value(), isSgLongDoubleVal         (that->exp.get())->get_value()));
+        case V_SgComplexVal: case V_SgUpcMythread: case V_SgUpcThreads:
           return boost::make_shared<CPUnknownKind>();
-        case V_SgEnumVal:    
+        case V_SgEnumVal:
           //return boost::make_shared<CPConcreteKind>(boost::shared_ptr<SgValueExp>(SageBuilder::buildEnumVal               (isSgEnumVal               (exp.get())->get_value()-1)));
           // NOTE: Need to write code to get the value of the Enum Val and create a new one
           assert(0);
@@ -2174,11 +2174,11 @@ CPValueKindPtr CPConcreteKind::doBinaryOp(DoOpType& doOp, CPConcreteKindPtr that
           // We've enumerated all cases so we should never get here
           assert(0);
       }
-      
+
     case V_SgComplexVal: case V_SgUpcMythread: case V_SgUpcThreads:
       return boost::make_shared<CPUnknownKind>();
-    
-    case V_SgEnumVal:    
+
+    case V_SgEnumVal:
       //return boost::make_shared<CPConcreteKind>(boost::shared_ptr<SgValueExp>(SageBuilder::buildEnumVal               (isSgEnumVal               (exp.get())->get_value()-1)));
       // NOTE: Need to write code to get the value of the Enum Val and create a new one
       assert(0);
@@ -2191,9 +2191,9 @@ CPValueKindPtr CPConcreteKind::doBinaryOp(DoOpType& doOp, CPConcreteKindPtr that
 
 // Applies the given unary or binary operation to this and the given CPValueKind
 // Returns:
-//    - if this CPValueKind can be updated to incorporate the result of the addition, 
+//    - if this CPValueKind can be updated to incorporate the result of the addition,
 //       return a freshly-allocated CPValueKind that holds the result.
-//    - if the two objects could not be merged and therefore that must be placed after 
+//    - if the two objects could not be merged and therefore that must be placed after
 //       this in the parent CPValueObject's list, return that.
 CPValueKindPtr CPConcreteKind::op(SgBinaryOp* op, CPValueKindPtr that) {
   //struct timeval tfStart, tfEnd; gettimeofday(&tfStart, NULL);
@@ -2214,7 +2214,7 @@ CPValueKindPtr CPConcreteKind::op(SgBinaryOp* op, CPValueKindPtr that) {
 
   // For all other cases we must have a valid rhs operand
   assert(that);
-  
+
   /*scope("CPConcreteKind::op(SgBinaryOp*)", scope::medium, attrGE("CPDebugLevel", 2));
   if(CPDebugLevel()>=2) {
     dbg << "this="<<str()<<endl;
@@ -2222,7 +2222,7 @@ CPValueKindPtr CPConcreteKind::op(SgBinaryOp* op, CPValueKindPtr that) {
     dbg << "(that->getKind() == CPValueKind::uninitialized)="<<(that->getKind() == CPValueKind::uninitialized)<<endl;
     dbg << "(that->getKind() == CPValueKind::unknown)="<<(that->getKind() == CPValueKind::unknown)<<endl;
   }*/
-  
+
   if(that->getKind() == CPValueKind::uninitialized) {
     if(isSgAndOp(op)) {
       // True && uninitialized => uninitialized
@@ -2235,7 +2235,7 @@ CPValueKindPtr CPConcreteKind::op(SgBinaryOp* op, CPValueKindPtr that) {
         //gettimeofday(&tfEnd, NULL); cout << "CPConcreteKind::op4\t"<<(((tfEnd.tv_sec*1000000 + tfEnd.tv_usec) - (tfStart.tv_sec*1000000 + tfStart.tv_usec)) / 1000000.0)<<"\t"<<SgNode2Str(op)<<endl;
         return boost::make_shared<CPUninitializedKind>();
       }
-    
+
     } else if(isSgOrOp(op)) {
       // True || uninitialized => True
       if(isConstantTrue(getVal().get())) {
@@ -2247,23 +2247,23 @@ CPValueKindPtr CPConcreteKind::op(SgBinaryOp* op, CPValueKindPtr that) {
         //gettimeofday(&tfEnd, NULL); cout << "CPConcreteKind::op6\t"<<(((tfEnd.tv_sec*1000000 + tfEnd.tv_usec) - (tfStart.tv_sec*1000000 + tfStart.tv_usec)) / 1000000.0)<<"\t"<<SgNode2Str(op)<<endl;
         return boost::make_shared<CPUninitializedKind>();
       }
-    
+
     // * op uninitialized => *
     } else {
       //gettimeofday(&tfEnd, NULL); cout << "CPConcreteKind::op6A\t"<<(((tfEnd.tv_sec*1000000 + tfEnd.tv_usec) - (tfStart.tv_sec*1000000 + tfStart.tv_usec)) / 1000000.0)<<"\t"<<SgNode2Str(op)<<endl;
       return copyAOType();
     }
   }
-  
+
   // * op unknown => unknown
   if(that->getKind() == CPValueKind::unknown) {
     //gettimeofday(&tfEnd, NULL); cout << "CPConcreteKind::op6B\t"<<(((tfEnd.tv_sec*1000000 + tfEnd.tv_usec) - (tfStart.tv_sec*1000000 + tfStart.tv_usec)) / 1000000.0)<<"\t"<<SgNode2Str(op)<<endl;
     return boost::make_shared<CPUnknownKind>();
   }
-  
+
   if(that->getKind() == CPValueKind::concrete) {
     CPConcreteKindPtr thatConcrete = that->asConcreteKind();
- 
+
 
     // ----- Arithmetic -----
     if(isSgAddOp(op) || isSgPlusAssignOp(op)) {
@@ -2286,7 +2286,7 @@ CPValueKindPtr CPConcreteKind::op(SgBinaryOp* op, CPValueKindPtr that) {
         return boost::make_shared<CPConcreteKind>(boost::shared_ptr<SgValueExp>(SageBuilder::buildDoubleVal(fVal1+fVal2)));
       // If not floating point, give up
       return boost::make_shared<CPUnknownKind>();
-    
+
     } else if(isSgSubtractOp(op) || isSgMinusAssignOp(op)) {
       //return createCPValueKindFromVal(thatConcrete->bindDoOpArgs2(bindDoOpArgs1(boost::lambda::_1 - boost::lambda::_2)));
       return doBinaryOp(boost::lambda::_1 - boost::lambda::_2, thatConcrete);
@@ -2296,7 +2296,7 @@ CPValueKindPtr CPConcreteKind::op(SgBinaryOp* op, CPValueKindPtr that) {
       return doBinaryOp(boost::lambda::_1 / boost::lambda::_2, thatConcrete);
     } else if(isSgIntegerDivideOp(op) || isSgIntegerDivideAssignOp(op)) {
       // TODO
-      
+
     } else if(isSgModOp(op) || isSgModAssignOp(op)) {
       assert(isIntegralVal(exp.get()) && isIntegralVal(thatConcrete->exp.get()));
       return doBinaryOpIntInt(boost::lambda::_1 % boost::lambda::_2, thatConcrete);
@@ -2329,7 +2329,7 @@ CPValueKindPtr CPConcreteKind::op(SgBinaryOp* op, CPValueKindPtr that) {
       return doBinaryOpIntInt(boost::lambda::_1 >> boost::lambda::_2, thatConcrete);
     } else if(isSgJavaUnsignedRshiftOp(op) || isSgJavaUnsignedRshiftAssignOp(op)) {
       // TODO (Java))
-    
+
     // ----- Comparison -----
     } else if(isSgEqualityOp(op)) {
       long long sVal1, sVal2;
@@ -2363,10 +2363,10 @@ CPValueKindPtr CPConcreteKind::op(SgBinaryOp* op, CPValueKindPtr that) {
       return doBinaryOp(boost::lambda::_1 >  boost::lambda::_2, thatConcrete);
     } else if(isSgIsOp(op)) {
       // TODO
-    
+
     } else if(isSgIsNotOp(op)) {
       // TODO
-      
+
     // ----- Memory References -----
     } else if(isSgDotExp(op)) {
       // This should be handled inside CPMemLocObjects
@@ -2379,15 +2379,15 @@ CPValueKindPtr CPConcreteKind::op(SgBinaryOp* op, CPValueKindPtr that) {
       assert(thatConcrete);
       // Get the offset of the SgPntrArrRefExp relative to the starting point of its parent expression
       long long nextOffset = getPntrArrRefOffset(isSgPntrArrRefExp(op), thatConcrete);
-      return doBinaryOp(boost::lambda::_1 + boost::lambda::_2, 
+      return doBinaryOp(boost::lambda::_1 + boost::lambda::_2,
                         boost::make_shared<CPConcreteKind>(boost::shared_ptr<SgValueExp>(SageBuilder::buildLongLongIntVal(nextOffset))));
-      
+
     } else if(isSgDotStarOp(op)) {
       // This should be handled inside CPMemLocObjects
       assert(0);
     } else if(isSgPointerAssignOp(op)) {
       // TODO (Fortran)
-      
+
     // ----- Miscelaneous ----
     } else if(isSgAssignOp(op)) {
       // This should be handled inside the ConstantPropagationAnalysis transfer function
@@ -2395,7 +2395,7 @@ CPValueKindPtr CPConcreteKind::op(SgBinaryOp* op, CPValueKindPtr that) {
     } else if(isSgCommaOpExp(op)) {
       // This should be handled inside the control flow functionality
       assert(0);
-    
+
     } else if(isSgConcatenationOp(op)) {
       // TODO
     } else if(isSgMembershipOp(op)) {
@@ -2407,26 +2407,26 @@ CPValueKindPtr CPConcreteKind::op(SgBinaryOp* op, CPValueKindPtr that) {
     }
   } else if(that->getKind() == CPValueKind::offsetList) {
     CPConcreteKindPtr thatOffset = that->asConcreteKind();
-    
+
     // Implement the operations that are defined for pointers by having the offset list kind deal with them
     if(isSgAddOp(op) || isSgSubtractOp(op)) return thatOffset->op(op, shared_from_this());
-    // Other options are undefined. 
+    // Other options are undefined.
     // Technically this means that we can return an uninitialized kind but to be safe we'll return unknown
-    else 
+    else
       return boost::make_shared<CPUnknownKind>();
   }
-  
+
   // We've enumerated all cases so we should never get here
   cerr << "ERROR: no support for "<<SgNode2Str(op)<<"!";
   assert(0);
 }
 
-// Returns whether the two given SgValueExps denote the same numeric value. 
+// Returns whether the two given SgValueExps denote the same numeric value.
 // If unknown, return unknownVal.
 bool CPConcreteKind::equalVals(SgValueExp* val1, SgValueExp* val2, bool unknownVal) {
   long long sVal1, sVal2;
   unsigned long long usVal1, usVal2;
-  
+
   // First check if both concrete values are integers of some type
   if(IsSignedConstInt(val1, sVal1)) {
     if(IsSignedConstInt(val2, sVal2))
@@ -2453,7 +2453,7 @@ bool CPConcreteKind::equalVals(SgValueExp* val1, SgValueExp* val2, bool unknownV
 bool CPConcreteKind::lessThanVals(SgValueExp* val1, SgValueExp* val2, bool unknownVal) {
   long long sVal1, sVal2;
   unsigned long long usVal1, usVal2;
-  
+
   // First check if both concrete values are integers of some type
   if(IsSignedConstInt(val1, sVal1)) {
     if(IsSignedConstInt(val2, sVal2))
@@ -2481,7 +2481,7 @@ bool CPConcreteKind::mayEqualAO(CPValueKindPtr that)
   // If that is not concrete, use its implementation
   if(that->getKind() != CPValueKind::concrete) return that->mayEqualAO(shared_from_this());
   CPConcreteKindPtr thatConcrete = that->asConcreteKind();
-  
+
   return equalVals(exp.get(), thatConcrete->getVal().get(),
                    /*unknownVal, default to mayEquals*/true);
 }
@@ -2490,7 +2490,7 @@ bool CPConcreteKind::mustEqualAO(CPValueKindPtr that) {
   // If that is not concrete, use its implementation
   if(that->getKind() != CPValueKind::concrete) return that->mustEqualAO(shared_from_this());
   CPConcreteKindPtr thatConcrete = that->asConcreteKind();
-  
+
   return equalVals(exp.get(), thatConcrete->getVal().get(),
                    /*unknownVal, default to mustEquals*/false);
 }
@@ -2517,7 +2517,7 @@ pair<bool, CPValueKindPtr> CPConcreteKind::meetUpdateAO(CPValueKindPtr that)
     //dbg << "that=>uninitialized"<<endl;
     return make_pair(true, copyAOType());
   }
-  
+
   // Concrete MEET Unknown => Unknown
   // Concrete MEET Offset  => Unknown
   if(that->getKind() == CPValueKind::offsetList ||
@@ -2525,9 +2525,9 @@ pair<bool, CPValueKindPtr> CPConcreteKind::meetUpdateAO(CPValueKindPtr that)
     //dbg << "that=>offsetlist or unknown"<<endl;
     return make_pair(true, boost::make_shared<CPUnknownKind>());
   }
-  
+
   // That is definitely concrete
-  
+
   // If this and that denote the same concrete value
   if(mustEqualAO(that)) {
     //dbg << "must equal, not modified"<<endl;
@@ -2588,7 +2588,7 @@ SgType* CPConcreteKind::getConcreteType()
 
 // Returns the concrete value (if there is one) as an SgValueExp, which allows callers to use
 // the normal ROSE mechanisms to decode it
-std::set<boost::shared_ptr<SgValueExp> > CPConcreteKind::getConcreteValue() { 
+std::set<boost::shared_ptr<SgValueExp> > CPConcreteKind::getConcreteValue() {
   std::set<boost::shared_ptr<SgValueExp> > vals;
   vals.insert(exp);
   return vals;
@@ -2624,16 +2624,16 @@ CPValueKindPtr CPOffsetListKind::op(SgBinaryOp* op, CPValueKindPtr that) {
   // * op uninitialized => *
   if(that && that->getKind() == CPValueKind::uninitialized)
     return copyAOType();
-  
+
   // * op unknown => unknown
   if(that && that->getKind() == CPValueKind::unknown)
     return boost::make_shared<CPUnknownKind>();
-  
+
   // If that is a concrete value or that was not provided because it is not needed (e.g. dot expression)
   if(!that || that->getKind() == CPValueKind::concrete) {
     CPConcreteKindPtr thatConcrete; if(that) thatConcrete = that->asConcreteKind();
     assert(offsetL.size()>0);
- 
+
     // The arithmetic only operations defined on offset kinds are binary + and -
     switch(op->variantT()) {
       case V_SgAddOp:
@@ -2669,7 +2669,7 @@ CPValueKindPtr CPOffsetListKind::op(SgBinaryOp* op, CPValueKindPtr that) {
 
         return boost::make_shared<CPOffsetListKind>(newOffsetL);
       }
-      
+
       case V_SgSubtractOp :
       {
         assert(thatConcrete);
@@ -2703,7 +2703,7 @@ CPValueKindPtr CPOffsetListKind::op(SgBinaryOp* op, CPValueKindPtr that) {
 
         return boost::make_shared<CPOffsetListKind>(newOffsetL);
       }
-       
+
       // ----- Comparison -----
       case V_SgEqualityOp:
       case V_SgNotEqualOp:
@@ -2720,7 +2720,7 @@ CPValueKindPtr CPOffsetListKind::op(SgBinaryOp* op, CPValueKindPtr that) {
           switch(op->variantT()) {
             case V_SgEqualityOp:
               if(IsSignedConstInt(thatConcrete->getVal().get(), sVal)) {
-                if(sVal==offsetL.back().get()) 
+                if(sVal==offsetL.back().get())
                   return boost::make_shared<CPConcreteKind>(boost::shared_ptr<SgValueExp>(SageBuilder::buildBoolValExp(true)));
                 else
                   return boost::make_shared<CPConcreteKind>(boost::shared_ptr<SgValueExp>(SageBuilder::buildBoolValExp(false)));
@@ -2731,10 +2731,10 @@ CPValueKindPtr CPOffsetListKind::op(SgBinaryOp* op, CPValueKindPtr that) {
                   return boost::make_shared<CPConcreteKind>(boost::shared_ptr<SgValueExp>(SageBuilder::buildBoolValExp(false)));
               }
               break;
-              
+
             case V_SgNotEqualOp:
               if(IsSignedConstInt(thatConcrete->getVal().get(), sVal)) {
-                if(sVal!=offsetL.back().get()) 
+                if(sVal!=offsetL.back().get())
                   return boost::make_shared<CPConcreteKind>(boost::shared_ptr<SgValueExp>(SageBuilder::buildBoolValExp(true)));
                 else
                   return boost::make_shared<CPConcreteKind>(boost::shared_ptr<SgValueExp>(SageBuilder::buildBoolValExp(false)));
@@ -2745,10 +2745,10 @@ CPValueKindPtr CPOffsetListKind::op(SgBinaryOp* op, CPValueKindPtr that) {
                   return boost::make_shared<CPConcreteKind>(boost::shared_ptr<SgValueExp>(SageBuilder::buildBoolValExp(false)));
               }
               break;
-            
+
             case V_SgLessOrEqualOp:
               if(IsSignedConstInt(thatConcrete->getVal().get(), sVal)) {
-                if(sVal<=offsetL.back().get()) 
+                if(sVal<=offsetL.back().get())
                   return boost::make_shared<CPConcreteKind>(boost::shared_ptr<SgValueExp>(SageBuilder::buildBoolValExp(true)));
                 else
                   return boost::make_shared<CPConcreteKind>(boost::shared_ptr<SgValueExp>(SageBuilder::buildBoolValExp(false)));
@@ -2759,10 +2759,10 @@ CPValueKindPtr CPOffsetListKind::op(SgBinaryOp* op, CPValueKindPtr that) {
                   return boost::make_shared<CPConcreteKind>(boost::shared_ptr<SgValueExp>(SageBuilder::buildBoolValExp(false)));
               }
               break;
-            
+
             case V_SgLessThanOp:
               if(IsSignedConstInt(thatConcrete->getVal().get(), sVal)) {
-                if(sVal<offsetL.back().get()) 
+                if(sVal<offsetL.back().get())
                   return boost::make_shared<CPConcreteKind>(boost::shared_ptr<SgValueExp>(SageBuilder::buildBoolValExp(true)));
                 else
                   return boost::make_shared<CPConcreteKind>(boost::shared_ptr<SgValueExp>(SageBuilder::buildBoolValExp(false)));
@@ -2773,10 +2773,10 @@ CPValueKindPtr CPOffsetListKind::op(SgBinaryOp* op, CPValueKindPtr that) {
                   return boost::make_shared<CPConcreteKind>(boost::shared_ptr<SgValueExp>(SageBuilder::buildBoolValExp(false)));
               }
               break;
-              
+
             case V_SgGreaterOrEqualOp:
               if(IsSignedConstInt(thatConcrete->getVal().get(), sVal)) {
-                if(sVal>=offsetL.back().get()) 
+                if(sVal>=offsetL.back().get())
                   return boost::make_shared<CPConcreteKind>(boost::shared_ptr<SgValueExp>(SageBuilder::buildBoolValExp(true)));
                 else
                   return boost::make_shared<CPConcreteKind>(boost::shared_ptr<SgValueExp>(SageBuilder::buildBoolValExp(false)));
@@ -2787,10 +2787,10 @@ CPValueKindPtr CPOffsetListKind::op(SgBinaryOp* op, CPValueKindPtr that) {
                   return boost::make_shared<CPConcreteKind>(boost::shared_ptr<SgValueExp>(SageBuilder::buildBoolValExp(false)));
               }
               break;
-            
+
             case V_SgGreaterThanOp:
               if(IsSignedConstInt(thatConcrete->getVal().get(), sVal)) {
-                if(sVal>offsetL.back().get()) 
+                if(sVal>offsetL.back().get())
                   return boost::make_shared<CPConcreteKind>(boost::shared_ptr<SgValueExp>(SageBuilder::buildBoolValExp(true)));
                 else
                   return boost::make_shared<CPConcreteKind>(boost::shared_ptr<SgValueExp>(SageBuilder::buildBoolValExp(false)));
@@ -2801,7 +2801,7 @@ CPValueKindPtr CPOffsetListKind::op(SgBinaryOp* op, CPValueKindPtr that) {
                   return boost::make_shared<CPConcreteKind>(boost::shared_ptr<SgValueExp>(SageBuilder::buildBoolValExp(false)));
               }
               break;
-              
+
             default:
               break;
           }
@@ -2809,7 +2809,7 @@ CPValueKindPtr CPOffsetListKind::op(SgBinaryOp* op, CPValueKindPtr that) {
         // If we don't have enough information to compare the two values
         return boost::make_shared<CPUnknownKind>();
       }
-      
+
       // ----- Memory References -----
       case V_SgDotExp:
       {
@@ -2829,7 +2829,7 @@ CPValueKindPtr CPOffsetListKind::op(SgBinaryOp* op, CPValueKindPtr that) {
         assert(type);
         SgClassDeclaration* decl = isSgClassDeclaration(type->get_declaration()->get_definingDeclaration());
         assert(decl);
-        
+
         /*dbg << "  type="<<SgNode2Str(type)<<endl;
         dbg << "  decl="<<SgNode2Str(type->get_declaration())<<", classdecl="<<isSgClassDeclaration(type->get_declaration()->get_definingDeclaration())<<endl;
         dbg << "  def="<<SgNode2Str(isSgClassDeclaration(type->get_declaration()->get_definingDeclaration())->get_definition())<<endl;*/
@@ -2853,9 +2853,9 @@ CPValueKindPtr CPOffsetListKind::op(SgBinaryOp* op, CPValueKindPtr that) {
             const SgInitializedNamePtrList& decls = isSgVariableDeclaration(*m)->get_variables();
             for(SgInitializedNamePtrList::const_iterator d=decls.begin(); d!=decls.end(); d++) {
               //dbg << "        decl "<<memberIdx<<"="<<SgNode2Str(*d)<<" type="<<SgNode2Str((*d)->get_type())<<endl;
-              if(*d == rhsVarDecl) { 
+              if(*d == rhsVarDecl) {
                 //dbg << "    memberIdx="<<memberIdx<<endl;
-                
+
                 // Return a new offset kind that extends the current one by appending a memberIdx rank
                 list<intWrap> newOffsetL = offsetL;
                 // Remove the trailing element in newOffsetL if it is a concrete constant 0 since such
@@ -2880,47 +2880,47 @@ CPValueKindPtr CPOffsetListKind::op(SgBinaryOp* op, CPValueKindPtr that) {
             }
             memberIdx++;
           }
-          
+
           /*else if(isSgClassDeclaration(*m)) {
             memberIdx += getNumClassMembers(isSgClassDeclaration(isSgClassDeclaration(*m)->get_definingDeclaration())->get_definition());
           }*/
         }
         assert(0); // There must be at least one match
       }
-      
-      case V_SgArrowExp: 
-        // Arrow expressions introduce aliasing, so we don't know their referent 
+
+      case V_SgArrowExp:
+        // Arrow expressions introduce aliasing, so we don't know their referent
         return boost::make_shared<CPUnknownKind>();
-    
+
       case V_SgPntrArrRefExp:
       {
         SIGHT_VERB_DECL(scope, ("V_SgPntrArrRefExp", scope::medium), 1, CPDebugLevel)
         assert(thatConcrete);
-        
+
         SgPntrArrRefExp* ref = isSgPntrArrRefExp(op);
-        
+
         // Get the offset of the SgPntrArrRefExp relative to the starting point of its parent expression
         long long nextOffset = getPntrArrRefOffset(ref, thatConcrete);
         list<intWrap> newOffsetL = offsetL;
-        
+
         // If the last element in the current offset list is a concrete value, add nextOffset to it
         if(offsetL.back().getType()==intWrap::offsetT)
           newOffsetL.back().set(newOffsetL.back().get() + nextOffset);
         // If the last element is a rank, append nextOffset
         else
           newOffsetL.push_back(offset(nextOffset));
-          
+
         return boost::make_shared<CPOffsetListKind>(newOffsetL);
       }
-      
+
       case V_SgDotStarOp:
         // TODO
         return boost::make_shared<CPUnknownKind>();
-        
+
       case V_SgPointerAssignOp:
         // TODO (Fortran)
         return boost::make_shared<CPUnknownKind>();
-    
+
       // ----- Miscelaneous ----
       case V_SgAssignOp:
         // This should be handled inside the ConstantPropagationAnalysis transfer function
@@ -2929,7 +2929,7 @@ CPValueKindPtr CPOffsetListKind::op(SgBinaryOp* op, CPValueKindPtr that) {
       case V_SgCommaOpExp:
         // This should be handled inside the control flow functionality
         assert(0);
-        
+
       default:
         return boost::make_shared<CPUnknownKind>();
     }
@@ -2937,7 +2937,7 @@ CPValueKindPtr CPOffsetListKind::op(SgBinaryOp* op, CPValueKindPtr that) {
     // This is not yet implemented so this assert will notify us when we need to do the heavy lifting
     assert(0);
   }
-  
+
   // We've enumerated all cases so we should never get here
   cerr << "ERROR: no support for "<<SgNode2Str(op)<<"!";
   assert(0);
@@ -2947,12 +2947,12 @@ CPValueKindPtr CPOffsetListKind::op(SgBinaryOp* op, CPValueKindPtr that) {
 bool CPOffsetListKind::mayEqualAO(CPValueKindPtr that)
 {
   // If that unknown or uninitialized, use its implementation
-  if(that->getKind() == CPValueKind::uninitialized || that->getKind() == CPValueKind::unknown) 
+  if(that->getKind() == CPValueKind::uninitialized || that->getKind() == CPValueKind::unknown)
     return that->mayEqualAO(shared_from_this());
 
   if(that->getKind() == CPValueKind::concrete) {
     CPConcreteKindPtr thatConcrete = that->asConcreteKind();
-    
+
     // If this object denotes a concrete value
     if(offsetL.size()==1 && offsetL.begin()->getType()==intWrap::offsetT) {
       long long thatSV;
@@ -2970,10 +2970,10 @@ bool CPOffsetListKind::mayEqualAO(CPValueKindPtr that)
       // Conservatively answer that they're may-equal
       return true;
   }
-  
+
   if(that->getKind() == CPValueKind::offsetList) {
     CPOffsetListKindPtr thatOffset = that->asOffsetListKind();
-    
+
     list<intWrap>::iterator itThis = offsetL.begin();
     list<intWrap>::iterator itThat = thatOffset->offsetL.begin();
     for(; itThis!=offsetL.end() && itThat!=thatOffset->offsetL.end(); itThis++, itThat++) {
@@ -2982,35 +2982,35 @@ bool CPOffsetListKind::mayEqualAO(CPValueKindPtr that)
       if(itThis->get()     != itThat->get())     return false;
     }
     // We've reached the end of one or both of the offset lists
-    
+
     // If we've reached the end of both offset lists, then the objects denote the same offset
     if(itThis==offsetL.end() && itThat==thatOffset->offsetL.end()) return true;
-    
+
     // We've reached the end of only one offset list, meaning that the other object refers to some
     // deeper offset within the parent memory region. The objects may denote the same offset only if
     // the un-finished object's remaining offsetL elements all denote a 0 offset or 0 rank
     // !!!GB: I'm not sure about the 0 rank since there may be additional padding!!!
-    if(itThis==offsetL.end()) 
+    if(itThis==offsetL.end())
       for(; itThat!=thatOffset->offsetL.end(); itThat++) { if(itThat->get()!=0) return false; }
     if(itThat==thatOffset->offsetL.end())
       for(; itThis!=offsetL.end(); itThis++) { if(itThis->get()!=0) return false; }
-    
+
     // All the offsets are 0, so the two objects are may-equal
     return true;
   }
-  
+
   // We've covered all the cases
   assert(0);
 }
 
 bool CPOffsetListKind::mustEqualAO(CPValueKindPtr that) {
   // If that unknown or uninitialized, use its implementation
-  if(that->getKind() == CPValueKind::uninitialized || that->getKind() == CPValueKind::unknown) 
+  if(that->getKind() == CPValueKind::uninitialized || that->getKind() == CPValueKind::unknown)
     return that->mayEqualAO(shared_from_this());
 
   if(that->getKind() == CPValueKind::concrete) {
     CPConcreteKindPtr thatConcrete = that->asConcreteKind();
-    
+
     // If this object denotes a concrete value
     if(offsetL.size()==1 && offsetL.begin()->getType()==intWrap::offsetT) {
       long long thatSV;
@@ -3028,10 +3028,10 @@ bool CPOffsetListKind::mustEqualAO(CPValueKindPtr that) {
       // Conservatively answer that they're not must-equal
       return false;
   }
-  
+
   if(that->getKind() == CPValueKind::offsetList) {
     CPOffsetListKindPtr thatOffset = that->asOffsetListKind();
-    
+
     list<intWrap>::iterator itThis = offsetL.begin();
     list<intWrap>::iterator itThat = thatOffset->offsetL.begin();
     for(; itThis!=offsetL.end() && itThat!=thatOffset->offsetL.end(); itThis++, itThat++) {
@@ -3040,20 +3040,20 @@ bool CPOffsetListKind::mustEqualAO(CPValueKindPtr that) {
       if(itThis->get()     != itThat->get())     return false;
     }
     // We've reached the end of one or both of the offset lists
-    
+
     // If we've reached the end of both offset lists, then the objects denote the same offset
     if(itThis==offsetL.end() && itThat==thatOffset->offsetL.end()) return true;
-    
+
     // We've reached the end of only one offset list, meaning that the other object refers to some
     // deeper offset within the parent memory region. The objects may denote the same offset only if
     // the un-finished object's remaining offsetL element is a single concrete value 0.
     if(itThis==offsetL.end() && itThat->getType()!=intWrap::offsetT && itThat->get()==0) return true;
     if(itThat==thatOffset->offsetL.end() && itThis->getType()!=intWrap::offsetT && itThis->get()==0) return true;
-    
+
     // The trailing offset is not a concrete 0, so the objects are not must-equal
     return false;
   }
-  
+
   // We've covered all the cases
   assert(0);
 }
@@ -3075,9 +3075,9 @@ bool CPOffsetListKind::subSetAO(CPValueKindPtr that) {
 pair<bool, CPValueKindPtr> CPOffsetListKind::meetUpdateAO(CPValueKindPtr that)
 {
   // OffsetList MEET Uninitialized => OffsetList
-  if(that->getKind() == CPValueKind::uninitialized) 
+  if(that->getKind() == CPValueKind::uninitialized)
     return make_pair(true, copyAOType());
-  
+
   // OffsetList MEET Unknown => Unknown
   if(that->getKind() == CPValueKind::unknown)
     return make_pair(true, boost::make_shared<CPUnknownKind>());
@@ -3085,7 +3085,7 @@ pair<bool, CPValueKindPtr> CPOffsetListKind::meetUpdateAO(CPValueKindPtr that)
   // OffsetList MEET Concrete
   if(that->getKind() == CPValueKind::concrete) {
     CPConcreteKindPtr thatConcrete = that->asConcreteKind();
-    
+
     // If this offset is just a single concrete value
     if(offsetL.size()==1 && offsetL.back().getType()==CPOffsetListKind::intWrap::offsetT) {
       // If both objects denote the same concrete value
@@ -3100,11 +3100,11 @@ pair<bool, CPValueKindPtr> CPOffsetListKind::meetUpdateAO(CPValueKindPtr that)
     // If the two objects do not denote the same concrete value
     return make_pair(true, boost::make_shared<CPUnknownKind>());
   }
-  
+
   // OffsetList MEET OffsetList
   if(that->getKind() == CPValueKind::offsetList) {
     CPOffsetListKindPtr thatOffset = that->asOffsetListKind();
-    // Compare the two offset lists directly 
+    // Compare the two offset lists directly
     // !!! (NOTE: this comparison doesn't take types into account when ranks are compared)
     if(offsetL.size() == thatOffset->offsetL.size()) {
       list<intWrap>::const_iterator thisI = offsetL.begin();
@@ -3119,7 +3119,7 @@ pair<bool, CPValueKindPtr> CPOffsetListKind::meetUpdateAO(CPValueKindPtr that)
     } else
       return make_pair(true, boost::make_shared<CPUnknownKind>());
   }
-  
+
   // We've covered all the cases
   assert(0);
 }
@@ -3193,7 +3193,7 @@ SgType* CPOffsetListKind::getConcreteType()
 
 // Returns the concrete value (if there is one) as an SgValueExp, which allows callers to use
 // the normal ROSE mechanisms to decode it
-std::set<boost::shared_ptr<SgValueExp> > CPOffsetListKind::getConcreteValue() { 
+std::set<boost::shared_ptr<SgValueExp> > CPOffsetListKind::getConcreteValue() {
   assert(isConcrete());
   std::set<boost::shared_ptr<SgValueExp> > vals;
   vals.insert(boost::shared_ptr<SgLongLongIntVal>(SageBuilder::buildLongLongIntVal(offsetL.back().get())));
@@ -3205,9 +3205,9 @@ bool CPOffsetListKind::isFullAO(PartEdgePtr pedge) { return false; }
 // Returns whether this AbstractObject denotes the empty set.
 bool CPOffsetListKind::isEmptyAO(PartEdgePtr pedge) { return false; }
 
-std::string CPOffsetListKind::str(std::string indent) const { 
-  ostringstream oss; 
-  
+std::string CPOffsetListKind::str(std::string indent) const {
+  ostringstream oss;
+
   oss <<"[CPOffsetListKind: offsetL=";
   for(list<intWrap>::const_iterator o=offsetL.begin(); o!=offsetL.end(); o++) {
     if(o!=offsetL.begin()) oss << ",";
@@ -3322,21 +3322,21 @@ CPMemLocObject::operator==(Lattice* X)
           this->getIndex()  == that->getIndex());
 }*/
 
-// Called by analyses to transfer this lattice's contents from across function scopes from a caller function 
-//    to a callee's scope and vice versa. If this this lattice maintains any information on the basis of 
-//    individual MemLocObjects these mappings must be converted, with MemLocObjects that are keys of the ml2ml 
+// Called by analyses to transfer this lattice's contents from across function scopes from a caller function
+//    to a callee's scope and vice versa. If this this lattice maintains any information on the basis of
+//    individual MemLocObjects these mappings must be converted, with MemLocObjects that are keys of the ml2ml
 //    replaced with their corresponding values. If a given key of ml2ml does not appear in the lattice, it must
-//    be added to the lattice and assigned a default initial value. In many cases (e.g. over-approximate sets 
-//    of MemLocObjects) this may not require any actual insertions. If the value of a given ml2ml mapping is 
-//    NULL (empty boost::shared_ptr), any information for MemLocObjects that must-equal to the key should be 
+//    be added to the lattice and assigned a default initial value. In many cases (e.g. over-approximate sets
+//    of MemLocObjects) this may not require any actual insertions. If the value of a given ml2ml mapping is
+//    NULL (empty boost::shared_ptr), any information for MemLocObjects that must-equal to the key should be
 //    deleted.
 // Since the function is called for the scope change across some Part, it needs to account for the fact that
 //    the keys in ml2ml are in scope on one side of Part, while the values on the other side. Specifically, it is
-//    guaranteed that the keys are in scope at fromPEdge while the values are in scope at the edge returned 
+//    guaranteed that the keys are in scope at fromPEdge while the values are in scope at the edge returned
 //    by getPartEdge().
 /*Lattice* CPMemLocObject::remapML(const std::set<MLMapping>& ml2ml, PartEdgePtr fromPEdge) {
   if(isCPFull || isCPEmpty) return dynamic_cast<CPMemLocObject*>(copyAOTypePtr());
-  
+
   CPMemLocObject* ret=NULL;
   for(std::set<MLMapping>::const_iterator m=ml2ml.begin(); m!=ml2ml.end(); m++) {
     if(m->from->mayEqual(MemLocObject::shared_from_this(), fromPEdge, analysis->getComposer(), analysis)) {
@@ -3356,56 +3356,56 @@ CPMemLocObject::operator==(Lattice* X)
 bool CPMemLocObject::mayEqualAO(MemLocObjectPtr o, PartEdgePtr pedge) {
   CPMemLocObjectPtr that = boost::dynamic_pointer_cast<CPMemLocObject>(o);
   assert(that);
-  
+
   /*scope s("CPMemLocObject::mayEqualML");
   dbg << "this="<<str()<<endl;
   dbg << "that="<<that->str()<<endl;*/
-  
+
   // If either object denotes the set of all memlocs, they're may-equal
   if(isCPFull || that->isCPFull)
     return true;
-  
+
   // If either object denotes the empty set, they're not may-equal
   if(isCPEmpty || that->isCPEmpty)
     return false;
-  
-  // Before we call into the parent class, make sure that it can understand the state of 
+
+  // Before we call into the parent class, make sure that it can understand the state of
   // this MemLocObject (a full or empty CPMemLocObject has NULL region and index)
   assert(!isCPFull && !that->isCPFull && !isCPEmpty && !that->isCPEmpty);
-  
+
   // Compare the region and index directly. We call mayEqualMR here because CP does not implement
   // MemRegions, meaning that we need to thread the logic through the composer to the real implementer.
   // However, values are implemented in CP, meaning that we can call mayEqualV directly
   // dbg << "region->mayEqual()=" << region->mayEqual(that->getRegion(), pedge, analysis->getComposer(), analysis) << endl;
   // dbg << "index->mayEqual()=" << ((!index && !that->index) || index->mayEqualAO(that->getIndex(), pedge)) << endl;
-  return region && region->mayEqual(that->getRegion(), pedge, analysis->getComposer(), analysis) && 
+  return region && region->mayEqual(that->getRegion(), pedge, analysis->getComposer(), analysis) &&
          ((!index && !that->index) || index->mayEqualAO(that->getIndex(), pedge));
 }
 
 bool CPMemLocObject::mustEqualAO(MemLocObjectPtr o, PartEdgePtr pedge) {
   CPMemLocObjectPtr that = boost::dynamic_pointer_cast<CPMemLocObject>(o);
   assert(that);
-  
+
   /*scope s("CPMemLocObject::mustEqualML");
   dbg << "this="<<str()<<endl;
   dbg << "that="<<that->str()<<endl;*/
-  
+
   // If either object denotes the set of all memlocs, they're not must-equal since they denote unbounded sets
   if(isCPFull || that->isCPFull)
     return false;
-  
+
   // If either object denotes the empty set, they're not must-equal, since must equality occurs only for sets of size 1
   if(isCPEmpty || that->isCPEmpty)
     return false;
-  
-  // Before we call into the parent class, make sure that it can understand the state of 
+
+  // Before we call into the parent class, make sure that it can understand the state of
   // this MemLocObject (a full or empty CPMemLocObject has NULL region and index)
   assert(!isCPFull && !that->isCPFull && !isCPEmpty && !that->isCPEmpty);
-  
+
   // Compare the region and index directly. We call mustEqualMR here because CP does not implement
   // MemRegions, meaning that we need to thread the logic through the composer to the real implementer.
   // However, values are implemented in CP, meaning that we can call mustEqualV directly
-  return region && region->mustEqual(that->getRegion(), pedge, analysis->getComposer(), analysis) && 
+  return region && region->mustEqual(that->getRegion(), pedge, analysis->getComposer(), analysis) &&
          ((!index && !that->index) || index->mustEqualAO(that->getIndex(), pedge));
 }
 
@@ -3414,31 +3414,31 @@ bool CPMemLocObject::mustEqualAO(MemLocObjectPtr o, PartEdgePtr pedge) {
 bool CPMemLocObject::equalSetAO(MemLocObjectPtr o, PartEdgePtr pedge) {
   CPMemLocObjectPtr that = boost::dynamic_pointer_cast<CPMemLocObject>(o);
   assert(that);
-  
+
   // If both objects denote the set of all memlocs, they're the same set
   if(isCPFull && that->isCPFull)
     return true;
-  
+
   // If only one of the objects denotes the set of all memlocs, they're not the same set
   if(isCPFull || that->isCPFull)
     return false;
-  
+
   // If both objects denotes the empty set, they're the same set
   if(isCPEmpty && that->isCPEmpty)
     return false;
-  
+
   // If only one of the objects denotes the empty set, they're not the same set
   if(isCPEmpty && that->isCPEmpty)
     return false;
 
-  // Before we call into the parent class, make sure that it can understand the state of 
+  // Before we call into the parent class, make sure that it can understand the state of
   // this MemLocObject (a full or empty CPMemLocObject has NULL region and index)
   assert(!isCPFull && !that->isCPFull && !isCPEmpty && !that->isCPEmpty);
-  
+
   // Compare the region and index directly. We call equalSetMR here because CP does not implement
   // MemRegions, meaning that we need to thread the logic through the composer to the real implementer.
   // However, values are implemented in CP, meaning that we can call equalSetV directly
-  return region && region->equalSet(that->getRegion(), pedge, analysis->getComposer(), analysis) && 
+  return region && region->equalSet(that->getRegion(), pedge, analysis->getComposer(), analysis) &&
          ((!index && !that->index) || index->equalSetAO(that->getIndex(), pedge));
 }
 
@@ -3448,38 +3448,38 @@ bool CPMemLocObject::equalSetAO(MemLocObjectPtr o, PartEdgePtr pedge) {
 bool CPMemLocObject::subSetAO(MemLocObjectPtr o, PartEdgePtr pedge) {
   CPMemLocObjectPtr that = boost::dynamic_pointer_cast<CPMemLocObject>(o);
   assert(that);
-  
+
   // If that object denotes the set of all memlocs, this is a subset of that
   if(that->isCPFull)
     return true;
-  
+
   // If this denotes the set of all memlocs but that does not, this is not a subset of that
   if(isCPFull)
     return false;
-  
+
   // If this denotes the empty set, it is a subset of that
   if(isCPEmpty)
     return true;
-  
+
   // If that denotes the empty set but this does not, this is not a subset of that
   if(that->isCPEmpty)
     return false;
-  
-  // Before we call into the parent class, make sure that it can understand the state of 
+
+  // Before we call into the parent class, make sure that it can understand the state of
   // this MemLocObject (a full or empty CPMemLocObject has NULL region and index)
   assert(!isCPFull && !that->isCPFull && !isCPEmpty && !that->isCPEmpty);
-  
+
   // Compare the region and index directly. We call subSetMR here because CP does not implement
   // MemRegions, meaning that we need to thread the logic through the composer to the real implementer.
   // However, values are implemented in CP, meaning that we can call subSetV directly
-  return region && region->subSet(that->getRegion(), pedge, analysis->getComposer(), analysis) && 
+  return region && region->subSet(that->getRegion(), pedge, analysis->getComposer(), analysis) &&
          ((!index && !that->index) || index->subSetAO(that->getIndex(), pedge));
 }
 
 // Returns true if this object is live at the given part and false otherwise
 bool CPMemLocObject::isLiveAO(PartEdgePtr pedge) {
   if(isCPFull || isCPEmpty) return true;
-  
+
 /*  // For now all CPMemLocs are live but in the future we may restrict this only to the CFGNode
   // of the Base expression.
   return true;*/
@@ -3494,7 +3494,7 @@ bool CPMemLocObject::isLiveAO(PartEdgePtr pedge) {
 bool CPMemLocObject::setToFull() {
   // NOTE: AbstractObjects do not support this method but we may want to make it a universal requirement.
   if(isCPFull) return false;
-  
+
   isCPFull  = true;
   isCPEmpty = false;
   region    = NULLMemRegionObject;
@@ -3507,7 +3507,7 @@ bool CPMemLocObject::setToFull() {
 bool CPMemLocObject::setToEmpty() {
   // NOTE: AbstractObjects do not support this method but we may want to make it a universal requirement.
   if(isCPEmpty) return false;
-  
+
   isCPFull  = false;
   isCPEmpty = true;
   region    = NULLMemRegionObject;
@@ -3529,23 +3529,23 @@ bool CPMemLocObject::isEmpty() {
 // Returns whether this AbstractObject denotes the set of all possible execution prefixes.
 bool CPMemLocObject::isFullAO(PartEdgePtr pedge) {
   if(isCPFull) return true;
-  
+
   // Compare the region and index directly. We call isFullMR here because CP does not implement
   // MemRegions, meaning that we need to thread the logic through the composer to the real implementer.
   // However, values are implemented in CP, meaning that we can call isFullV directly
-  return region->isFull(pedge, analysis->getComposer(), analysis) && 
+  return region->isFull(pedge, analysis->getComposer(), analysis) &&
          (!index || index->isFullAO(pedge));
-  
+
 }
 
 // Returns whether this AbstractObject denotes the empty set.
 bool CPMemLocObject::isEmptyAO(PartEdgePtr pedge) {
   if(isCPEmpty) return true;
-  
+
   // Compare the region and index directly. We call isEmptyMR here because CP does not implement
   // MemRegions, meaning that we need to thread the logic through the composer to the real implementer.
   // However, values are implemented in CP, meaning that we can call isEmptyV directly
-  return region->isEmpty(pedge, analysis->getComposer(), analysis) && 
+  return region->isEmpty(pedge, analysis->getComposer(), analysis) &&
          (!index || index->isEmptyAO(pedge));
 }
 
@@ -3662,7 +3662,7 @@ bool CPMemLocObject::intersectUpdate(CPMemLocObject* that, PartEdgePtr pedge, Co
 MemLocObjectPtr CPMemLocObject::copyAOType() const {
   return boost::make_shared<CPMemLocObject>(*this);
 }
-  
+
   // Allocates a copy of this object and returns a regular pointer to it
 /*MemLocObject* CPMemLocObject::copyAOTypePtr() const {
   return new CPMemLocObject(*this);
@@ -3671,8 +3671,8 @@ MemLocObjectPtr CPMemLocObject::copyAOType() const {
 std::string CPMemLocObject::str(std::string indent) const { // pretty print for the object
   if(isCPFull)       return "[CPMemLocObject: Full]";
   else if(isCPEmpty) return "[CPMemLocObject: Empty]";
-  
-  ostringstream oss; 
+
+  ostringstream oss;
   //oss << "[CPMemLocObject: region="<<(region?region->str(indent+"    "):"NULL");
   oss << "<table><tr><td colspan=\"2\">CPMemLocObject</td></tr>";
   oss << "<tr><td>region:</td><td>"<<(region?region->str():"NULL")<<"</td><tr>";
@@ -3682,7 +3682,7 @@ std::string CPMemLocObject::str(std::string indent) const { // pretty print for 
   }
   //oss <<"]";
   oss << "</table>"<<endl;
-  
+
   return oss.str();
   return "";
 }
@@ -3697,7 +3697,7 @@ std::string CPMemLocObject::str(std::string indent) const { // pretty print for 
   CPValueObjectPtr arg1Lat, arg2Lat, resLat;
   arg1Lat = getLatticeOperand(sgn, sgn->get_lhs_operand());
   resLat  = getLattice(sgn);
-  
+
   // If the first operand of the short-circuit operation has a known value and it is sufficient to determine
   // the operation's outcome
   if(arg1Lat->getLevel() == CPValueObject::constantValue &&
@@ -3728,20 +3728,20 @@ std::string CPMemLocObject::str(std::string indent) const { // pretty print for 
   }
 }*/
 
-void ConstantPropagationAnalysisTransfer::visit(SgVarRefExp *vref) { 
+void ConstantPropagationAnalysisTransfer::visit(SgVarRefExp *vref) {
 }
 
 void ConstantPropagationAnalysisTransfer::visit(SgDotExp *dot) {
   SIGHT_VERB_DECL(scope, ("ConstantPropagationAnalysisTransfer::visit(SgDotExp *dot)", scope::medium), 1, CPDebugLevel)
-  
+
   /*assert(dfInfo[NULLPartEdge].size()==2);
-  
+
   CodeLocObjectPtr cl = boost::make_shared<CodeLocObject>(getPart(), getCFGNode());
   dbg << "cl="<<cl->str();
-  
+
   AbstractObjectMap* cl2ml = dynamic_cast<AbstractObjectMap*>(dfInfo[NULLPartEdge][1]);
   assert(cl2ml);*/
-  
+
   /*MemLocObjectPtr ml = boost::dynamic_pointer_cast<MemLocObject>(cl2ml->get(cl));//composer->Expr2MemLocSelf(dot->get_lhs_operand(), part->inEdgeFromAny(), analysis);
   assert(ml);
   CPMemLocObjectPtr core = boost::dynamic_pointer_cast<CPMemLocObject>(ml);
@@ -3751,7 +3751,7 @@ void ConstantPropagationAnalysisTransfer::visit(SgDotExp *dot) {
   dbg << "ml="<<(ml?ml->str():"NULL")<<endl;
   UnionMemLocObjectPtr coreUnion = boost::dynamic_pointer_cast<UnionMemLocObject>(ml);
   dbg << "coreUnion="<<(coreUnion?coreUnion->str():"NULL")<<endl;
-  
+
   const list<MemLocObjectPtr>& coreMLs = coreUnion->getMemLocs();
   CPMemLocObjectPtr core;
   if(coreMLs.size()==1)
@@ -3770,35 +3770,38 @@ void ConstantPropagationAnalysisTransfer::visit(SgDotExp *dot) {
   if(opPartEdges.size()==1) {
     PartPtr operandPart = (*opPartEdges.begin())->source();
     dbg << "operandPart="<<operandPart->str()<<endl;
-    
+
     if(operandPart->CFGNodes().size()==1) {
       CFGNode cn = *operandPart->CFGNodes().begin();
       dbg << "cn="<<CFGNode2Str(cn)<<endl;
-      
+
       CodeLocObjectPtr lhsCL = boost::make_shared<CodeLocObject>(operandPart, cn);
       dbg << "lhsCL="<<lhsCL->str()<<endl;
-      
+
       core = boost::dynamic_pointer_cast<CPMemLocObject>(cl2ml->get(lhsCL));
       dbg << "core="<<(core? core->str():"NULL")<<endl;
       assert(core);
     } else assert(0);
   } else assert(0);*/
-  
+
   //MemLocObjectPtr ml = composer->OperandExpr2MemLoc(dot, dot->get_lhs_operand(), part->inEdgeFromAny(), analysis);
   MemLocObjectPtr ml = analysis->OperandExpr2MemLocUse(dot, dot->get_lhs_operand(), part->inEdgeFromAny());
+  dbg << "ml="<<ml->str()<<endl;
   CombinedMemLocObjectPtr mlUnion = boost::dynamic_pointer_cast<CombinedMemLocObject>(ml);
   assert(mlUnion);
   const std::list<MemLocObjectPtr>& mlVals = mlUnion->getMemLocs();
   assert(mlVals.size()==1);
-  CPMemLocObjectPtr core = boost::dynamic_pointer_cast<CPMemLocObject>(*mlVals.begin());
+  CPMemLocObjectPtr core = boost::dynamic_pointer_cast<CPMemLocObject>((*mlVals.begin())->project(analysis, part->inEdgeFromAny(), composer, analysis));
+  dbg << "*mlVals.begin()="<<(*mlVals.begin())->str()<<endl;
+  dbg << "core="<<core<<endl;
   assert(core);
-  
+
   // Compute the offset into the region of the core MemLoc that results from the dot expression
   CPValueLatticePtr offset = core->getCPIndex()->ground->op(dot, NULLCPValueLattice);
   SIGHT_VERB(dbg << "offset="<<(offset? offset->str(): "NULL")<<endl, 1, CPDebugLevel)
-  
+
   // Update this node's MemLoc to use the same region as core but with the new offset
-  
+
   /*if(dfInfo[NULLPartEdge][1]) delete dfInfo[NULLPartEdge][1];
   dfInfo[NULLPartEdge][1] = new CPMemLocObject(core->getRegion(), offset, dot, part->inEdgeFromAny(), analysis);
   dbg << "dfInfo[1]="<<dfInfo[NULLPartEdge][1]->str()<<endl;*/
@@ -3808,31 +3811,31 @@ void ConstantPropagationAnalysisTransfer::visit(SgDotExp *dot) {
   nodeState.addFact(analysis, 0, new CPMemLocObjectNodeFact(dotML));
 }
 
-void ConstantPropagationAnalysisTransfer::visit(SgPntrArrRefExp *paRef) { 
+void ConstantPropagationAnalysisTransfer::visit(SgPntrArrRefExp *paRef) {
   SIGHT_VERB_DECL(scope, ("ConstantPropagationAnalysisTransfer::visit(SgPntrArrRefExp *paRef)", scope::medium), 1, CPDebugLevel)
-  
+
   /*assert(dfInfo[NULLPartEdge].size()==2);
-  
+
   CodeLocObjectPtr cl = boost::make_shared<CodeLocObject>(getPart(), getCFGNode());
   dbg << "cl="<<cl->str();
-  
+
   AbstractObjectMap* cl2ml = dynamic_cast<AbstractObjectMap*>(dfInfo[NULLPartEdge][1]);
   assert(cl2ml);*/
-  
+
   // In expression array[i], the memory location denoted by "array"
   /*list<PartEdgePtr> opPartEdges = part->inEdgeFromAny()->getOperandPartEdge(paRef, paRef->get_lhs_operand());
   CPMemLocObjectPtr core;
   if(opPartEdges.size()==1) {
     PartPtr operandPart = (*opPartEdges.begin())->source();
     dbg << "operandPart="<<operandPart->str()<<endl;
-    
+
     if(operandPart->CFGNodes().size()==1) {
       CFGNode cn = *operandPart->CFGNodes().begin();
       dbg << "cn="<<CFGNode2Str(cn)<<endl;
-      
+
       CodeLocObjectPtr lhsCL = boost::make_shared<CodeLocObject>(operandPart, cn);
       dbg << "lhsCL="<<lhsCL->str()<<endl;
-      
+
       core = boost::dynamic_pointer_cast<CPMemLocObject>(cl2ml->get(lhsCL));
       dbg << "core="<<(core? core->str():"NULL")<<endl;
       assert(core);
@@ -3859,25 +3862,25 @@ void ConstantPropagationAnalysisTransfer::visit(SgPntrArrRefExp *paRef) {
   CPValueObjectPtr index = boost::dynamic_pointer_cast<CPValueObject>(*indexVals.begin());
   assert(index);
   SIGHT_VERB(dbg << "index="<<index->str()<<endl, 1, CPDebugLevel)
-  
+
   // Compute the offset into the region of the core MemLoc that results from the arraypntr reference expression
   CPValueLatticePtr offset = core->getCPIndex()->ground->op(paRef, index->ground);
   SIGHT_VERB(dbg << "offset="<<offset->str()<<endl, 1, CPDebugLevel)
-  
+
   CPMemLocObjectPtr paRefML = boost::make_shared<CPMemLocObject>(core->getRegion(), offset->createValueObject(), paRef, part->inEdgeFromAny(), analysis);
   SIGHT_VERB(dbg << "paRefML="<<(paRefML? paRefML->str(): "NULL")<<endl, 1, CPDebugLevel)
   //cl2ml->insert(cl, paRefML);
   nodeState.addFact(analysis, 0, new CPMemLocObjectNodeFact(paRefML));
 }
 
-void ConstantPropagationAnalysisTransfer::visit(SgBinaryOp *sgn) { 
+void ConstantPropagationAnalysisTransfer::visit(SgBinaryOp *sgn) {
   SIGHT_VERB_DECL(scope, ("ConstantPropagationAnalysisTransfer::visit(SgBinaryOp)", scope::medium), 1, CPDebugLevel)
   //struct timeval vStart, vEnd; gettimeofday(&vStart, NULL);
-  
+
   // Only bother to consider operators with short-circuiting a the end of the operator so that
   // all of its operands precede the operator
   if((isSgAndOp(sgn) || isSgOrOp(sgn)) && cn.getIndex()!=2) return;
-  
+
   CPValueLatticePtr arg1Lat, arg2Lat;//, resLat_tmp;
   //struct timeval gStart, gEnd; gettimeofday(&gStart, NULL);
   getLattices(sgn, arg1Lat, arg2Lat);//, resLat_tmp);
@@ -3899,9 +3902,9 @@ void ConstantPropagationAnalysisTransfer::visit(SgBinaryOp *sgn) {
 }
 
 // Unary ops that update the operand
-void ConstantPropagationAnalysisTransfer::visit(SgMinusMinusOp *sgn) { 
+void ConstantPropagationAnalysisTransfer::visit(SgMinusMinusOp *sgn) {
   SIGHT_VERB_DECL(scope, ("ConstantPropagationAnalysisTransfer::visit(SgMinusMinusOp)", scope::medium), 1, CPDebugLevel)
-  
+
   CPValueLatticePtr arg1Lat;//, arg2Lat;//, resLat_tmp;
   getLattices(sgn, arg1Lat);//, arg2Lat);//, resLat_tmp);
   CPValueLatticePtr resLat = arg1Lat->op(sgn);
@@ -3910,9 +3913,9 @@ void ConstantPropagationAnalysisTransfer::visit(SgMinusMinusOp *sgn) {
   setLatticeOperand(sgn, sgn->get_operand(), resLat);
 }
 
-void ConstantPropagationAnalysisTransfer::visit(SgPlusPlusOp *sgn) { 
+void ConstantPropagationAnalysisTransfer::visit(SgPlusPlusOp *sgn) {
   SIGHT_VERB_DECL(scope, ("ConstantPropagationAnalysisTransfer::visit(SgPlusPlusOp)", scope::medium), 1, CPDebugLevel)
-  
+
   CPValueLatticePtr arg1Lat;//, arg2Lat;//, resLat_tmp;
   getLattices(sgn, arg1Lat);//, arg2Lat);//, resLat_tmp);
   CPValueLatticePtr resLat = arg1Lat->op(sgn);
@@ -3922,9 +3925,9 @@ void ConstantPropagationAnalysisTransfer::visit(SgPlusPlusOp *sgn) {
 }
 
 // Unary ops that do not update the operand
-// void ConstantPropagationAnalysisTransfer::visit(SgUnaryOp *sgn) { 
+// void ConstantPropagationAnalysisTransfer::visit(SgUnaryOp *sgn) {
 //   scope s("ConstantPropagationAnalysisTransfer::visit(SgUnaryOp)", scope::medium, attrGE("CPDebugLevel", 1));
-  
+
 //   CPValueLatticePtr arg1Lat;//, arg2Lat;//, resLat_tmp;
 //   getLattices(sgn, arg1Lat);//, arg2Lat);//, resLat_tmp);
 //   CPValueLatticePtr resLat = arg1Lat->op(sgn);
@@ -3933,9 +3936,9 @@ void ConstantPropagationAnalysisTransfer::visit(SgPlusPlusOp *sgn) {
 // }
 
 // Unary ops that do not update the operand
-void ConstantPropagationAnalysisTransfer::visit(SgCastExp *sgn) { 
+void ConstantPropagationAnalysisTransfer::visit(SgCastExp *sgn) {
   SIGHT_VERB_DECL(scope, ("ConstantPropagationAnalysisTransfer::visit(SgCastExp)", scope::medium), 1, CPDebugLevel)
-  
+
   CPValueLatticePtr arg1Lat;//, arg2Lat;//, resLat_tmp;
   getLattices(sgn, arg1Lat);//, arg2Lat);//, resLat_tmp);
   CPValueLatticePtr resLat = arg1Lat->op(sgn);
@@ -3944,9 +3947,9 @@ void ConstantPropagationAnalysisTransfer::visit(SgCastExp *sgn) {
 }
 
 // Unary ops that do not update the operand
-void ConstantPropagationAnalysisTransfer::visit(SgMinusOp *sgn) { 
+void ConstantPropagationAnalysisTransfer::visit(SgMinusOp *sgn) {
   SIGHT_VERB_DECL(scope, ("ConstantPropagationAnalysisTransfer::visit(SgMinusOp)", scope::medium), 1, CPDebugLevel)
-  
+
   CPValueLatticePtr arg1Lat;//, arg2Lat;//, resLat_tmp;
   getLattices(sgn, arg1Lat);//, arg2Lat);//, resLat_tmp);
   CPValueLatticePtr resLat = arg1Lat->op(sgn);
@@ -3955,9 +3958,9 @@ void ConstantPropagationAnalysisTransfer::visit(SgMinusOp *sgn) {
 }
 
 // Unary ops that do not update the operand
-void ConstantPropagationAnalysisTransfer::visit(SgNotOp *sgn) { 
+void ConstantPropagationAnalysisTransfer::visit(SgNotOp *sgn) {
   SIGHT_VERB_DECL(scope, ("ConstantPropagationAnalysisTransfer::visit(SgNotOp)", scope::medium), 1, CPDebugLevel);
-  
+
   CPValueLatticePtr arg1Lat;//, arg2Lat;//, resLat_tmp;
   getLattices(sgn, arg1Lat);//, arg2Lat);//, resLat_tmp);
   CPValueLatticePtr resLat = arg1Lat->op(sgn);
@@ -3968,7 +3971,7 @@ void ConstantPropagationAnalysisTransfer::visit(SgNotOp *sgn) {
 void ConstantPropagationAnalysisTransfer::visit(SgValueExp *val) {
   SIGHT_VERB(scope reg("ConstantPropagationAnalysisTransfer::visit(SgValExp)", scope::low), 1, CPDebugLevel)
   assert(val);
-  
+
 //prodLat->setToEmpty();
   SgTreeCopy copyHelp;
   boost::shared_ptr<SgValueExp> valCopy((SgValueExp*)(val->copy(copyHelp)));
@@ -3977,12 +3980,12 @@ void ConstantPropagationAnalysisTransfer::visit(SgValueExp *val) {
 
 
 ConstantPropagationAnalysisTransfer::ConstantPropagationAnalysisTransfer(
-          PartPtr part, PartPtr supersetPart, CFGNode cn, NodeState& state, 
-          map<PartEdgePtr, vector<Lattice*> >& dfInfo, 
+          PartPtr part, PartPtr supersetPart, CFGNode cn, NodeState& state,
+          map<PartEdgePtr, vector<Lattice*> >& dfInfo,
           Composer* composer, ConstantPropagationAnalysis* analysis)
    : VariableStateTransfer<CPValueLattice, ConstantPropagationAnalysis>
                        (state, dfInfo, boost::make_shared<CPValueLattice>(part->inEdgeFromAny()),
-                        composer, analysis, part, supersetPart, cn, 
+                        composer, analysis, part, supersetPart, cn,
                         CPDebugLevel, "CPDebugLevel")
 {
 }
@@ -4000,7 +4003,7 @@ ConstantPropagationAnalysis::ConstantPropagationAnalysis(bool useSSA) : FWDatafl
 }
 
 // Creates a basic CPMemLocObject for the given SgNode. This object does not take into
-// account any constant propagation and will be used as a seed from which to propagate 
+// account any constant propagation and will be used as a seed from which to propagate
 // more precise information.
 CPMemLocObjectPtr ConstantPropagationAnalysis::createBasicCPML(SgNode* n, PartEdgePtr pedge) {
 //  struct timeval gopeStart, gopeEnd; gettimeofday(&gopeStart, NULL);
@@ -4009,7 +4012,7 @@ CPMemLocObjectPtr ConstantPropagationAnalysis::createBasicCPML(SgNode* n, PartEd
   MemRegionObjectPtr curMR = composer->Expr2MemRegion(n, pedge, this);
   //dbg << "curMR="<<curMR->str()<<endl;
 //  gettimeofday(&gopeEnd, NULL); cout << "              ConstantPropagationAnalysis::createBasicCPML Expr2MemRegion\t"<<(((gopeEnd.tv_sec*1000000 + gopeEnd.tv_usec) - (gopeStart.tv_sec*1000000 + gopeStart.tv_usec)) / 1000000.0)<<endl;
-    
+
 /*  // If this expression denotes the starting point of a memory region, create a MemLocObject
   // that is explicitly at the start of mr
   CPMemLocObjectPtr ml;
@@ -4026,14 +4029,14 @@ CPMemLocObjectPtr ConstantPropagationAnalysis::createBasicCPML(SgNode* n, PartEd
             // !!! Should create ServerImplKind here!!!
                                            boost::make_shared<CPOffsetListKind>(CPOffsetListKind::offset(0)),
                                            pedge)->createValueObject(),
-                                       // boost::make_shared<CPValueObject>(boost::make_shared<CPUninitializedKind>(), pedge), 
+                                       // boost::make_shared<CPValueObject>(boost::make_shared<CPUninitializedKind>(), pedge),
                                 n, pedge, this);
 */
   // Create a MemLocObject that refers to the first offset within the MemRegion. Cache the CPMemLocObject
   // associated with MemRegionObject.
  // struct timeval cacheStart, cacheEnd; gettimeofday(&cacheStart, NULL);
 
-  CPMemLocObjectPtr res = 
+  CPMemLocObjectPtr res =
         boost::make_shared<CPMemLocObject>(
                               curMR, boost::make_shared<CPValueLattice>(
                                          boost::make_shared<CPOffsetListKind>(CPOffsetListKind::offset(0)),
@@ -4056,33 +4059,33 @@ void ConstantPropagationAnalysis::genInitLattice(PartPtr part, PartEdgePtr pedge
   /*dbg << "ConstantPropagationAnalysis::initializeState, analysis="<<returning l="<<l<<" n=<"<<escape(p.getNode()->unparseToString())<<" | "<<p.getNode()->class_name()<<" | "<<p.getIndex()<<">\n";
   dbg << "    l="<<l->str("    ")<<endl;*/
   initLattices.push_back(ml2val);
-  
+
   //initLattices.push_back(new CPMemLocObject(NULLMemRegionObject, NULLCPValueObject, NULL, pedge, this));
-  
+
   /*
   // The second lattice represents the memory location denoted by the current CFGNode
   assert(part->CFGNodes().size()==1);
   CFGNode n = *(part->CFGNodes().begin());
-  
+
   MemRegionObjectPtr mr = composer->Expr2MemRegion(n.getNode(), part->inEdgeFromAny(), this);
   CPMemLocObject* ml;
   scope s("ConstantPropagationAnalysis::genInitLattice()", scope::medium, attrGE("CPDebugLevel", 1));
-  
+
   // If this expression denotes the starting point of a memory region, create a MemLocObject
   // that is explicitly at the start of mr
   if(isSgVarRefExp(n.getNode()))
     ml = new CPMemLocObject(mr, boost::make_shared<CPValueObject>(
                                          boost::make_shared<CPConcreteKind>(
-                                                  boost::shared_ptr<SgValueExp>(SageBuilder::buildIntVal(0))), pedge), 
+                                                  boost::shared_ptr<SgValueExp>(SageBuilder::buildIntVal(0))), pedge),
                             n.getNode(), pedge, this);
   // Otherwise, create one that refers to an unknown offset within mr
   else
-    ml = new CPMemLocObject(mr, boost::make_shared<CPValueObject>(boost::make_shared<CPUninitializedKind>(), pedge), 
+    ml = new CPMemLocObject(mr, boost::make_shared<CPValueObject>(boost::make_shared<CPUninitializedKind>(), pedge),
                             n.getNode(), pedge, this);
-  
+
   dbg << "new MemLoc post:"<<ml->str()<<endl;
   initLattices.push_back(ml);*/
-  
+
   /*AbstractObjectMap* cl2ml = new AbstractObjectMap(boost::make_shared<CPMemLocObject>(false, true, (SgNode*)NULL, pedge, this),
                                                    pedge,
                                                    getComposer(), this);
@@ -4091,16 +4094,16 @@ void ConstantPropagationAnalysis::genInitLattice(PartPtr part, PartEdgePtr pedge
     CodeLocObjectPtr curCL = boost::make_shared<CodeLocObject>(part, *n);
     cl2ml->insert(curCL, ConstantPropagationAnalysis::createBasicCPML(n->getNode(), part->inEdgeFromAny()));
   }
-  
+
   dbg << "cl2ml:"<<cl2ml->str()<<endl;
   initLattices.push_back(cl2ml);*/
 }
-  
+
 bool
-ConstantPropagationAnalysis::transfer(PartPtr p, CFGNode cn, NodeState& state, 
+ConstantPropagationAnalysis::transfer(PartPtr p, CFGNode cn, NodeState& state,
                                       map<PartEdgePtr, vector<Lattice*> >& dfInfo)
 {
-  assert(0); 
+  assert(0);
   return false;
 }
 
@@ -4116,11 +4119,11 @@ ConstantPropagationAnalysis::getTransferVisitor(PartPtr part, PartPtr supersetPa
 ValueObjectPtr ConstantPropagationAnalysis::Expr2Val(SgNode* n, PartEdgePtr pedge)
 {
   SIGHT_VERB_DECL(scope, (txt()<<"ConstantPropagationAnalysis::Expr2Val(n="<<SgNode2Str(n)<<", pedge="<<pedge->str()<<")", scope::medium), 1, CPDebugLevel)
-  
+
   //MemLocObjectPtr ml = getComposer()->Expr2MemLoc(n, pedge, this);
   MemLocObjectPtr ml = Expr2MemLocUse(n, pedge);
   SIGHT_VERB(dbg << "ml="<<(ml? ml->str(): "NULL")<<endl, 1, CPDebugLevel)
-  
+
   // If pedge doesn't have wildcards
   //dbg << "source="<<pedge->source()->str()<<endl;
   //dbg << "target="<<pedge->target()->str()<<endl;
@@ -4128,7 +4131,7 @@ ValueObjectPtr ConstantPropagationAnalysis::Expr2Val(SgNode* n, PartEdgePtr pedg
     // Get the NodeState at the source of this edge
     NodeState* state = NodeState::getNodeState(this, (useSSA? NULLPart: pedge->source()));
     SIGHT_VERB(dbg << "state="<<state->str(this)<<endl, 1, CPDebugLevel)
-    
+
     // Get the value map at the current edge
     AbstractObjectMap* cpMap =
               useSSA? dynamic_cast<AbstractObjectMap*>(state->getLatticeAbove(this, NULLPartEdge, 0)) :
@@ -4140,12 +4143,12 @@ ValueObjectPtr ConstantPropagationAnalysis::Expr2Val(SgNode* n, PartEdgePtr pedg
       SIGHT_VERB(dbg << "l="<<(l?l->str():"NULL")<<endl, 1, CPDebugLevel)
     }
     assert(cpMap);
-    
+
     // We currently can only handle requests for the SgNode that corresponds to the current Part
     set<CFGNode> nodes = pedge->source()->CFGNodes();
     assert(nodes.size()==1);
 //    assert(nodes.begin()->getNode() == n);
-    
+
     // Get the MemLoc at the source part
     SIGHT_VERB_IF(1, CPDebugLevel)
       indent ind;
@@ -4156,14 +4159,14 @@ ValueObjectPtr ConstantPropagationAnalysis::Expr2Val(SgNode* n, PartEdgePtr pedg
     CPValueLatticePtr val = boost::dynamic_pointer_cast<CPValueLattice>(cpMap->get(ml));
     assert(val);
     SIGHT_VERB(dbg << "val="<<val->str()<<endl, 1, CPDebugLevel)
-    
+
     return val->copyCPLat()->createValueObject();
   // If the target of this edge is a wildcard
   } else if(pedge->source()) {
     // Get the NodeState at the source of this edge
     NodeState* state = NodeState::getNodeState(this, pedge->source());
     //dbg << "state="<<state->str(this)<<endl;
-        
+
     map<PartEdgePtr, vector<Lattice*> >& e2lats = state->getLatticeBelowAllMod(this);
     assert(e2lats.size()>=1);
     CPValueLatticePtr mergedLat;
@@ -4171,44 +4174,44 @@ ValueObjectPtr ConstantPropagationAnalysis::Expr2Val(SgNode* n, PartEdgePtr pedg
       PartEdgePtr supersetEdge = lats->first;
       assert(supersetEdge->source() == pedge->getSupersetPartEdge()->source());
       SIGHT_VERB_DECL(scope, (txt()<<"edge "<<lats->first.get()->str(), scope::medium), 1, CPDebugLevel)
-      
+
       // Get the value map at the current edge
       AbstractObjectMap* cpMap = dynamic_cast<AbstractObjectMap*>(state->getLatticeBelow(this, lats->first, 0));
       assert(cpMap);
-      
+
       //MemLocObjectPtr p = composer->Expr2MemLoc(n, pedge, this);
       // We currently can only handle requests for the SgNode that corresponds to the current Part
       set<CFGNode> nodes = pedge->source()->CFGNodes();
       assert(nodes.size()==1);
       assert(nodes.begin()->getNode() == n);
-      
+
       SIGHT_VERB_IF(2, CPDebugLevel)
         indent ind;
         dbg << "cpMap="<<cpMap<<"="<<cpMap->str()<<endl;
-      SIGHT_VERB_FI() 
-      
+      SIGHT_VERB_FI()
+
       CPValueLatticePtr val = boost::dynamic_pointer_cast<CPValueLattice> (boost::dynamic_pointer_cast<ValueObject>(cpMap->get(ml)));
       SIGHT_VERB(dbg << "val="<<val->str()<<endl, 1, CPDebugLevel)
 
       if(lats==e2lats.begin())
         mergedLat = val->copyCPLat();
-      else 
+      else
         mergedLat->meetUpdate(val.get());
-      
+
       SIGHT_VERB(dbg << "mergedLat="<<mergedLat->str()<<endl, 1, CPDebugLevel)
     }
     return mergedLat->createValueObject();
-  
+
   // If the source of this edge is a wildcard
   } else if(pedge->target()) {
     // Get the NodeState at the target of this edge
     NodeState* state = NodeState::getNodeState(this, pedge->target());
     SIGHT_VERB(dbg << "state="<<state->str()<<endl, 2, CPDebugLevel)
-    
+
     // Get the value map at the NULL edge, which denotes the meet over all incoming edges
     AbstractObjectMap* cpMap = dynamic_cast<AbstractObjectMap*>(state->getLatticeAbove(this, pedge->getSupersetPartEdge(), 0));
     assert(cpMap);
-    
+
     SIGHT_VERB_IF(2, CPDebugLevel)
       indent ind;
       dbg << "cpMap="<<cpMap<<"="<<cpMap->str()<<endl;
@@ -4218,7 +4221,7 @@ ValueObjectPtr ConstantPropagationAnalysis::Expr2Val(SgNode* n, PartEdgePtr pedg
     CPValueLatticePtr val = boost::dynamic_pointer_cast<CPValueLattice>(cpMap->get(ml));
     assert(val);
     SIGHT_VERB(dbg << "val="<<val->str()<<endl, 1, CPDebugLevel)
-    
+
     return val->copyCPLat()->createValueObject();
   }
   assert(0);
@@ -4226,7 +4229,7 @@ ValueObjectPtr ConstantPropagationAnalysis::Expr2Val(SgNode* n, PartEdgePtr pedg
 
 MemLocObjectPtr ConstantPropagationAnalysis::Expr2MemLoc(SgNode* n, PartEdgePtr pedge) {
   SIGHT_VERB_DECL(scope, (txt()<<"ConstantPropagationAnalysis::Expr2MemLoc(n="<<SgNode2Str(n)<<", pedge="<<pedge->str()<<")", scope::medium), 1, CPDebugLevel)
- 
+
   //struct timeval gopeStart, gopeEnd; gettimeofday(&gopeStart, NULL);
 
   // SgInitializedNames denote entities that are lexically known and thus do not require
@@ -4239,15 +4242,15 @@ MemLocObjectPtr ConstantPropagationAnalysis::Expr2MemLoc(SgNode* n, PartEdgePtr 
     //gettimeofday(&gopeEnd, NULL); cout << "            ConstantPropagationAnalysis::Expr2MemLoc\t"<<(((gopeEnd.tv_sec*1000000 + gopeEnd.tv_usec) - (gopeStart.tv_sec*1000000 + gopeStart.tv_usec)) / 1000000.0)<<endl;
     return ret;
   }
-  
+
   // NOTE: this is a temporary hack where we assume the appropriate index for the CFGNode
   //       that represents SgNode n. In the future we should change Expr2* to accept CFGNodes
   CFGNode cn;
-       if(isSgBinaryOp(n) || 
+       if(isSgBinaryOp(n) ||
           isSgUnaryOp(n))     cn = CFGNode(n, 2);
   else if(isSgValueExp(n))    cn = CFGNode(n, 1);
   else                        cn = CFGNode(n, 0);
-  
+
   // Confirm that n corresponds to the source part
   if(pedge->source()) {
     assert(pedge->source()->CFGNodes().size()==1);
@@ -4256,34 +4259,34 @@ MemLocObjectPtr ConstantPropagationAnalysis::Expr2MemLoc(SgNode* n, PartEdgePtr 
     assert(pedge->target()->CFGNodes().size()==1);
     assert(pedge->target()->CFGNodes().begin()->getNode() == n);
   }
-  
+
   if(pedge->source()) {
     SIGHT_VERB_DECL(scope, (txt()<<"Source: "<<pedge->source()->str(), scope::medium), 2, CPDebugLevel)
     NodeState* state = NodeState::getNodeState(this, pedge->source());
     SIGHT_VERB(dbg << "state="<<state->str()<<endl, 1, CPDebugLevel)
   }
-  
+
   if(pedge->target()) {
     SIGHT_VERB_DECL(scope, (txt()<<"target: "<<pedge->target()->str(), scope::medium), 2, CPDebugLevel)
     NodeState* state = NodeState::getNodeState(this, pedge->target());
     SIGHT_VERB(dbg << "state="<<state->str()<<endl, 1, CPDebugLevel)
   }
-  
+
   // If pedge doesn't have wildcards
   if(pedge->source() && pedge->target()) {
     cout << "st\n";
     /*CodeLocObjectPtr cl = boost::make_shared<CodeLocObject>(pedge->source(), cn);
     SIGHT_VERB(dbg << "cl="<<cl->str()<<endl, 1, CPDebugLevel)*/
-    
+
     //struct timeval gopeStart, gopeEnd; gettimeofday(&gopeStart, NULL);
     // Get the NodeState at the source of this edge
     NodeState* state = NodeState::getNodeState(this, pedge->source());
     SIGHT_VERB(dbg << "state="<<state->str()<<endl, 3, CPDebugLevel)
-    
+
     /* // Get the memory location at the current edge
     AbstractObjectMap* cl2ml = dynamic_cast<AbstractObjectMap*>(state->getLatticeBelow(this, pedge->getSupersetPartEdge(), 1));
     assert(cl2ml);
-    
+
     // Get the memory location at the current edge
     CPMemLocObjectPtr ml = boost::dynamic_pointer_cast<CPMemLocObject>(cl2ml->get(cl));*/
     NodeFact* mlFact = state->getFact(this, 0);
@@ -4292,7 +4295,7 @@ MemLocObjectPtr ConstantPropagationAnalysis::Expr2MemLoc(SgNode* n, PartEdgePtr 
     CPMemLocObjectPtr ml = cpmlFact->ml;
     assert(ml);
     SIGHT_VERB(dbg << "ml="<<ml->str()<<endl, 1, CPDebugLevel)
-    
+
     //gettimeofday(&gopeEnd, NULL); cout << "            ConstantPropagationAnalysis::Expr2MemLoc getFact\t"<<(((gopeEnd.tv_sec*1000000 + gopeEnd.tv_usec) - (gopeStart.tv_sec*1000000 + gopeStart.tv_usec)) / 1000000.0)<<endl;
 
     /*struct timeval copyStart, copyEnd; gettimeofday(&copyStart, NULL);
@@ -4307,7 +4310,7 @@ MemLocObjectPtr ConstantPropagationAnalysis::Expr2MemLoc(SgNode* n, PartEdgePtr 
     // Get the NodeState at the source of this edge
     NodeState* state = NodeState::getNodeState(this, pedge->source());
     SIGHT_VERB(dbg << "state="<<state->str()<<endl, 2, CPDebugLevel)
-    
+
     map<PartEdgePtr, vector<Lattice*> >& e2lats = state->getLatticeBelowAllMod(this);
     assert(e2lats.size()>=1);
     CPMemLocObjectPtr mergedML;
@@ -4315,15 +4318,15 @@ MemLocObjectPtr ConstantPropagationAnalysis::Expr2MemLoc(SgNode* n, PartEdgePtr 
       SIGHT_VERB_DECL(scope, (txt()<<"edge "<<lats->first.get()->str(), scope::medium), 1, CPDebugLevel)
       PartEdgePtr supersetEdge = lats->first;
       assert(supersetEdge.get()->source() == pedge->getSupersetPartEdge()->source());
-      
+
       // NOTE: for now we're assuming that the CFGNode index is 0 but this will need to be corrected
       /*CodeLocObjectPtr cl = boost::make_shared<CodeLocObject>(pedge->source(), cn);
       SIGHT_VERB(dbg << "cl="<<cl->str(), 1, CPDebugLevel)*/
-      
+
       // Get the memory location at the current edge
       /*AbstractObjectMap* cl2ml = dynamic_cast<AbstractObjectMap*>(state->getLatticeBelow(this, supersetEdge, 1));
       assert(cl2ml);
-    
+
       // Get the memory location at the current edge
       CPMemLocObjectPtr ml = boost::dynamic_pointer_cast<CPMemLocObject>(cl2ml->get(cl));*/
       NodeFact* mlFact = state->getFact(this, 0);
@@ -4332,12 +4335,12 @@ MemLocObjectPtr ConstantPropagationAnalysis::Expr2MemLoc(SgNode* n, PartEdgePtr 
       CPMemLocObjectPtr ml = cpmlFact->ml;
       assert(ml);
       SIGHT_VERB(dbg << "ml="<<ml->str()<<endl, 1, CPDebugLevel)
-      
+
       if(lats==e2lats.begin())
         mergedML = boost::dynamic_pointer_cast<CPMemLocObject>(ml->copyAOType());
       else
         mergedML->meetUpdate((MemLocObjectPtr)ml, supersetEdge, getComposer(), this);
-      
+
       SIGHT_VERB(dbg << "mergedML="<<mergedML->str()<<endl, 1, CPDebugLevel)
     }
     return mergedML;
@@ -4347,15 +4350,15 @@ MemLocObjectPtr ConstantPropagationAnalysis::Expr2MemLoc(SgNode* n, PartEdgePtr 
     // Get the NodeState at the target of this edge
     NodeState* state = NodeState::getNodeState(this, pedge->target());
     SIGHT_VERB(dbg << "state="<<state->str()<<endl, 3, CPDebugLevel)
-    
+
     // NOTE: for now we're assuming that the CFGNode index is 0 but this will need to be corrected
     /*CodeLocObjectPtr cl = boost::make_shared<CodeLocObject>(pedge->target(), cn);
     SIGHT_VERB(dbg << "cl="<<cl->str(), 1, CPDebugLevel)*/
-    
+
     // Get the memory location at the current edge
     /*AbstractObjectMap* cl2ml = dynamic_cast<AbstractObjectMap*>(state->getLatticeAbove(this, NULLPartEdge, 1));
     assert(cl2ml);
-    
+
     // Get the memory location at the current edge
     CPMemLocObjectPtr ml = boost::dynamic_pointer_cast<CPMemLocObject>(cl2ml->get(cl));*/
 
@@ -4368,7 +4371,7 @@ MemLocObjectPtr ConstantPropagationAnalysis::Expr2MemLoc(SgNode* n, PartEdgePtr 
 
     return ml->copyAOType();
   }
-  
+
   //gettimeofday(&gopeEnd, NULL); cout << "            ConstantPropagationAnalysis::Expr2MemLoc\t"<<(((gopeEnd.tv_sec*1000000 + gopeEnd.tv_usec) - (gopeStart.tv_sec*1000000 + gopeStart.tv_usec)) / 1000000.0)<<endl;
 
   // If pedge doesn't have wildcards
@@ -4376,23 +4379,23 @@ MemLocObjectPtr ConstantPropagationAnalysis::Expr2MemLoc(SgNode* n, PartEdgePtr 
     // Confirm that n corresponds to the source part
     assert(pedge->source()->CFGNodes().size()==1);
     assert(pedge->source()->CFGNodes().begin()->getNode() == n);
-    
+
     // Get the NodeState at the source of this edge
     NodeState* state = NodeState::getNodeState(this, pedge->source());
-    
+
     // Get the memory location at the current edge
     CPMemLocObject* ml = dynamic_cast<CPMemLocObject*>(state->getLatticeBelow(this, pedge->getSupersetPartEdge(), 1));
     if(ml==NULL) { Lattice* l = state->getLatticeBelow(this, pedge->getSupersetPartEdge(), 1);dbg << "ml="<<(l? l->str(): "NULL")<<endl; }
     assert(ml);
-    
+
     if(CPDebugLevel()>=1) dbg << "ml="<<ml->str()<<endl;
-    
+
     return ml->copyAOType();
   // If the target of this edge is a wildcard
   } else if(pedge->source()) {
     // Get the NodeState at the source of this edge
     NodeState* state = NodeState::getNodeState(this, pedge->source());
-    
+
     map<PartEdgePtr, vector<Lattice*> >& e2lats = state->getLatticeBelowAllMod(this);
     assert(e2lats.size()>=1);
     CPMemLocObjectPtr mergedML;
@@ -4400,40 +4403,40 @@ MemLocObjectPtr ConstantPropagationAnalysis::Expr2MemLoc(SgNode* n, PartEdgePtr 
       scope sEdge(txt()<<"edge "<<lats->first.get()->str(), scope::medium, attrGE("CPDebugLevel", 1));
       PartEdge* edgePtr = lats->first.get();
       assert(edgePtr->source() == pedge.get()->source());
-      
+
       // Confirm that n corresponds to the source part
       assert(pedge->source()->CFGNodes().size()==1);
       assert(pedge->source()->CFGNodes().begin()->getNode() == n);
-      
+
       // Get the value map at the current edge
       CPMemLocObject* ml = dynamic_cast<CPMemLocObject*>(state->getLatticeBelow(this, lats->first, 1));
       if(ml==NULL) { Lattice* l = state->getLatticeBelow(this, pedge, 1);dbg << "ml="<<(l? l->str(): "NULL")<<endl; }
       assert(ml);
-      
+
       if(CPDebugLevel()>=1) dbg << "ml="<<ml->str()<<endl;
-      
+
       if(lats==e2lats.begin())
         mergedML = boost::dynamic_pointer_cast<CPMemLocObject>(ml->copyAOType());
       else
         mergedML->meetUpdate(ml, lats->first, getComposer(), this);
-      
+
       if(CPDebugLevel()>=1) dbg << "mergedML="<<mergedML->str()<<endl;
     }
     return mergedML;
-  
+
   // If the source of this edge is a wildcard
   } else if(pedge->target()) {
     // Get the NodeState at the target of this edge
     NodeState* state = NodeState::getNodeState(this, pedge->target());
     if(CPDebugLevel()>=2) dbg << "state="<<state->str()<<endl;
-    
+
     // Get the value map at the current edge
     CPMemLocObject* ml = dynamic_cast<CPMemLocObject*>(state->getLatticeAbove(this, NULLPartEdge, 1));
     if(ml==NULL) { Lattice* l = state->getLatticeAbove(this, NULLPartEdge, 1);dbg << "ml="<<(l? l->str(): "NULL")<<endl; }
     assert(ml);
-    
+
     if(CPDebugLevel()>=1) dbg << "ml="<<ml->str()<<endl;
-    
+
     return ml->copyAOType();
   }*/
   assert(0);

@@ -51,13 +51,13 @@ bool ComposedAnalysis::isLive(AbstractObjectPtr ao, PartEdgePtr pedge)
 {
   ValueObjectPtr val = boost::dynamic_pointer_cast<ValueObject>(ao);
   if(val) return isLiveVal(val, pedge);
-  
+
   MemLocObjectPtr ml = boost::dynamic_pointer_cast<MemLocObject>(ao);
   if(ml) return isLiveMemLoc(ml, pedge);
-  
+
   CodeLocObjectPtr cl = boost::dynamic_pointer_cast<CodeLocObject>(ao);
   if(cl) return isLiveCodeLoc(cl, pedge);
-  
+
   assert(0);
 }
 
@@ -72,14 +72,14 @@ bool ComposedAnalysis::mayEqual(AbstractObjectPtr ao1, AbstractObjectPtr ao2, Pa
     assert(val2);
     return mayEqualV(val1, val2, pedge);
   }
-  
+
   MemLocObjectPtr ml1 = boost::dynamic_pointer_cast<MemLocObject>(ao1);
   if(ml1) {
     MemLocObjectPtr ml2 = boost::dynamic_pointer_cast<MemLocObject>(ao2);
     assert(ml2);
     return mayEqualML(ml1, ml2, pedge);
   }
-  
+
   CodeLocObjectPtr cl1 = boost::dynamic_pointer_cast<CodeLocObject>(ao1);
   if(cl1) {
     CodeLocObjectPtr cl2 = boost::dynamic_pointer_cast<CodeLocObject>(ao2);
@@ -99,14 +99,14 @@ bool ComposedAnalysis::mustEqual(AbstractObjectPtr ao1, AbstractObjectPtr ao2, P
     assert(val2);
     return mustEqualV(val1, val2, pedge);
   }
-  
+
   MemLocObjectPtr ml1 = boost::dynamic_pointer_cast<MemLocObject>(ao1);
   if(ml1) {
     MemLocObjectPtr ml2 = boost::dynamic_pointer_cast<MemLocObject>(ao2);
     assert(ml2);
     return mustEqualML(ml1, ml2, pedge);
   }
-  
+
   CodeLocObjectPtr cl1 = boost::dynamic_pointer_cast<CodeLocObject>(ao1);
   if(cl1) {
     CodeLocObjectPtr cl2 = boost::dynamic_pointer_cast<CodeLocObject>(ao2);
@@ -197,7 +197,7 @@ std::set<PartPtr> ComposedAnalysis::GetStartAStates()
 std::set<PartPtr> ComposedAnalysis::GetEndAStates()
 {
   // If the result of this function has not yet been computed
-  if(!endStatesInitialized) { 
+  if(!endStatesInitialized) {
     // Get the result and cache it
     EndAStates = GetEndAStates_Spec();
     endStatesInitialized = true;
@@ -226,7 +226,7 @@ PartEdgePtr ComposedAnalysis::convertPEdge(PartEdgePtr pedge)
   // If the result of this function has been computed, return it
   map<PartEdgePtr, PartEdgePtr>::iterator oldPEdge=refined2BasePedge.find(pedge);
   if(oldPEdge != refined2BasePedge.end()) return oldPEdge->second;
-  
+
   // Cache the result
   PartEdgePtr result = pedge->getSupersetPartEdge();
   refined2BasePedge[pedge] = result;
@@ -325,14 +325,14 @@ void ComposedAnalysis::initializeStateDense(PartPtr part, PartPtr supersetPart, 
   state.setFacts(this, initFacts);
 }
 
-// Generates the initial lattice state for the given dataflow node, in the given function. Implementations 
+// Generates the initial lattice state for the given dataflow node, in the given function. Implementations
 // fill in the lattices above and below this part, as well as the facts, as needed. Since in many cases
-// the lattices above and below each node are the same, implementors can alternately implement the 
+// the lattices above and below each node are the same, implementors can alternately implement the
 // genInitLattice and genInitFact functions, which are called by the default implementation of initializeState.
 void ComposedAnalysis::initializeStateSSA(PartPtr part, NodeState& state)
 {
   if(getDirection()==none) return;
-  
+
   // Analyses associate all arriving information with a single NULL edge and all departing information
   // with the edge on which the information departs
   if(getDirection()==fw) {
@@ -724,9 +724,7 @@ void ComposedAnalysis::transferAStateDense(ComposedAnalysis* analysis,
     //printf("                 dfInfoAnte.size()=%d, dfInfoPost.size()=%d, this=%p\n", dfInfoAnte.size(), dfInfoPost.size(), this);
     if(c==v.begin()) {
       SIGHT_VERB_IF(1, composedAnalysisDebugLevel)
-        dbg << "==================================  "<<endl;
-        dbg << "  Copying incoming Lattice :"<<endl;
-        {indent ind; dbg <<NodeState::str(dfInfoAnte); }
+        {scope s("Copying incoming Lattice"); dbg <<NodeState::str(dfInfoAnte); }
         /*dbg << "  To outgoing Lattice: "<<endl;
         {indent ind; dbg <<NodeState::str(dfInfoPost); }*/
       SIGHT_VERB_FI()
@@ -932,11 +930,9 @@ bool ComposedAnalysis::propagateStateToNextNode(
   vector<Lattice*>::const_iterator itC, itN;
   SIGHT_VERB_IF(1, composedAnalysisDebugLevel)
     dbg << endl << "Propagating to Next Node: "<<nextPart->str()<<endl;
-    dbg << "Cur Node Lattice "<<endl;
-    { indent ind; dbg<<NodeState::str(curNodeState); }
+    { scope s("Cur Node Lattice"); dbg<<NodeState::str(curNodeState); }
 
-    dbg << "Next Node Lattice "<<endl;
-    { indent ind; dbg<<NodeState::str(nextNodeState); }
+    { scope s("Next Node Lattice"); dbg<<NodeState::str(nextNodeState); }
   SIGHT_VERB_FI()
 
   // Update forward info above nextPart from the forward info below curPart.
@@ -956,8 +952,8 @@ bool ComposedAnalysis::propagateStateToNextNode(
     SIGHT_VERB(dbg << "Copying over next state"<<endl, 1, composedAnalysisDebugLevel)
     PartEdgePtr nextPartWildCardPartEdge      = getDirection() == fw? nextPart->inEdgeFromAny() :         nextPart->outEdgeToAny();
     PartEdgePtr nextSuperPartWildCardPartEdge = getDirection() == fw? nextSupersetPart->inEdgeFromAny() : nextSupersetPart->outEdgeToAny();
-    NodeState::copyLatticesOW(nextNodeState, /*toDepartEdge*/   nextPartWildCardPartEdge, nextSuperPartWildCardPartEdge, 
-                              curNodeState,  /*fromDepartEdge*/ curPartWildCardPartEdge,  curSuperPartWildCardPartEdge, 
+    NodeState::copyLatticesOW(nextNodeState, /*toDepartEdge*/   nextPartWildCardPartEdge, nextSuperPartWildCardPartEdge,
+                              curNodeState,  /*fromDepartEdge*/ curPartWildCardPartEdge,  curSuperPartWildCardPartEdge,
                               /*adjustPEdge*/ false);
     modified = true;
   }
@@ -968,7 +964,7 @@ bool ComposedAnalysis::propagateStateToNextNode(
   SIGHT_VERB_IF(1, composedAnalysisDebugLevel)
     indent ind;
     if(modified) {
-      dbg << "Next node's in-data modified. Adding..."<<endl;
+      scope s("Next node's in-data modified. Adding...");
       dbg << "Propagated: Lattice "<<endl;
       { indent ind; dbg<<NodeState::str(nextNodeState); }
     }
@@ -1222,21 +1218,6 @@ void ComposedAnalysis::propagateDF2DescDense(ComposedAnalysis* analysis,
         curDF->replaceML(dfCopy);
         delete dfCopy;
         delete unionLats[i];
-        //dbg << "curDF: "<<curDF->str()<<endl;
-
-/*
-        dbg << "A: "<<unionLats[i]->str()<<endl;
-        unionLats[i]->setPartEdge(*de);
-        dbg << "B: "<<unionLats[i]->str()<<endl;
-        unionLats[i]->replaceML(dfInfo[nextSupersetPartEdge][i]);
-        dbg << "C: "<<unionLats[i]->str()<<endl;
-        Lattice* oldDF = dfInfo[nextSupersetPartEdge][i];
-        dbg << "C: oldDF="<<oldDF->str()<<endl;
-        dfInfo[nextSupersetPartEdge][i] = unionLats[i];
-        dbg << "oldDF="<<oldDF<<", unionLats[i]="<<unionLats[i]<<endl;
-//        delete oldDF;
-        dbg << "D: "<<unionLats[i]->str()<<endl;
-        dbg << "E: "<<dfInfo[nextSupersetPartEdge][i]->str()<<endl;*/
       }
       //}
 
@@ -1255,6 +1236,13 @@ void ComposedAnalysis::propagateDF2DescDense(ComposedAnalysis* analysis,
         (*lat)->setPartEdge(*de);
       }
     }
+
+    // Remap the MemLocs inside each edge's Lattice to account for this PartEdge's changes in scope
+    analysis->remapML(nextSupersetPartEdge, dfInfo[nextSupersetPartEdge]);
+    SIGHT_VERB_IF(1, composedAnalysisDebugLevel)
+    scope mpsReg("Remapped DFState", scope::low);
+      dbg << NodeState::str(dfInfo[nextSupersetPartEdge])<<endl;
+    SIGHT_VERB_FI()
 
     NodeState* nextState = NodeState::getNodeState(analysis, nextPart);
     SIGHT_VERB(dbg << "next State="<<nextState->str()<<endl, 1, composedAnalysisDebugLevel)
@@ -1338,12 +1326,12 @@ void ComposedAnalysis::propagateDF2DescSSA(ComposedAnalysis* analysis,
       }
     }
   }
-  
+
   if(modified) {
     // --------------------
     // Collect all the Parts that used the outputs of this part
     set<PartPtr> useParts;
-  
+
     { SIGHT_VERB_DECL(scope, ("Defs->Uses:"), 1, composedAnalysisDebugLevel)
     set<SSAMemLocObjectPtr> defs = ssa->getDefs(part);
     for(set<SSAMemLocObjectPtr>::iterator d=defs.begin(); d!=defs.end(); d++) {
@@ -1354,11 +1342,11 @@ void ComposedAnalysis::propagateDF2DescSSA(ComposedAnalysis* analysis,
         useParts.insert((*u)->loc);
       }
     }}
-  
+
     if(ssa->isPhiNode(part)) {
       { SIGHT_VERB_DECL(scope, ("Phi Defs->Uses:"), 1, composedAnalysisDebugLevel)
       const map<SSAMemLocObjectPtr, set<SSAMemLocObjectPtr> >& phiDefs = ssa->getDefsUsesAtPhiNode(part);
-  
+
       for(map<SSAMemLocObjectPtr, set<SSAMemLocObjectPtr> >::const_iterator group=phiDefs.begin(); group!=phiDefs.end(); ++group) {
         SIGHT_VERB(dbg << "phi def "<<(group->first)->str()<<endl, 1, composedAnalysisDebugLevel)
         set<SSAMemLocObjectPtr> uses = ssa->getUses(group->first);
@@ -1367,13 +1355,13 @@ void ComposedAnalysis::propagateDF2DescSSA(ComposedAnalysis* analysis,
           useParts.insert((*u)->loc);
         }
      }}}
-  
+
     // --------------------
     // Add all the use parts to the worklist
     SIGHT_VERB(dbg << "Use Parts:"<<endl, 1, composedAnalysisDebugLevel)
     for(set<PartPtr>::iterator p=useParts.begin(); p!=useParts.end(); p++) {
       SIGHT_VERB(dbg << "    "<<(*p)->str()<<endl, 1, composedAnalysisDebugLevel)
-  
+
       // Add an anchor to toAnchors from the current Abstract State to its current descendant
       SIGHT_VERB_IF(1, composedAnalysisDebugLevel)
       anchor toAnchor;
@@ -1382,9 +1370,9 @@ void ComposedAnalysis::propagateDF2DescSSA(ComposedAnalysis* analysis,
       toAnchors[*p].insert(toAnchor);
       fromAnchors[*p].insert(make_pair(curPartAnchor, *p));
       SIGHT_VERB_FI()
-  
+
       // !!!! Deal with function call Scope transfers
-  
+
       // Add the use part to the worklist
       curNodeIt->add(p->get()->inEdgeFromAny());
     }
@@ -1414,11 +1402,18 @@ void ComposedAnalysis::setDescendantLatticeLocationsDense(
 
   // Get the dataflow information of analysis at part
   NodeState* state = NodeState::getNodeState(analysis, part);
-  SIGHT_VERB(dbg<<"state="<<state->str()<<endl, 1, composedAnalysisDebugLevel)
+  SIGHT_VERB_IF(1, composedAnalysisDebugLevel)
+  {
+     scope s("state");
+     dbg<<state->str()<<endl;
+  }
+  SIGHT_VERB_FI()
   map<PartEdgePtr, std::vector<Lattice*> > dfInfoPost = getLatticePost(state, analysis);
 
   // Set the partEdge of all the lattices on the post side of this part
   //assert(descEdges.size() == descSupersetEdges.size());
+  {
+  SIGHT_VERB_DECL(scope, (txt()<<"Descendant Edges (#"<<descEdges.size()<<")"), 1, composedAnalysisDebugLevel)
   for(list<PartEdgePtr>::iterator e=descEdges.begin()/*, eSuper=descSupersetEdges.begin()*/;
       e!=descEdges.end(); ++e/*, ++eSuper*/) {
     PartEdgePtr supersetPartEdge = (*e)->getSupersetPartEdge();
@@ -1428,9 +1423,9 @@ void ComposedAnalysis::setDescendantLatticeLocationsDense(
       (*l)->setPartEdge(*e);
       SIGHT_VERB(dbg<<"lattice "<<(*l)->str()<<endl, 1, composedAnalysisDebugLevel)
     }
-  }
+  }}
 
-  // Remap the MemLocs inside each edge's Lattice to account for this PartEdge's changes in scope
+/*  // Remap the MemLocs inside each edge's Lattice to account for this PartEdge's changes in scope
   for(list<PartEdgePtr>::iterator e=descEdges.begin(); e!=descEdges.end(); ++e) {
     PartEdgePtr supersetPartEdge = (*e)->getSupersetPartEdge();
     analysis->remapML((getDirection()==fw? supersetPart->inEdgeFromAny():
@@ -1441,7 +1436,7 @@ void ComposedAnalysis::setDescendantLatticeLocationsDense(
       for(vector<Lattice*>::iterator df=dfInfoPost[supersetPartEdge].begin(); df!=dfInfoPost[supersetPartEdge].end(); df++)
         dbg << (*df)->str()<<endl;
     SIGHT_VERB_FI()
-  }
+  }*/
 }
 
 /*************************
@@ -1452,7 +1447,7 @@ void ComposedAnalysis::setDescendantLatticeLocationsDense(
 
 std::map<PartEdgePtr, std::vector<Lattice*> > UndirDataflow::emptyMap;
 
-  
+
 set<PartPtr>
 FWDataflow::getInitialWorklist()
 {
@@ -1474,7 +1469,7 @@ void FWDataflow::setLatticeAnte(NodeState *state, map<PartEdgePtr, vector<Lattic
   if(overwrite) state->copyLatticesOW(state->getLatticeAboveAllMod(this), dfInfo);
   else          state->copyLattices  (state->getLatticeAboveAllMod(this), dfInfo);
 }
-void FWDataflow::setLatticePost(NodeState *state, map<PartEdgePtr, vector<Lattice*> >& dfInfo, bool overwrite) { 
+void FWDataflow::setLatticePost(NodeState *state, map<PartEdgePtr, vector<Lattice*> >& dfInfo, bool overwrite) {
   if(overwrite) state->copyLatticesOW(state->getLatticeBelowAllMod(this), dfInfo);
   else          state->copyLattices  (state->getLatticeBelowAllMod(this), dfInfo);
 }
@@ -1486,13 +1481,13 @@ void BWDataflow::setLatticeAnte(NodeState *state, map<PartEdgePtr, vector<Lattic
   if(overwrite) state->copyLatticesOW(state->getLatticeBelowAllMod(this), dfInfo);
   else          state->copyLattices  (state->getLatticeBelowAllMod(this), dfInfo);
 }
-void BWDataflow::setLatticePost(NodeState *state, map<PartEdgePtr, vector<Lattice*> >& dfInfo, bool overwrite) { 
+void BWDataflow::setLatticePost(NodeState *state, map<PartEdgePtr, vector<Lattice*> >& dfInfo, bool overwrite) {
   if(overwrite) state->copyLatticesOW(state->getLatticeAboveAllMod(this), dfInfo);
   else          state->copyLattices  (state->getLatticeAboveAllMod(this), dfInfo);
 }
 
 list<PartPtr> FWDataflow::getDescendants(PartPtr part)
-{ 
+{
   list<PartPtr> descendants;
   list<PartEdgePtr> outEdges = part->outEdges();
   for(list<PartEdgePtr>::iterator ei=outEdges.begin(); ei!=outEdges.end(); ei++)
@@ -1501,7 +1496,7 @@ list<PartPtr> FWDataflow::getDescendants(PartPtr part)
 }
 
 list<PartPtr> BWDataflow::getDescendants(PartPtr part)
-{ 
+{
   list<PartPtr> descendants;
   list<PartEdgePtr> inEdges = part->inEdges();
   for(list<PartEdgePtr>::iterator ei=inEdges.begin(); ei!=inEdges.end(); ei++)
@@ -1510,12 +1505,12 @@ list<PartPtr> BWDataflow::getDescendants(PartPtr part)
 }
 
 list<PartEdgePtr> FWDataflow::getEdgesToDescendants(PartPtr part)
-{ 
+{
   return part->outEdges();
 }
 
 list<PartEdgePtr> BWDataflow::getEdgesToDescendants(PartPtr part)
-{  
+{
  return part->inEdges();
 }
 
@@ -1749,8 +1744,8 @@ void printDataflowInfoPass::genInitLattice(PartPtr part, PartEdgePtr pedge, Part
 {
   initLattices.push_back((Lattice*)(new BoolAndLattice(0, pedge)));
 }
-  
-bool printDataflowInfoPass::transfer(PartPtr part, CFGNode cn, NodeState& state, 
+
+bool printDataflowInfoPass::transfer(PartPtr part, CFGNode cn, NodeState& state,
                                      std::map<PartEdgePtr, std::vector<Lattice*> >& dfInfo)
 {
   dbg << "-----#############################--------\n";
@@ -1758,7 +1753,7 @@ bool printDataflowInfoPass::transfer(PartPtr part, CFGNode cn, NodeState& state,
   dbg << "State:\n";
   SIGHT_VERB(indent ind, 1, composedAnalysisDebugLevel);
   dbg << state.str(analysis)<<endl;
-  
+
   return dynamic_cast<BoolAndLattice*>(dfInfo[part->inEdgeFromAny()][0])->set(true);
 }
 
@@ -1777,8 +1772,8 @@ void checkDataflowInfoPass::genInitLattice(PartPtr part, PartEdgePtr pedge, Part
   initLattices.push_back((Lattice*)(new BoolAndLattice(0, pedge)));
   SIGHT_VERB(dbg << ">>>checkDataflowInfoPass::genInitLattice"<<endl, 2, composedAnalysisDebugLevel)
 }
-  
-bool checkDataflowInfoPass::transfer(PartPtr part, CFGNode cn, NodeState& state, 
+
+bool checkDataflowInfoPass::transfer(PartPtr part, CFGNode cn, NodeState& state,
                                      std::map<PartEdgePtr, std::vector<Lattice*> >& dfInfo)
 {
   set<CFGNode> nodes = part->CFGNodes();
@@ -1792,7 +1787,7 @@ bool checkDataflowInfoPass::transfer(PartPtr part, CFGNode cn, NodeState& state,
           ValueObjectPtr v = getComposer()->OperandExpr2Val(call, *a, part->inEdgeFromAny(), this);
           assert(v);
           SIGHT_VERB(dbg << "v="<<v->str()<<", v->isConcrete()="<<v->isConcrete()<<", a="<<SgNode2Str(*a)<<endl, 1, composedAnalysisDebugLevel)
-          
+
           ostringstream errorMesg;
           if(!v->isConcrete())
             errorMesg << "Debug assertion at "<<call->get_file_info()->get_filenameString()<<":"<<call->get_file_info()->get_line()<<" failed: concrete interpretation not available! test="<<(*a)->unparseToString()<<" v="<<v->str();
@@ -1800,7 +1795,7 @@ bool checkDataflowInfoPass::transfer(PartPtr part, CFGNode cn, NodeState& state,
             set<boost::shared_ptr<SgValueExp> > concreteVals = v->getConcreteValue();
             if(concreteVals.size()==0)
               errorMesg << "Debug assertion at "<<call->get_file_info()->get_filenameString()<<":"<<call->get_file_info()->get_line()<<" failed: interpretation not convertible to a boolean! test="<<(*a)->unparseToString()<<" v="<<v->str()<<" v->getConcreteValue() is empty!";
-            
+
             for(set<boost::shared_ptr<SgValueExp> >::iterator cv=concreteVals.begin(); cv!=concreteVals.end(); cv++) {
               if(!ValueObject::isValueBoolCompatible(*cv))
                 errorMesg << "Debug assertion at "<<call->get_file_info()->get_filenameString()<<":"<<call->get_file_info()->get_line()<<" failed: interpretation not convertible to a boolean! test="<<(*a)->unparseToString()<<" v="<<v->str()<<" v->getConcreteValue()="<<SgNode2Str(cv->get());
@@ -1808,7 +1803,7 @@ bool checkDataflowInfoPass::transfer(PartPtr part, CFGNode cn, NodeState& state,
                 errorMesg << "Debug assertion at "<<call->get_file_info()->get_filenameString()<<":"<<call->get_file_info()->get_line()<<" failed: test evaluates to false! test="<<(*a)->unparseToString()<<" v="<<v->str()<<" v->getConcreteValue()="<<SgNode2Str(cv->get());
             }
           }
-          
+
           if(errorMesg.str() != "") {
             cerr << errorMesg.str() << endl;
             dbg << "<span style=\"color:red;font-size:14pt\">"<<errorMesg.str()<<"</span>"<<endl;

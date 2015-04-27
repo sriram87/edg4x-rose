@@ -638,30 +638,34 @@ std::string StxFuncContext::str(std::string indent) const {
  *******************/
 
 // the Syntactic Analysis interesting filter
-bool stxVirtualCFGFilter (CFGNode cfgn)
+/*bool stxVirtualCFGFilter (CFGNode cfgn)
 {
-  //scope s(txt()<<"stxVirtualCFGFilter("<<CFGNode2Str(cfgn)<<")");
+  scope s(txt()<<"stxVirtualCFGFilter("<<CFGNode2Str(cfgn)<<")");
   SgNode * node = cfgn.getNode();
   assert (node != NULL) ;
+
   //Keep the last index for initialized names. This way the definition of the variable doesn't
   //propagate to its assign initializer.
   if (isSgInitializedName(node)) {
-    //dbg << "isSgInitializedName: "<<(cfgn == node->cfgForEnd())<<endl;
+    dbg << "isSgInitializedName: "<<(cfgn == node->cfgForEnd())<<endl;
     return (cfgn == node->cfgForEnd());
   } else if(isSgFunctionParameterList(node)) {
-    //dbg << "isSgFunctionParameterList: "<<(cfgn.getIndex()==isSgFunctionParameterList(node)->get_args().size())<<endl;
+    dbg << "isSgFunctionParameterList: "<<(cfgn.getIndex()==isSgFunctionParameterList(node)->get_args().size())<<endl;
     return cfgn.getIndex()==isSgFunctionParameterList(node)->get_args().size();
   } else if(isSgFunctionDefinition(node)) {
-    //dbg << "isSgFunctionDefinition: "<<(cfgn.getIndex()==3)<<endl;
+    dbg << "isSgFunctionDefinition: "<<(cfgn.getIndex()==3)<<endl;
     return cfgn.getIndex()==3;
   } else if(isSgVariableDeclaration(node)) {
-    //dbg << "isSgVariableDeclaration: "<<true<<endl;
+    dbg << "isSgVariableDeclaration: "<<true<<endl;
     return true;
+  } else if(isSgFunctionCallExp(node)) {
+    dbg << "isSgFunctionCallExp: "<<(cfgn.getIndex()==2 || cfgn.getIndex()==3)<<endl;
+    return (cfgn.getIndex()==2 || cfgn.getIndex()==3);
   } else {
-    //dbg << "Other: "<<(cfgn.isInteresting())<<endl;
+    dbg << "Other: "<<(cfgn.isInteresting())<<endl;
     return (cfgn.isInteresting());
   }
-}
+}*/
 
 
 // Parts must be created via static construction methods to make it possible to separately
@@ -680,12 +684,12 @@ StxPartPtr StxPart::create(CFGNode n, ComposedAnalysis* analysis, bool (*f) (CFG
     return NULLStxPart;
 }
 StxPartPtr StxPart::create(const StxPart& part) {
-  StxPartPtr newPart(boost::shared_ptr<StxPart>(new StxPart(part, stxVirtualCFGFilter)));
+  StxPartPtr newPart(boost::shared_ptr<StxPart>(new StxPart(part, defaultFilter/*stxVirtualCFGFilter*/)));
   newPart->init();
   return newPart;
 }
 StxPartPtr StxPart::create(const StxPartPtr& part) {
-  StxPartPtr newPart(boost::shared_ptr<StxPart>(new StxPart(part, stxVirtualCFGFilter)));
+  StxPartPtr newPart(boost::shared_ptr<StxPart>(new StxPart(part, defaultFilter/*stxVirtualCFGFilter*/)));
   newPart->init();
   return newPart;
 }
@@ -781,8 +785,9 @@ map<StxPartEdgePtr, bool> makeClosureDF(const vector<CFGEdge>& orig, // raw in o
   map<StxPartEdgePtr, bool> edges;
   
   for (set<CFGPath>::iterator i = allPaths.begin(); i != allPaths.end(); ++i) {
+    SIGHT_VERB(dbg << "*i="<<CFGNode2Str(i->source())<<" ==&gt; "<<CFGNode2Str(i->target())<<endl, 3, stxAnalysisDebugLevel)
+
     // Only if the end node of the path is interesting
-    //if (((*i).*otherSide)().isInteresting())
     if (filter(((*i).*otherSide)())) {
       //edges.push_back(/*boost::static_pointer_cast<PartEdge>(*/boost::make_shared<StxPartEdge>(*i, filter)/*)*/);
       //edges.push_back(StxPartEdge::create(*i, analysis, filter));
@@ -796,12 +801,12 @@ map<StxPartEdgePtr, bool> makeClosureDF(const vector<CFGEdge>& orig, // raw in o
     dbg << "    edge="<<e->first->str()<<endl;*/
   //for (list<StxPartEdgePtr>::iterator i = edges.begin(); i != edges.end(); ++i) {
   
-  // Make sure that for each edge either the source or the target is interesting
+/*  // Make sure that for each edge either the source or the target is interesting
   for (map<StxPartEdgePtr, bool>::iterator i = edges.begin(); i != edges.end(); ++i) {
     StxPartEdgePtr edge = i->first;
     assert(edge->source()->filterAny(filter)  || 
                 edge->target()->filterAny(filter)); // at least one node is interesting
-  }
+  }*/
   return edges;
 }
 
@@ -1149,13 +1154,20 @@ void StxPartEdge::init() {
 // Returns whether an edge from the given source to the given target corresponds to a valid
 // edge in the Fuse portion of the Virtual CFG
 bool StxPartEdge::isValidEdge(CFGNode src, CFGNode tgt) {
-
+  /*scope s("StxPartEdge::isValidEdge()");
+  dbg << "src="<<CFGNode2Str(src)<<endl;
+  dbg << "tgt="<<CFGNode2Str(tgt)<<endl;*/
   //if(isSgFunctionParameterList(src.getNode()) && src.getIndex()==0) return false;
   //if(isSgFunctionParameterList(tgt.getNode())) return false;
   if(isSgInitializedName(src.getNode()) && isSgFunctionParameterList(tgt.getNode())) return false;
-  return stxVirtualCFGFilter(src) && stxVirtualCFGFilter(tgt);
 
-  return true;
+  /*dbg << "stxVirtualCFGFilter(src)="<<stxVirtualCFGFilter(src)<<endl;
+  dbg << "stxVirtualCFGFilter(tgt)="<<stxVirtualCFGFilter(tgt)<<endl;*/
+
+  //return stxVirtualCFGFilter(src) && stxVirtualCFGFilter(tgt);
+  return defaultFilter(src) && defaultFilter(tgt);
+
+//  return true;
 }
 
 // PartEdges must be created via static construction methods to make it possible to separately

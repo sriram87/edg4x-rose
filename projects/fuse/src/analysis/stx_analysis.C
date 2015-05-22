@@ -40,7 +40,7 @@ map<CFGNode, Function> Entry2Func;
 map<CFGNode, Function> Exit2Func;
 
 // Maps the synthesized entry point of a function with no definition to its corresponding exit point
-map<CFGNode, CFGNode> Entry2Exit;  
+map<CFGNode, CFGNode> Entry2Exit;
 // Maps the synthesized exit point of a function with no definition to its corresponding entry point
 map<CFGNode, CFGNode> Exit2Entry;
 
@@ -56,37 +56,37 @@ class FuncEntryExitFunctor
 {
   public:
   typedef void* result_type;
-  
+
   void* operator()(SgNode* n) {
     // If this is a function declaration, AND
     if(SgFunctionDeclaration* decl=isSgFunctionDeclaration(n)) {
       Function func(decl);
       SIGHT_VERB_DECL(scope, ("FuncEntryExitFunctor", scope::medium), 2, stxAnalysisDebugLevel)
-      
-      SIGHT_VERB_IF(2, stxAnalysisDebugLevel) 
+
+      SIGHT_VERB_IF(2, stxAnalysisDebugLevel)
         dbg << "Func "<<func.get_name().getString()<<endl;
         dbg << "Type = "<<SgNode2Str(decl->get_type())<<endl;
         dbg << "Declaration = "<<func.get_declaration()<<"="<<SgNode2Str(decl)<<endl;
         dbg << "Definition = "<<(func.get_definition()? SgNode2Str(func.get_definition()): "NULL")<<endl;
-        
+
         /*if(decl->get_definingDeclaration())
           dbg << "Has defining Declaration: def="<<isSgFunctionDeclaration(decl->get_definingDeclaration())->get_definition()<<endl;
         else
           dbg << "Has not defining Declaration: def="<<isSgFunctionDeclaration(decl->get_firstNondefiningDeclaration())->get_definition()<<endl;*/
       SIGHT_VERB_FI()
-      
-      if(// This is not a declaration defined in a templated class 
+
+      if(// This is not a declaration defined in a templated class
          // According to rose/src/backend/unparser/languageIndependenceSupport/modified_sage.C:1308
          // "It should be impossible to reach this code since SgTemplateInstantiationDefn is not a class, function or member function type"
          //!isSgTemplateInstantiationDefn(decl->get_parent()) &&
          // And this is not a declaration of a template function (we only care about the instantiations of such functions)
-         !isSgTemplateFunctionDeclaration(decl) && 
+         !isSgTemplateFunctionDeclaration(decl) &&
          !isSgTemplateMemberFunctionDeclaration(decl)) {
         CFGNode Entry;
         CFGNode Exit;
-         
+
         SIGHT_VERB(dbg << "Function "<<(Func2Entry.find(func)==Func2Entry.end()? "NOT": "")<<" Found\n", 2, stxAnalysisDebugLevel)
-        
+
         // If this function has no definition and we have not yet added it to the data structures, do so now
         if(func.get_definition()==NULL && Func2Entry.find(func)==Func2Entry.end()) {
           /*SgFunctionParameterList* params=SageBuilder::buildFunctionParameterList();
@@ -263,12 +263,12 @@ bool func2AllCalls_initialized=false;
 set<Function> getAllCalleeFuncs(SgFunctionCallExp* call) {
   SIGHT_VERB_DECL(scope, (txt()<<"getAllCalleeFuncs("<<SgNode2Str(call)<<")", scope::medium), 2, stxAnalysisDebugLevel)
   initFuncEntryExit();
-  
+
   set<Function> callees;
-  
+
   Function callee(call);
   SIGHT_VERB(dbg << "callee.isKnown()="<<callee.isKnown()<<endl, 2, stxAnalysisDebugLevel)
-  
+
   // If the function being called is statically known
   if(callee.isKnown())
     //callees.insert(call);
@@ -283,7 +283,7 @@ set<Function> getAllCalleeFuncs(SgFunctionCallExp* call) {
         callees.insert(f->first);
     }
   }
-  
+
   return callees;
 }
 
@@ -291,7 +291,7 @@ class func2AllCallsFunctor
 {
   public:
   typedef void* result_type;
-  
+
   void* operator()(SgNode* n) {
     if(SgFunctionCallExp* call=isSgFunctionCallExp(n)) {
       set<Function> callees = getAllCalleeFuncs(call);
@@ -305,11 +305,11 @@ class func2AllCallsFunctor
 // Determines the association between functions and their possible call sites.
 void init_func2AllCalls()
 {
-  
+
   if(!func2AllCalls_initialized) {
     NodeQuery::querySubTree(SageInterface::getProject(), func2AllCallsFunctor());
     func2AllCalls_initialized=true;
-    
+
     SIGHT_VERB_IF(3, stxAnalysisDebugLevel)
       scope reg("func2AllCalls", scope::medium);
       for(map<Function, set<SgFunctionCallExp*> >::iterator i=func2AllCalls.begin(); i!=func2AllCalls.end(); i++) {
@@ -324,7 +324,7 @@ void init_func2AllCalls()
 
 // Returns the set of all the function calls that may call the given function
 const set<SgFunctionCallExp*>& func2Calls(Function func)
-{ 
+{
   init_func2AllCalls();
   return func2AllCalls[func];
 }
@@ -344,7 +344,7 @@ SyntacticAnalysis* SyntacticAnalysis::instance()
 }
 
 // Returns a shared pointer to a freshly-allocated copy of this ComposedAnalysis object
-ComposedAnalysisPtr SyntacticAnalysis::copy() { 
+ComposedAnalysisPtr SyntacticAnalysis::copy() {
   if(!_instance) _instance = boost::make_shared<SyntacticAnalysis>();
   return _instance;
 }
@@ -385,7 +385,7 @@ MemRegionObjectPtr SyntacticAnalysis::Expr2MemRegionStatic(SgNode* n, PartEdgePt
   //scope s(txt()<<"SyntacticAnalysis::Expr2MemRegionStatic()");
   //dbg << "n="<<n<<SgNode2Str(n)<<endl;
   //dbg << "pedge="<<pedge->str()<<endl;
-  
+
   static map<SgNode*, StxMemRegionObjectPtr> cache;
   map<SgNode*, StxMemRegionObjectPtr>::iterator cLoc = cache.find(n);
 
@@ -402,8 +402,8 @@ MemRegionObjectPtr SyntacticAnalysis::Expr2MemRegionStatic(SgNode* n, PartEdgePt
     //dbg << "Found cLoc->second="<<cLoc->second->str()<<endl;
     //gettimeofday(&gopeEnd, NULL); cout << "                  SyntacticAnalysis::Expr2MemRegion cached\t"<<(((gopeEnd.tv_sec*1000000 + gopeEnd.tv_usec) - (gopeStart.tv_sec*1000000 + gopeStart.tv_usec)) / 1000000.0)<<endl;
     return cLoc->second;
-  } 
-  
+  }
+
 
   //return boost::make_shared<StxMemRegionObject>(n);
 }
@@ -415,10 +415,10 @@ MemLocObjectPtr SyntacticAnalysis::Expr2MemLoc(SgNode* n, PartEdgePtr pedge) {
 MemLocObjectPtr SyntacticAnalysis::Expr2MemLocStatic(SgNode* n, PartEdgePtr pedge) {
 /*  StxMemRegionObjectPtr region = boost::make_shared<StxMemRegionObject>(n);
   // If this is an expression or named memory region, we create a MemLocObject with a 0 index
-  // since the syntactic analysis only generates such regions for the SgNodes that mark the 
+  // since the syntactic analysis only generates such regions for the SgNodes that mark the
   // entire memory region in question rather than a sub-region (subsequent analyses do this to
   // get better precision)
-  if(region->getType() == StxMemRegionType::expr || 
+  if(region->getType() == StxMemRegionType::expr ||
      region->getType() == StxMemRegionType::named)
     return boost::make_shared<MemLocObject>(region, boost::make_shared<StxValueObject>(SageBuilder::buildIntVal(0)), n);
   // If this is an unknown memory region, we have no idea where inside the region we may be.
@@ -434,10 +434,10 @@ MemLocObjectPtr SyntacticAnalysis::Expr2MemLocStatic(SgNode* n, PartEdgePtr pedg
     assert(region);
     MemLocObjectPtr res;
     // If this is an expression or named memory region, we create a MemLocObject with a 0 index
-    // since the syntactic analysis only generates such regions for the SgNodes that mark the 
+    // since the syntactic analysis only generates such regions for the SgNodes that mark the
     // entire memory region in question rather than a sub-region (subsequent analyses do this to
     // get better precision)
-    if(region->getType() == StxMemRegionType::expr || 
+    if(region->getType() == StxMemRegionType::expr ||
        region->getType() == StxMemRegionType::named)
       res = boost::make_shared<MemLocObject>(region, boost::make_shared<StxValueObject>(SageBuilder::buildIntVal(0)), n);
     // If this is an unknown memory region, we have no idea where inside the region we may be.
@@ -459,7 +459,7 @@ set<SgVariableDeclaration*> SyntacticAnalysis::globalDeclarations;
 void SyntacticAnalysis::initGlobalDeclarations() {
   static bool initialized = false;
   if(initialized) return;
-  
+
   Rose_STL_Container<SgNode*> globalScopes = NodeQuery::querySubTree(SageInterface::getProject(), V_SgGlobal);
   for(Rose_STL_Container<SgNode*>::iterator gs=globalScopes.begin(); gs!=globalScopes.end(); gs++) {
   //SgGlobal* global = SageInterface::getFirstGlobalScope(SageInterface::getProject());
@@ -480,23 +480,23 @@ void SyntacticAnalysis::initGlobalDeclarations() {
       }
     }
   }
-  
+
   initialized = true;
 }
 
 // Return the anchor Parts of a given function
 std::set<PartPtr> SyntacticAnalysis::GetStartAStates_Spec()
-{ 
+{
   // Return the entry points into all the global VariableDeclarations
   set<PartPtr> startStates;
   for(set<SgVariableDeclaration*>::iterator d=SyntacticAnalysis::globalDeclarations.begin(); d!=SyntacticAnalysis::globalDeclarations.end(); d++)
     startStates.insert(StxPart::create((*d)->cfgForBeginning(), this, filter));
-  
+
   // If there are no global VariableDeclarations, the analysis entry points are the entries
   // into the non-static functions
   if(startStates.size()==0)
     addFunctionEntries(startStates, this);
-  
+
   return startStates;
 }
 
@@ -504,11 +504,11 @@ std::set<PartPtr> SyntacticAnalysis::GetStartAStates_Spec()
 bool isExternallyCallable(const Function& func) {
   return !isSgMemberFunctionDeclaration(func.get_declaration()) &&
          !SageInterface::isStatic(func.get_declaration()) &&
-         !func.get_declaration()->get_file_info()->isCompilerGenerated() && 
+         !func.get_declaration()->get_file_info()->isCompilerGenerated() &&
          func.get_definition()->getAttribute("fuse:UnknownSideEffects")==NULL;
 }
 
-// Adds the entry points into all the non-static functions (can be called from the outside) to 
+// Adds the entry points into all the non-static functions (can be called from the outside) to
 // the given set
 template <class ArgPartPtr>
 void SyntacticAnalysis::addFunctionEntries(set<ArgPartPtr>& states, SyntacticAnalysis* analysis) {
@@ -532,29 +532,29 @@ set<PartPtr> SyntacticAnalysis::GetEndAStates_Spec()
   grs.runAnalysis();
   for(set<PartPtr>::iterator r=grs.returns.begin(); r!=grs.returns.end(); r++)
     endStates.push_back(*r);*/
-  
+
   // The CFGNodes that denote the stard and end of the main() function
   /*CFGNode mainStart = getFuncStartCFG(
                            SageInterface::findMain(SageInterface::getFirstGlobalScope(SageInterface::getProject()))->get_definition());
   CFGNode mainEnd = getFuncEndCFG(
                            SageInterface::findMain(SageInterface::getFirstGlobalScope(SageInterface::getProject()))->get_definition());
-  
-  set<PartPtr> endStates;          
-  
+
+  set<PartPtr> endStates;
+
   // Find all the return statements in main() and add them to endStates
   for(VirtualCFG::dataflowIterator df(mainStart, mainEnd); df!=VirtualCFG::iterator::end(); df++) {
     if(SgReturnStmt* ret = isSgReturnStmt((*df).getNode()))
       endStates.insert(StxPart::create(ret, this, filter));
   }
-  
+
   // Add main's ending point
   endStates.insert(StxPart::create(mainEnd, this, filter));*/
-  
+
   // Return the entry points of all the non-static functions
   set<PartPtr> endStates;
   /*Function main(SageInterface::findMain(SageInterface::getFirstGlobalScope(SageInterface::getProject()))->get_definition());
   endStates.insert(StxPart::create(getStxFunc2Exit(main), this, filter));*/
-  
+
   initFuncEntryExit();
   SIGHT_VERB_DECL(scope, ("EndAStates"), 3, stxAnalysisDebugLevel)
   for(map<Function, CFGNode>::iterator f=Func2Exit.begin(); f!=Func2Exit.end(); f++) {
@@ -565,7 +565,7 @@ set<PartPtr> SyntacticAnalysis::GetEndAStates_Spec()
       endStates.insert(StxPart::create(f->second, this, filter));
     }
   }
-  
+
   return endStates;
 }
 
@@ -605,7 +605,7 @@ StxFuncContextPtr StxFuncContext::getContext(CFGNode n) {
 // Returns a list of PartContextPtr objects that denote more detailed context information about
 // this PartContext's internal contexts. If there aren't any, the function may just return a list containing
 // this PartContext itself.
-list<PartContextPtr> StxFuncContext::getSubPartContexts() const { 
+list<PartContextPtr> StxFuncContext::getSubPartContexts() const {
   std::list<PartContextPtr> listOfMe;
   listOfMe.push_back(makePtr<StxFuncContext>(n));
   return listOfMe;
@@ -680,7 +680,7 @@ StxPartPtr StxPart::create(CFGNode n, ComposedAnalysis* analysis, bool (*f) (CFG
     newPart->init();
     return newPart;
   // Otherwise, return NULL
-  } else 
+  } else
     return NULLStxPart;
 }
 StxPartPtr StxPart::create(const StxPart& part) {
@@ -700,7 +700,7 @@ StxPartPtr StxPart::create(const StxPart& part,    bool (*f) (CFGNode)) {
     newPart->init();
     return newPart;
   // Otherwise, return NULL
-  } else 
+  } else
     return NULLStxPart;
 }
 StxPartPtr StxPart::create(const StxPartPtr& part, bool (*f) (CFGNode)) {
@@ -712,16 +712,16 @@ StxPartPtr StxPart::create(const StxPartPtr& part, bool (*f) (CFGNode)) {
 void StxPart::init() {
   Part::init();
 
-  // Set the superset Part of this Part to be itself since the syntactic analysis
+  // Set the Input Part of this Part to be itself since the syntactic analysis
   // runs first and doesn't refine anything else
-  setSupersetPart(shared_from_this());
+  setInputPart(shared_from_this());
 }
 
 // Returns a shared pointer to this of type StxPartPtr;
 StxPartPtr StxPart::get_shared_this()
 { return dynamicPtrCast<StxPart>(makePtrFromThis(shared_from_this())); }
 
-/* // Returns true if the given edge is from the start of a short-circuit operation (|| and &&) to its end 
+/* // Returns true if the given edge is from the start of a short-circuit operation (|| and &&) to its end
 bool isShortCircuitEdge(CFGEdge edge) {
   return ((isSgAndOp(edge.source().getNode()) && isSgAndOp(edge.target().getNode())) ||
           (isSgOrOp(edge.source().getNode())  && isSgOrOp(edge.target().getNode()))) &&
@@ -733,21 +733,21 @@ void makeClosureDF_rec(CFGPath path, // The current set of CFG paths
         vector<CFGEdge> (CFGNode::*closure)() const, // find successor edges from a node, CFGNode::outEdges() for example
         CFGNode (CFGPath::*otherSide)() const, // node from the other side of the path: CFGPath::target()
         CFGPath (*merge)(const CFGPath&, const CFGPath&),  // merge two paths into one
-        bool (*filter) (CFGNode))   // filter function 
+        bool (*filter) (CFGNode))   // filter function
 {
   SIGHT_VERB(dbg << "makeClosureDF_rec: path: "<<CFGNode2Str(path.source())<<" ==&gt; "<<CFGNode2Str(path.target())<<endl, 3, stxAnalysisDebugLevel);
-  
+
   // If the edge of the current path is not interesting
   if(!filter((path.*otherSide)())) {
     // Recurse to find its extensions that may be interesting
-    vector<CFGEdge> extensions = ((path.*otherSide)().*closure)(); 
+    vector<CFGEdge> extensions = ((path.*otherSide)().*closure)();
     //dbg << "otherSide="<<CFGNode2Str((path.*otherSide)())<<endl;
     for(vector<CFGEdge>::iterator e=extensions.begin(); e!=extensions.end(); e++) {
       SIGHT_VERB(dbg << "extension "<<CFGNode2Str(e->source())<<" ==&gt; "<<CFGNode2Str(e->target())<<endl, 3, stxAnalysisDebugLevel);
 
       /* // Skip edges from the start of a short-circuit operation (|| and &&) to its end
       if(isShortCircuitEdge(*e)) { continue; }*/
-      
+
       SIGHT_VERB_DECL(indent, (), 3, stxAnalysisDebugLevel);
       CFGPath extension = (*merge)(path, *e);
       // Extend path with e to create the full extension of path
@@ -761,13 +761,13 @@ void makeClosureDF_rec(CFGPath path, // The current set of CFG paths
 }
 
 // XXX: This code is duplicated from frontend/SageIII/virtualCFG/virtualCFG.C
-// Make a set of raw CFG edges closure. Raw edges may have src and dest CFG nodes which are to be filtered out. 
+// Make a set of raw CFG edges closure. Raw edges may have src and dest CFG nodes which are to be filtered out.
 // The method used is to connect them into CFG paths so src and dest nodes of each path are interesting, skipping intermediate filtered nodes)
 map<StxPartEdgePtr, bool> makeClosureDF(const vector<CFGEdge>& orig, // raw in or out edges to be processed
                                         vector<CFGEdge> (CFGNode::*closure)() const, // find successor edges from a node, CFGNode::outEdges() for example
                                         CFGNode (CFGPath::*otherSide)() const, // node from the other side of the path: CFGPath::target()
                                         CFGPath (*merge)(const CFGPath&, const CFGPath&),  // merge two paths into one
-                                        bool (*filter) (CFGNode),   // filter function 
+                                        bool (*filter) (CFGNode),   // filter function
                                         ComposedAnalysis* analysis)
 {
   SIGHT_VERB_DECL(scope, ("makeClosureDF", scope::medium), 3, stxAnalysisDebugLevel)
@@ -779,11 +779,11 @@ map<StxPartEdgePtr, bool> makeClosureDF(const vector<CFGEdge>& orig, // raw in o
     if(isShortCircuitEdge(*e)) { continue; }*/
     makeClosureDF_rec(*e, allPaths, closure, otherSide, merge, filter);
   }
-  
-  // Maps edges to bools. A map is used to enable efficient lookups to avoid inserting duplicate edges, 
+
+  // Maps edges to bools. A map is used to enable efficient lookups to avoid inserting duplicate edges,
   // which may happen in situations like an if statement with empty true and false bodies.
   map<StxPartEdgePtr, bool> edges;
-  
+
   for (set<CFGPath>::iterator i = allPaths.begin(); i != allPaths.end(); ++i) {
     SIGHT_VERB(dbg << "*i="<<CFGNode2Str(i->source())<<" ==&gt; "<<CFGNode2Str(i->target())<<endl, 3, stxAnalysisDebugLevel)
 
@@ -792,7 +792,7 @@ map<StxPartEdgePtr, bool> makeClosureDF(const vector<CFGEdge>& orig, // raw in o
       //edges.push_back(/*boost::static_pointer_cast<PartEdge>(*/boost::make_shared<StxPartEdge>(*i, filter)/*)*/);
       //edges.push_back(StxPartEdge::create(*i, analysis, filter));
       StxPartEdgePtr newEdge = StxPartEdge::create(*i, analysis, filter);
-      SIGHT_VERB(dbg << "newEdge="<<newEdge->str()<<endl, 3, stxAnalysisDebugLevel)
+      SIGHT_VERB(dbg << "newEdge="<<(newEdge? newEdge->str(): "NULL")<<endl, 3, stxAnalysisDebugLevel)
       if(newEdge && edges.find(newEdge) == edges.end()) edges[newEdge] = true;
     }
   }
@@ -800,11 +800,11 @@ map<StxPartEdgePtr, bool> makeClosureDF(const vector<CFGEdge>& orig, // raw in o
   for(map<StxPartEdgePtr, bool>::iterator e=edges.begin(); e!=edges.end(); e++)
     dbg << "    edge="<<e->first->str()<<endl;*/
   //for (list<StxPartEdgePtr>::iterator i = edges.begin(); i != edges.end(); ++i) {
-  
+
 /*  // Make sure that for each edge either the source or the target is interesting
   for (map<StxPartEdgePtr, bool>::iterator i = edges.begin(); i != edges.end(); ++i) {
     StxPartEdgePtr edge = i->first;
-    assert(edge->source()->filterAny(filter)  || 
+    assert(edge->source()->filterAny(filter)  ||
                 edge->target()->filterAny(filter)); // at least one node is interesting
   }*/
   return edges;
@@ -815,7 +815,7 @@ map<StxPartEdgePtr, bool> StxPart::getOutEdges()
   SIGHT_VERB_DECL(scope, (txt()<<"StxPart::getOutEdges() ret="<<CFGNode2Str(n), scope::medium), 2, stxAnalysisDebugLevel)
   map<StxPartEdgePtr, bool> vStx;
   SgFunctionCallExp* call;
-  
+
   // If this is the end of a SgVariableDeclaration of a global variable
   if(isSgVariableDeclaration(n.getNode()) && n.getIndex()==1 && isSgGlobal(n.getNode()->get_parent())) {
     // The successors are the entry points of all the non-static functions
@@ -831,38 +831,38 @@ map<StxPartEdgePtr, bool> StxPart::getOutEdges()
   // If current node is a function call, connect the call to the SgFunctionParameterList of the called function.
   } else if((call = isSgFunctionCallExp(n.getNode())) && n.getIndex()==2) {
     set<Function> callees = getAllCalleeFuncs(call);
-   
-    SIGHT_VERB_IF(2, stxAnalysisDebugLevel) 
+
+    SIGHT_VERB_IF(2, stxAnalysisDebugLevel)
       dbg << "type = "<<SgNode2Str(isSgFunctionCallExp(n.getNode())->get_type())<<", funcCall->get_function()="<<(isSgFunctionCallExp(n.getNode())->get_function()? SgNode2Str(isSgFunctionCallExp(n.getNode())->get_function()): "NULL")<<endl;
       dbg << "function = "<<SgNode2Str(isSgFunctionCallExp(n.getNode())->get_function())<<" function type="<<SgNode2Str(isSgFunctionCallExp(n.getNode())->get_function()->get_type())<<endl;
       scope sCallees("Callees", scope::low);
       for(set<Function>::iterator c=callees.begin(); c!=callees.end(); c++)
         dbg << c->str()<<" declaration="<<c->get_declaration()<<"="<<SgNode2Str(c->get_declaration())<<endl;
     SIGHT_VERB_FI()
-    
+
     for(set<Function>::iterator c=callees.begin(); c!=callees.end(); c++) {
       StxPartEdgePtr edge = StxPartEdge::create(n, getStxFunc2Entry(*c), analysis);
       if(edge) vStx[edge] = true;
     }
-    
+
     // If the callee function has a definition, connect this function call directly to the function's entry point
     /*if(callee.get_definition()) {
       assert(callee.get_params());
       //vStx[StxPartEdge::create(n, CFGNode(callee.get_params(), 1), analysis)] = true;
       vStx[StxPartEdge::create(n, getStxFunc2Entry(callee), analysis)] = true;
-      
+
       {
         dbg << "The successors of call "<<CFGNode2Str(n)<<endl;
         {indent ind;
-        
+
         map<StxPartEdgePtr, bool> outvStx = makeClosureDF(n.outEdges(), &CFGNode::outEdges, &CFGPath::target, &mergePaths, filter, analysis);
         for(map<StxPartEdgePtr, bool>::iterator i=outvStx.begin(); i!=outvStx.end(); i++) {
           dbg << i->first->source()->str() << " =&gt; "<< i->first->target()->str()<<endl;
         }}
-        
+
         / *dbg << "The predecessors of call "<<CFGNode2Str(n)<<endl;
         {indent ind;
-        
+
         map<StxPartEdgePtr, bool> invStx = makeClosureDF(n.inEdges(), &CFGNode::inEdges, &CFGPath::source, &mergePathsReversed, filter, analysis);
         for(map<StxPartEdgePtr, bool>::iterator i=invStx.begin(); i!=invStx.end(); i++) {
           dbg << i->first->source()->str() << " =&gt; "<< i->first->target()->str()<<endl;
@@ -881,12 +881,12 @@ map<StxPartEdgePtr, bool> StxPart::getOutEdges()
   //} else if(/*SgFunctionDefinition* def = */isSgFunctionDefinition(n.getNode())) {
   } else if(isStxFuncExit(n)) {
     Function func= getStxExit2Func(n);
-  
+
     // If this is the synthesized exit node a function without a body
     /*if(isStxFuncExit(n)) func = getStxExit2Func(n);
     else                   func = Function(def);*/
     SIGHT_VERB(dbg << "Definition n="<<CFGNode2Str(n)<<" func="<<func.get_name().getString()<<" isStxFuncExit(n)="<<isStxFuncExit(n)<<endl, 2, stxAnalysisDebugLevel)
-    
+
     const set<SgFunctionCallExp*>& calls = func2Calls(func);
     SIGHT_VERB(dbg << "#calls="<<calls.size()<<" Connecting n="<<CFGNode2Str(n)<<endl, 2, stxAnalysisDebugLevel)
     SIGHT_VERB_DECL(indent, (), 2, stxAnalysisDebugLevel)
@@ -894,7 +894,7 @@ map<StxPartEdgePtr, bool> StxPart::getOutEdges()
       CFGNode callNode(*c, 3);
       StxPartEdgePtr edge = StxPartEdge::create(n, callNode, analysis, filter);
       if(edge) vStx[edge]=1;
-      
+
       /*dbg << "To the successors of call "<<CFGNode2Str(callNode)<<endl;
       indent ind;
       // Connect the SgFunctionDefinition to the nodes that follow each call to it, using makeClosureDF() to skip
@@ -905,6 +905,7 @@ map<StxPartEdgePtr, bool> StxPart::getOutEdges()
         vStx[StxPartEdge::create(n, i->first->stxTarget()->n, analysis, filter)]=1;
       }*/
     }
+
   // If the current node is a return statement, connect it to the function's exit SgFunctionDefinition node
   } else if(SgReturnStmt* ret = isSgReturnStmt(n.getNode())) {
     Function func(SageInterface::getEnclosingFunctionDeclaration(ret));
@@ -914,7 +915,7 @@ map<StxPartEdgePtr, bool> StxPart::getOutEdges()
     SIGHT_VERB_FI()
     StxPartEdgePtr edge = StxPartEdge::create(n, getStxFunc2Exit(func), analysis);
     if(edge) vStx[edge] = true;
-  //} else if(isSgFunctionParameterList(n.getNode())) {
+
   } else if(isStxFuncEntry(n)) {
     // If this is the synthesized entry node to a function without a body, return the edge to its corresponding exit node
     /*if(isStxFuncEntry(n)) {
@@ -922,7 +923,9 @@ map<StxPartEdgePtr, bool> StxPart::getOutEdges()
       return vStx;
     } else*/
     return makeClosureDF(n.outEdges(), &CFGNode::outEdges, &CFGPath::target, &mergePaths, filter, analysis);
-  } else {
+
+  // If this is a valid source for edges
+  } else if(StxPartEdge::isValidEdgeSource(n)) {
     return makeClosureDF(n.outEdges(), &CFGNode::outEdges, &CFGPath::target, &mergePaths, filter, analysis);
   }
 //  dbg << "#vStx="<<vStx.size()<<endl;
@@ -930,7 +933,7 @@ map<StxPartEdgePtr, bool> StxPart::getOutEdges()
 }
 
 list<PartEdgePtr> StxPart::outEdges() {
-  ostringstream oss; 
+  ostringstream oss;
   //dbg << "n=>"<<CFGNode2Str(n)<<endl;
   //scope reg(txt()<<"StxPart::outEdges() part="<<str(), scope::medium);
   map<StxPartEdgePtr, bool> vStx = getOutEdges();
@@ -940,8 +943,8 @@ list<PartEdgePtr> StxPart::outEdges() {
     //dbg << "edge="<<(i->first? i->first->str(): "NULL")<<endl;
     v.push_back(dynamicPtrCast<PartEdge>(i->first));
   }
-  
-//  dbg << "#v="<<v.size()<<endl;
+
+  //dbg << "#v="<<v.size()<<endl;
   return v;
 }
 
@@ -963,9 +966,9 @@ map<StxPartEdgePtr, bool> StxPart::getInEdges()
   // If current node is the return side of a function call, connect the call to the exit point of the called function.
   if((call = isSgFunctionCallExp(n.getNode())) && n.getIndex()==3) {
     Function callee(call);
-    
+
     SIGHT_VERB(dbg << "StxPart::getInEdges() Return side of Call: callee="<<callee.str()<<" known="<<callee.isKnown()<<endl, 2, stxAnalysisDebugLevel);
-    
+
     // If the function is known
     if(callee.isKnown()) {
       SIGHT_VERB(dbg << "exit="<<CFGNode2Str(getStxFunc2Exit(callee))<<endl, 2, stxAnalysisDebugLevel)
@@ -979,17 +982,17 @@ map<StxPartEdgePtr, bool> StxPart::getInEdges()
           vStx[StxPartEdge::create(f->second, n, analysis)] = true;
       }
     }
-    
+
   // If the current Node is the exit point of a function
   } else if(isStxFuncExit(n)) {
     Function func = getStxExit2Func(n);
     SIGHT_VERB(dbg << "Function Exit n="<<CFGNode2Str(n)<<" func="<<func.get_name().getString()<<endl, 2, stxAnalysisDebugLevel)
-    
+
     // Connect it to the immediately preceding CFGNode
     vStx = makeClosureDF(n.inEdges(), &CFGNode::inEdges, &CFGPath::source, &mergePathsReversed, filter, analysis);
-    
+
     SIGHT_VERB(dbg << "-------------#vStx="<<vStx.size()<<"---------------------"<<endl, 2, stxAnalysisDebugLevel)
-    
+
     // Also connect it to all the SgReturnStmts in the function
     for(CFGIterator it(getStxFunc2Entry(func)); it!=CFGIterator::end(); it++) {
       if(isSgReturnStmt(it->getNode()) && it->getIndex()==1)
@@ -999,9 +1002,9 @@ map<StxPartEdgePtr, bool> StxPart::getInEdges()
   // If the current node is the entry point of a function
   } else if(isStxFuncEntry(n)) {
     Function func = getStxEntry2Func(n);
-  
+
     SIGHT_VERB(dbg << "Function Entry n="<<CFGNode2Str(n)<<" func="<<func.get_name().getString()<<endl, 2, stxAnalysisDebugLevel)
-    
+
     const set<SgFunctionCallExp*>& calls = func2Calls(func);
     SIGHT_VERB(dbg << "#calls="<<calls.size()<<" Connecting n="<<CFGNode2Str(n)<<endl, 2, stxAnalysisDebugLevel)
     SIGHT_VERB_DECL(indent, (), 2, stxAnalysisDebugLevel)
@@ -1009,7 +1012,7 @@ map<StxPartEdgePtr, bool> StxPart::getInEdges()
       CFGNode callNode(*c, 2);
       vStx[StxPartEdge::create(callNode, n, analysis, filter)]=1;
     }
-    
+
     // If this function can be called from the outside, add incoming edges from all the global
     // declarations
     if(isExternallyCallable(func)) {
@@ -1025,7 +1028,8 @@ map<StxPartEdgePtr, bool> StxPart::getInEdges()
     {
       SIGHT_VERB(dbg << "Beginning of declaration of global variable"<<endl, 2, stxAnalysisDebugLevel)
       return vStx;
-    } else {
+    // If this is a valid target for edges
+    } else if(StxPartEdge::isValidEdgeTarget(n)) {
       SIGHT_VERB(dbg << "Internal Node"<<endl, 2, stxAnalysisDebugLevel)
       return makeClosureDF(n.inEdges(), &CFGNode::inEdges, &CFGPath::source, &mergePathsReversed, filter, analysis);
     }
@@ -1034,10 +1038,10 @@ map<StxPartEdgePtr, bool> StxPart::getInEdges()
 }
 
 list<PartEdgePtr> StxPart::inEdges() {
-  ostringstream oss; 
-//  scope reg(txt()<<"StxPart::inEdges() part="<<str(), scope::medium, attrGE("stxAnalysisDebugLevel", 2));
+  ostringstream oss;
+  SIGHT_VERB_DECL(scope, (txt()<<"StxPart::inEdges() part="<<str()), 2, stxAnalysisDebugLevel)
   map<StxPartEdgePtr, bool> vStx = getInEdges();
- 
+
   SIGHT_VERB(dbg <<"#vStx="<<vStx.size()<<endl, 2, stxAnalysisDebugLevel)
   list<PartEdgePtr> v;
   for(map<StxPartEdgePtr, bool>::iterator i=vStx.begin(); i!=vStx.end(); i++)
@@ -1074,12 +1078,28 @@ set<PartPtr> StxPart::matchingCallParts() const
   return ret;
 }
 
+// If this Part corresponds to a function entry/exit, returns the set of Parts that contain
+// its corresponding exit/entry, respectively.
+set<PartPtr> StxPart::matchingEntryExitParts() const {
+  set<PartPtr> ret;
+  if(isSgFunctionDefinition(n.getNode()) && n.getIndex()==3) {
+    SgFunctionParameterList* params = isSgFunctionDefinition(n.getNode())->get_declaration()->get_parameterList();
+    ret.insert(StxPart::create(CFGNode(params, params->get_args().size()), analysis));
+  } else if(isSgFunctionParameterList(n.getNode()) && n.getIndex()==isSgFunctionParameterList(n.getNode())->get_args().size()) {
+    Function func(isSgFunctionParameterList(n.getNode()));
+    assert(func.get_definition());
+    ret.insert(StxPart::create(CFGNode(func.get_definition(), 3), analysis));
+  }
+
+  return ret;
+}
+
 /*// Let A={ set of execution prefixes that terminate at the given anchor SgNode }
 // Let O={ set of execution prefixes that terminate at anchor's operand SgNode }
 // Since to reach a given SgNode an execution must first execute all of its operands it must
 //    be true that there is a 1-1 mapping m() : O->A such that o in O is a prefix of m(o).
 // This function is the inverse of m: given the anchor node and operand as well as the
-//    Part that denotes a subset of A (the function is called on this part), 
+//    Part that denotes a subset of A (the function is called on this part),
 //    it returns a list of Parts that partition O.
 std::list<PartPtr> StxPart::getOperandPart(SgNode* anchor, SgNode* operand)
 {
@@ -1146,9 +1166,9 @@ std::string StxPart::str(std::string indent) const
 void StxPartEdge::init() {
   PartEdge::init();
 
-  // Set the superset PartEdge of this PartEdge to be itself since the syntactic analysis
+  // Set the Input PartEdge of this PartEdge to be itself since the syntactic analysis
   // runs first and doesn't refine anything else
-  setSupersetPartEdge(shared_from_this());
+  setInputPartEdge(shared_from_this());
 }
 
 // Returns whether an edge from the given source to the given target corresponds to a valid
@@ -1159,15 +1179,33 @@ bool StxPartEdge::isValidEdge(CFGNode src, CFGNode tgt) {
   dbg << "tgt="<<CFGNode2Str(tgt)<<endl;*/
   //if(isSgFunctionParameterList(src.getNode()) && src.getIndex()==0) return false;
   //if(isSgFunctionParameterList(tgt.getNode())) return false;
+  // Edge from one of a function's parameters to SgParameterList
   if(isSgInitializedName(src.getNode()) && isSgFunctionParameterList(tgt.getNode())) return false;
+  // Edge from SgParameterList to one of a function's parameters
+  if(isSgFunctionParameterList(src.getNode()) && src.getIndex()<src.getNode()->cfgIndexForEnd() &&
+     isSgInitializedName(tgt.getNode()))
+    return false;
 
   /*dbg << "stxVirtualCFGFilter(src)="<<stxVirtualCFGFilter(src)<<endl;
   dbg << "stxVirtualCFGFilter(tgt)="<<stxVirtualCFGFilter(tgt)<<endl;*/
 
   //return stxVirtualCFGFilter(src) && stxVirtualCFGFilter(tgt);
+  //dbg << "defaultFilter(src)="<<defaultFilter(src)<<", defaultFilter(tgt)="<<defaultFilter(tgt)<<endl;
   return defaultFilter(src) && defaultFilter(tgt);
+}
 
-//  return true;
+// Returns whether this CFGNode is a valid source for any edge in the Fuse portion of the Virtual CFG
+bool StxPartEdge::isValidEdgeSource(CFGNode src) {
+  return defaultFilter(src);
+}
+
+// Returns whether this CFGNode is a valid target for any edge in the Fuse portion of the Virtual CFG
+bool StxPartEdge::isValidEdgeTarget(CFGNode tgt) {
+  if(isSgFunctionParameterList(tgt.getNode())) return false;
+  // Function parameter inside an SgParameterList
+  if(isSgInitializedName(tgt.getNode()) && isSgFunctionParameterList(tgt.getNode()->get_parent())) return false;
+
+  return defaultFilter(tgt);
 }
 
 // PartEdges must be created via static construction methods to make it possible to separately
@@ -1204,11 +1242,11 @@ StxPartPtr StxPartEdge::stxSource() const {
   else return StxPart::create(p.source(), analysis, filter);
 }
 
-PartPtr StxPartEdge::target() const { 
+PartPtr StxPartEdge::target() const {
   return stxTarget();
 }
 
-StxPartPtr StxPartEdge::stxTarget() const { 
+StxPartPtr StxPartEdge::stxTarget() const {
   if(isNULLCFGNode(p.target().getNode())) return NULLPart;
   else return StxPart::create(p.target(), analysis, filter);
 }
@@ -1218,7 +1256,7 @@ StxPartPtr StxPartEdge::stxTarget() const {
 // Since to reach a given SgNode an execution must first execute all of its operands it must
 //    be true that there is a 1-1 mapping m() : O->A such that o in O is a prefix of m(o).
 // This function is the inverse of m: given the anchor node and operand as well as the
-//    PartEdge that denotes a subset of A (the function is called on this PartEdge), 
+//    PartEdge that denotes a subset of A (the function is called on this PartEdge),
 //    it returns a list of PartEdges that partition O.
 std::list<PartEdgePtr> StxPartEdge::getOperandPartEdge(SgNode* anchor, SgNode* operand)
 {
@@ -1241,14 +1279,14 @@ std::list<PartEdgePtr> StxPartEdge::getOperandPartEdge(SgNode* anchor, SgNode* o
 // If the source Part corresponds to a conditional of some sort (if, switch, while test, etc.)
 // it must evaluate some predicate and depending on its value, continue execution along one of the
 // outgoing edges. The value associated with each outgoing edge is fixed and known statically.
-// getPredicateValue() returns the value associated with this particular edge. Since a single 
+// getPredicateValue() returns the value associated with this particular edge. Since a single
 // Part may correspond to multiple CFGNodes getPredicateValue() returns a map from each CFG node
-// within its source part that corresponds to a conditional to the value of its predicate along 
+// within its source part that corresponds to a conditional to the value of its predicate along
 // this edge.
 map<CFGNode, boost::shared_ptr<SgValueExp> > StxPartEdge::getPredicateValue()
 {
   CFGNode cn = p.source();
-  
+
   map<CFGNode, boost::shared_ptr<SgValueExp> > pv;
        if(p.condition() == eckTrue)  pv[cn] = boost::shared_ptr<SgValueExp>(SageBuilder::buildBoolValExp(true));
   else if(p.condition() == eckFalse) pv[cn] = boost::shared_ptr<SgValueExp>(SageBuilder::buildBoolValExp(false));
@@ -1258,7 +1296,7 @@ map<CFGNode, boost::shared_ptr<SgValueExp> > StxPartEdge::getPredicateValue()
     assert(val);
     pv[cn] = boost::shared_ptr<SgValueExp>(val);
   }
-  
+
   return pv;
 }
 
@@ -1301,8 +1339,8 @@ bool StxPartEdge::less(const PartEdgePtr& o) const
 std::string StxPartEdge::str(std::string indent) const
 {
   ostringstream oss;
-  oss << (isNULLCFGNode(p.source().getNode())? "*" : source()->str()) << 
-         " ==&gt; " << 
+  oss << (isNULLCFGNode(p.source().getNode())? "*" : source()->str()) <<
+         " ==&gt; " <<
          (isNULLCFGNode(p.target().getNode())? "*" : target()->str());// << ", analysis="<<analysis
   return oss.str();
 }
@@ -1319,7 +1357,7 @@ StxValueObject::StxValueObject(SgNode* n) : ValueObject(n)//, AbstractionHierarc
       dbg << "StxValueObject::StxValueObject("<<SgNode2Str(n)<<")";
       dbg << " isSgCastExp(n)="<<isSgCastExp(n)<<" unwrapCasts(isSgCastExp(n))="<<(isSgCastExp(n) ? SgNode2Str(unwrapCasts(isSgCastExp(n))) : "NULL")<<" iscast="<<(isSgCastExp(n) ? isSgValueExp(unwrapCasts(isSgCastExp(n))) : 0)<<endl;
     SIGHT_VERB_FI()
-    if(isSgValueExp(n)) 
+    if(isSgValueExp(n))
       val = isSgValueExp(n);
     // If this is a value that has been wrapped in many casts
     // GB 2012-10-09 - NOTE: in the future we'll need to refine this code to accurately capture the effect of these casts!
@@ -1327,12 +1365,12 @@ StxValueObject::StxValueObject(SgNode* n) : ValueObject(n)//, AbstractionHierarc
       val = isSgValueExp(unwrapCasts(isSgCastExp(n)));
     else
       val = NULL;
-  // Otherwise, default this ValueObject to an unknown 
-  } else 
+  // Otherwise, default this ValueObject to an unknown
+  } else
     val = NULL;
 }
 
-StxValueObject::StxValueObject(const StxValueObject& that) : 
+StxValueObject::StxValueObject(const StxValueObject& that) :
         ValueObject((const ValueObject&)that)/*, AbstractionHierarchy(that)*/, val(that.val)
 { }
 
@@ -1341,10 +1379,10 @@ bool StxValueObject::mayEqualAO(ValueObjectPtr that_arg, PartEdgePtr pedge)
   StxValueObjectPtr that = boost::dynamic_pointer_cast <StxValueObject> (that_arg);
   // ValueObject abstractions of different types may be equal to each other (can't tell either way)
   if(!that) { return true; }
-  
+
   // If either object is not an SgValue, they may be equal to each other
   if(val==NULL || that->val==NULL) { return true; }
-  
+
   // If both are SgValues, equalValExp makes a definitive precise comparison
   return equalValExp(val, that->val);
 }
@@ -1355,10 +1393,10 @@ bool StxValueObject::mustEqualAO(ValueObjectPtr that_arg, PartEdgePtr pedge)
   StxValueObjectPtr that = boost::dynamic_pointer_cast <StxValueObject> (that_arg);
   // ValueObject abstractions of different types can't be proven to be definitely equal to each other (can't tell either way)
   if(!that) { return false; }
-  
+
   // If either object is not an SgValue, we can't prove that must be equal to each other
   if(val==NULL || that->val==NULL) { return false; }
-  
+
   // If both are SgValues, equalValExp makes a definitive precise comparison
   //if(stxAnalysisDebugLevel()>=1) dbg << "StxValueObject::mustEqualV calling equalValExp("<<SgNode2Str(val)<<", "<<SgNode2Str(that->val)<<")"<<endl;
   return equalValExp(val, that->val);
@@ -1371,12 +1409,12 @@ bool StxValueObject::equalSetAO(ValueObjectPtr that_arg, PartEdgePtr pedge)
   StxValueObjectPtr that = boost::dynamic_pointer_cast <StxValueObject> (that_arg);
   // ValueObject abstractions of different types can't be proven to be definitely equal to each other (can't tell either way)
   if(!that) { return false; }
-  
-  // If neither object is not a known SgValue, they both denote the set of all Values, 
+
+  // If neither object is not a known SgValue, they both denote the set of all Values,
   if(val==NULL && that->val==NULL) { return true; }
   // If only one of the objects is not a known SgValue, they denote different sets
   if(val==NULL || that->val==NULL) { return false; }
-  
+
   // If both are SgValues, equalValExp makes a definitive precise comparison
   return equalValExp(val, that->val);
 }
@@ -1389,15 +1427,15 @@ bool StxValueObject::subSetAO(ValueObjectPtr that_arg, PartEdgePtr pedge)
   StxValueObjectPtr that = boost::dynamic_pointer_cast <StxValueObject> (that_arg);
   // ValueObject abstractions of different types can't be proven to be definitely equal to each other (can't tell either way)
   if(!that) { return false; }
-  
-  // If neither object is not a known SgValue, they both denote the set of all Values, 
+
+  // If neither object is not a known SgValue, they both denote the set of all Values,
   if(val==NULL && that->val==NULL) { return true; }
-  
+
   // If that object denotes all SgValues and this object denotes some concrete one, this is a subset of that
   if(that->val==NULL) { return true; }
   // If it is vice versa, then this object (all) is not a subset of that object (concrete)
   else if(val==NULL) { return false; }
-  
+
   // If both are SgValues, equalValExp returns true if they denote the same value
   return equalValExp(val, that->val);
 }
@@ -1405,9 +1443,9 @@ bool StxValueObject::subSetAO(ValueObjectPtr that_arg, PartEdgePtr pedge)
 // Returns true if the given pair of SgValueExps represent the same value and false otherwise
 bool StxValueObject::equalValExp(SgValueExp* a, SgValueExp* b)
 {
-  if(isSgBoolValExp(a) && isSgBoolValExp(b)) 
+  if(isSgBoolValExp(a) && isSgBoolValExp(b))
     return isSgBoolValExp(a)->get_value() == isSgBoolValExp(b)->get_value();
-  else if(isSgCharVal(a) && isSgCharVal(a)) 
+  else if(isSgCharVal(a) && isSgCharVal(a))
     return isSgCharVal(a)->get_value() == isSgCharVal(b)->get_value();
   else if(isSgComplexVal(a) && isSgComplexVal(b))
     return equalValExp(isSgComplexVal(a)->get_real_value(), isSgComplexVal(b)->get_real_value()) &&
@@ -1506,7 +1544,7 @@ bool StxValueObject::meetUpdateAO(ValueObjectPtr that_arg, PartEdgePtr pedge)
 {
   StxValueObjectPtr that = boost::dynamic_pointer_cast <StxValueObject> (that_arg);
   assert(that);
-  
+
   // If the value objects denote different values
   if(!mustEqualAO(that, pedge)) {
     // Set the value pointer of this object to NULL since we cannot represent their union with a single value
@@ -1552,7 +1590,7 @@ std::set<boost::shared_ptr<SgValueExp> > StxValueObject::getConcreteValue()
   concreteVals.insert(boost::shared_ptr<SgValueExp>((SgValueExp*)val->copy(copyHelp)));
   return concreteVals;
 }
- 
+
 //std::string StxValueObject::str(const string& indent) {
 std::string StxValueObject::str(std::string indent) const { // pretty print for the object
   return "[StxValueObject: "+(val? val->unparseToString() : "NULL")+"]";
@@ -1562,17 +1600,17 @@ std::string StxValueObject::str(std::string indent) const { // pretty print for 
 ValueObjectPtr StxValueObject::copyAOType() const
 { return boost::make_shared<StxValueObject>(*this); }
 
-// Returns a key that uniquely identifies this particular AbstractObject in the 
+// Returns a key that uniquely identifies this particular AbstractObject in the
 // set hierarchy.
 const AbstractionHierarchy::hierKeyPtr& StxValueObject::getHierKey() const {
   if(!isHierKeyCached) {
     ((StxValueObject*)this)->cachedHierKey = boost::make_shared<AOSHierKey>(((StxValueObject*)this)->shared_from_this());
-    
+
     // The NULL val gets an empty key since it denotes the full set
     if(val==NULL) { }
-    else 
+    else
       ((StxValueObject*)this)->cachedHierKey->add(boost::make_shared<comparableSgValueExp>(val));
-    
+
     ((StxValueObject*)this)->isHierKeyCached = true;
   }
   return cachedHierKey;
@@ -1586,7 +1624,7 @@ const AbstractionHierarchy::hierKeyPtr& StxValueObject::getHierKey() const {
 StxCodeLocObject::StxCodeLocObject(SgNode* n, PartEdgePtr pedge) : pedge(pedge)
 {
   code = isSgExpression(n);
-}    
+}
 
 StxCodeLocObject::StxCodeLocObject(const StxCodeLocObject& that) : pedge(that.pedge), code(that.code)
 { }
@@ -1605,9 +1643,9 @@ bool StxCodeLocObject::mustEqualCL(CodeLocObjectPtr that_arg, PartEdgePtr pedge)
   StxCodeLocObjectPtr that = boost::dynamic_pointer_cast <StxCodeLocObject> (that_arg);
   if(!that) { return false; }
   if(isSgFunctionCallExp(code) && isSgFunctionCallExp(that->code) &&
-     isSgFunctionCallExp(code)->getAssociatedFunctionSymbol() && 
+     isSgFunctionCallExp(code)->getAssociatedFunctionSymbol() &&
      isSgFunctionCallExp(that->code)->getAssociatedFunctionSymbol())
-    return isSgFunctionCallExp(code)->getAssociatedFunctionSymbol()->get_name() == 
+    return isSgFunctionCallExp(code)->getAssociatedFunctionSymbol()->get_name() ==
            isSgFunctionCallExp(that->code)->getAssociatedFunctionSymbol()->get_name();
   else
     return false;
@@ -1620,9 +1658,9 @@ bool StxCodeLocObject::equalSetCL(CodeLocObjectPtr that_arg, PartEdgePtr pedge)
   if(!that) { return false; }
   // If both objects denote a concrete function, they denote the same set of those functions are equal
   if(isSgFunctionCallExp(code) && isSgFunctionCallExp(that->code) &&
-     isSgFunctionCallExp(code)->getAssociatedFunctionSymbol() && 
+     isSgFunctionCallExp(code)->getAssociatedFunctionSymbol() &&
      isSgFunctionCallExp(that->code)->getAssociatedFunctionSymbol())
-    return isSgFunctionCallExp(code)->getAssociatedFunctionSymbol()->get_name() == 
+    return isSgFunctionCallExp(code)->getAssociatedFunctionSymbol()->get_name() ==
            isSgFunctionCallExp(that->code)->getAssociatedFunctionSymbol()->get_name();
   // If both objects denote the set of all CodeLocs, they're equal
   else if(code==NULL && that->code==NULL)
@@ -1639,9 +1677,9 @@ bool StxCodeLocObject::subSetCL(CodeLocObjectPtr that_arg, PartEdgePtr pedge)
   if(!that) { return false; }
   // If both objects denote a concrete function, they denote the same set of those functions are equal
   if(isSgFunctionCallExp(code) && isSgFunctionCallExp(that->code) &&
-     isSgFunctionCallExp(code)->getAssociatedFunctionSymbol() && 
+     isSgFunctionCallExp(code)->getAssociatedFunctionSymbol() &&
      isSgFunctionCallExp(that->code)->getAssociatedFunctionSymbol())
-    return isSgFunctionCallExp(code)->getAssociatedFunctionSymbol()->get_name() == 
+    return isSgFunctionCallExp(code)->getAssociatedFunctionSymbol()->get_name() ==
            isSgFunctionCallExp(that->code)->getAssociatedFunctionSymbol()->get_name();
   // If both objects denote the set of all CodeLocs, they're equal
   else if(code==NULL && that->code==NULL)
@@ -1661,14 +1699,14 @@ bool StxCodeLocObject::meetUpdateCL(CodeLocObjectPtr that_arg, PartEdgePtr pedge
 {
    StxCodeLocObjectPtr that = boost::dynamic_pointer_cast <StxCodeLocObject> (that_arg);
    assert(that);
-   
-   // If the objects denote different code location expressions, 
+
+   // If the objects denote different code location expressions,
    // make this into a wildcard location
    if(code != that->code) {
      code = NULL;
      return true;
    }
-   
+
    return false;
 }
 
@@ -1683,7 +1721,7 @@ std::string StxCodeLocObject::str(std::string indent) { // pretty print for the 
 }
 
 // Allocates a copy of this object and returns a pointer to it
-CodeLocObjectPtr StxCodeLocObject::copyCL() const 
+CodeLocObjectPtr StxCodeLocObject::copyCL() const
 { return boost::make_shared<StxCodeLocObject>(*this); }
 */
 
@@ -1715,7 +1753,7 @@ StxMemRegionObject::StxMemRegionObject(SgNode* n): MemRegionObject(n)/*, Abstrac
         assert(0);
 }
 
-StxMemRegionObject::StxMemRegionObject(const StxMemRegionObject& that): 
+StxMemRegionObject::StxMemRegionObject(const StxMemRegionObject& that):
       MemRegionObject(that)/*, AbstractionHierarchy(that)*/, type(that.type)
 {}
 
@@ -1724,14 +1762,14 @@ StxMemRegionObject::StxMemRegionObject(const StxMemRegionObject& that):
 bool StxMemRegionObject::mayEqualAO(MemRegionObjectPtr o, PartEdgePtr pedge)
 {
   StxMemRegionObjectPtr that = boost::dynamic_pointer_cast<StxMemRegionObject>(o); assert(that);
-  
+
   // If either object denotes the set of all memory regions, the two objects are may-equal
   if(getType()==StxMemRegionType::all || that->getType()==StxMemRegionType::all)
     return true;
-  
+
   // At this point we're sure that neither this nor that are all objects
   assert(getType()!=StxMemRegionType::all && that->getType()!=StxMemRegionType::all);
-  
+
   // Expression objects are distinct from each other and both named and storage objects
   if((getType()==StxMemRegionType::expr && that->getType()!=StxMemRegionType::expr) ||
      (getType()!=StxMemRegionType::expr && that->getType()==StxMemRegionType::expr) ||
@@ -1739,19 +1777,19 @@ bool StxMemRegionObject::mayEqualAO(MemRegionObjectPtr o, PartEdgePtr pedge)
     return false;
   else if(getType()==StxMemRegionType::expr && that->getType()==StxMemRegionType::expr)
     return true;
-  
+
   // At this point we're sure that neither this nor that are expression objects
   assert(getType()!=StxMemRegionType::expr && that->getType()!=StxMemRegionType::expr);
-  
+
   // Storage objects denote the set of memory regions in stack+heap+globals
   // All known objects are specific regions within stack+heap+globals
   // Thus, if either this or that are storage they may-equal each other
   if(getType()==StxMemRegionType::storage || that->getType()==StxMemRegionType::storage)
     return true;
-  
+
   // At this point we're sure that both this and that are known objects
   assert(getType()==StxMemRegionType::named && that->getType()==StxMemRegionType::named);
-  
+
   // Named objects are distinct from each other iff their symbols are.
   return type->getUID()==that->type->getUID();
 }
@@ -1759,15 +1797,15 @@ bool StxMemRegionObject::mayEqualAO(MemRegionObjectPtr o, PartEdgePtr pedge)
 bool StxMemRegionObject::mustEqualAO(MemRegionObjectPtr o, PartEdgePtr pedge)
 {
   StxMemRegionObjectPtr that = boost::dynamic_pointer_cast<StxMemRegionObject>(o); assert(that);
-  
+
   // If either object denotes the set of all memory regions, the two objects are not must-equal since this
   // set has unbounded size
   if(getType()==StxMemRegionType::all || that->getType()==StxMemRegionType::all)
     return false;
-  
+
   // At this point we're sure that neither this nor that are all objects
   assert(getType()!=StxMemRegionType::all && that->getType()!=StxMemRegionType::all);
-  
+
   // Expression objects are distinct from each other and both named and storage objects
   if((getType()==StxMemRegionType::expr && that->getType()!=StxMemRegionType::expr) ||
      (getType()!=StxMemRegionType::expr && that->getType()==StxMemRegionType::expr) ||
@@ -1775,21 +1813,21 @@ bool StxMemRegionObject::mustEqualAO(MemRegionObjectPtr o, PartEdgePtr pedge)
     return false;
   else if(getType()==StxMemRegionType::expr && that->getType()==StxMemRegionType::expr)
     return true;
-  
+
   // At this point we're sure that neither this nor that are expression objects
   assert(getType()!=StxMemRegionType::expr && that->getType()!=StxMemRegionType::expr);
-  
+
   // Storage objects denote the set of memory regions in stack+heap+globals
   // All known objects are specific regions within stack+heap+globals
-  // Thus, if either this or that are storage they may-equal each other. 
-  // However, since storage objects are unbounded-size sets of memory regions, 
+  // Thus, if either this or that are storage they may-equal each other.
+  // However, since storage objects are unbounded-size sets of memory regions,
   // these objects are not must-equal.
   if(getType()==StxMemRegionType::storage || that->getType()==StxMemRegionType::storage)
     return false;
-  
+
   // At this point we're sure that both this and that are known objects
   assert(getType()==StxMemRegionType::named && that->getType()==StxMemRegionType::named);
-  
+
   // Named objects are distinct from each other iff their symbols are.
   return type->getUID()==that->type->getUID();
 }
@@ -1801,14 +1839,14 @@ bool StxMemRegionObject::equalSetAO(MemRegionObjectPtr o, PartEdgePtr pedge)
   // If both objects denotes the set of all memory regions, the two objects denote the same set
   if(getType()==StxMemRegionType::all && that->getType()==StxMemRegionType::all)
     return true;
-  
+
   // If only one of them denotes the set of all memory regions, they're not the same set
   if(getType()==StxMemRegionType::all || that->getType()==StxMemRegionType::all)
     return false;
-  
+
   // At this point we're sure that neither this nor that are all objects
   assert(getType()!=StxMemRegionType::all && that->getType()!=StxMemRegionType::all);
-  
+
   // Expression objects are distinct from each other and both named and storage objects
   if((getType()==StxMemRegionType::expr && that->getType()!=StxMemRegionType::expr) ||
      (getType()!=StxMemRegionType::expr && that->getType()==StxMemRegionType::expr) ||
@@ -1816,23 +1854,23 @@ bool StxMemRegionObject::equalSetAO(MemRegionObjectPtr o, PartEdgePtr pedge)
     return false;
   else if(getType()==StxMemRegionType::expr && that->getType()==StxMemRegionType::expr)
     return true;
-  
+
   // At this point we're sure that neither this nor that are expression objects
   assert(getType()!=StxMemRegionType::expr && that->getType()!=StxMemRegionType::expr);
-  
+
   // Storage objects denote the set of memory regions in stack+heap+globals
   // All known objects are specific regions within stack+heap+globals
   // If both objects denote this set, they're equal
   if(getType()==StxMemRegionType::storage && that->getType()==StxMemRegionType::storage)
     return true;
-  
+
   // But if only one denotes this set, they're not equal
   if(getType()==StxMemRegionType::storage || that->getType()==StxMemRegionType::storage)
     return false;
-  
+
   // At this point we're sure that both this and that are known objects
   assert(getType()==StxMemRegionType::named && that->getType()==StxMemRegionType::named);
-  
+
   // Named objects are distinct from each other iff their symbols are.
   return type->getUID()==that->type->getUID();
 }
@@ -1840,18 +1878,18 @@ bool StxMemRegionObject::equalSetAO(MemRegionObjectPtr o, PartEdgePtr pedge)
 bool StxMemRegionObject::subSetAO(MemRegionObjectPtr o, PartEdgePtr pedge)
 {
   StxMemRegionObjectPtr that = boost::dynamic_pointer_cast<StxMemRegionObject>(o); assert(that);
-  
+
   // If that object denotes the set of all memory regions, it contains everything else
   if(that->getType()!=StxMemRegionType::all)
     return true;
-  
+
   // However, if this one denotes the set of all regions but that does not
   if(getType()==StxMemRegionType::all)
     return false;
-  
+
   // At this point we're sure that neither this nor that are all objects
   assert(getType()!=StxMemRegionType::all && that->getType()!=StxMemRegionType::all);
-  
+
   // Expression objects are distinct from each other and both named and storage objects
   if((getType()==StxMemRegionType::expr && that->getType()!=StxMemRegionType::expr) ||
      (getType()!=StxMemRegionType::expr && that->getType()==StxMemRegionType::expr) ||
@@ -1859,23 +1897,23 @@ bool StxMemRegionObject::subSetAO(MemRegionObjectPtr o, PartEdgePtr pedge)
     return false;
   else if(getType()==StxMemRegionType::expr && that->getType()==StxMemRegionType::expr)
     return true;
-  
+
   // At this point we're sure that neither this nor that are expression objects
   assert(getType()!=StxMemRegionType::expr && that->getType()!=StxMemRegionType::expr);
-  
+
   // Storage objects denote the set of memory regions in stack+heap+globals
   // All known objects are specific regions within stack+heap+globals
   // If that object denotes all storage regions, it must contain this one
   if(that->getType()==StxMemRegionType::storage)
     return true;
-  
+
   // However, if this object denotes the set of all storage regions but that one does not
   if(getType()==StxMemRegionType::storage)
     return false;
-  
+
   // At this point we're sure that both this and that are known objects
   assert(getType()==StxMemRegionType::named && that->getType()==StxMemRegionType::named);
-  
+
   // Named objects are distinct from each other iff their symbols are.
   return type->getUID()==that->type->getUID();
 }
@@ -1893,7 +1931,7 @@ ValueObjectPtr StxMemRegionObject::getRegionSizeAO(PartEdgePtr pedge)
 bool StxMemRegionObject::meetUpdateAO(MemRegionObjectPtr o, PartEdgePtr pedge)
 {
   StxMemRegionObjectPtr that = boost::dynamic_pointer_cast<StxMemRegionObject>(o); assert(that);
-  
+
   // expr + * = all
   // all + * = all
   if(getType()==StxMemRegionType::expr || that->getType()==StxMemRegionType::expr ||
@@ -1904,7 +1942,7 @@ bool StxMemRegionObject::meetUpdateAO(MemRegionObjectPtr o, PartEdgePtr pedge)
     } else
       return false;
   }
-  
+
   // named + named = storage
   // named + storage = storage
   // storage + storage = storage
@@ -1935,7 +1973,7 @@ bool StxMemRegionObject::isEmptyAO(PartEdgePtr pedge) {
   // StxMemRegionObjects are only created for non-empty sets of memory regions
   return false;
 }
-       
+
 
 // Allocates a copy of this object and returns a pointer to it
 MemRegionObjectPtr StxMemRegionObject::copyAOType() const {
@@ -1946,12 +1984,12 @@ std::string StxMemRegionObject::str(std::string indent) const { // pretty print 
   return txt() << "[StxMR: "<<type->str()<<"]";
 }
 
-// Returns a key that uniquely identifies this particular AbstractObject in the 
+// Returns a key that uniquely identifies this particular AbstractObject in the
 // set hierarchy.
 const AbstractionHierarchy::hierKeyPtr& StxMemRegionObject::getHierKey() const {
   if(!isHierKeyCached) {
     ((StxMemRegionObject*)this)->cachedHierKey = boost::make_shared<AOSHierKey>(((StxMemRegionObject*)this)->shared_from_this());
-    
+
     // The all object gets an empty key since it contains all the object types
     if(getType()==StxMemRegionType::all) { }
     else {
@@ -1977,7 +2015,7 @@ StxExprMemRegionTypePtr NULLStxExprMemRegionType;
 StxExprMemRegionTypePtr StxExprMemRegionType::getInstance(SgNode* n) {
   if(SgExpression* expr = isSgExpression(n)) {
     // if(!isSgVarRefExp(n) && !isSgDotExp(n) && !isSgPntrArrRefExp(n))
-    if(!isSgVarRefExp(n) && !isSgDotExp(n) && !isSgPntrArrRefExp(n) && !isSgPointerDerefExp(n))    
+    if(!isSgVarRefExp(n) && !isSgDotExp(n) && !isSgPntrArrRefExp(n) && !isSgPointerDerefExp(n))
       return boost::make_shared<StxExprMemRegionType>(expr);
   }
 
@@ -1985,7 +2023,7 @@ StxExprMemRegionTypePtr StxExprMemRegionType::getInstance(SgNode* n) {
   return NULLStxExprMemRegionType;
 }
 
-// Return the list of this node's ancestors, upto and including the nearest enclosing 
+// Return the list of this node's ancestors, upto and including the nearest enclosing
 // statement as well as the node itself, with the deeper ancestors placed towards the front of the list
 /*list<SgNode*> getAncestorToStmt(SgNode* n) {
   list<SgNode*> ancestors;
@@ -2006,20 +2044,20 @@ StxExprMemRegionTypePtr StxExprMemRegionType::getInstance(SgNode* n) {
 }*/
 
 bool enc (SgExpression* expr, const CFGNode& n) {
-  // expr is in-scope at n if they're inside the same statement or n is an SgIfStmt, SgForStatement, SgWhileStmt 
+  // expr is in-scope at n if they're inside the same statement or n is an SgIfStmt, SgForStatement, SgWhileStmt
   // or SgDoWhileStmt and exprr is inside its sub-statements
-  return (SageInterface::getEnclosingStatement(n.getNode()) == 
+  return (SageInterface::getEnclosingStatement(n.getNode()) ==
           SageInterface::getEnclosingStatement(expr)) ||
-         (isSgIfStmt(n.getNode()) && 
+         (isSgIfStmt(n.getNode()) &&
           isSgIfStmt(n.getNode())->get_conditional()==
           SageInterface::getEnclosingStatement(expr)) ||
-         (isSgWhileStmt(n.getNode()) && 
+         (isSgWhileStmt(n.getNode()) &&
           isSgWhileStmt(n.getNode())->get_condition()==
           SageInterface::getEnclosingStatement(expr)) ||
-         (isSgDoWhileStmt(n.getNode()) && 
+         (isSgDoWhileStmt(n.getNode()) &&
           isSgDoWhileStmt(n.getNode())->get_condition()==
           SageInterface::getEnclosingStatement(expr)) ||
-         (isSgForStatement(n.getNode()) && 
+         (isSgForStatement(n.getNode()) &&
           (isSgForStatement(n.getNode())->get_for_init_stmt()==SageInterface::getEnclosingStatement(expr) ||
            isSgForStatement(n.getNode())->get_test()         ==SageInterface::getEnclosingStatement(expr)));
 }
@@ -2035,7 +2073,7 @@ bool StxExprMemRegionType::isLiveAO(PartEdgePtr pedge) {
   //        This rule is fairly loose but at least it is easy to compute. The right rule
   //        would have been that the part is on some path between the expression and its
   //        parent but this would require an expensive graph search
-  /*return SageInterface::getEnclosingStatement(expr) == 
+  /*return SageInterface::getEnclosingStatement(expr) ==
          SageInterface::getEnclosingStatement(part.getNode());*/
   //boost::function<bool (SgExpression*, const CFGNode&)> enc1 = &enc;
 
@@ -2049,12 +2087,12 @@ bool StxExprMemRegionType::isLiveAO(PartEdgePtr pedge) {
   dbg << "expr="<<SgNode2Str(expr)<<endl;
   if(pedge->source()) dbg << "is at source="<<pedge->source()->mapCFGNodeANY<bool>(boost::bind(enc, expr, _1))<<endl;
   if(pedge->target()) dbg << "is at target="<<pedge->target()->mapCFGNodeANY<bool>(boost::bind(enc, expr, _1))<<endl;*/
-  
+
   return (pedge->source() ? pedge->source()->mapCFGNodeANY<bool>(boost::bind(enc, expr, _1)): false) ||
          (pedge->target() ? pedge->target()->mapCFGNodeANY<bool>(boost::bind(enc, expr, _1)): false);
 
   /*struct enc { public: bool op(SgExpression* expr, const CFGNode& n) {
-    return SageInterface::getEnclosingStatement(expr) == 
+    return SageInterface::getEnclosingStatement(expr) ==
            SageInterface::getEnclosingStatement(n.getNode());
   } }; enc e;
   return part->mapCFGNodeANY<bool>(boost::bind(&enc::op, expr, _1));*/
@@ -2075,7 +2113,7 @@ bool StxExprMemRegionType::isLiveAO(PartEdgePtr pedge) {
   /*if(expr==part.getNode() || isOperand(part.getNode(), expr)) { //expr->get_parent()==part.getNode()) {
     //dbg << "IN-SCOPE"<<endl;
     return true;
-  // Otherwise, expr is only in-scope if shares an ancestor with part.getNode() but part.getNode() 
+  // Otherwise, expr is only in-scope if shares an ancestor with part.getNode() but part.getNode()
   // is not that ancestor.
 } else {
     //dbg << "expr->get_parent()=["<<expr->get_parent()->unparseToString()<<" | "<<expr->get_parent()->class_name()<<"]"<<endl;
@@ -2098,7 +2136,7 @@ bool StxExprMemRegionType::isLiveAO(PartEdgePtr pedge) {
 
     // Iterate through the ancestor lists from the deepest point to the shallowest, looking for a deviation
     list<SgNode*>::iterator a, p;
-    for(a = anchorAncestors.begin(), p = partAncestors.begin(); 
+    for(a = anchorAncestors.begin(), p = partAncestors.begin();
         a!=anchorAncestors.end() && p!=partAncestors.end(); a++, p++) {
       if(*a != *p) break;
     }
@@ -2138,13 +2176,13 @@ StxNamedMemRegionTypePtr StxNamedMemRegionType::getInstance(SgNode* n) {
     do {
       operand = cast->get_operand();
     } while((cast=isSgCastExp(cast->get_operand())));
-    
+
     if(SgVarRefExp* ref = isSgVarRefExp(operand))
       return boost::make_shared<StxNamedMemRegionType>(ref->get_symbol()->get_declaration(), ref->get_symbol());
   } else if(SgInitializedName* iname = isSgInitializedName(n)) {
     return boost::make_shared<StxNamedMemRegionType>(iname, iname->search_for_symbol_from_symbol_table());
   }
-  
+
   return NULLStxNamedMemRegionType;
 }
 
@@ -2268,7 +2306,7 @@ class IsOperandVisitor : public ROSE_VisitorPatternDefaultBase
       // Function Reference
       // !!! CURRENTLY WE HAVE NO NOTION OF VARIABLES THAT IDENTIFY FUNCTIONS, SO THIS CASE IS EXCLUDED FOR NOW
       //} else if(isSgFunctionRefExp(sgn)) {
-      //} else if(isSgMemberFunctionRefExp(sgn)) { 
+      //} else if(isSgMemberFunctionRefExp(sgn)) {
 
       // !!! DON'T KNOW HOW TO HANDLE THESE
       //} else if(isSgStatementExpression(sgn)) {(
@@ -2278,16 +2316,16 @@ class IsOperandVisitor : public ROSE_VisitorPatternDefaultBase
       //} else if(isSgTypeIdOp(sgn)) {
       // Var Args
       // !!! DON'T HANDLE THESE RIGHT NOW. WILL HAVE TO IN THE FUTURE
-      /*  SgVarArgOp 
-          SgExpression *  get_operand_expr () const 
+      /*  SgVarArgOp
+          SgExpression *  get_operand_expr () const
           SgVarArgCopyOp
           SgExpression *  get_lhs_operand () const
-          SgExpression *  get_rhs_operand () const  
-          SgVarArgEndOp 
-          SgExpression *  get_operand_expr 
-          SgVarArgStartOneOperandOp 
-          SgExpression *  get_operand_expr () const 
-          SgVarArgStartOp 
+          SgExpression *  get_rhs_operand () const
+          SgVarArgEndOp
+          SgExpression *  get_operand_expr
+          SgVarArgStartOneOperandOp
+          SgExpression *  get_operand_expr () const
+          SgVarArgStartOp
           SgExpression *  get_lhs_operand () const
           SgExpression *  get_rhs_operand () const */
       // !!! WHAT IS THIS?
@@ -2321,7 +2359,7 @@ class IsOperandVisitor : public ROSE_VisitorPatternDefaultBase
           return;
         }
   }
-  // Designated Initializer 
+  // Designated Initializer
   void visit(SgDesignatedInitializer *sgn) {
       SgExprListExp* exprList = sgn->get_designatorList();
       for(SgExpressionPtrList::iterator expr=exprList->get_expressions().begin();

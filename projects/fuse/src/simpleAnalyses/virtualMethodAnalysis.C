@@ -8,7 +8,7 @@ using namespace sight;
 using namespace SageInterface;
 
 namespace fuse {
-#define VirtualMethodAnalysisDebugLevel 0
+#define VirtualMethodAnalysisDebugLevel 2
 
 /********************************
  ***** ClassInheritanceTree *****
@@ -137,7 +137,7 @@ Lattice* ClassInheritanceTree::copy() const {
 // The part of this object is to be used for AbstractObject comparisons.
 // Meet update finds the common tree prefix among the two treeS
 bool ClassInheritanceTree::meetUpdate(Lattice* that_arg) {
-  SIGHT_VERB(scope reg("ClassInheritanceTree::meetUpdate()", scope::medium), 1, VirtualMethodAnalysisDebugLevel)
+  SIGHT_VERB_DECL(scope, ("ClassInheritanceTree::meetUpdate()", scope::medium), 1, VirtualMethodAnalysisDebugLevel)
   ClassInheritanceTree* that = dynamic_cast<ClassInheritanceTree*>(that_arg);
   ROSE_ASSERT(that);
 
@@ -572,6 +572,186 @@ std::string ClassInheritanceTree::str(std::string indent) const {
   return s.str();
 }
 
+/******************************
+ ***** MethodEntryExitMap *****
+ ******************************/
+
+MethodEntryExitMap::MethodEntryExitMap(PartEdgePtr latPEdge):
+    Lattice(latPEdge),
+    FiniteLattice(latPEdge),
+    fullEntryPoints(false)
+{ }
+
+MethodEntryExitMap::MethodEntryExitMap(const MethodEntryExitMap& that) : Lattice(that), FiniteLattice(that) {
+  entryPoints = that.entryPoints;
+  fullEntryPoints = that.fullEntryPoints;
+}
+
+MethodEntryExitMap& MethodEntryExitMap::operator=(const MethodEntryExitMap& that) {
+  entryPoints = that.entryPoints;
+  fullEntryPoints = that.fullEntryPoints;
+  return *this;
+}
+
+// returns a copy of this lattice
+Lattice* MethodEntryExitMap::copy() const
+{
+  return new MethodEntryExitMap(*this);
+}
+
+// Adds a new entry point for the given function. Returns true if this causes this
+// object to change and false otherwise
+bool MethodEntryExitMap::add(const Function& func, PartEdgePtr entry) {
+  map<Function, set<PartEdgePtr> >::iterator funcLoc = entryPoints.find(func);
+  // If we don't have any entry points currently recorded for this function
+  if(funcLoc == entryPoints.end()) {
+    entryPoints[func].insert(entry);
+    return true;
+  // If we already have some points recorded, add the new entry point
+  } else {
+    pair<set<PartEdgePtr>::iterator,bool> ret = funcLoc->second.insert(entry);
+    return ret.second;
+  }
+}
+
+// Computes the meet of this and that and saves the result in this
+// returns true if this causes this to change and false otherwise
+// The part of this object is to be used for AbstractObject comparisons.
+// meetUpdate finds the common tree prefix among the two treeS
+bool MethodEntryExitMap::meetUpdate(Lattice* that_arg) {
+  MethodEntryExitMap* that = dynamic_cast<MethodEntryExitMap*>(that_arg);
+  assert(that);
+
+/*  cout << "meetUpdate"<<endl;
+  cout << "    this="<<str("    ")<<endl;
+  cout << "    that="<<that->str("    ")<<endl;*/
+
+  // If that is full, make this full as well
+  if(that->isFull()) return setToFull();
+  bool modified = false;
+
+  // Iterate over all the functions in that.entryPoints
+  for(map<Function, set<PartEdgePtr> >::iterator i=that->entryPoints.begin(); i!=that->entryPoints.end(); ++i) {
+    // Add all the entry points for the current function in that->entryPoints under the same
+    // function in this->entryPoints.
+    for(set<PartEdgePtr>::iterator entry=i->second.begin(); entry!=i->second.end(); ++entry) {
+      //cout << "        adding "<<SgNode2Str(i->first.get_declaration())<<": "<<(*entry)->str()<<endl;
+
+      pair<set<PartEdgePtr>::iterator, bool> ret = entryPoints[i->first].insert(*entry);
+      modified = modified || ret.second;
+    }
+  }
+
+  return modified;
+}
+
+// Computes the intersection of this and that and saves the result in this
+// returns true if this causes this to change and false otherwise
+// The part of this object is to be used for AbstractObject comparisons.
+// intersectUpdate finds the common tree prefix among the two treeS
+bool MethodEntryExitMap::intersectUpdate(Lattice* that_arg)  {
+  MethodEntryExitMap* that = dynamic_cast<MethodEntryExitMap*>(that_arg);
+  assert(that);
+
+  // If that is empty, make this empty as well
+  if(that->isEmpty()) return setToEmpty();
+
+  bool modified = false;
+
+  // Iterate over all the functions in this->entryPoints
+  for(map<Function, set<PartEdgePtr> >::iterator i=entryPoints.begin(); i!=entryPoints.end(); ) {
+    // If the current entry in this->entryPoints doesn't exist in that->entryPoints, remove it
+    if(that->entryPoints.find(i->first) == that->entryPoints.end())
+      entryPoints.erase(i++);
+    // Otherwise, keep it
+    else {
+      // Iterate over all the entry points in i->second.
+      for(set<PartEdgePtr>::iterator entry=i->second.begin(); entry!=i->second.end(); ) {
+        // If the current entry point in this->entryPoints doesn't exist in that->entryPoints, remove it
+        if(that->entryPoints[i->first].find(*entry) == that->entryPoints[i->first].end()) {
+          i->second.erase(entry++);
+          modified = true;
+        // Otherwise, keep it and advance to the next entry point
+        } else
+          ++entry;
+      }
+
+      // If the current Function in this->entryPoints has no more entry points, remove it
+      if(i->second.size()==0) {
+        entryPoints.erase(i++);
+        modified = true;
+      // Otherwise, leave it alone and advance to the next Function
+      } else
+        ++i;
+    }
+  }
+
+  return modified;
+}
+
+bool MethodEntryExitMap::operator==(Lattice* that_arg) {
+  MethodEntryExitMap* that = dynamic_cast<MethodEntryExitMap*>(that_arg);
+  assert(that);
+
+  return fullEntryPoints == that->fullEntryPoints &&
+         entryPoints     == that->entryPoints;
+}
+
+// Set this Lattice object to represent the set of all possible execution prefixes.
+// Return true if this causes the object to change and false otherwise.
+bool MethodEntryExitMap::setToFull() {
+  if(fullEntryPoints) return false;
+
+  fullEntryPoints = true;
+  entryPoints.clear();
+  return true;
+}
+
+// Set this Lattice object to represent the of no execution prefixes (empty set).
+// Return true if this causes the object to change and false otherwise.
+bool MethodEntryExitMap::setToEmpty() {
+  bool modified = (entryPoints.size()!=0 || !fullEntryPoints);
+  entryPoints.size();
+  fullEntryPoints = false;
+  return modified;
+}
+
+// Set all the value information that this Lattice object associates with this MemLocObjectPtr to full.
+// Return true if this causes the object to change and false otherwise.
+bool MethodEntryExitMap::setMLValueToFull(MemLocObjectPtr ml) {
+  return false;
+}
+
+// Returns whether this lattice denotes the set of all possible execution prefixes.
+bool MethodEntryExitMap::isFull() {
+  return fullEntryPoints;
+}
+
+// Returns whether this lattice denotes the empty set.
+bool MethodEntryExitMap::isEmpty() {
+  return !fullEntryPoints && entryPoints.size()==0;
+}
+
+std::string MethodEntryExitMap::str(std::string indent) const {
+  ostringstream oss;
+
+  oss << "[MethodEntryExitMap: ";
+  if(fullEntryPoints) oss << "FULL";
+  else {
+    oss << endl;
+    for(map<Function, set<PartEdgePtr> >::const_iterator i=entryPoints.begin(); i!=entryPoints.end(); ++i) {
+      oss << indent << "    "<< i->first.str()<<endl;
+      for(set<PartEdgePtr>::const_iterator entry=i->second.begin(); entry!=i->second.end(); ++entry) {
+        oss << indent << "        "<<(*entry)->str()<<endl;
+      }
+    }
+  }
+
+  oss << "]";
+
+  return oss.str();
+}
+
 /****************************
  ***** VirtualMethodPart *****
  ****************************/
@@ -581,8 +761,9 @@ VirtualMethodPart::VirtualMethodPart(PartPtr base, ComposedAnalysis* analysis) :
 {
   cacheInitialized_outEdges=false;
   cacheInitialized_inEdges=false;
-  cacheInitialized_CFGNodes=-false;
+  cacheInitialized_CFGNodes=false;
   cacheInitialized_matchingCallParts=false;
+  cacheInitialized_matchingEntryExitParts=false;
   cacheInitialized_inEdgeFromAny=false;
   cacheInitialized_outEdgeToAny=false;
 }
@@ -590,20 +771,22 @@ VirtualMethodPart::VirtualMethodPart(PartPtr base, ComposedAnalysis* analysis) :
 VirtualMethodPart::VirtualMethodPart(const VirtualMethodPart& that) :
   Part((const Part&)that)
 {
-  cacheInitialized_outEdges          = that.cacheInitialized_outEdges;
-  cache_outEdges                     = that.cache_outEdges;
-  cacheInitialized_inEdges           = that.cacheInitialized_inEdges;
-  cache_inEdges                      = that.cache_inEdges;
-  cacheInitialized_CFGNodes          = that.cacheInitialized_CFGNodes;
-  cache_CFGNodes                     = that.cache_CFGNodes;
-  cacheInitialized_matchingCallParts = that.cacheInitialized_matchingCallParts;
-  cache_matchingCallParts            = that.cache_matchingCallParts;
-  cacheInitialized_inEdgeFromAny     = that.cacheInitialized_inEdgeFromAny;
-  cache_inEdgeFromAny                = that.cache_inEdgeFromAny;
-  cacheInitialized_outEdgeToAny      = that.cacheInitialized_outEdgeToAny;
-  cache_outEdgeToAny                 = that.cache_outEdgeToAny;
-  cache_equal                        = that.cache_equal;
-  cache_less                         = that.cache_less;
+  cacheInitialized_outEdges               = that.cacheInitialized_outEdges;
+  cache_outEdges                          = that.cache_outEdges;
+  cacheInitialized_inEdges                = that.cacheInitialized_inEdges;
+  cache_inEdges                           = that.cache_inEdges;
+  cacheInitialized_CFGNodes               = that.cacheInitialized_CFGNodes;
+  cache_CFGNodes                          = that.cache_CFGNodes;
+  cacheInitialized_matchingCallParts      = that.cacheInitialized_matchingCallParts;
+  cache_matchingCallParts                 = that.cache_matchingCallParts;
+  cacheInitialized_matchingEntryExitParts = that.cacheInitialized_matchingEntryExitParts;
+  cache_matchingEntryExitParts            = that.cache_matchingEntryExitParts;
+  cacheInitialized_inEdgeFromAny          = that.cacheInitialized_inEdgeFromAny;
+  cache_inEdgeFromAny                     = that.cache_inEdgeFromAny;
+  cacheInitialized_outEdgeToAny           = that.cacheInitialized_outEdgeToAny;
+  cache_outEdgeToAny                      = that.cache_outEdgeToAny;
+  cache_equal                             = that.cache_equal;
+  cache_less                              = that.cache_less;
 }
 
 // Returns a shared pointer to this of type VirtualMethodPartPtr
@@ -616,7 +799,8 @@ VirtualMethodPartPtr VirtualMethodPart::get_shared_this()
 
 // Returns whether the given function call according to the available information
 // about object types
-bool VirtualMethodPart::isPossibleFunctionCall(const Function& calleeFunc, SgFunctionCallExp* call, AbstractObjectMap* aom, PartEdgePtr baseEdge) {
+bool VirtualMethodPart::isPossibleFunctionCall(const Function& calleeFunc, SgFunctionCallExp* call,
+                                               AbstractObjectMap* aom/*, PartEdgePtr NodeStatePartEdge*/) {
   /*dbg << "call->get_function()="<<SgNode2Str(call->get_function())<<endl;
   if(isSgArrowExp(call->get_function())) {
     dbg << "isSgArrowExp(call->get_function())->get_lhs_operand()="<<SgNode2Str(isSgArrowExp(call->get_function())->get_lhs_operand())<<endl;
@@ -631,9 +815,24 @@ bool VirtualMethodPart::isPossibleFunctionCall(const Function& calleeFunc, SgFun
     return true;
   // If this function call is done through a variable (E.g. var.foo())
   } else {
-    MemLocObjectPtr ml = analysis->getComposer()->Expr2MemLoc(call->get_function(), baseEdge, analysis);
-    SIGHT_VERB(dbg << "call through variable "<<ml->str()<<endl, 2, VirtualMethodAnalysisDebugLevel)
-    ClassInheritanceTreePtr tree = dynamic_pointer_cast<ClassInheritanceTree>(aom->get(ml));
+    //MemLocObjectPtr ml = analysis->getComposer()->Expr2MemLoc(call->get_function(), getNodeStateLocPart()->inEdgeFromAny(), analysis);
+    SIGHT_VERB(dbg << "call through expression "<<SgNode2Str(call->get_function())<<endl, 2, VirtualMethodAnalysisDebugLevel)
+    MemLocObjectPtr callObj;
+    // Get the MemLoc that denotes the object a method of which is being called
+    if(SgDotExp* dotCall = isSgDotExp(call->get_function()))
+      callObj = analysis->getComposer()->Expr2MemLoc(dotCall->get_lhs_operand(), getNodeStateLocPart()->inEdgeFromAny(), analysis);
+    else if(SgArrowExp* arrowCall = isSgArrowExp(call->get_function()))
+      // Currently Fuse doesn't provide a way to create new expressions and run queries against them
+      // (in this case SgPointerDerefExp(call->get_function())) but this will be done in the future.
+      assert(false);
+    else
+      assert(false);
+
+    SIGHT_VERB(dbg << "calling through MemLoc "<<callObj->str()<<endl, 2, VirtualMethodAnalysisDebugLevel)
+    //{ scope s("key"); dbg << dynamic_pointer_cast<AbstractionHierarchy>(callObj)->getHierKey()->str()<<endl;}
+    //{ scope s(txt()<<"aom ("<<aom<<")"); dbg << aom->str()<<endl; }
+
+    ClassInheritanceTreePtr tree = dynamic_pointer_cast<ClassInheritanceTree>(aom->get(callObj));
     SIGHT_VERB(dbg << "tree at variable="<<endl<<tree->str()<<endl, 2, VirtualMethodAnalysisDebugLevel)
     ROSE_ASSERT(tree);
     set<SgFunctionDeclaration*> callees = tree->getCalleeDefs(call);
@@ -653,162 +852,159 @@ bool VirtualMethodPart::isPossibleFunctionCall(const Function& calleeFunc, SgFun
     }
   }
 
+  SIGHT_VERB(dbg << "call edge NOT is possible. Omitting."<<endl, 2, VirtualMethodAnalysisDebugLevel)
   return false;
 }
 
 // Given baseEdges, a list of edges from the server analysis' ATS, set cache_Edges to contain the edges in
 // the VMAnalysis' ATS that wrap them
-void VirtualMethodPart::wrapEdges(std::list<PartEdgePtr>& cache_Edges, const std::list<PartEdgePtr>& baseEdges)
+void VirtualMethodPart::wrapEdges(std::list<PartEdgePtr>& cache_Edges, const AnalysisPartEdgeLists& baseEdges)
 {
   SIGHT_VERB_DECL(scope, (txt() << "wrapEdges() #baseEdges="<<baseEdges.size()), 2, VirtualMethodAnalysisDebugLevel)
 
   // Consider all the VirtualMethodParts along all of this part's outgoing edges. Since this is a forward
   // analysis, they are maintained separately
-  for(list<PartEdgePtr>::const_iterator be=baseEdges.begin(); be!=baseEdges.end(); be++) {
-    SIGHT_VERB(scope beS(txt()<<"be="<<be->str(), scope::low), 2, VirtualMethodAnalysisDebugLevel)
+  for(AnalysisPartEdgeLists::const_iterator edge=baseEdges.begin(); edge!=baseEdges.end(); ++edge) {
+    SIGHT_VERB_DECL(scope, (txt()<<"edge="<<edge->input()->str(), scope::low), 2, VirtualMethodAnalysisDebugLevel)
 
     // If this edge enters a function
     set<CFGNode> matchNodes;
-    if((*be)->source()->mustOutgoingFuncCall(matchNodes)) {
+    if(edge->input()->source()->mustOutgoingFuncCall(matchNodes)) {
       // The entry point of the called function
-      SgFunctionParameterList* calleeEntry = (*be)->target()->mustSgNodeAll<SgFunctionParameterList>();
+      SgFunctionParameterList* calleeEntry = edge->input()->target()->mustSgNodeAll<SgFunctionParameterList>();
       ROSE_ASSERT(calleeEntry);
       // The descriptor of the called function
       Function curCalleeFunc(SageInterface::getEnclosingFunctionDeclaration(calleeEntry));
       SIGHT_VERB(dbg << "edge is call to function "<<curCalleeFunc.str()<<endl, 2, VirtualMethodAnalysisDebugLevel)
 
-      NodeState* callPartState = NodeState::getNodeState(analysis, (*be)->source());
+      NodeState* callPartState = NodeState::getNodeState(analysis, /*edge->NodeState()->source()*/getNodeStateLocPart());
+      dbg << "callPartState="<<callPartState->str()<<endl;
       AbstractObjectMap* curPartAOM =
           dynamic_cast<AbstractObjectMap*>(
-              callPartState->getLatticeBelow(analysis, (*be)->getSupersetPartEdge(), 0));
+              callPartState->getLatticeBelow(analysis, edge->index(), 0));
       ROSE_ASSERT(curPartAOM);
 
-      set<CFGNode> nodes=(*be)->source()->CFGNodes();
+      MethodEntryExitMap* curPartMEEMap =
+          dynamic_cast<MethodEntryExitMap*>(
+              callPartState->getLatticeBelow(analysis, edge->index(), 1));
+      ROSE_ASSERT(curPartMEEMap);
+
+      //dbg << "edge->input()->source()="<<edge->input()->source()->src()<<endl;
+      set<CFGNode> nodes=edge->input()->source()->CFGNodes();
+      //dbg << "#nodes="<<nodes.size()<<endl;
       for(set<CFGNode>::iterator n=nodes.begin(); n!=nodes.end(); n++) {
-        SIGHT_VERB(dbg << "    n="<<CFGNode2Str(*n)<<endl, 2, VirtualMethodAnalysisDebugLevel)
+        SIGHT_VERB_DECL(scope, (txt()<<"    n="<<CFGNode2Str(*n)), 2, VirtualMethodAnalysisDebugLevel)
         SgFunctionCallExp* call = isSgFunctionCallExp(n->getNode());
-        if(call && n->getIndex()==2 && isPossibleFunctionCall(curCalleeFunc, call, curPartAOM, *be))
-          cache_Edges.push_back(VirtualMethodPartEdge::create(*be, analysis));
+        if(call && n->getIndex()==2 && isPossibleFunctionCall(curCalleeFunc, call, curPartAOM/*, edge->NodeState()*/)) {
+          dbg << "This is a possible function call."<<endl;
+          PartEdgePtr entryEdge = VirtualMethodPartEdge::create(edge->input(), analysis);
+          cache_Edges.push_back(entryEdge);
+
+          // Record this entry point to the current function
+          curPartMEEMap->add(curCalleeFunc, entryEdge);
+        }
       }
 
+      dbg << "AFTER: callPartState="<<callPartState->str()<<endl;
+
     // If this edge exits a function
-    } else if((*be)->target()->mustIncomingFuncCall(matchNodes)) {
+    } else if(edge->input()->target()->mustIncomingFuncCall(matchNodes)) {
       // The definition of the function being exited
-      SgFunctionDefinition* calleeExit = (*be)->source()->mustSgNodeAll<SgFunctionDefinition>();
+      SgFunctionDefinition* calleeExit = edge->input()->source()->mustSgNodeAll<SgFunctionDefinition>();
       ROSE_ASSERT(calleeExit);
       // The descriptor of the function being exited
       Function curCalleeFunc(calleeExit);
-      SIGHT_VERB(dbg << "edge is an exit from function "<<curCalleeFunc.str()<<endl, 2, VirtualMethodAnalysisDebugLevel)
+      SIGHT_VERB(dbg << "edge is an exit from function "<<curCalleeFunc.str()<<endl, 2, VirtualMethodAnalysisDebugLevel);
 
-      // The parts that denote the call site of the function being exited
-      std::set<PartPtr> callParts = (*be)->target()->matchingCallParts();
-      assert(callParts.size()==1);
-      PartPtr callPart = *callParts.begin();
-      // The NodeState at the call part of this exit edge
-      NodeState* callPartState = NodeState::getNodeState(analysis, callPart);
-      //dbg << "callPartState="<<callPartState->str(analysis)<<endl;
-      SIGHT_VERB(dbg << "callPartState="<<callPartState->str(analysis)<<endl, 2, VirtualMethodAnalysisDebugLevel)
-      AbstractObjectMap* callPartAOM =
-          dynamic_cast<AbstractObjectMap*>(
-              callPartState->getLatticeAbove(analysis, callPart->getSupersetPart()->inEdgeFromAny(), 0));
-      ROSE_ASSERT(callPartAOM);
+      // The parts that denote the entry point into this function
+      set<PartPtr> entryPartsNodeState = getNodeStateLocPart()->matchingEntryExitParts();
 
-      // Iterate over all the CFG nodes at the function exit
-      set<CFGNode> nodes=(*be)->target()->CFGNodes();
-      for(set<CFGNode>::iterator n=nodes.begin(); n!=nodes.end(); n++) {
-        SIGHT_VERB(dbg << "    n="<<CFGNode2Str(*n)<<endl, 2, VirtualMethodAnalysisDebugLevel)
-        SgFunctionCallExp* call = isSgFunctionCallExp(n->getNode());
-        // If this exit corresponds to a possible function call according to the VMAnalysis, add it to the cache_Edges
-        if(call && n->getIndex()==3 && isPossibleFunctionCall(curCalleeFunc, call, callPartAOM, *be))
-          cache_Edges.push_back(VirtualMethodPartEdge::create(*be, analysis));
+      // The parts within the input and index ATSs that denote the call site of the function being exited
+      set<PartPtr> callPartsInput = edge->input()->target()->matchingCallParts();
+      assert(callPartsInput.size()==1);
+      SIGHT_VERB_IF(2, VirtualMethodAnalysisDebugLevel)
+      scope s("callPartsInput");
+      for(set<PartPtr>::iterator p=callPartsInput.begin(); p!=callPartsInput.end(); ++p)
+        dbg << (*p)->str()<<endl;
+      SIGHT_VERB_FI()
+      std::set<PartPtr> callPartsIndex = edge->index()->target()->matchingCallParts();
+      assert(callPartsIndex.size()==1);
+
+      // Determine if any of the incoming edges to any part in entryPartsNodeState are possible function calls
+      bool anyPossible=false;
+      for(set<PartPtr>::iterator entryP=entryPartsNodeState.begin(); entryP!=entryPartsNodeState.end(); ++entryP) {
+        SIGHT_VERB_DECL(scope, (txt()<< "entryP="<<(*entryP)->str()), 2, VirtualMethodAnalysisDebugLevel);
+        // Iterate through all the incoming edges of the current entry part to find the ones that correspond to
+        // an edge in callPartsInput (callPartsInput edges are from the input ATS and these incom
+        // edges are from the NodeState ATS)
+        list<PartEdgePtr> inE = (*entryP)->inEdges();
+        for(list<PartEdgePtr>::iterator inNodeStateEdge=inE.begin(); inNodeStateEdge!=inE.end() && !anyPossible; ++inNodeStateEdge) {
+          SIGHT_VERB_DECL(scope, (txt()<< "inNodeStateEdge="<<(*inNodeStateEdge)->str()), 2, VirtualMethodAnalysisDebugLevel);
+          // If the source of input edge of the current incoming NodeState edge corresponds to a call entry
+          // that matches the current call exit.
+          if(callPartsInput.find((*inNodeStateEdge)->getInputPartEdge()->source()) != callPartsInput.end()) {
+            SIGHT_VERB(dbg << "Edge found in callPartsInput"<<endl, 2, VirtualMethodAnalysisDebugLevel);
+            // Look up the analysis results at the function entry NodeState Part
+
+            // The NodeState at the call entry part of this call exit edge
+            NodeState* callPartState = NodeState::getNodeState(analysis, (*inNodeStateEdge)->source());
+            //dbg << "callPartState="<<callPartState->str(analysis)<<endl;
+            SIGHT_VERB(dbg << "callPartState="<<callPartState->str(analysis)<<endl, 2, VirtualMethodAnalysisDebugLevel)
+            AbstractObjectMap* callPartAOM =
+                dynamic_cast<AbstractObjectMap*>(
+                    callPartState->getLatticeAbove(analysis, (*callPartsIndex.begin())->inEdgeFromAny(), 0));
+            ROSE_ASSERT(callPartAOM);
+
+            // Iterate over all the SgNodes that correspond to the SgFunctionCallExps at the current call
+            // and use the callPartAOM to determine whether any of them correspond to a valid function call.
+            set<CFGNode> nodes=edge->input()->target()->CFGNodes();
+            for(set<CFGNode>::iterator n=nodes.begin(); n!=nodes.end() && !anyPossible; n++) {
+              SIGHT_VERB(dbg << "    n="<<CFGNode2Str(*n)<<endl, 2, VirtualMethodAnalysisDebugLevel)
+              SgFunctionCallExp* call = isSgFunctionCallExp(n->getNode());
+              // If this exit corresponds to a possible function call according to the VMAnalysis, add it to the cache_Edges
+              if(call && n->getIndex()==3 && isPossibleFunctionCall(curCalleeFunc, call, callPartAOM/*, edge->NodeState()*/)) {
+                anyPossible = true;
+              }
+            }
+          } else {
+            SIGHT_VERB(dbg << "Edge NOT found in callPartsInput"<<endl, 2, VirtualMethodAnalysisDebugLevel);
+          }
         }
-      // Not a function call, so we leave this edge as it is
-      } else
-        cache_Edges.push_back(VirtualMethodPartEdge::create(*be, analysis));
-    }
+      }
 
-    SIGHT_VERB_IF(2, VirtualMethodAnalysisDebugLevel)
-    scope s("cache_Edges");
-    for(list<PartEdgePtr>::iterator e=cache_Edges.begin(); e!=cache_Edges.end(); e++)
-      dbg << "    "<<(*e)->str()<<endl;
-    SIGHT_VERB_FI()
+      // If this exit corresponds to a possible function call according to the VMAnalysis, add it to the cache_Edges
+      if(anyPossible)
+        cache_Edges.push_back(VirtualMethodPartEdge::create(edge->input(), analysis));
+
+    // Not a function call, so we leave this edge as it is
+    } else
+      cache_Edges.push_back(VirtualMethodPartEdge::create(edge->input(), analysis));
+  }
+
+  SIGHT_VERB_IF(2, VirtualMethodAnalysisDebugLevel)
+  scope s("cache_Edges");
+  for(list<PartEdgePtr>::iterator e=cache_Edges.begin(); e!=cache_Edges.end(); e++)
+    dbg << "    "<<(*e)->str()<<endl;
+  SIGHT_VERB_FI()
 }
 
 list<PartEdgePtr> VirtualMethodPart::outEdges()
 {
-  if(!cacheInitialized_outEdges) {
+/*Need to re-evaluate outEdges under tight composition*/
+    cache_outEdges.clear();
+/*Need to re-evaluate outEdges under tight composition* /
+  if(!cacheInitialized_outEdges) {*/
     SIGHT_VERB_DECL(scope, (txt()<<"VirtualMethodPart::outEdges()", scope::medium), 2, VirtualMethodAnalysisDebugLevel)
-    list<PartEdgePtr> baseEdges = getSupersetPart()->outEdges();
+    AnalysisPartEdgeLists baseEdges =
+        getAnalysis()->NodeState2All(getNodeStateLocPart()).
+                            outEdgesIndexInput(*getAnalysis()->getComposer());// /*NodeState_valid*/ false, /*index_valid*/ true, /*input_valid*/ true);
 
+    dbg << "baseEdges="<<baseEdges.str()<<endl;
     wrapEdges(cache_outEdges, baseEdges);
 
-/*    SIGHT_VERB(dbg << "#baseEdges="<<baseEdges.size()<<endl, 2, VirtualMethodAnalysisDebugLevel)
-
-    // The NodeState at the current part
-    NodeState* curPartState = NodeState::getNodeState(analysis, getSupersetPart());
-    SIGHT_VERB(dbg << "curPartState="<<curPartState->str(analysis)<<endl, 2, VirtualMethodAnalysisDebugLevel)
-
-    // Consider all the VirtualMethodParts along all of this part's outgoing edges. Since this is a forward
-    // analysis, they are maintained separately
-    for(list<PartEdgePtr>::iterator be=baseEdges.begin(); be!=baseEdges.end(); be++) {
-      SIGHT_VERB(scope beS(txt()<<"be="<<be->str(), scope::low), 2, VirtualMethodAnalysisDebugLevel)
-
-      // If this edge enters a function
-      //SgFunctionParameterList* calleeEntry = (*be)->target()->mustSgNodeAll<SgFunctionParameterList>();
-      //if(calleeEntry) {
-      set<CFGNode> matchNodes;
-      if((*be)->source()->mustOutgoingFuncCall(matchNodes)) {
-        SgFunctionParameterList* calleeEntry = (*be)->target()->mustSgNodeAll<SgFunctionParameterList>();
-        ROSE_ASSERT(calleeEntry);
-        Function curCalleeFunc(SageInterface::getEnclosingFunctionDeclaration(calleeEntry));
-        SIGHT_VERB(dbg << "edge is call to function "<<curCalleeFunc.str()<<endl, 2, VirtualMethodAnalysisDebugLevel)
-
-        AbstractObjectMap* curPartAOM = dynamic_cast<AbstractObjectMap*>(curPartState->getLatticeBelow(analysis, *be, 0)); ROSE_ASSERT(curPartAOM);
-
-        set<CFGNode> nodes=(*be)->source()->CFGNodes();
-        for(set<CFGNode>::iterator n=nodes.begin(); n!=nodes.end(); n++) {
-          SIGHT_VERB(dbg << "    n="<<CFGNode2Str(*n)<<endl, 2, VirtualMethodAnalysisDebugLevel)
-          SgFunctionCallExp* call = isSgFunctionCallExp(n->getNode());
-          if(call && n->getIndex()==2 && isPossibleFunctionCall(curCalleeFunc, call, curPartAOM, *be))
-            cache_outEdges.push_back(VirtualMethodPartEdge::create(*be, analysis));
-        }
-
-      // If this edge exits a function
-      } else if((*be)->target()->mustIncomingFuncCall(matchNodes)) {
-        SgFunctionDefinition* calleeExit = (*be)->source()->mustSgNodeAll<SgFunctionDefinition>();
-        ROSE_ASSERT(calleeExit);
-        Function curCalleeFunc(calleeExit);
-        SIGHT_VERB(dbg << "edge is an exit from function "<<curCalleeFunc.str()<<endl, 2, VirtualMethodAnalysisDebugLevel)
-
-        std::set<PartPtr> callParts = (*be)->target()->matchingCallParts();
-        assert(callParts.size()==1);
-        PartPtr callPart = *callParts.begin();
-        // The NodeState at the call part of this exit edge
-        NodeState* callPartState = NodeState::getNodeState(analysis, callPart);
-        //dbg << "callPartState="<<callPartState->str(analysis)<<endl;
-        SIGHT_VERB(dbg << "callPartState="<<callPartState->str(analysis)<<endl, 2, VirtualMethodAnalysisDebugLevel)
-        AbstractObjectMap* callPartAOM = dynamic_cast<AbstractObjectMap*>(callPartState->getLatticeAbove(analysis, callPart->inEdgeFromAny(), 0)); ROSE_ASSERT(callPartAOM);
-
-        set<CFGNode> nodes=(*be)->target()->CFGNodes();
-        for(set<CFGNode>::iterator n=nodes.begin(); n!=nodes.end(); n++) {
-          SIGHT_VERB(dbg << "    n="<<CFGNode2Str(*n)<<endl, 2, VirtualMethodAnalysisDebugLevel)
-          SgFunctionCallExp* call = isSgFunctionCallExp(n->getNode());
-          if(call && n->getIndex()==3 && isPossibleFunctionCall(curCalleeFunc, call, callPartAOM, *be))
-            cache_outEdges.push_back(VirtualMethodPartEdge::create(*be, analysis));
-        }
-      // Not a function call, so we leave this edge as it is
-      } else
-        cache_outEdges.push_back(VirtualMethodPartEdge::create(*be, analysis));
-    }
-
-    SIGHT_VERB_IF(1, VirtualMethodAnalysisDebugLevel)
-      scope s("cache_outEdges");
-      for(list<PartEdgePtr>::iterator e=cache_outEdges.begin(); e!=cache_outEdges.end(); e++)
-        dbg << "    "<<(*e)->str()<<endl;
-    SIGHT_VERB_FI()*/
-
+/*Need to re-evaluate outEdges under tight composition* /
     cacheInitialized_outEdges=true;
-  }
+  }*/
 
   SIGHT_VERB_IF(2, VirtualMethodAnalysisDebugLevel)
   { scope s("outEdges() cache_outEdges");
@@ -823,7 +1019,9 @@ list<PartEdgePtr> VirtualMethodPart::inEdges()
 {
   if(!cacheInitialized_inEdges) {
     SIGHT_VERB_DECL(scope, (txt()<<"VirtualMethodPart::inEdges()", scope::medium), 2, VirtualMethodAnalysisDebugLevel)
-    list<PartEdgePtr> baseEdges = getSupersetPart()->inEdges();
+    AnalysisPartEdgeLists baseEdges =
+        getAnalysis()->NodeState2All(getNodeStateLocPart()).
+                            inEdgesIndexInput(*getAnalysis()->getComposer());// /*NodeState_valid*/ false, /*index_valid*/ true, /*input_valid*/ true);
 
     wrapEdges(cache_inEdges, baseEdges);
 
@@ -843,11 +1041,10 @@ list<PartEdgePtr> VirtualMethodPart::inEdges()
 set<CFGNode> VirtualMethodPart::CFGNodes() const
 {
   if(!cacheInitialized_CFGNodes) {
-    const_cast<VirtualMethodPart*>(this)->cache_CFGNodes = getSupersetPart()->CFGNodes();
+    const_cast<VirtualMethodPart*>(this)->cache_CFGNodes = getInputPart()->CFGNodes();
     const_cast<VirtualMethodPart*>(this)->cacheInitialized_CFGNodes = true;
   }
   return cache_CFGNodes;
-  //return getSupersetPart()->CFGNodes();
 }
 
 // If this Part corresponds to a function call/return, returns the set of Parts that contain
@@ -855,19 +1052,34 @@ set<CFGNode> VirtualMethodPart::CFGNodes() const
 set<PartPtr> VirtualMethodPart::matchingCallParts() const {
   if(!cacheInitialized_matchingCallParts) {
     // Wrap the parts returned by the call to the parent Part with VirtualMethodPart
-    set<PartPtr> parentMatchParts = getSupersetPart()->matchingCallParts();
+    set<PartPtr> parentMatchParts = getInputPart()->matchingCallParts();
     for(set<PartPtr>::iterator mp=parentMatchParts.begin(); mp!=parentMatchParts.end(); mp++) {
       const_cast<VirtualMethodPart*>(this)->cache_matchingCallParts.insert(VirtualMethodPart::create(*mp, analysis));
     }
-    //const_cast<VirtualMethodPart*>(this)->cacheInitialized_matchingCallParts=true;
+    const_cast<VirtualMethodPart*>(this)->cacheInitialized_matchingCallParts=true;
   }
   return cache_matchingCallParts;
 }
 
+// If this Part corresponds to a function entry/exit, returns the set of Parts that contain
+// its corresponding exit/entry, respectively.
+set<PartPtr> VirtualMethodPart::matchingEntryExitParts() const {
+  if(!cacheInitialized_matchingEntryExitParts) {
+    // Wrap the parts returned by the call to the parent Part with VirtualMethodPart
+    set<PartPtr> parentMatchParts = getInputPart()->matchingEntryExitParts();
+    for(set<PartPtr>::iterator mp=parentMatchParts.begin(); mp!=parentMatchParts.end(); mp++) {
+      const_cast<VirtualMethodPart*>(this)->cache_matchingEntryExitParts.insert(VirtualMethodPart::create(*mp, analysis));
+    }
+    const_cast<VirtualMethodPart*>(this)->cacheInitialized_matchingEntryExitParts=true;
+  }
+  return cache_matchingEntryExitParts;
+}
+
+
 // Returns a PartEdgePtr, where the source is a wild-card part (NULLPart) and the target is this Part
 PartEdgePtr VirtualMethodPart::inEdgeFromAny() {
   if(!cacheInitialized_inEdgeFromAny) {
-    cache_inEdgeFromAny = VirtualMethodPartEdge::create(getSupersetPart()->inEdgeFromAny(), analysis);
+    cache_inEdgeFromAny = VirtualMethodPartEdge::create(getInputPart()->inEdgeFromAny(), analysis);
     cacheInitialized_inEdgeFromAny=true;
   }
   return cache_inEdgeFromAny;
@@ -876,7 +1088,7 @@ PartEdgePtr VirtualMethodPart::inEdgeFromAny() {
 // Returns a PartEdgePtr, where the target is a wild-card part (NULLPart) and the source is this Part
 PartEdgePtr VirtualMethodPart::outEdgeToAny() {
   if(!cacheInitialized_outEdgeToAny) {
-    cache_outEdgeToAny = VirtualMethodPartEdge::create(getSupersetPart()->outEdgeToAny(), analysis);
+    cache_outEdgeToAny = VirtualMethodPartEdge::create(getInputPart()->outEdgeToAny(), analysis);
     cacheInitialized_outEdgeToAny=true;
   }
   return cache_outEdgeToAny;
@@ -889,9 +1101,13 @@ bool VirtualMethodPart::equal(const PartPtr& o) const
   assert(analysis == that->analysis);
 
   /*if(cache_equal.find(that.get()) == cache_equal.end())
-    const_cast<VirtualMethodPart*>(this)->cache_equal[that.get()] = (getSupersetPart() == that->getSupersetPart());
+    const_cast<VirtualMethodPart*>(this)->cache_equal[that.get()] = (getInputPart() == that->getInputPart());
   return const_cast<VirtualMethodPart*>(this)->cache_equal[that.get()];*/
-  return getSupersetPart() == that->getSupersetPart();
+/*  cout << "          VirtualMethodPart::equal()"<<endl;
+  cout << "              this->input="<<getInputPart()->str()<<endl;
+  cout << "              that->input="<<that->getInputPart()->str()<<endl;
+  cout << "              eq = "<<(getInputPart() == that->getInputPart())<<endl;*/
+  return getInputPart() == that->getInputPart();
 }
 
 bool VirtualMethodPart::less(const PartPtr& o) const
@@ -901,16 +1117,16 @@ bool VirtualMethodPart::less(const PartPtr& o) const
   assert(analysis == that->analysis);
 
   /*if(cache_less.find(that.get()) == cache_less.end())
-    const_cast<VirtualMethodPart*>(this)->cache_less[that.get()] = (getSupersetPart() < that->getSupersetPart());
+    const_cast<VirtualMethodPart*>(this)->cache_less[that.get()] = (getInputPart() < that->getInputPart());
   return const_cast<VirtualMethodPart*>(this)->cache_less[that.get()];*/
-  return getSupersetPart() < that->getSupersetPart();
+  return getInputPart() < that->getInputPart();
 }
 
 // Pretty print for the object
 std::string VirtualMethodPart::str(std::string indent) const
 {
   ostringstream oss;
-  oss << "[VMPart: "<<getSupersetPart()->str()<<"]";
+  oss << "[VMPart: "<<getInputPart()->str()<<"]";
   return oss.str();
 }
 
@@ -951,9 +1167,9 @@ PartPtr VirtualMethodPartEdge::target() const
 { return tgt; }
 
 // Sets this PartEdge's parent
-void VirtualMethodPartEdge::setSupersetPartEdge(PartEdgePtr parent)
+void VirtualMethodPartEdge::setInputPartEdge(PartEdgePtr parent)
 {
-  PartEdge::setSupersetPartEdge(parent);
+  PartEdge::setInputPartEdge(parent);
 }
 
 // Let A={ set of execution prefixes that terminate at the given anchor SgNode }
@@ -989,10 +1205,10 @@ std::list<PartEdgePtr> VirtualMethodPartEdge::getOperandPartEdge(SgNode* anchor,
     SIGHT_VERB(scope reg("VirtualMethodPartEdge::getOperandPartEdge()", scope::medium), 1, VirtualMethodAnalysisDebugLevel)
     SIGHT_VERB(dbg << "anchor="<<SgNode2Str(anchor)<<" operand="<<SgNode2Str(operand)<<endl, 1, VirtualMethodAnalysisDebugLevel)
 
-    std::list<PartEdgePtr> baseEdges = getSupersetPartEdge()->getOperandPartEdge(anchor, operand);
-    for(std::list<PartEdgePtr>::iterator e=baseEdges.begin(); e!=baseEdges.end(); e++) {
-      SIGHT_VERB(dbg << "e="<<(*e)->str()<<endl, 1, VirtualMethodAnalysisDebugLevel)
-      PartEdgePtr dpeEdge = VirtualMethodPartEdge::create(*e, analysis);
+    std::list<PartEdgePtr> baseEdges = getInputPartEdge()->getOperandPartEdge(anchor, operand);
+    for(std::list<PartEdgePtr>::iterator edge=baseEdges.begin(); edge!=baseEdges.end(); ++edge) {
+      SIGHT_VERB(dbg << "edge="<<edge->str()<<endl, 1, VirtualMethodAnalysisDebugLevel)
+      PartEdgePtr dpeEdge = VirtualMethodPartEdge::create(*edge, analysis);
       SIGHT_VERB(scope reg("vmEdge", scope::low), 2, VirtualMethodAnalysisDebugLevel)
       SIGHT_VERB(dbg<<dpeEdge->str()<<endl, 1, VirtualMethodAnalysisDebugLevel)
       cache_getOperandPartEdge[anchor][operand].push_back(dpeEdge);
@@ -1011,7 +1227,7 @@ std::list<PartEdgePtr> VirtualMethodPartEdge::getOperandPartEdge(SgNode* anchor,
 std::map<CFGNode, boost::shared_ptr<SgValueExp> > VirtualMethodPartEdge::getPredicateValue()
 {
   if(!cacheInitialized_getPredicateValue) {
-    cache_getPredicateValue = getSupersetPartEdge()->getPredicateValue();
+    cache_getPredicateValue = getInputPartEdge()->getPredicateValue();
     cacheInitialized_getPredicateValue = true;
   }
   return cache_getPredicateValue;
@@ -1069,22 +1285,24 @@ VirtualMethodAnalysis::VirtualMethodAnalysis(bool trackBase2RefinedPartEdgeMappi
   cacheInitialized_GetEndAStates_Spec = false;
 }
 
-void VirtualMethodAnalysis::genInitLattice(PartPtr part, PartEdgePtr pedge, PartPtr supersetPart,
+void VirtualMethodAnalysis::genInitLattice(const AnalysisParts& parts, const AnalysisPartEdges& pedges,
                                       std::vector<Lattice*>& initLattices)
 {
-  AbstractObjectMap* productlattice = new AbstractObjectMap(boost::make_shared<ClassInheritanceTree>(pedge),
-                                                            pedge,
+  AbstractObjectMap* productlattice = new AbstractObjectMap(boost::make_shared<ClassInheritanceTree>(pedges.NodeState()),
+                                                            pedges.NodeState(),
                                                             getComposer(),
                                                             this);
   initLattices.push_back(productlattice);
+
+  initLattices.push_back(new MethodEntryExitMap(pedges.NodeState()));
 }
 
 
 boost::shared_ptr<DFTransferVisitor>
-VirtualMethodAnalysis::getTransferVisitor(PartPtr part, PartPtr supersetPart, CFGNode cn, NodeState& state,
-                                     std::map<PartEdgePtr, std::vector<Lattice*> >& dfInfo)
+VirtualMethodAnalysis::getTransferVisitor(AnalysisParts& parts, CFGNode cn, NodeState& state,
+                                          std::map<PartEdgePtr, std::vector<Lattice*> >& dfInfo)
 {
-  VirtualMethodAnalysisTransfer* ptat = new VirtualMethodAnalysisTransfer(part, supersetPart, cn, state, dfInfo, getComposer(), this);
+  VirtualMethodAnalysisTransfer* ptat = new VirtualMethodAnalysisTransfer(parts, cn, state, dfInfo, getComposer(), this);
   return boost::shared_ptr<DFTransferVisitor>(ptat);
 }
 
@@ -1126,12 +1344,12 @@ set<PartPtr> VirtualMethodAnalysis::GetEndAStates_Spec()
  *****************************************/
 
 VirtualMethodAnalysisTransfer::VirtualMethodAnalysisTransfer(
-          PartPtr part, PartPtr supersetPart, CFGNode cn, NodeState& state,
+          AnalysisParts& parts, CFGNode cn, NodeState& state,
           map<PartEdgePtr, vector<Lattice*> >& dfInfo,
           Composer* composer, VirtualMethodAnalysis* analysis)
    : VariableStateTransfer<ClassInheritanceTree, VirtualMethodAnalysis>
-                       (state, dfInfo, boost::make_shared<ClassInheritanceTree>(part->inEdgeFromAny()),
-                        composer, analysis, part, supersetPart, cn,
+                       (state, dfInfo, boost::make_shared<ClassInheritanceTree>(parts.NodeState()->inEdgeFromAny()),
+                        composer, analysis, parts, cn,
                         VirtualMethodAnalysisDebugLevel, "VirtualMethodAnalysisDebugLevel")
 {}
 
@@ -1146,7 +1364,7 @@ void VirtualMethodAnalysisTransfer::visit(SgVarRefExp *vref) {
     ROSE_ASSERT(cdef);
     SIGHT_VERB(dbg << "cdef="<<SgNode2Str(cdef)<<endl, 1, VirtualMethodAnalysisDebugLevel)
 
-    setLattice(vref, boost::make_shared<ClassInheritanceTree>(cdef, part->inEdgeFromAny()));
+    setLattice(vref, boost::make_shared<ClassInheritanceTree>(cdef, parts.NodeState()->inEdgeFromAny()));
   }
 }
 
@@ -1162,7 +1380,7 @@ void VirtualMethodAnalysisTransfer::visit(SgInitializedName *name) {
     ROSE_ASSERT(cdef);
     SIGHT_VERB(dbg << "cdef="<<SgNode2Str(cdef)<<endl, 1, VirtualMethodAnalysisDebugLevel)
 
-    setLattice(name, boost::make_shared<ClassInheritanceTree>(cdef, part->inEdgeFromAny()));
+    setLattice(name, boost::make_shared<ClassInheritanceTree>(cdef, parts.NodeState()->inEdgeFromAny()));
   }
 }
 

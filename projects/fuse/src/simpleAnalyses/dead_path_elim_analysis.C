@@ -6,7 +6,7 @@ using namespace sight;
 
 namespace fuse {
 
-#define DPEAnalDebugLevel 0
+#define DPEAnalDebugLevel 2
 #if DPEAnalDebugDevel==0
   #define DISABLE_SIGHT
 #endif
@@ -26,6 +26,7 @@ DeadPathElimPart::DeadPathElimPart(PartPtr base, ComposedAnalysis* analysis) :
   cacheInitialized_inEdges=false;
   cacheInitialized_CFGNodes=false;
   cacheInitialized_matchingCallParts=false;
+  cacheInitialized_matchingEntryExitParts=false;
   cacheInitialized_inEdgeFromAny=false;
   cacheInitialized_outEdgeToAny=false;
 }
@@ -33,20 +34,22 @@ DeadPathElimPart::DeadPathElimPart(PartPtr base, ComposedAnalysis* analysis) :
 DeadPathElimPart::DeadPathElimPart(const DeadPathElimPart& that) :
   Part((const Part&)that)
 {
-  cacheInitialized_outEdges          = that.cacheInitialized_outEdges;
-  cache_outEdges                     = that.cache_outEdges;
-  cacheInitialized_inEdges           = that.cacheInitialized_inEdges;
-  cache_inEdges                      = that.cache_inEdges;
-  cacheInitialized_CFGNodes          = that.cacheInitialized_CFGNodes;
-  cache_CFGNodes                     = that.cache_CFGNodes;
-  cacheInitialized_matchingCallParts = that.cacheInitialized_matchingCallParts;
-  cache_matchingCallParts            = that.cache_matchingCallParts;
-  cacheInitialized_inEdgeFromAny     = that.cacheInitialized_inEdgeFromAny;
-  cache_inEdgeFromAny                = that.cache_inEdgeFromAny;
-  cacheInitialized_outEdgeToAny      = that.cacheInitialized_outEdgeToAny;
-  cache_outEdgeToAny                 = that.cache_outEdgeToAny;
-  cache_equal                        = that.cache_equal;
-  cache_less                         = that.cache_less;
+  cacheInitialized_outEdges               = that.cacheInitialized_outEdges;
+  cache_outEdges                          = that.cache_outEdges;
+  cacheInitialized_inEdges                = that.cacheInitialized_inEdges;
+  cache_inEdges                           = that.cache_inEdges;
+  cacheInitialized_CFGNodes               = that.cacheInitialized_CFGNodes;
+  cache_CFGNodes                          = that.cache_CFGNodes;
+  cacheInitialized_matchingCallParts      = that.cacheInitialized_matchingCallParts;
+  cache_matchingCallParts                 = that.cache_matchingCallParts;
+  cacheInitialized_matchingEntryExitParts = that.cacheInitialized_matchingEntryExitParts;
+  cache_matchingEntryExitParts            = that.cache_matchingEntryExitParts;
+  cacheInitialized_inEdgeFromAny          = that.cacheInitialized_inEdgeFromAny;
+  cache_inEdgeFromAny                     = that.cache_inEdgeFromAny;
+  cacheInitialized_outEdgeToAny           = that.cacheInitialized_outEdgeToAny;
+  cache_outEdgeToAny                      = that.cache_outEdgeToAny;
+  cache_equal                             = that.cache_equal;
+  cache_less                              = that.cache_less;
 }
 
 // Returns a shared pointer to this of type DeadPathElimPartPtr
@@ -64,26 +67,29 @@ list<PartEdgePtr> DeadPathElimPart::outEdges()
 
   if(!cacheInitialized_outEdges) {
   //  scope reg(txt()<<"DeadPathElimPart::outEdges()", scope::medium, attrGE("DPEAnalDebugLevel", 2));
-    list<PartEdgePtr> baseEdges = getSupersetPart()->outEdges();
+    // The NodeState at the current part
+    SIGHT_VERB(dbg << "getNodeStateLocPart()="<<getNodeStateLocPart()->str()<<endl, 2, DPEAnalDebugLevel)
+    NodeState* outState = NodeState::getNodeState(analysis, getNodeStateLocPart());
+    SIGHT_VERB(dbg << "outState="<<outState->str(analysis)<<endl, 2, DPEAnalDebugLevel)
 
+    list<PartEdgePtr> baseEdges = getInputPart()->outEdges();
     SIGHT_VERB(dbg << "#baseEdges="<<baseEdges.size()<<endl, 2, DPEAnalDebugLevel)
 
-    // The NodeState at the current part
-    SIGHT_VERB(dbg << "getATSLocationPart()="<<getATSLocationPart()->str()<<endl, 2, DPEAnalDebugLevel)
-    NodeState* outState = NodeState::getNodeState(analysis, getATSLocationPart());
-    SIGHT_VERB(dbg << "outState="<<outState->str(analysis)<<endl, 2, DPEAnalDebugLevel)
     // Consider all the DeadPathElimParts along all of this part's outgoing edges. Since this is a forward
     // analysis, they are maintained separately
-    for(list<PartEdgePtr>::iterator be=baseEdges.begin(); be!=baseEdges.end(); be++) {
-      SIGHT_VERB_DECL(scope, (txt()<<"be="<<be->str(), scope::low), 2, DPEAnalDebugLevel)
-      //dbg << "outState->getLatticeBelow(analysis, *be, 0) = "<<outState->getLatticeBelow(analysis, *be, 0)->str()<<endl;
-  
-      DeadPathElimPartEdge* outPartEdge = dynamic_cast<DeadPathElimPartEdge*>(outState->getLatticeBelow(analysis, *be, 0));
+    const map<PartEdgePtr, vector<Lattice*> >& lattices = outState->getLatticeBelowAll(analysis);
+    for(map<PartEdgePtr, vector<Lattice*> >::const_iterator i=lattices.begin(); i!=lattices.end(); ++i) {
+      SIGHT_VERB_DECL(scope, (txt()<<"be="<<i->first->str(), scope::low), 2, DPEAnalDebugLevel)
+      assert(i->second.size()==1);
+      SIGHT_VERB(dbg << "outState->getLatticeBelow(analysis, *be, 0) = "<<i->second[0]->str()<<endl, 2, DPEAnalDebugLevel)
+
+      DeadPathElimPartEdge* outPartEdge = dynamic_cast<DeadPathElimPartEdge*>(i->second[0]);
       assert(outPartEdge);
       SIGHT_VERB(dbg << "outPartEdge("<<(outPartEdge->level==live)<<")="<<outPartEdge->str()<<endl, 2, DPEAnalDebugLevel)
 
-      if(outPartEdge->level==live)
-        // Create a new DeadPathElimPartEdgePtr from an existing outPartEdge. To ensure that the 
+      // If this outgoing edge is not a wildcard and is live
+      if(outPartEdge->target() && outPartEdge->level==live)
+        // Create a new DeadPathElimPartEdgePtr from an existing outPartEdge. To ensure that the
         // original is not deallocated when the shared pointer goes out of scope, we keep the shared
         // pointer in a cache data structure that persists.
         //cache_outEdges.push_back(initPtr(dynamic_cast<DeadPathElimPartEdge*>(outPartEdge)));
@@ -114,29 +120,32 @@ list<PartEdgePtr> DeadPathElimPart::outEdges()
 list<PartEdgePtr> DeadPathElimPart::inEdges()
 {
   if(!cacheInitialized_inEdges) {
-    list<PartEdgePtr> baseEdges      = getATSLocationPart()->inEdges();
-    list<PartEdgePtr> baseSuperEdges = getSupersetPart()->inEdges();
-    assert(baseEdges.size() == baseSuperEdges.size());
+    AnalysisParts parts = getAnalysis()->NodeState2All(getNodeStateLocPart());
+    AnalysisPartEdgeLists inEdges = parts.inEdgesAll(*getAnalysis());
+    /*list<PartEdgePtr> baseEdges      = getNodeStateLocPart()->inEdges();
+    list<PartEdgePtr> baseSuperEdges = getInput()->inEdges();
+    assert(baseEdges.size() == baseSuperEdges.size());*/
 
   //  scope reg(txt()<<"DeadPathElimPart::inEdges() #baseEdges="<<baseEdges.size(), scope::medium, attrGE("DPEAnalDebugLevel", 2));
 
     // Since this is a forward analysis, information from preceding parts is aggregated under the NULL edge
     // of this part. As such, to get the parts that lead to this part we need to iterate over the incoming edges
     // and then look at the parts they arrive from.
-    list<PartEdgePtr>::iterator be=baseEdges.begin(), beSuper=baseSuperEdges.begin();
-    for(; beSuper!=baseSuperEdges.end(); ++be, ++beSuper) {
-      SIGHT_VERB(dbg << "be="<<be->str()<<endl, 2, DPEAnalDebugLevel)
-      NodeState* inState = NodeState::getNodeState(analysis, (*be)->source());
+    /*list<PartEdgePtr>::iterator be=baseEdges.begin(), beSuper=baseSuperEdges.begin();
+    for(; beSuper!=baseSuperEdges.end(); ++be, ++beSuper) {*/
+    for(AnalysisPartEdgeLists::iterator edge=inEdges.begin(); edge!=inEdges.end(); ++edge) {
+      SIGHT_VERB(dbg << "edge->NodeState()="<<edge->NodeState()->str()<<endl, 2, DPEAnalDebugLevel)
+      NodeState* inState = NodeState::getNodeState(analysis, edge->NodeState()->source());
       SIGHT_VERB_IF(2, DPEAnalDebugLevel)
       scope inscope("inState", scope::low);
       dbg << inState->str()<<endl;
       SIGHT_VERB_FI()
-      DeadPathElimPartEdge* inPartEdge = dynamic_cast<DeadPathElimPartEdge*>(inState->getLatticeBelow(analysis, *beSuper, 0));
+      DeadPathElimPartEdge* inPartEdge = dynamic_cast<DeadPathElimPartEdge*>(inState->getLatticeBelow(analysis, edge->index(), 0));
       assert(inPartEdge);
       SIGHT_VERB(dbg << "inPartEdge="<<inPartEdge->str()<<endl, 2, DPEAnalDebugLevel)
 
       if(inPartEdge->level==live)
-        // Create a new DeadPathElimPartEdgePtr from an existing inPartEdge. To ensure that the 
+        // Create a new DeadPathElimPartEdgePtr from an existing inPartedge. To ensure that the
         // original is not deallocated when the shared pointer goes out of scope, we keep the shared
         // pointer in a cache data structure that persists.
         //cache_inEdges.push_back(initPtr(dynamic_cast<DeadPathElimPartEdge*>(inPartEdge->copy())));
@@ -150,7 +159,7 @@ list<PartEdgePtr> DeadPathElimPart::inEdges()
 set<CFGNode> DeadPathElimPart::CFGNodes() const
 {
   if(!cacheInitialized_CFGNodes) {
-    const_cast<DeadPathElimPart*>(this)->cache_CFGNodes = getSupersetPart()->CFGNodes();
+    const_cast<DeadPathElimPart*>(this)->cache_CFGNodes = getInputPart()->CFGNodes();
     const_cast<DeadPathElimPart*>(this)->cacheInitialized_CFGNodes = true;
   }
   return cache_CFGNodes;
@@ -162,14 +171,29 @@ set<CFGNode> DeadPathElimPart::CFGNodes() const
 set<PartPtr> DeadPathElimPart::matchingCallParts() const {
   if(!cacheInitialized_matchingCallParts) {
     // Wrap the parts returned by the call to the parent Part with DeadPathElimPart
-    set<PartPtr> parentMatchParts = getSupersetPart()->matchingCallParts();
+    set<PartPtr> parentMatchParts = getInputPart()->matchingCallParts();
     for(set<PartPtr>::iterator mp=parentMatchParts.begin(); mp!=parentMatchParts.end(); mp++) {
       const_cast<DeadPathElimPart*>(this)->cache_matchingCallParts.insert(DeadPathElimPart::create(*mp, analysis));
     }
-    //const_cast<DeadPathElimPart*>(this)->cacheInitialized_matchingCallParts=true;
+    const_cast<DeadPathElimPart*>(this)->cacheInitialized_matchingCallParts=true;
   }
   return cache_matchingCallParts;
 }
+
+// If this Part corresponds to a function entry/exit, returns the set of Parts that contain
+// its corresponding exit/entry, respectively.
+set<PartPtr> DeadPathElimPart::matchingEntryExitParts() const {
+  if(!cacheInitialized_matchingEntryExitParts) {
+    // Wrap the parts returned by the call to the parent Part with DeadPathElimPart
+    set<PartPtr> parentMatchParts = getInputPart()->matchingEntryExitParts();
+    for(set<PartPtr>::iterator mp=parentMatchParts.begin(); mp!=parentMatchParts.end(); mp++) {
+      const_cast<DeadPathElimPart*>(this)->cache_matchingEntryExitParts.insert(DeadPathElimPart::create(*mp, analysis));
+    }
+    const_cast<DeadPathElimPart*>(this)->cacheInitialized_matchingEntryExitParts=true;
+  }
+  return cache_matchingEntryExitParts;
+}
+
 
 /*
 // Let A={ set of execution prefixes that terminate at the given anchor SgNode }
@@ -177,7 +201,7 @@ set<PartPtr> DeadPathElimPart::matchingCallParts() const {
 // Since to reach a given SgNode an execution must first execute all of its operands it must
 //    be true that there is a 1-1 mapping m() : O->A such that o in O is a prefix of m(o).
 // This function is the inverse of m: given the anchor node and operand as well as the
-//    Part that denotes a subset of A (the function is called on this part), 
+//    Part that denotes a subset of A (the function is called on this part),
 //    it returns a list of Parts that partition O.
 list<PartPtr> DeadPathElimPart::getOperandPart(SgNode* anchor, SgNode* operand)
 {
@@ -198,23 +222,23 @@ list<PartPtr> DeadPathElimPart::getOperandPart(SgNode* anchor, SgNode* operand)
 }
 */
 // Returns a PartEdgePtr, where the source is a wild-card part (NULLPart) and the target is this Part
-PartEdgePtr DeadPathElimPart::inEdgeFromAny() { 
+PartEdgePtr DeadPathElimPart::inEdgeFromAny() {
   if(!cacheInitialized_inEdgeFromAny) {
-    cout << "DeadPathElimPart::inEdgeFromAny():"<<endl;
-    cout << "    getATSLocationPart()="<<getATSLocationPart()->str()<<endl;
-    cout << "    getSupersetPart()="<<getSupersetPart()->str()<<endl;
-    cache_inEdgeFromAny = DeadPathElimPartEdge::create(getATSLocationPart()->inEdgeFromAny(),
-                                                       getSupersetPart()->inEdgeFromAny(), analysis);
+    /*scope("DeadPathElimPart::inEdgeFromAny()");
+    dbg << "    getNodeStateLocPart()="<<getNodeStateLocPart()->str()<<endl;
+    dbg << "    getSupersetPart()="<<getSupersetPart()->str()<<endl;*/
+    cache_inEdgeFromAny = DeadPathElimPartEdge::create(getNodeStateLocPart()->inEdgeFromAny(),
+                                                       getInputPart()->inEdgeFromAny(), analysis);
     cacheInitialized_inEdgeFromAny=true;
   }
   return cache_inEdgeFromAny;
 }
 
 // Returns a PartEdgePtr, where the target is a wild-card part (NULLPart) and the source is this Part
-PartEdgePtr DeadPathElimPart::outEdgeToAny() { 
+PartEdgePtr DeadPathElimPart::outEdgeToAny() {
   if(!cacheInitialized_outEdgeToAny) {
-    cache_outEdgeToAny = DeadPathElimPartEdge::create(getATSLocationPart()->outEdgeToAny(),
-                                                      getSupersetPart()->outEdgeToAny(), analysis);
+    cache_outEdgeToAny = DeadPathElimPartEdge::create(getNodeStateLocPart()->outEdgeToAny(),
+                                                      getInputPart()->outEdgeToAny(), analysis);
     cacheInitialized_outEdgeToAny=true;
   }
   return cache_outEdgeToAny;
@@ -225,11 +249,10 @@ bool DeadPathElimPart::equal(const PartPtr& o) const
   const DeadPathElimPartPtr that = dynamicConstPtrCast<DeadPathElimPart>(o);
   assert(that.get());
   assert(analysis == that->analysis);
-  
+
   if(cache_equal.find(that.get()) == cache_equal.end())
-    const_cast<DeadPathElimPart*>(this)->cache_equal[that.get()] = (getSupersetPart() == that->getSupersetPart());
+    const_cast<DeadPathElimPart*>(this)->cache_equal[that.get()] = (getInputPart() == that->getInputPart());
   return const_cast<DeadPathElimPart*>(this)->cache_equal[that.get()];
-  //return getSupersetPart() == that->getSupersetPart();
 }
 
 bool DeadPathElimPart::less(const PartPtr& o) const
@@ -237,18 +260,17 @@ bool DeadPathElimPart::less(const PartPtr& o) const
   const DeadPathElimPartPtr that = dynamicConstPtrCast<DeadPathElimPart>(o);
   assert(that.get());
   assert(analysis == that->analysis);
-  
+
   if(cache_less.find(that.get()) == cache_less.end())
-    const_cast<DeadPathElimPart*>(this)->cache_less[that.get()] = (getSupersetPart() < that->getSupersetPart());
+    const_cast<DeadPathElimPart*>(this)->cache_less[that.get()] = (getInputPart() < that->getInputPart());
   return const_cast<DeadPathElimPart*>(this)->cache_less[that.get()];
-  //return getSupersetPart() < that->getSupersetPart();
 }
 
 // Pretty print for the object
 std::string DeadPathElimPart::str(std::string indent) const
 {
   ostringstream oss;
-  oss << "[DPEPart: "<<getSupersetPart()->str()<<"]";
+  oss << "[DPEPart: "<<getInputPart()->str()<<"]";
   return oss.str();
 }
 
@@ -256,22 +278,22 @@ std::string DeadPathElimPart::str(std::string indent) const
  ***** DeadPathElimPartEdge *****
  ************************************/
 /* GB 2012-10-15 - Commented out because this constructor makes it difficult to set the lattice of the created edge
-DeadPathElimPartEdge::DeadPathElimPartEdge(DeadPathElimPartPtr src, DeadPathElimPartPtr tgt, 
-                                           PartEdgePtr baseEdge, DeadPatComposedAnalysishElimAnalysis* analysis) : 
+DeadPathElimPartEdge::DeadPathElimPartEdge(DeadPathElimPartPtr src, DeadPathElimPartPtr tgt,
+                                           PartEdgePtr baseEdge, DeadPatComposedAnalysishElimAnalysis* analysis) :
     Lattice(baseEdge), FiniteLattice(baseEdge), baseEdge(baseEdge), src(src), tgt(tgt), level(bottom), analysis(analysis)
 {}*/
 
 // Constructor to be used when constructing the edges (e.g. from genInitLattice()).
-DeadPathElimPartEdge::DeadPathElimPartEdge(PartEdgePtr atsLocationPartEdge, PartEdgePtr supersetPartEdge, ComposedAnalysis* analysis, DPELevel level) :
-        Lattice(atsLocationPartEdge), FiniteLattice(atsLocationPartEdge), PartEdge(analysis, atsLocationPartEdge, supersetPartEdge)
+DeadPathElimPartEdge::DeadPathElimPartEdge(PartEdgePtr NodeStateLocPartEdge, PartEdgePtr inputPartEdge, ComposedAnalysis* analysis, DPELevel level) :
+        Lattice(NodeStateLocPartEdge), FiniteLattice(NodeStateLocPartEdge), PartEdge(analysis, NodeStateLocPartEdge, inputPartEdge)
 {
-  src = supersetPartEdge->source() ? DeadPathElimPart::create(supersetPartEdge->source(), analysis) : dynamicPtrCast<DeadPathElimPart>(NULLPart);
-  tgt = supersetPartEdge->target() ? DeadPathElimPart::create(supersetPartEdge->target(), analysis) : dynamicPtrCast<DeadPathElimPart>(NULLPart);
+  src = inputPartEdge->source() ? DeadPathElimPart::create(inputPartEdge->source(), analysis) : dynamicPtrCast<DeadPathElimPart>(NULLPart);
+  tgt = inputPartEdge->target() ? DeadPathElimPart::create(inputPartEdge->target(), analysis) : dynamicPtrCast<DeadPathElimPart>(NULLPart);
   /*dbg << "DeadPathElimPartEdge::DeadPathElimPartEdge()"<<endl;
-  dbg << "supersetPartEdge="<<supersetPartEdge->str()<<endl;
+  dbg << "inputPartEdge="<<inputPartEdge->str()<<endl;
   dbg << "src="<<(src? src->str() : "NULL")<<endl;
   dbg << "tgt="<<(tgt? tgt->str() : "NULL")<<endl;*/
-  
+
   cacheInitialized_getPredicateValue=false;
 
   this->level = level;
@@ -279,52 +301,49 @@ DeadPathElimPartEdge::DeadPathElimPartEdge(PartEdgePtr atsLocationPartEdge, Part
 
 // Constructor to be used when traversing the part graph created by the DeadPathElimAnalysis, after
 // all the DeadPathElimPartEdges have been constructed and stored in NodeStates.
-DeadPathElimPartEdge::DeadPathElimPartEdge(PartEdgePtr atsLocationPartEdge, PartEdgePtr supersetPartEdge, ComposedAnalysis* analysis) :
-        Lattice(atsLocationPartEdge), FiniteLattice(atsLocationPartEdge), PartEdge(analysis, atsLocationPartEdge, supersetPartEdge)
+DeadPathElimPartEdge::DeadPathElimPartEdge(PartEdgePtr NodeStateLocPartEdge, PartEdgePtr inputPartEdge, ComposedAnalysis* analysis) :
+        Lattice(NodeStateLocPartEdge), FiniteLattice(NodeStateLocPartEdge), PartEdge(analysis, NodeStateLocPartEdge, inputPartEdge)
 {
-  /*src = base.source() ? DeadPathElimPart::create(base.source(), analysis, bottom) : NULLPart;
-  tgt = base.target() ? DeadPathElimPart::create(base.target(), analysis, bottom) : NULLPart;
-  level = bottom;*/
-
   // Look up this edge in the results of the DeadPathElimAnalysis results and copy data from that edge into this object
   //DeadPathElimPartEdge* dpeEdge;
-  if(supersetPartEdge->source()) src=DeadPathElimPart::create(supersetPartEdge->source(), analysis);
-  if(supersetPartEdge->target()) tgt=DeadPathElimPart::create(supersetPartEdge->target(), analysis);
+  if(getInputPartEdge()->source()) src=DeadPathElimPart::create(getInputPartEdge()->source(), analysis);
+  if(getInputPartEdge()->target()) tgt=DeadPathElimPart::create(getInputPartEdge()->target(), analysis);
 
   // If the source is not a wildcard, look for the record in the source part, which maintains separate information
   // for all the outgoing edges
-  //dbg << "supersetPartEdge="<<supersetPartEdge->str()<<endl;
+  //dbg << "getInputPartEdge()="<<getInputPartEdge()->str()<<endl;
   //dbg << "this="<<str()<<endl;
   // If the edge has a concrete source and target
-  if(supersetPartEdge->source() && supersetPartEdge->target()) {
-    /*DeadPathElimPartPtr sourceDPEPart = DeadPathElimPart::create(supersetPartEdge->source(), analysis, bottom);
-    dbg << "seEdge->source()="<<supersetPartEdge->source()->str()<<endl;
-    dbg << "seEdge->target()="<<supersetPartEdge->target()->str()<<endl;
+  if(getInputPartEdge()->source() && getInputPartEdge()->target()) {
+    /*DeadPathElimPartPtr sourceDPEPart = DeadPathElimPart::create(getInputPartEdge()->source(), analysis, bottom);
+    dbg << "seEdge->source()="<<getInputPartEdge()->source()->str()<<endl;
+    dbg << "seEdge->target()="<<getInputPartEdge()->target()->str()<<endl;
     dbg << "sourceDPEPart="<<sourceDPEPart->str()<<endl;*/
-    NodeState* state = NodeState::getNodeState(analysis, latPEdge->source());
-    /*list<PartEdgePtr> edges = supersetPartEdge->source()->outEdges();
+    NodeState* state = NodeState::getNodeState(analysis, getNodeStateLocPartEdge()->source());
+    /*list<PartEdgePtr> edges = getInputPartEdge()->source()->outEdges();
     dbg << "source->outEdges="<<endl;
     for(list<PartEdgePtr>::iterator e=edges.begin(); e!=edges.end(); e++)
     { dbg << (*e)->str()<<endl; }*/
-    
+
     SIGHT_VERB_IF(2, DPEAnalDebugLevel)
       dbg << "source state="<<endl<<"        "<<state->str(analysis, "        ")<<endl;
-      dbg << "supersetPartEdge="<<supersetPartEdge->str("        ")<<endl;
+      dbg << "getInputPartEdge()="<<getInputPartEdge()->str("        ")<<endl;
     SIGHT_VERB_FI()
-    // Get the DeadPathElimPartEdge that is stored along latPEdge at the NodeState of its source part
-    DeadPathElimPartEdge* dpeEdge = dynamic_cast<DeadPathElimPartEdge*>(state->getLatticeBelow(analysis, latPEdge, 0));
-    SIGHT_VERB(dbg << "dpeEdge lattice = "<<state->getLatticeBelow(analysis, latPEdge, 0)->str("        ")<<endl, 2, DPEAnalDebugLevel)
+    // Get the DeadPathElimPartEdge that is stored along getNodeStateLocPartEdge() at the NodeState of its source part
+    AnalysisPartEdges pedges = getAnalysis()->NodeState2All(getNodeStateLocPartEdge());
+    DeadPathElimPartEdge* dpeEdge = dynamic_cast<DeadPathElimPartEdge*>(state->getLatticeBelow(analysis, pedges.index(), 0));
+    SIGHT_VERB(dbg << "dpeEdge lattice = "<<state->getLatticeBelow(analysis, pedges.index(), 0)->str("        ")<<endl, 2, DPEAnalDebugLevel)
     level = dpeEdge->level;
   // If the target is a wildcard look at the source part and aggregate the DPEEdges along all the outgoing paths.
   // The resulting edge is live if any of the outgoing edges are live.
-  } else if(supersetPartEdge->source()) {
-    NodeState* state = NodeState::getNodeState(analysis, latPEdge->source());
-  
+  } else if(getInputPartEdge()->source()) {
+    NodeState* state = NodeState::getNodeState(analysis, getNodeStateLocPartEdge()->source());
+
     SIGHT_VERB_IF(2, DPEAnalDebugLevel)
       dbg << "source state="<<endl<<"        "<<state->str(analysis, "        ")<<endl;
-      dbg << "supersetPartEdge="<<supersetPartEdge->str("        ")<<endl;
+      dbg << "getInputPartEdge()="<<getInputPartEdge()->str("        ")<<endl;
     SIGHT_VERB_FI()
-    
+
     // Merge the lattices along all the outgoing edges
     map<PartEdgePtr, std::vector<Lattice*> >& e2lats = state->getLatticeBelowAllMod(analysis);
     assert(e2lats.size()>=1);
@@ -333,34 +352,35 @@ DeadPathElimPartEdge::DeadPathElimPartEdge(PartEdgePtr atsLocationPartEdge, Part
     for(map<PartEdgePtr, std::vector<Lattice*> >::iterator lats=e2lats.begin(); lats!=e2lats.end(); lats++) {
       PartEdge* edgePtr = lats->first.get();
       SIGHT_VERB(dbg << "edgePtr="<<edgePtr->str("        ")<<endl, 2, DPEAnalDebugLevel)
-      assert(edgePtr->source() == supersetPartEdge.get()->source());
-      
+      assert(edgePtr->source() == getInputPartEdge().get()->source());
+
       DeadPathElimPartEdge* dpeEdge = dynamic_cast<DeadPathElimPartEdge*>(state->getLatticeBelow(analysis, lats->first, 0));
       assert(dpeEdge);
 
       if(dpeEdge->level == live) level = live;
     }
   // If the source is a wildcard, look for the record in the target part where all the edges are aggregated
-  } else if(supersetPartEdge->target()) {
-    assert(supersetPartEdge->target());
-    DeadPathElimPartPtr targetDPEPart = DeadPathElimPart::create(supersetPartEdge->target(), analysis);
+  } else if(getInputPartEdge()->target()) {
+    assert(getInputPartEdge()->target());
+    DeadPathElimPartPtr targetDPEPart = DeadPathElimPart::create(getInputPartEdge()->target(), analysis);
     //#SA: record is aggregated on the wildcard edge
-    NodeState* state = NodeState::getNodeState(analysis, latPEdge->target());
-    DeadPathElimPartEdge* dpeEdge = dynamic_cast<DeadPathElimPartEdge*>(state->getLatticeAbove(analysis, supersetPartEdge, 0));
+    NodeState* state = NodeState::getNodeState(analysis, getNodeStateLocPartEdge()->target());
+    AnalysisPartEdges pedges = getAnalysis()->NodeState2All(getNodeStateLocPartEdge());
+    DeadPathElimPartEdge* dpeEdge = dynamic_cast<DeadPathElimPartEdge*>(state->getLatticeAbove(analysis, pedges.index(), 0));
     // If the analysis recorded info at this edge, use its level
     if(dpeEdge) level = dpeEdge->level;
     // Otherwise, if the DPE analysis was never run here, it must be dead
     else        level = dead;
   }
   //assert(dpeEdge);
-  
+
   cacheInitialized_getPredicateValue=false;
 }
 
 DeadPathElimPartEdge::DeadPathElimPartEdge(const DeadPathElimPartEdge& that) :
-  Lattice(that.latPEdge), 
-  FiniteLattice(that.latPEdge), 
-  PartEdge((const PartEdge&)that), 
+  Lattice(that.latPEdge),
+  FiniteLattice(that.latPEdge),
+  PartEdge((const PartEdge&)that),
   src(that.src), tgt(that.tgt), level(that.level)
 {
   cache_getOperandPartEdge           = that.cache_getOperandPartEdge;
@@ -379,32 +399,27 @@ PartPtr DeadPathElimPartEdge::source() const
 PartPtr DeadPathElimPartEdge::target() const
 { return tgt; }
 
-// Overload the setPartEdge (from Lattice) and setSupersetPartEdge (from PartEdge) methods to ensure that they
+// Overload the setPartEdge (from Lattice), setSupersetPartEdge and setNodeStateLocPartEdge (from PartEdge) methods to ensure that they
 // are always set in a consistent manner regardless of which one is called
-// Sets the PartEdge that this Lattice's information corresponds to. 
+// Sets the PartEdge that this Lattice's information corresponds to.
 // Returns true if this causes the edge to change and false otherwise
 bool DeadPathElimPartEdge::setPartEdge(PartEdgePtr latPEdge)
 {
   bool modified = Lattice::setPartEdge(latPEdge);
-  PartEdge::setATSLocationPartEdge(latPEdge);
-  //PartEdge::setSupersetPartEdge(latPEdge);
-  
-  // Look up this edge in the results of the DeadPathElimAnalysis and copy data from that edge into this object
-/*  if(latPEdge->source()) src=DeadPathElimPart::create(latPEdge->source(), analysis);
-  if(latPEdge->target()) tgt=DeadPathElimPart::create(latPEdge->target(), analysis);*/
-  
+  PartEdge::setNodeStateLocPartEdge(latPEdge);
   return modified;
 }
 
 // Sets this Part's parent
-void DeadPathElimPartEdge::setSupersetPartEdge(PartEdgePtr parent)
+void DeadPathElimPartEdge::setInputPartEdge(PartEdgePtr parent)
 {
-  //Lattice::setPartEdge(parent);
-  /*scope s("DeadPathElimPartEdge::setSupersetPartEdge");
-  dbg << "parent="<<parent->str()<<endl;*/
-  PartEdge::setSupersetPartEdge(parent);
-  /*dbg << "getSupersetPartEdge()="<<getSupersetPartEdge()->str()<<endl;
-  dbg << "this="<<str()<<endl;*/
+  PartEdge::setInputPartEdge(parent);
+}
+
+// Sets this PartEdge's NodeStateLocPartEdge
+void DeadPathElimPartEdge::setNodeStateLocPartEdge(PartEdgePtr parent)
+{
+  PartEdge::setNodeStateLocPartEdge(parent);
 }
 
 // Let A={ set of execution prefixes that terminate at the given anchor SgNode }
@@ -412,25 +427,25 @@ void DeadPathElimPartEdge::setSupersetPartEdge(PartEdgePtr parent)
 // Since to reach a given SgNode an execution must first execute all of its operands it must
 //    be true that there is a 1-1 mapping m() : O->A such that o in O is a prefix of m(o).
 // This function is the inverse of m: given the anchor node and operand as well as the
-//    PartEdge that denotes a subset of A (the function is called on this PartEdge), 
+//    PartEdge that denotes a subset of A (the function is called on this PartEdge),
 //    it returns a list of PartEdges that partition O.
 std::list<PartEdgePtr> DeadPathElimPartEdge::getOperandPartEdge(SgNode* anchor, SgNode* operand)
 {
   if(cache_getOperandPartEdge.find(anchor) == cache_getOperandPartEdge.end() ||
      cache_getOperandPartEdge[anchor].find(operand) == cache_getOperandPartEdge[anchor].end()) {
-    
+
     // operand precedes anchor in the CFG, either immediately or at some distance. As such, the edge
     //   we're looking for is not necessarily the edge from operand to anchor but rather the first
     //   edge along the path from operand to anchor. Since operand is part of anchor's expression
     //   tree we're guaranteed that there is only one such path.
-    // The implementor of the partition we're running on may have created multiple parts for 
+    // The implementor of the partition we're running on may have created multiple parts for
     //   operand to provide path sensitivity and indeed, may have created additional outgoing edges
     //   from each of the operand's parts. Fortunately, since in the original program the original
-    //   edge led from operand to anchor and the implementor of the partition could have only hierarchically 
+    //   edge led from operand to anchor and the implementor of the partition could have only hierarchically
     //   refined the original partition, all the new edges must also lead from operand to anchor.
     //   As such, the returned list contains all the outgoing edges from all the parts that correspond
     //   to operand.
-    // Note: if the partitioning process is not hierarchical we may run into minor trouble since the 
+    // Note: if the partitioning process is not hierarchical we may run into minor trouble since the
     //   new edges from operand may lead to parts other than anchor. However, this is just an issue
     //   of precision since we'll account for paths that are actually infeasible.
 
@@ -442,40 +457,40 @@ std::list<PartEdgePtr> DeadPathElimPartEdge::getOperandPartEdge(SgNode* anchor, 
     SIGHT_VERB(dbg << "this="<<str()<<endl, 1, DPEAnalDebugLevel)
 
     if(level==live) {
-      SIGHT_VERB(dbg << "getATSLocationPartEdge="<<getATSLocationPartEdge()->str()<<endl, 1, DPEAnalDebugLevel)
-      std::list<PartEdgePtr> atsLocEdges = getATSLocationPartEdge()->getOperandPartEdge(anchor, operand);
-      SIGHT_VERB(dbg << "getSupersetPartEdge="<<getSupersetPartEdge()->str()<<endl, 1, DPEAnalDebugLevel)
-      std::list<PartEdgePtr> supersetEdges = getSupersetPartEdge()->getOperandPartEdge(anchor, operand);
-      if(atsLocEdges.size() != supersetEdges.size()) {
-        dbg << "ERROR: #atsLocEdge("<<atsLocEdges.size()<<") != #supersetEdges("<<supersetEdges.size()<<")"<<endl;
+      SIGHT_VERB(dbg << "getNodeStateLocPartEdge="<<getNodeStateLocPartEdge()->str()<<endl, 1, DPEAnalDebugLevel)
+      std::list<PartEdgePtr> atsLocEdges = getNodeStateLocPartEdge()->getOperandPartEdge(anchor, operand);
+      SIGHT_VERB(dbg << "getInputPartEdge="<<getInputPartEdge()->str()<<endl, 1, DPEAnalDebugLevel)
+      std::list<PartEdgePtr> inputEdges = getInputPartEdge()->getOperandPartEdge(anchor, operand);
+      if(atsLocEdges.size() != inputEdges.size()) {
+        dbg << "ERROR: #atsLocEdge("<<atsLocEdges.size()<<") != #inputEdges("<<inputEdges.size()<<")"<<endl;
         { scope s("atsLocEdges");
         for(list<PartEdgePtr>::iterator e=atsLocEdges.begin(); e!=atsLocEdges.end(); ++e)
           dbg << (*e)->str()<<endl; }
-        { scope s("supersetEdges");
-          for(list<PartEdgePtr>::iterator e=supersetEdges.begin(); e!=supersetEdges.end(); ++e)
+        { scope s("inputEdges");
+          for(list<PartEdgePtr>::iterator e=inputEdges.begin(); e!=inputEdges.end(); ++e)
             dbg << (*e)->str()<<endl; }
 
-        cerr << "ERROR: #atsLocEdge("<<atsLocEdges.size()<<") != #supersetEdges("<<supersetEdges.size()<<")"<<endl;
+        cerr << "ERROR: #atsLocEdge("<<atsLocEdges.size()<<") != #inputEdges("<<inputEdges.size()<<")"<<endl;
         { cerr << "atsLocEdges"<<endl;
         for(list<PartEdgePtr>::iterator e=atsLocEdges.begin(); e!=atsLocEdges.end(); ++e)
           cerr << "    "<< (*e)->str()<<endl; }
-        { cerr << "supersetEdges"<<endl;
-          for(list<PartEdgePtr>::iterator e=supersetEdges.begin(); e!=supersetEdges.end(); ++e)
+        { cerr << "inputEdges"<<endl;
+          for(list<PartEdgePtr>::iterator e=inputEdges.begin(); e!=inputEdges.end(); ++e)
             cerr << "    "<< (*e)->str()<<endl; }
       }
-      assert(atsLocEdges.size() == supersetEdges.size());
+      assert(atsLocEdges.size() == inputEdges.size());
       std::list<PartEdgePtr>::iterator atsLocE=atsLocEdges.begin(),
-                                       superE=supersetEdges.begin();
-      for(; atsLocE!=atsLocEdges.end(); ++atsLocE, ++superE) {
+                                       inputE=inputEdges.begin();
+      for(; atsLocE!=atsLocEdges.end(); ++atsLocE, ++inputE) {
         SIGHT_VERB(dbg << "atsLocE="<<(*atsLocE)->str()<<endl, 1, DPEAnalDebugLevel)
-        PartEdgePtr dpeEdge = DeadPathElimPartEdge::create(*atsLocE, *superE, analysis);
+        PartEdgePtr dpeEdge = DeadPathElimPartEdge::create(*atsLocE, *inputE, analysis);
         SIGHT_VERB_IF(1, DPEAnalDebugLevel)
         scope reg("dpeEdge", scope::low);
         dbg<<dpeEdge->str()<<endl;
         SIGHT_VERB_FI()
         cache_getOperandPartEdge[anchor][operand].push_back(dpeEdge);
       }
-  /*            
+  /*
       for(list<PartPtr>::iterator opP=opParts.begin(); opP!=opParts.end(); opP++) {
         list<PartEdgePtr> edges = (*opP)->outEdges();
         for(list<PartEdgePtr>::iterator e=edges.begin(); e!=edges.end(); e++) {
@@ -484,7 +499,7 @@ std::list<PartEdgePtr> DeadPathElimPartEdge::getOperandPartEdge(SgNode* anchor, 
           dbg << "e->target() = "<<(*e)->target()->str()<<endl;* /
           assert(src || tgt);
           DeadPathElimAnalysis* analysis = (src? src->analysis : tgt->analysis);
-          PartEdgePtr edge = DeadPathElimPartEdge::create(DeadPathElimPart::create((*opP)->inEdgeFromAny(), analysis), 
+          PartEdgePtr edge = DeadPathElimPartEdge::create(DeadPathElimPart::create((*opP)->inEdgeFromAny(), analysis),
                                                             DeadPathElimPart::create((*e)->target()->inEdgeFromAny(), analysis));
           //dbg << "edge = "<<edge->str()<<endl;
           l.push_back(edge);
@@ -502,14 +517,14 @@ std::list<PartEdgePtr> DeadPathElimPartEdge::getOperandPartEdge(SgNode* anchor, 
 // If the source Part corresponds to a conditional of some sort (if, switch, while test, etc.)
 // it must evaluate some predicate and depending on its value continue, execution along one of the
 // outgoing edges. The value associated with each outgoing edge is fixed and known statically.
-// getPredicateValue() returns the value associated with this particular edge. Since a single 
+// getPredicateValue() returns the value associated with this particular edge. Since a single
 // Part may correspond to multiple CFGNodes getPredicateValue() returns a map from each CFG node
-// within its source part that corresponds to a conditional to the value of its predicate along 
-// this edge. 
+// within its source part that corresponds to a conditional to the value of its predicate along
+// this edge.
 std::map<CFGNode, boost::shared_ptr<SgValueExp> > DeadPathElimPartEdge::getPredicateValue()
 {
   if(!cacheInitialized_getPredicateValue) {
-    cache_getPredicateValue = getSupersetPartEdge()->getPredicateValue();
+    cache_getPredicateValue = getNodeStateLocPartEdge()->getPredicateValue();
     cacheInitialized_getPredicateValue = true;
   }
   return cache_getPredicateValue;
@@ -561,26 +576,27 @@ std::string DeadPathElimPartEdge::str(std::string indent) const
   ostringstream oss;
 
   //cout << "latPEdge="<<latPEdge->str()<<endl;
-  //cout << "getATSLocationPartEdge()="<<getATSLocationPartEdge()->str()<<endl;
+  //cout << "getNodeStateLocPartEdge()="<<getNodeStateLocPartEdge()->str()<<endl;
 
 
 /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
  * This check should be reinstated but removing it for now to work on other stuff
-   if(latPEdge != getATSLocationPartEdge()) {
+   if(latPEdge != getNodeStateLocPartEdge()) {
     dbg << "DeadPathElimPartEdge"<<endl;
     dbg << "this="<<"[DPEEdge("<<(level==dead? "D": (level==live? "L": (level==bottom? "B": "<font color=\"#FF0000\"><b>??? </b></font>")))<<"): "<<
                       (src ? src->str(indent+"&nbsp;&nbsp;&nbsp;&nbsp;"): "NULL")<<" ==&gt; " <<
                       (tgt ? tgt->str(indent+"&nbsp;&nbsp;&nbsp;&nbsp;"): "NULL")<<endl;
     dbg << "latPEdge="<<latPEdge->str()<<endl;
-    dbg << "getATSLocationPartEdge()="<<getATSLocationPartEdge()->str()<<endl;
+    dbg << "getNodeStateLocPartEdge()="<<getNodeStateLocPartEdge()->str()<<endl;
     dbg << "getSupersetPartEdge()="<<getSupersetPartEdge()->str()<<endl;
   }
-  assert(latPEdge == getATSLocationPartEdge());*/
+  assert(latPEdge == getNodeStateLocPartEdge());*/
   oss << "[DPEEdge<"<<this<<"> ("<<(level==dead? "D": (level==live? "L": (level==bottom? "B": "<font color=\"#FF0000\"><b>??? </b></font>")))<<"): "<<
                       (src ? src->str(indent+"&nbsp;&nbsp;&nbsp;&nbsp;"): "NULL")<<" ==&gt; " <<
                       (tgt ? tgt->str(indent+"&nbsp;&nbsp;&nbsp;&nbsp;"): "NULL")<<
                       ", "<<endl;
-  oss << indent << "    parent=<"<<getSupersetPartEdge()->str()<<"]";
+  oss << indent << "    parent=<"<<getInputPartEdge()->str()<<"]";
+  oss << indent << "    location=<"<<getNodeStateLocPartEdge()->str()<<"]";
   recursive = false;
 
   return oss.str();
@@ -600,11 +616,11 @@ Lattice* DeadPathElimPartEdge::copy() const
 void DeadPathElimPartEdge::copy(Lattice* that_arg)
 {
   Lattice::copy(that_arg);
-  
+
   DeadPathElimPartEdge* that = dynamic_cast<DeadPathElimPartEdge*>(that_arg);
   assert(that);
   assert(PartEdge::compatible(*that));
-  
+
   src   = that->src;
   tgt   = that->tgt;
   level = that->level;
@@ -618,7 +634,7 @@ bool DeadPathElimPartEdge::operator==(Lattice* that_arg) /*const*/
   DeadPathElimPartEdge* that = dynamic_cast<DeadPathElimPartEdge*>(that_arg);
   assert(that);
   assert(analysis == that->analysis);
-  
+
   /*if(latPEdge==that->latPEdge) {
     assert(src==that->src);
     assert(tgt==that->tgt);
@@ -628,13 +644,13 @@ bool DeadPathElimPartEdge::operator==(Lattice* that_arg) /*const*/
   return src==that->src && tgt==that->tgt;
 }
 
-// Called by analyses to transfer this lattice's contents from across function scopes from a caller function 
-//    to a callee's scope and vice versa. If this this lattice maintains any information on the basis of 
-//    individual MemLocObjects these mappings must be converted, with MemLocObjects that are keys of the ml2ml 
+// Called by analyses to transfer this lattice's contents from across function scopes from a caller function
+//    to a callee's scope and vice versa. If this this lattice maintains any information on the basis of
+//    individual MemLocObjects these mappings must be converted, with MemLocObjects that are keys of the ml2ml
 //    replaced with their corresponding values. If a given key of ml2ml does not appear in the lattice, it must
-//    be added to the lattice and assigned a default initial value. In many cases (e.g. over-approximate sets 
-//    of MemLocObjects) this may not require any actual insertions. If the value of a given ml2ml mapping is 
-//    NULL (empty boost::shared_ptr), any information for MemLocObjects that must-equal to the key should be 
+//    be added to the lattice and assigned a default initial value. In many cases (e.g. over-approximate sets
+//    of MemLocObjects) this may not require any actual insertions. If the value of a given ml2ml mapping is
+//    NULL (empty boost::shared_ptr), any information for MemLocObjects that must-equal to the key should be
 //    deleted.
 // Since the function is called for the scope change across some Part, it needs to account for the fact that
 //    the keys in ml2ml are in scope on one side of Part, while the values on the other side. Specifically, it is
@@ -644,8 +660,8 @@ bool DeadPathElimPartEdge::operator==(Lattice* that_arg) /*const*/
 Lattice* DeadPathElimPartEdge::remapML(const std::set<MLMapping>& ml2ml, PartEdgePtr newPEdge) {
   return copy();
 }
-  
-// Adds information about the MemLocObjects in newL to this Lattice, overwriting any information previously 
+
+// Adds information about the MemLocObjects in newL to this Lattice, overwriting any information previously
 //    maintained in this lattice about them.
 // Returns true if the Lattice state is modified and false otherwise.
 bool DeadPathElimPartEdge::replaceML(Lattice* newL)
@@ -662,14 +678,14 @@ bool DeadPathElimPartEdge::meetUpdate(Lattice* that_arg)
   DeadPathElimPartEdge* that = dynamic_cast<DeadPathElimPartEdge*>(that_arg);
   assert(that);
   // We don't check this becase when we meet information from a caller with information from a callee its a pain
-  // to convert the edges from caller scope to callee scope, although this may be a good idea in the future to 
+  // to convert the edges from caller scope to callee scope, although this may be a good idea in the future to
   // clean up the code.
   //assert(latPEdge==that->latPEdge);
   // We don't need to make sure that the sources are the same since they will be wildcards but will not necessarily be equal to each other
   //assert(src==that->src);
   //assert(tgt==that->tgt);
   assert(analysis==that->analysis);
-  
+
   // The result of the meet is the max of the lattice points of the two arguments
   bool modified = (level<that->level);
   SIGHT_VERB(dbg << "DeadPathElimPartEdge::meetUpdate() level="<<level<<" that->level="<<that->level<<" newLevel="<<(level<that->level? that->level: level)<<endl, 1, DPEAnalDebugLevel)
@@ -678,7 +694,7 @@ bool DeadPathElimPartEdge::meetUpdate(Lattice* that_arg)
   // Copy the new level to the source and target of the edge
   /*if(src) src->level = level;
   if(tgt) tgt->level = level;*/
-  
+
   // Union the predVals maps
   for(map<CFGNode, boost::shared_ptr<SgValueExp> >::iterator v=that->predVals.begin(); v!=that->predVals.end(); v++) {
     // If both edges have a mapping for the current CFGNode, they must be the same
@@ -692,7 +708,7 @@ bool DeadPathElimPartEdge::meetUpdate(Lattice* that_arg)
   }
 
   SIGHT_VERB(dbg << "DeadPathElimPartEdge::meetUpdate() final="<<str()<<endl, 1, DPEAnalDebugLevel)
-      
+
   return modified;
 }
 
@@ -764,29 +780,27 @@ bool DeadPathElimPartEdge::isEmpty(PartEdgePtr pedge)
  ***** DeadPathElimAnalysis *****
  ********************************/
 
-boost::shared_ptr<DFTransferVisitor> DeadPathElimAnalysis::getTransferVisitor(PartPtr part, PartPtr supersetPart,
+boost::shared_ptr<DFTransferVisitor> DeadPathElimAnalysis::getTransferVisitor(
+                                   AnalysisParts& parts,
                                    CFGNode cn, NodeState& state, std::map<PartEdgePtr, std::vector<Lattice*> >& dfInfo)
-{ 
-  return boost::shared_ptr<DeadPathElimTransfer>(new DeadPathElimTransfer(part, supersetPart, cn, state, dfInfo, this));
+{
+  return boost::shared_ptr<DeadPathElimTransfer>(new DeadPathElimTransfer(parts, cn, state, dfInfo, this));
 }
 
 /********************************
  ***** DeadPathElimTransfer *****
  ********************************/
 
-DeadPathElimTransfer::DeadPathElimTransfer(PartPtr part, PartPtr supersetPart, CFGNode cn, NodeState &s,
+DeadPathElimTransfer::DeadPathElimTransfer(AnalysisParts& parts, CFGNode cn, NodeState &s,
                                            std::map<PartEdgePtr, std::vector<Lattice*> > &dfInfo, DeadPathElimAnalysis* dpea)
-   : DFTransferVisitor(part, supersetPart, cn, s, dfInfo),
+   : DFTransferVisitor(parts, cn, s, dfInfo),
      dpea(dpea),
-     part(part),
-     supersetPart(supersetPart),
-     cn(cn),
      modified(false)
 { }
 
-bool DeadPathElimTransfer::finish() { 
+bool DeadPathElimTransfer::finish() {
   return modified;
-  
+
   // !!! WHY AREN'T WE DEALLOCATING DeadPathElimPartEdge* dfEdge = dynamic_cast<DeadPathElimPartEdge*>(*dfInfo[NULLPartEdge].begin());????
 }
 
@@ -802,14 +816,14 @@ void DeadPathElimTransfer::visit2OutNode(SgNode* sgn, ValueObjectPtr val, maymus
   if(val->isConcrete()) {
     set<boost::shared_ptr<SgValueExp> > concreteVals = val->getConcreteValue();
     SIGHT_VERB(dbg << "#concreteVals="<<concreteVals.size()<<endl, 1, DPEAnalDebugLevel)
-    
+
     // If there is just one option and it is interpretable as a boolean
     if(concreteVals.size()==1 && ValueObject::isValueBoolCompatible(*concreteVals.begin())) {
       boost::shared_ptr<SgValueExp> concreteVal = *concreteVals.begin();
-    
+
       // Get the edge that is propagated along the incoming dataflow path
       //#SA: Incoming dfInfo is associated with inEdgeFromAny
-      DeadPathElimPartEdge* dfEdge = dynamic_cast<DeadPathElimPartEdge*>(*dfInfo[supersetPart->inEdgeFromAny()].begin());
+      DeadPathElimPartEdge* dfEdge = dynamic_cast<DeadPathElimPartEdge*>(*dfInfo[parts.index()->inEdgeFromAny()].begin());
       // Adjust the base Edge so that it now starts at its original target part and terminates at NULL
       // (i.e. advance it forward by one node without specifying the target yet)
       dfEdge->src = dfEdge->tgt;
@@ -826,13 +840,13 @@ void DeadPathElimTransfer::visit2OutNode(SgNode* sgn, ValueObjectPtr val, maymus
       bool IfPredValue = ValueObject::SgValue2Bool(concreteVal);
 
       // Consider all the source part's outgoing edges (implemented by a server analysis)
-      std::list<PartEdgePtr> edges = supersetPart->outEdges();
-      SIGHT_VERB(dbg << "IfPredValue="<<IfPredValue<<" edges.size()="<<edges.size()<<endl, 1, DPEAnalDebugLevel)
-      assert(edges.size()==1 || edges.size()==2);
-      for(std::list<PartEdgePtr>::iterator e=edges.begin(); e!=edges.end(); e++) {
-        std::map<CFGNode, boost::shared_ptr<SgValueExp> > pv = (*e)->getPredicateValue();
+      AnalysisPartEdgeLists outE = parts.outEdgesIndexInput(*dpea->getComposer());///*NodeState_valid*/ false, /*indexes_valid*/ true, /*inputs_valid*/ true);
+      SIGHT_VERB(dbg << "IfPredValue="<<IfPredValue<<" outE.size()="<<outE.size()<<endl, 1, DPEAnalDebugLevel)
+      assert(outE.size()==1 || outE.size()==2);
+      for(AnalysisPartEdgeLists::iterator edge=outE.begin(); edge!=outE.end(); ++edge) {
+        std::map<CFGNode, boost::shared_ptr<SgValueExp> > pv = edge->input()->getPredicateValue();
         SIGHT_VERB_IF(1, DPEAnalDebugLevel)
-          dbg << "e="<<(*e)->str()<<endl;
+          dbg << "e="<<edge->input()->str()<<endl;
           dbg << "cn="<<CFGNode2Str(cn)<<" pv="<<endl;
           for(map<CFGNode, boost::shared_ptr<SgValueExp> >::iterator v=pv.begin(); v!=pv.end(); v++)
           { indent ind; dbg << CFGNode2Str(v->first) << "("<<(v->first==cn)<<"|"<<(v->first.getNode()==cn.getNode())<<") =&gt; "<<SgNode2Str(v->second.get())<<endl; }
@@ -850,7 +864,7 @@ void DeadPathElimTransfer::visit2OutNode(SgNode* sgn, ValueObjectPtr val, maymus
 
         // If the current edge corresponds to the true branch
         if(ValueObject::SgValue2Bool(pv[cn])) {
-          // Set the level of the true edge to live/dead if the outcome of this conditional is true/false 
+          // Set the level of the true edge to live/dead if the outcome of this conditional is true/false
           // and the incoming edge was live
           if(IfPredValue==true || (IfPredValue==false && trueBranchMayMust==may))
             dpeEdge->level = (dfLevel==live? live: dfLevel);
@@ -863,7 +877,7 @@ void DeadPathElimTransfer::visit2OutNode(SgNode* sgn, ValueObjectPtr val, maymus
           SIGHT_VERB(dbg << "True Edge="<<dpeEdge->str()<<endl, 1, DPEAnalDebugLevel)
         // Else, if the current edge corresponds to the false branch
         } else {
-          // Set the level of the true edge to live/dead if the outcome of this conditional is true/false 
+          // Set the level of the true edge to live/dead if the outcome of this conditional is true/false
           // and the incoming edge was live
           if(IfPredValue==false || (IfPredValue==true && falseBranchMayMust==may))
             dpeEdge->level = (dfLevel==live? live: dfLevel);
@@ -877,18 +891,18 @@ void DeadPathElimTransfer::visit2OutNode(SgNode* sgn, ValueObjectPtr val, maymus
         }
 
         // Set this dpeEdge's target to be the same as the target of the current server edge but using the edge's level
-        dpeEdge->tgt = DeadPathElimPart::create((*e)->target(), dpea);
+        dpeEdge->tgt = DeadPathElimPart::create(edge->input()->target(), dpea);
 
         // Set this dpeEdges's baseEdge to be the current edge using both Lattice API (setPartEdge) and Part API (setParent)
 //%%% keep setParent since *e corresponds to the ATS to be refined
 //%%% remove setPartEdge() since that edge should be the one from the ATS on top of which we're running. That should be set by the ComposedAnalysis.
 //        dpeEdge->setPartEdge(*e);
-        dpeEdge->setSupersetPartEdge(*e);
+        dpeEdge->setInputPartEdge(edge->input());
 
         // Add the current DeadPathElimPartEdge to dfInfo
-        vector<Lattice *> dfLatVec; 
+        vector<Lattice *> dfLatVec;
         dfLatVec.push_back(dpeEdge);
-        dfInfo[*e] = dfLatVec;
+        dfInfo[edge->index()] = dfLatVec;
       }
 
       modified = true;
@@ -904,7 +918,7 @@ void DeadPathElimTransfer::visit(SgIfStmt *sgn)
   if(SgExprStatement* es=isSgExprStatement(sgn->get_conditional())) {
     indent ind;
     // Get the value of the predicate test in the SgIfStmt's conditional
-    ValueObjectPtr val = dpea->getComposer()->OperandExpr2Val(sgn, es->get_expression(), part->inEdgeFromAny(), dpea);
+    ValueObjectPtr val = dpea->getComposer()->OperandExpr2Val(sgn, es->get_expression(), parts.NodeState()->inEdgeFromAny(), dpea);
     visit2OutNode(sgn, val, must, must);
   } else {
     visit((SgNode*)sgn);
@@ -918,7 +932,7 @@ void DeadPathElimTransfer::visit(SgAndOp *op)
   // If this is the portion of the short-circuit operation after the first argument was evaluated but before
   // the second argument
   if(cn.getIndex()==1) {
-    ValueObjectPtr val = dpea->getComposer()->OperandExpr2Val(op, op->get_lhs_operand(), part->inEdgeFromAny(), dpea);
+    ValueObjectPtr val = dpea->getComposer()->OperandExpr2Val(op, op->get_lhs_operand(), parts.NodeState()->inEdgeFromAny(), dpea);
     visit2OutNode(op, val, may, must);
   } else {
     visit((SgNode*)op);
@@ -931,7 +945,7 @@ void DeadPathElimTransfer::visit(SgOrOp *op)
   // If this is the portion of the short-circuit operation after the first argument was evaluated but before
   // the second argument
   if(cn.getIndex()==1) {
-    ValueObjectPtr val = dpea->getComposer()->OperandExpr2Val(op, op->get_lhs_operand(), part->inEdgeFromAny(), dpea);
+    ValueObjectPtr val = dpea->getComposer()->OperandExpr2Val(op, op->get_lhs_operand(), parts.NodeState()->inEdgeFromAny(), dpea);
     visit2OutNode(op, val, must, may);
   } else {
     visit((SgNode*)op);
@@ -944,7 +958,7 @@ void DeadPathElimTransfer::visit(SgNode *sgn)
 
   // Get the edge that is propagated along the incoming dataflow path
   //#SA: Incoming dfInfo is associated with inEdgeFromAny
-  DeadPathElimPartEdge* dfEdge = dynamic_cast<DeadPathElimPartEdge*>(*dfInfo[supersetPart->inEdgeFromAny()].begin());
+  DeadPathElimPartEdge* dfEdge = dynamic_cast<DeadPathElimPartEdge*>(*dfInfo[parts.index()->inEdgeFromAny()].begin());
   SIGHT_VERB(dbg << "Initial dfEdge="<<dfEdge->str()<<endl, 1, DPEAnalDebugLevel)
   // Adjust the base Edge so that it now starts at its original target part and terminates at NULL
   // (i.e. advance it forward by one node without specifying the target yet)
@@ -952,15 +966,16 @@ void DeadPathElimTransfer::visit(SgNode *sgn)
   dfEdge->tgt = NULLPart;
   dfEdge->clearPred2Val();
   SIGHT_VERB(dbg << "Final dfEdge="<<dfEdge->str()<<endl, 1, DPEAnalDebugLevel)
-  
+
   // Consider all the source part's outgoing edges (implemented by a server analysis)
-  std::list<PartEdgePtr> baseEdges = supersetPart->outEdges();
-  
+  dbg << "parts="<<parts.str()<<endl;
+  std::list<PartEdgePtr> baseEdges = parts.input()->outEdges();
+
   // If this abstract state has no outgoing edges, return without modifying dfInfo. This is because
-  // the composer may wish to do something with the resulting Lattice (e.g. copy it on a wildcard outgoing edge) 
+  // the composer may wish to do something with the resulting Lattice (e.g. copy it on a wildcard outgoing edge)
   // even if its information content has not changed.
   if(baseEdges.size()==0) { modified=true; return; }
-  
+
   // Empty out dfInfo in preparation for it being overwritten
   dfInfo.clear();
 
@@ -972,16 +987,16 @@ void DeadPathElimTransfer::visit(SgNode *sgn)
     if(dfInfo.size()==0) dpeEdge = dfEdge;
     else                 dpeEdge = dynamic_cast<DeadPathElimPartEdge*>(dfEdge->copy());
     assert(dpeEdge);
-    
+
     // Set this dpeEdge's target to be the same as the current server edge's target but with the dfEdge's level
     dpeEdge->tgt = DeadPathElimPart::create((*e)->target(), dpea);
-    
+
     // Set this dpeEdges's baseEdge to be the current edge using both Lattice API (setPartEdge) and setSupersetPartEdge API (setParent)
     //dpeEdge->setPartEdge(*e);
-    dpeEdge->setSupersetPartEdge(*e);
+    dpeEdge->setInputPartEdge(*e);
     SIGHT_VERB(dbg << "dpeEdge="<<dpeEdge->str()<<endl, 1, DPEAnalDebugLevel)
-    
-    vector<Lattice *> dfLatVec; 
+
+    vector<Lattice *> dfLatVec;
     dfLatVec.push_back(dpeEdge);
     dfInfo[*e] = dfLatVec;
   }
@@ -996,19 +1011,18 @@ DeadPathElimAnalysis::DeadPathElimAnalysis(bool trackBase2RefinedPartEdgeMapping
 
 // Initializes the state of analysis lattices at the given function, part and edge into our out of the part
 // by setting initLattices to refer to freshly-allocated Lattice objects.
-void DeadPathElimAnalysis::genInitLattice(PartPtr part, PartEdgePtr pedge, PartPtr supersetPart,
+void DeadPathElimAnalysis::genInitLattice(const AnalysisParts& parts, const AnalysisPartEdges& pedges,
                                           std::vector<Lattice*>& initLattices)
 {
-  DeadPathElimPartEdge* newPartEdge = DeadPathElimPartEdge::createRaw(part->inEdgeFromAny(), supersetPart->inEdgeFromAny(), this, bottom);
-  
+  DeadPathElimPartEdge* newPartEdge = DeadPathElimPartEdge::createRaw(parts.NodeState()->inEdgeFromAny(), parts.input()->inEdgeFromAny(), this, bottom);
+
   SIGHT_VERB_DECL(scope, (txt() << "DeadPathElimPart::genInitLattice()"), 2, DPEAnalDebugLevel)
-  SIGHT_VERB(dbg << "part="<<part->str()<<endl, 2, DPEAnalDebugLevel)
-  SIGHT_VERB(dbg << "pedge="<<pedge->str()<<endl, 2, DPEAnalDebugLevel)
-  SIGHT_VERB(dbg << "supersetPart="<<supersetPart->str()<<endl, 2, DPEAnalDebugLevel)
-  
+  SIGHT_VERB(dbg << "parts.NodeState()="<<parts.NodeState()->str()<<endl, 2, DPEAnalDebugLevel)
+  SIGHT_VERB(dbg << "pedges.NodeState()="<<pedges.NodeState()->str()<<endl, 2, DPEAnalDebugLevel)
+
   // If this an the entry node of this function, set newPart to live
   set<PartPtr> startParts = getComposer()->GetStartAStates(this);
-  if(startParts.find(part) != startParts.end()) {
+  if(startParts.find(parts.NodeState()) != startParts.end()) {
     newPartEdge->setToFull();
   }
 
@@ -1016,10 +1030,10 @@ void DeadPathElimAnalysis::genInitLattice(PartPtr part, PartEdgePtr pedge, PartP
   initLattices.push_back(newPartEdge);
 }
 
-bool DeadPathElimAnalysis::transfer(PartPtr part, CFGNode cn, NodeState& state, 
+bool DeadPathElimAnalysis::transfer(AnalysisParts& parts, CFGNode cn, NodeState& state,
                                     std::map<PartEdgePtr, std::vector<Lattice*> >& dfInfo)
 {
-  assert(0); 
+  assert(0);
   return false;
 }
 

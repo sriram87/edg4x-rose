@@ -604,25 +604,25 @@ AbstractionPtr AbstractObject::genIntersection(MAOMapPtr maoMap) {
    ##### MappedAbstractObject #####
    ################################ */
 
-template<class Key, bool KeyIsComposedAnalysis, class AOSubType, AbstractObject::AOType type, class MappedAOSubType>
-MappedAbstractObject<Key, KeyIsComposedAnalysis, AOSubType, type, MappedAOSubType>::
+template<class Key, bool KeyIsComposedAnalysis, class AOSubType, class AOSubTypePtr, AbstractObject::AOType type, class MappedAOSubType>
+MappedAbstractObject<Key, KeyIsComposedAnalysis, AOSubType, AOSubTypePtr, type, MappedAOSubType>::
       MappedAbstractObject(uiType ui, int nFull, ComposedAnalysis* analysis) :
   AOSubType(NULL), MappedAbstractionBase(ui, nFull, analysis)
 {
   initializedPOKey=false;
 }
 
-template<class Key, bool KeyIsComposedAnalysis, class AOSubType, AbstractObject::AOType type, class MappedAOSubType>
-MappedAbstractObject<Key, KeyIsComposedAnalysis, AOSubType, type, MappedAOSubType>::
-      MappedAbstractObject(uiType ui, int nFull, ComposedAnalysis* analysis, const std::map<Key, boost::shared_ptr<AOSubType> >& aoMap) :
+template<class Key, bool KeyIsComposedAnalysis, class AOSubType, class AOSubTypePtr, AbstractObject::AOType type, class MappedAOSubType>
+MappedAbstractObject<Key, KeyIsComposedAnalysis, AOSubType, AOSubTypePtr, type, MappedAOSubType>::
+      MappedAbstractObject(uiType ui, int nFull, ComposedAnalysis* analysis, const std::map<Key, AOSubTypePtr >& aoMap) :
   AOSubType(NULL), MappedAbstractionBase(ui, nFull, analysis), aoMap(aoMap)
 {
   initializedPOKey=false;
 }
 
 
-template<class Key, bool KeyIsComposedAnalysis, class AOSubType, AbstractObject::AOType type, class MappedAOSubType>
-MappedAbstractObject<Key, KeyIsComposedAnalysis, AOSubType, type, MappedAOSubType>::
+template<class Key, bool KeyIsComposedAnalysis, class AOSubType, class AOSubTypePtr, AbstractObject::AOType type, class MappedAOSubType>
+MappedAbstractObject<Key, KeyIsComposedAnalysis, AOSubType, AOSubTypePtr, type, MappedAOSubType>::
       MappedAbstractObject(const MappedAbstractObject& that) :
   AOSubType(that), MappedAbstractionBase(that.ui, that.nFull, that.analysis), aoMap(that.aoMap)
 {
@@ -631,17 +631,17 @@ MappedAbstractObject<Key, KeyIsComposedAnalysis, AOSubType, type, MappedAOSubTyp
 
 
 // Returns true if this is a MappedAbstractObject and false otherwise
-template<class Key, bool KeyIsComposedAnalysis, class AOSubType, AbstractObject::AOType type, class MappedAOSubType>
-bool MappedAbstractObject<Key, KeyIsComposedAnalysis, AOSubType, type, MappedAOSubType>::isMappedAO()
+template<class Key, bool KeyIsComposedAnalysis, class AOSubType, class AOSubTypePtr, AbstractObject::AOType type, class MappedAOSubType>
+bool MappedAbstractObject<Key, KeyIsComposedAnalysis, AOSubType, AOSubTypePtr, type, MappedAOSubType>::isMappedAO()
 {
-  //cout << "MappedAbstractObject<Key, KeyIsComposedAnalysis, AOSubType, type, MappedAOSubType>::isMappedAO()"<<endl;
+  //cout << "MappedAbstractObject<Key, KeyIsComposedAnalysis, AOSubType, AOSubTypePtr, type, MappedAOSubType>::isMappedAO()"<<endl;
   return true; }
 
-template<class Key, bool KeyIsComposedAnalysis, class AOSubType, AbstractObject::AOType type, class MappedAOSubType>
-SgNode* MappedAbstractObject<Key, KeyIsComposedAnalysis, AOSubType, type, MappedAOSubType>::getBase() const {
+template<class Key, bool KeyIsComposedAnalysis, class AOSubType, class AOSubTypePtr, AbstractObject::AOType type, class MappedAOSubType>
+SgNode* MappedAbstractObject<Key, KeyIsComposedAnalysis, AOSubType, AOSubTypePtr, type, MappedAOSubType>::getBase() const {
   // Returns the base SgNode shared by all the MemLocs in this object or NULL, if the base SgNodes are different
   SgNode* base = NULL;
-  for (typename map<Key, boost::shared_ptr<AOSubType> >::const_iterator it = aoMap.begin(); it != aoMap.end(); ++it) {
+  for (typename map<Key, AOSubTypePtr >::const_iterator it = aoMap.begin(); it != aoMap.end(); ++it) {
     if (it == aoMap.begin())
       base = it->second->getBase();
     else if (base != it->second->getBase())
@@ -652,20 +652,20 @@ SgNode* MappedAbstractObject<Key, KeyIsComposedAnalysis, AOSubType, type, Mapped
 }
 
 /*  // Allocates a copy of this object and returns a pointer to it
-template<class Key, bool KeyIsComposedAnalysis, class AOSubType, AbstractObject::AOType type, class MappedAOSubType>
-AbstractObjectPtr MappedAbstractObject<Key, KeyIsComposedAnalysis, AOSubType, type, MappedAOSubType>::copyAO() const {
+template<class Key, bool KeyIsComposedAnalysis, class AOSubType, class AOSubTypePtr, AbstractObject::AOType type, class MappedAOSubType>
+AbstractObjectPtr MappedAbstractObject<Key, KeyIsComposedAnalysis, AOSubType, AOSubTypePtr, type, MappedAOSubType>::copyAO() const {
   return copyAOType();
 }*/
 
 
 // Functions that identify the type of AbstractObject this is. Should be over-ridden by derived
 // classes to save the cost of a dynamic cast.
-template<class Key, bool KeyIsComposedAnalysis, class AOSubType, AbstractObject::AOType type, class MappedAOSubType>
-AbstractObject::AOType MappedAbstractObject<Key, KeyIsComposedAnalysis, AOSubType, type, MappedAOSubType>::getAOType() const
+template<class Key, bool KeyIsComposedAnalysis, class AOSubType, class AOSubTypePtr, AbstractObject::AOType type, class MappedAOSubType>
+AbstractObject::AOType MappedAbstractObject<Key, KeyIsComposedAnalysis, AOSubType, AOSubTypePtr, type, MappedAOSubType>::getAOType() const
 { return type; }
 
-template<class Key, bool KeyIsComposedAnalysis, class AOSubType, AbstractObject::AOType type, class MappedAOSubType>
-void MappedAbstractObject<Key, KeyIsComposedAnalysis, AOSubType, type, MappedAOSubType>::add(Key key, boost::shared_ptr<AOSubType> ao,
+template<class Key, bool KeyIsComposedAnalysis, class AOSubType, class AOSubTypePtr, AbstractObject::AOType type, class MappedAOSubType>
+void MappedAbstractObject<Key, KeyIsComposedAnalysis, AOSubType, AOSubTypePtr, type, MappedAOSubType>::add(Key key, AOSubTypePtr ao,
                                                PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis) {
   // If the object is already full don't add anything
   if (isUnion() && isFull(pedge, comp, analysis))
@@ -682,19 +682,19 @@ void MappedAbstractObject<Key, KeyIsComposedAnalysis, AOSubType, type, MappedAOS
 }
 
 // Allocates a copy of this object and returns a pointer to it
-template<class Key, bool KeyIsComposedAnalysis, class AOSubType, AbstractObject::AOType type, class MappedAOSubType>
-boost::shared_ptr<AOSubType> MappedAbstractObject<Key, KeyIsComposedAnalysis, AOSubType, type, MappedAOSubType>::copyAOType() const {
-  map<Key, boost::shared_ptr<AOSubType> > newAOMap;
-  for(typename map<Key, boost::shared_ptr<AOSubType> >::const_iterator it = aoMap.begin(); it != aoMap.end(); ++it)
+template<class Key, bool KeyIsComposedAnalysis, class AOSubType, class AOSubTypePtr, AbstractObject::AOType type, class MappedAOSubType>
+AOSubTypePtr MappedAbstractObject<Key, KeyIsComposedAnalysis, AOSubType, AOSubTypePtr, type, MappedAOSubType>::copyAOType() const {
+  map<Key, AOSubTypePtr > newAOMap;
+  for(typename map<Key, AOSubTypePtr >::const_iterator it = aoMap.begin(); it != aoMap.end(); ++it)
     newAOMap[it->first] = it->second->copyAOType();
 
   return boost::make_shared<MappedAOSubType >(ui, nFull, analysis, newAOMap);
 }
 
-template<class Key, bool KeyIsComposedAnalysis, class AOSubType, AbstractObject::AOType type, class MappedAOSubType>
-bool MappedAbstractObject<Key, KeyIsComposedAnalysis, AOSubType, type, MappedAOSubType>::mayEqualWithKey(Key key,
-    const map<Key, boost::shared_ptr<AOSubType> >& thatAOMap, PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis) {
-  typename map<Key, boost::shared_ptr<AOSubType> >::const_iterator s_it = thatAOMap.find(key);
+template<class Key, bool KeyIsComposedAnalysis, class AOSubType, class AOSubTypePtr, AbstractObject::AOType type, class MappedAOSubType>
+bool MappedAbstractObject<Key, KeyIsComposedAnalysis, AOSubType, AOSubTypePtr, type, MappedAOSubType>::mayEqualWithKey(Key key,
+    const map<Key, AOSubTypePtr >& thatAOMap, PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis) {
+  typename map<Key, AOSubTypePtr >::const_iterator s_it = thatAOMap.find(key);
   if (s_it == thatAOMap.end())
     return true;
   return aoMap[key]->mayEqual(s_it->second, pedge, comp, analysis);
@@ -712,16 +712,16 @@ bool MappedAbstractObject<Key, KeyIsComposedAnalysis, AOSubType, type, MappedAOS
 //! computed at Key=PartEdgePtrthat describes some sets of executions.
 //! MayEquality check on mapped AO is performed on intersection of sub-executions
 //! or union of sub-executions over the keyed AO objects.
-template<class Key, bool KeyIsComposedAnalysis, class AOSubType, AbstractObject::AOType type, class MappedAOSubType>
-bool MappedAbstractObject<Key, KeyIsComposedAnalysis, AOSubType, type, MappedAOSubType>::mayEqualAO(boost::shared_ptr<AOSubType> thatAO, PartEdgePtr pedge)
+template<class Key, bool KeyIsComposedAnalysis, class AOSubType, class AOSubTypePtr, AbstractObject::AOType type, class MappedAOSubType>
+bool MappedAbstractObject<Key, KeyIsComposedAnalysis, AOSubType, AOSubTypePtr, type, MappedAOSubType>::mayEqualAO(AOSubTypePtr thatAO, PartEdgePtr pedge)
 { return mayEqual(thatAO, pedge, analysis->getComposer(), analysis); }
 
 // Returns whether this object may/must be equal to o within the given Part p
-template<class Key, bool KeyIsComposedAnalysis, class AOSubType, AbstractObject::AOType type, class MappedAOSubType>
-bool MappedAbstractObject<Key, KeyIsComposedAnalysis, AOSubType, type, MappedAOSubType>::mayEqual(AbstractObjectPtr thatAO, PartEdgePtr pedge,
+template<class Key, bool KeyIsComposedAnalysis, class AOSubType, class AOSubTypePtr, AbstractObject::AOType type, class MappedAOSubType>
+bool MappedAbstractObject<Key, KeyIsComposedAnalysis, AOSubType, AOSubTypePtr, type, MappedAOSubType>::mayEqual(AbstractObjectPtr thatAO, PartEdgePtr pedge,
                                                     Composer* comp, ComposedAnalysis* analysis) {
-  boost::shared_ptr<MappedAbstractObject<Key, KeyIsComposedAnalysis, AOSubType, type, MappedAOSubType> > thatAO_p =
-      boost::dynamic_pointer_cast<MappedAbstractObject<Key, KeyIsComposedAnalysis, AOSubType, type, MappedAOSubType> >(thatAO);
+  boost::shared_ptr<MappedAbstractObject<Key, KeyIsComposedAnalysis, AOSubType, AOSubTypePtr, type, MappedAOSubType> > thatAO_p =
+      boost::dynamic_pointer_cast<MappedAbstractObject<Key, KeyIsComposedAnalysis, AOSubType, AOSubTypePtr, type, MappedAOSubType> >(thatAO);
   assert(thatAO_p);
 
   // This object denotes full set of AO (full set of executions)
@@ -739,8 +739,8 @@ bool MappedAbstractObject<Key, KeyIsComposedAnalysis, AOSubType, type, MappedAOS
   // Two cases reach here [1] isUnion()=true && nFull_AO=0 [2] intersect=true && nFullAO=0 or nFull_AO!=0.
   // For both cases iterate on the AO map and discharge the mayEqualAO query to individual objects
   // which are answered based on its set of sub-executions (or its dataflow facts) computed by the corresponding analysis.
-  const map<Key, boost::shared_ptr<AOSubType> > thatAOMap = thatAO_p->getAOMap();
-  typename map<Key, boost::shared_ptr<AOSubType> >::iterator it;
+  const map<Key, AOSubTypePtr > thatAOMap = thatAO_p->getAOMap();
+  typename map<Key, AOSubTypePtr >::iterator it;
   for (it = aoMap.begin(); it != aoMap.end(); ++it) {
     // discharge query
     bool isMayEq = mayEqualWithKey(it->first, thatAOMap, pedge, comp, analysis);
@@ -776,10 +776,10 @@ bool MappedAbstractObject<Key, KeyIsComposedAnalysis, AOSubType, type, MappedAOS
     assert(0);
 }
 
-template<class Key, bool KeyIsComposedAnalysis, class AOSubType, AbstractObject::AOType type, class MappedAOSubType>
-bool MappedAbstractObject<Key, KeyIsComposedAnalysis, AOSubType, type, MappedAOSubType>::mustEqualWithKey(Key key,
-    const map<Key, boost::shared_ptr<AOSubType> >& thatAOMap, PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis) {
-  typename map<Key, boost::shared_ptr<AOSubType> >::const_iterator s_it = thatAOMap.find(key);
+template<class Key, bool KeyIsComposedAnalysis, class AOSubType, class AOSubTypePtr, AbstractObject::AOType type, class MappedAOSubType>
+bool MappedAbstractObject<Key, KeyIsComposedAnalysis, AOSubType, AOSubTypePtr, type, MappedAOSubType>::mustEqualWithKey(Key key,
+    const map<Key, AOSubTypePtr >& thatAOMap, PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis) {
+  typename map<Key, AOSubTypePtr >::const_iterator s_it = thatAOMap.find(key);
   if (s_it == thatAOMap.end())
     return false;
   return aoMap[key]->mustEqual(s_it->second, pedge, comp, analysis);
@@ -797,14 +797,14 @@ bool MappedAbstractObject<Key, KeyIsComposedAnalysis, AOSubType, type, MappedAOS
 //! computed at Key=PartEdgePtrthat describes some sets of executions.
 //! MustEquality check on mapped AO is performed on intersection (mostAccurate=true) of sub-executions
 //! or union (mostAccurate=false) of sub-executions over the keyed AO objects.
-template<class Key, bool KeyIsComposedAnalysis, class AOSubType, AbstractObject::AOType type, class MappedAOSubType>
-bool MappedAbstractObject<Key, KeyIsComposedAnalysis, AOSubType, type, MappedAOSubType>::mustEqualAO(boost::shared_ptr<AOSubType> thatAO, PartEdgePtr pedge)
+template<class Key, bool KeyIsComposedAnalysis, class AOSubType, class AOSubTypePtr, AbstractObject::AOType type, class MappedAOSubType>
+bool MappedAbstractObject<Key, KeyIsComposedAnalysis, AOSubType, AOSubTypePtr, type, MappedAOSubType>::mustEqualAO(AOSubTypePtr thatAO, PartEdgePtr pedge)
 { return mustEqual(thatAO, pedge, analysis->getComposer(), analysis); }
 
-template<class Key, bool KeyIsComposedAnalysis, class AOSubType, AbstractObject::AOType type, class MappedAOSubType>
-bool MappedAbstractObject<Key, KeyIsComposedAnalysis, AOSubType, type, MappedAOSubType>::mustEqual(AbstractObjectPtr thatAO, PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis) {
-  boost::shared_ptr<MappedAbstractObject<Key, KeyIsComposedAnalysis, AOSubType, type, MappedAOSubType> > thatAO_p =
-      boost::dynamic_pointer_cast<MappedAbstractObject<Key, KeyIsComposedAnalysis, AOSubType, type, MappedAOSubType> >(thatAO);
+template<class Key, bool KeyIsComposedAnalysis, class AOSubType, class AOSubTypePtr, AbstractObject::AOType type, class MappedAOSubType>
+bool MappedAbstractObject<Key, KeyIsComposedAnalysis, AOSubType, AOSubTypePtr, type, MappedAOSubType>::mustEqual(AbstractObjectPtr thatAO, PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis) {
+  boost::shared_ptr<MappedAbstractObject<Key, KeyIsComposedAnalysis, AOSubType, AOSubTypePtr, type, MappedAOSubType> > thatAO_p =
+      boost::dynamic_pointer_cast<MappedAbstractObject<Key, KeyIsComposedAnalysis, AOSubType, AOSubTypePtr, type, MappedAOSubType> >(thatAO);
   assert(thatAO_p);
 
   // This object denotes full set of AO (full set of executions)
@@ -822,8 +822,8 @@ bool MappedAbstractObject<Key, KeyIsComposedAnalysis, AOSubType, type, MappedAOS
   // Two cases reach here [1] isUnion()=true && nFull_AO=0 [2] intersect=true && nFullAO=0 or nFull_AO!=0.
   // For both cases iterate on the AO map and discharge the mayEqualAO query to individual objects
   // which are answered based on its set of sub-executions (or its dataflow facts) computed by the corresponding analysis.
-  const map<Key, boost::shared_ptr<AOSubType> > thatAOMap = thatAO_p->getAOMap();
-  typename map<Key, boost::shared_ptr<AOSubType> >::iterator it;
+  const map<Key, AOSubTypePtr > thatAOMap = thatAO_p->getAOMap();
+  typename map<Key, AOSubTypePtr >::iterator it;
   for (it = aoMap.begin(); it != aoMap.end(); ++it) {
     // discharge query
     bool isMustEq = mustEqualWithKey(it->first, thatAOMap, pedge, comp, analysis);
@@ -861,10 +861,10 @@ bool MappedAbstractObject<Key, KeyIsComposedAnalysis, AOSubType, type, MappedAOS
 
 //! Discharge the query to the corresponding AO
 //! If key not found in thatAOMap return false
-template<class Key, bool KeyIsComposedAnalysis, class AOSubType, AbstractObject::AOType type, class MappedAOSubType>
-bool MappedAbstractObject<Key, KeyIsComposedAnalysis, AOSubType, type, MappedAOSubType>::equalSetWithKey(Key key,
-    const map<Key, boost::shared_ptr<AOSubType> >& thatAOMap, PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis) {
-  typename map<Key, boost::shared_ptr<AOSubType> >::const_iterator s_it = thatAOMap.find(key);
+template<class Key, bool KeyIsComposedAnalysis, class AOSubType, class AOSubTypePtr, AbstractObject::AOType type, class MappedAOSubType>
+bool MappedAbstractObject<Key, KeyIsComposedAnalysis, AOSubType, AOSubTypePtr, type, MappedAOSubType>::equalSetWithKey(Key key,
+    const map<Key, AOSubTypePtr >& thatAOMap, PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis) {
+  typename map<Key, AOSubTypePtr >::const_iterator s_it = thatAOMap.find(key);
   if (s_it == thatAOMap.end())
     return false;
   return aoMap[key]->equalSet(s_it->second, pedge, comp, analysis);
@@ -875,17 +875,17 @@ bool MappedAbstractObject<Key, KeyIsComposedAnalysis, AOSubType, type, MappedAOS
 //! answered based on union or intersection of sub-executions.
 //! Simply discharge the queries to all keyed CodeLoc objects
 //! If all the discharged queries come back equal then the two objects are equal otherwise not.
-template<class Key, bool KeyIsComposedAnalysis, class AOSubType, AbstractObject::AOType type, class MappedAOSubType>
-bool MappedAbstractObject<Key, KeyIsComposedAnalysis, AOSubType, type, MappedAOSubType>::equalSetAO(boost::shared_ptr<AOSubType> thatAO, PartEdgePtr pedge)
+template<class Key, bool KeyIsComposedAnalysis, class AOSubType, class AOSubTypePtr, AbstractObject::AOType type, class MappedAOSubType>
+bool MappedAbstractObject<Key, KeyIsComposedAnalysis, AOSubType, AOSubTypePtr, type, MappedAOSubType>::equalSetAO(AOSubTypePtr thatAO, PartEdgePtr pedge)
 { return equalSet(thatAO, pedge, analysis->getComposer(), analysis); }
 
 // general versions of equalset() that accounts for framework details before routing the call to the
 // derived class' equalset() check. specifically, it routes the call through the composer to make
 // sure the equalset() call gets the right partedge.
-template<class Key, bool KeyIsComposedAnalysis, class AOSubType, AbstractObject::AOType type, class MappedAOSubType>
-bool MappedAbstractObject<Key, KeyIsComposedAnalysis, AOSubType, type, MappedAOSubType>::equalSet(AbstractObjectPtr thatAO, PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis) {
-  boost::shared_ptr<MappedAbstractObject<Key, KeyIsComposedAnalysis, AOSubType, type, MappedAOSubType> > thatAO_p =
-      boost::dynamic_pointer_cast<MappedAbstractObject<Key, KeyIsComposedAnalysis, AOSubType, type, MappedAOSubType> >(thatAO);
+template<class Key, bool KeyIsComposedAnalysis, class AOSubType, class AOSubTypePtr, AbstractObject::AOType type, class MappedAOSubType>
+bool MappedAbstractObject<Key, KeyIsComposedAnalysis, AOSubType, AOSubTypePtr, type, MappedAOSubType>::equalSet(AbstractObjectPtr thatAO, PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis) {
+  boost::shared_ptr<MappedAbstractObject<Key, KeyIsComposedAnalysis, AOSubType, AOSubTypePtr, type, MappedAOSubType> > thatAO_p =
+      boost::dynamic_pointer_cast<MappedAbstractObject<Key, KeyIsComposedAnalysis, AOSubType, AOSubTypePtr, type, MappedAOSubType> >(thatAO);
   assert(thatAO_p);
 
   // This object denotes full set of AO (full set of executions)
@@ -896,8 +896,8 @@ bool MappedAbstractObject<Key, KeyIsComposedAnalysis, AOSubType, type, MappedAOS
   if (isEmpty(pedge, comp, analysis))
     return thatAO_p->isEmpty(pedge, comp, analysis);
 
-  const map<Key, boost::shared_ptr<AOSubType> > thatAOMap = thatAO_p->getAOMap();
-  typename map<Key, boost::shared_ptr<AOSubType> >::iterator it;
+  const map<Key, AOSubTypePtr > thatAOMap = thatAO_p->getAOMap();
+  typename map<Key, AOSubTypePtr >::iterator it;
   for (it = aoMap.begin(); it != aoMap.end(); ++it) {
     // discharge query
     // break even if one of them returns false
@@ -911,10 +911,10 @@ bool MappedAbstractObject<Key, KeyIsComposedAnalysis, AOSubType, type, MappedAOS
 //! Discharge the query to the corresponding AO
 //! If key not found in thatAOMap return true as the
 //! keyed object on thatAOMap denotes full set
-template<class Key, bool KeyIsComposedAnalysis, class AOSubType, AbstractObject::AOType type, class MappedAOSubType>
-bool MappedAbstractObject<Key, KeyIsComposedAnalysis, AOSubType, type, MappedAOSubType>::subSetWithKey(Key key,
-    const map<Key, boost::shared_ptr<AOSubType> >& thatAOMap, PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis) {
-  typename map<Key, boost::shared_ptr<AOSubType> >::const_iterator s_it = thatAOMap.find(key);
+template<class Key, bool KeyIsComposedAnalysis, class AOSubType, class AOSubTypePtr, AbstractObject::AOType type, class MappedAOSubType>
+bool MappedAbstractObject<Key, KeyIsComposedAnalysis, AOSubType, AOSubTypePtr, type, MappedAOSubType>::subSetWithKey(Key key,
+    const map<Key, AOSubTypePtr >& thatAOMap, PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis) {
+  typename map<Key, AOSubTypePtr >::const_iterator s_it = thatAOMap.find(key);
   if (s_it == thatAOMap.end())
     return true;
   return aoMap[key]->equalSet(s_it->second, pedge, comp, analysis);
@@ -926,17 +926,17 @@ bool MappedAbstractObject<Key, KeyIsComposedAnalysis, AOSubType, type, MappedAOS
 //! answered based on union or intersection of sub-executions.
 //! Simply discharge the queries to all keyed CodeLoc objects
 //! If all the discharged queries come back true then this is a subset of that otherwise not.
-template<class Key, bool KeyIsComposedAnalysis, class AOSubType, AbstractObject::AOType type, class MappedAOSubType>
-bool MappedAbstractObject<Key, KeyIsComposedAnalysis, AOSubType, type, MappedAOSubType>::subSetAO(boost::shared_ptr<AOSubType> thatAO, PartEdgePtr pedge)
+template<class Key, bool KeyIsComposedAnalysis, class AOSubType, class AOSubTypePtr, AbstractObject::AOType type, class MappedAOSubType>
+bool MappedAbstractObject<Key, KeyIsComposedAnalysis, AOSubType, AOSubTypePtr, type, MappedAOSubType>::subSetAO(AOSubTypePtr thatAO, PartEdgePtr pedge)
 { return subSet(thatAO, pedge, analysis->getComposer(), analysis); }
 
 // General versions of subSet() that accounts for framework details before routing the call to the
 // derived class' subSet() check. Specifically, it routes the call through the composer to make
 // sure the subSet() call gets the right PartEdge.
-template<class Key, bool KeyIsComposedAnalysis, class AOSubType, AbstractObject::AOType type, class MappedAOSubType>
-bool MappedAbstractObject<Key, KeyIsComposedAnalysis, AOSubType, type, MappedAOSubType>::subSet(AbstractObjectPtr thatAO, PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis) {
-  boost::shared_ptr<MappedAbstractObject<Key, KeyIsComposedAnalysis, AOSubType, type, MappedAOSubType> > thatAO_p =
-      boost::dynamic_pointer_cast<MappedAbstractObject<Key, KeyIsComposedAnalysis, AOSubType, type, MappedAOSubType> >(thatAO);
+template<class Key, bool KeyIsComposedAnalysis, class AOSubType, class AOSubTypePtr, AbstractObject::AOType type, class MappedAOSubType>
+bool MappedAbstractObject<Key, KeyIsComposedAnalysis, AOSubType, AOSubTypePtr, type, MappedAOSubType>::subSet(AbstractObjectPtr thatAO, PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis) {
+  boost::shared_ptr<MappedAbstractObject<Key, KeyIsComposedAnalysis, AOSubType, AOSubTypePtr, type, MappedAOSubType> > thatAO_p =
+      boost::dynamic_pointer_cast<MappedAbstractObject<Key, KeyIsComposedAnalysis, AOSubType, AOSubTypePtr, type, MappedAOSubType> >(thatAO);
   assert(thatAO_p);
 
   // This object denotes full set of AO (full set of executions)
@@ -952,8 +952,8 @@ bool MappedAbstractObject<Key, KeyIsComposedAnalysis, AOSubType, type, MappedAOS
   // If this object has a key and that does not then
   // the keyed object is subset of that (return true) implemented by subsetAOWithKey
   // If any of the discharged query return false then return false.
-  const map<Key, boost::shared_ptr<AOSubType> > thatAOMap = thatAO_p->getAOMap();
-  typename map<Key, boost::shared_ptr<AOSubType> >::iterator it;
+  const map<Key, AOSubTypePtr > thatAOMap = thatAO_p->getAOMap();
+  typename map<Key, AOSubTypePtr >::iterator it;
   for (it = aoMap.begin(); it != aoMap.end(); ++it) {
     // discharge query
     // break even if one of them returns false
@@ -963,7 +963,7 @@ bool MappedAbstractObject<Key, KeyIsComposedAnalysis, AOSubType, type, MappedAOS
 
   // If this object doesn't have the key and that object has the key then
   // return false as this object has full object mapped to the key
-  typename map<Key, boost::shared_ptr<AOSubType> >::const_iterator c_it;
+  typename map<Key, AOSubTypePtr >::const_iterator c_it;
   for (c_it = thatAOMap.begin(); c_it != thatAOMap.end() && (nFull != 0);
       ++c_it) {
     if (aoMap.find(c_it->first) == aoMap.end())
@@ -978,12 +978,12 @@ bool MappedAbstractObject<Key, KeyIsComposedAnalysis, AOSubType, type, MappedAOS
 //! It can be answered based on union (mostAccurate=false) or intersection
 //! (mostAccurate=true) of executions
 //! The conservative answer is to assume that the object is live
-template<class Key, bool KeyIsComposedAnalysis, class AOSubType, AbstractObject::AOType type, class MappedAOSubType>
-bool MappedAbstractObject<Key, KeyIsComposedAnalysis, AOSubType, type, MappedAOSubType>::isLiveAO(PartEdgePtr pedge)
+template<class Key, bool KeyIsComposedAnalysis, class AOSubType, class AOSubTypePtr, AbstractObject::AOType type, class MappedAOSubType>
+bool MappedAbstractObject<Key, KeyIsComposedAnalysis, AOSubType, AOSubTypePtr, type, MappedAOSubType>::isLiveAO(PartEdgePtr pedge)
 { return isLive(pedge, analysis->getComposer(), analysis); }
 
-template<class Key, bool KeyIsComposedAnalysis, class AOSubType, AbstractObject::AOType type, class MappedAOSubType>
-bool  MappedAbstractObject<Key, KeyIsComposedAnalysis, AOSubType, type, MappedAOSubType>::isLive(PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis) {
+template<class Key, bool KeyIsComposedAnalysis, class AOSubType, class AOSubTypePtr, AbstractObject::AOType type, class MappedAOSubType>
+bool  MappedAbstractObject<Key, KeyIsComposedAnalysis, AOSubType, AOSubTypePtr, type, MappedAOSubType>::isLive(PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis) {
   // If this object is full return the conservative answer
   if (isFull(pedge, comp, analysis))
     return true;
@@ -996,7 +996,7 @@ bool  MappedAbstractObject<Key, KeyIsComposedAnalysis, AOSubType, type, MappedAO
   // 1. This object may have have one or more full objects under intersection
   // 2. This object doesnt have any full objects added to it under union
   // Under both cases the answer is based on how individual analysis respond to the query
-  typename map<Key, boost::shared_ptr<AOSubType> >::iterator it = aoMap.begin();
+  typename map<Key, AOSubTypePtr >::iterator it = aoMap.begin();
   for (; it != aoMap.end(); ++it) {
     bool isLive = it->second->isLive(pedge, comp, analysis);
     if (isUnion() && isLive == true)
@@ -1014,15 +1014,15 @@ bool  MappedAbstractObject<Key, KeyIsComposedAnalysis, AOSubType, type, MappedAO
     assert(0);
 }
 
-template<class Key, bool KeyIsComposedAnalysis, class AOSubType, AbstractObject::AOType type, class MappedAOSubType>
-bool MappedAbstractObject<Key, KeyIsComposedAnalysis, AOSubType, type, MappedAOSubType>::meetUpdateAO(boost::shared_ptr<AOSubType> thatAO, PartEdgePtr pedge)
+template<class Key, bool KeyIsComposedAnalysis, class AOSubType, class AOSubTypePtr, AbstractObject::AOType type, class MappedAOSubType>
+bool MappedAbstractObject<Key, KeyIsComposedAnalysis, AOSubType, AOSubTypePtr, type, MappedAOSubType>::meetUpdateAO(AOSubTypePtr thatAO, PartEdgePtr pedge)
 { return meetUpdate(thatAO, pedge, analysis->getComposer(), analysis); }
 
 //! meetUpdateAO performs the join operation of abstractions of two mls
-template<class Key, bool KeyIsComposedAnalysis, class AOSubType, AbstractObject::AOType type, class MappedAOSubType>
-bool MappedAbstractObject<Key, KeyIsComposedAnalysis, AOSubType, type, MappedAOSubType>::meetUpdate(AbstractObjectPtr that, PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis) {
-  boost::shared_ptr<MappedAbstractObject<Key, KeyIsComposedAnalysis, AOSubType, type, MappedAOSubType> > thatAO_p =
-      boost::dynamic_pointer_cast<MappedAbstractObject<Key, KeyIsComposedAnalysis, AOSubType, type, MappedAOSubType> >(
+template<class Key, bool KeyIsComposedAnalysis, class AOSubType, class AOSubTypePtr, AbstractObject::AOType type, class MappedAOSubType>
+bool MappedAbstractObject<Key, KeyIsComposedAnalysis, AOSubType, AOSubTypePtr, type, MappedAOSubType>::meetUpdate(AbstractObjectPtr that, PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis) {
+  boost::shared_ptr<MappedAbstractObject<Key, KeyIsComposedAnalysis, AOSubType, AOSubTypePtr, type, MappedAOSubType> > thatAO_p =
+      boost::dynamic_pointer_cast<MappedAbstractObject<Key, KeyIsComposedAnalysis, AOSubType, AOSubTypePtr, type, MappedAOSubType> >(
           that);
   assert(thatAO_p);
 
@@ -1038,10 +1038,10 @@ bool MappedAbstractObject<Key, KeyIsComposedAnalysis, AOSubType, type, MappedAOS
   }
 
   // Both objects are not full
-  const map<Key, boost::shared_ptr<AOSubType> > thatAOMap = thatAO_p->getAOMap();
+  const map<Key, AOSubTypePtr > thatAOMap = thatAO_p->getAOMap();
 
-  typename map<Key, boost::shared_ptr<AOSubType> >::iterator it = aoMap.begin();
-  typename map<Key, boost::shared_ptr<AOSubType> >::const_iterator s_it; // search iterator for thatAOMap
+  typename map<Key, AOSubTypePtr >::iterator it = aoMap.begin();
+  typename map<Key, AOSubTypePtr >::const_iterator s_it; // search iterator for thatAOMap
 
   bool modified = false;
   while (it != aoMap.end()) {
@@ -1077,30 +1077,30 @@ bool MappedAbstractObject<Key, KeyIsComposedAnalysis, AOSubType, type, MappedAOS
 }
 
 //! Method that sets this mapped object to full
-template<class Key, bool KeyIsComposedAnalysis, class AOSubType, AbstractObject::AOType type, class MappedAOSubType>
-void MappedAbstractObject<Key, KeyIsComposedAnalysis, AOSubType, type, MappedAOSubType>::setAOToFull() {
+template<class Key, bool KeyIsComposedAnalysis, class AOSubType, class AOSubTypePtr, AbstractObject::AOType type, class MappedAOSubType>
+void MappedAbstractObject<Key, KeyIsComposedAnalysis, AOSubType, AOSubTypePtr, type, MappedAOSubType>::setAOToFull() {
   assert(nFull > 0);
   if (aoMap.size() > 0)
     aoMap.clear();
 }
 
-template<class Key, bool KeyIsComposedAnalysis, class AOSubType, AbstractObject::AOType type, class MappedAOSubType>
-bool MappedAbstractObject<Key, KeyIsComposedAnalysis, AOSubType, type, MappedAOSubType>::isFullAO(PartEdgePtr pedge)
+template<class Key, bool KeyIsComposedAnalysis, class AOSubType, class AOSubTypePtr, AbstractObject::AOType type, class MappedAOSubType>
+bool MappedAbstractObject<Key, KeyIsComposedAnalysis, AOSubType, AOSubTypePtr, type, MappedAOSubType>::isFullAO(PartEdgePtr pedge)
 { return isFull(pedge, analysis->getComposer(), analysis); }
 
-template<class Key, bool KeyIsComposedAnalysis, class AOSubType, AbstractObject::AOType type, class MappedAOSubType>
-bool MappedAbstractObject<Key, KeyIsComposedAnalysis, AOSubType, type, MappedAOSubType>::isFull(PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis) {
+template<class Key, bool KeyIsComposedAnalysis, class AOSubType, class AOSubTypePtr, AbstractObject::AOType type, class MappedAOSubType>
+bool MappedAbstractObject<Key, KeyIsComposedAnalysis, AOSubType, AOSubTypePtr, type, MappedAOSubType>::isFull(PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis) {
   if (nFull > 0 && aoMap.size() == 0)
     return true;
   return false;
 }
 
-template<class Key, bool KeyIsComposedAnalysis, class AOSubType, AbstractObject::AOType type, class MappedAOSubType>
-bool MappedAbstractObject<Key, KeyIsComposedAnalysis, AOSubType, type, MappedAOSubType>::isEmptyAO(PartEdgePtr pedge)
+template<class Key, bool KeyIsComposedAnalysis, class AOSubType, class AOSubTypePtr, AbstractObject::AOType type, class MappedAOSubType>
+bool MappedAbstractObject<Key, KeyIsComposedAnalysis, AOSubType, AOSubTypePtr, type, MappedAOSubType>::isEmptyAO(PartEdgePtr pedge)
 { return isEmpty(pedge, analysis->getComposer(), analysis); }
 
-template<class Key, bool KeyIsComposedAnalysis, class AOSubType, AbstractObject::AOType type, class MappedAOSubType>
-bool MappedAbstractObject<Key, KeyIsComposedAnalysis, AOSubType, type, MappedAOSubType>::isEmpty(PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis) {
+template<class Key, bool KeyIsComposedAnalysis, class AOSubType, class AOSubTypePtr, AbstractObject::AOType type, class MappedAOSubType>
+bool MappedAbstractObject<Key, KeyIsComposedAnalysis, AOSubType, AOSubTypePtr, type, MappedAOSubType>::isEmpty(PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis) {
   if (nFull == 0 && aoMap.size() == 0)
     return true;
   return false;
@@ -1111,13 +1111,17 @@ bool MappedAbstractObject<Key, KeyIsComposedAnalysis, AOSubType, type, MappedAOS
 // individual objects that came from a given analysis and returns their combination. For example, a Union object
 // will implement this method by invoking it on its members, calling meetUpdate on these objects and returning
 // the resulting object.
-template<class Key, bool KeyIsComposedAnalysis, class AOSubType, AbstractObject::AOType type, class MappedAOSubType>
-boost::shared_ptr<AOSubType> MappedAbstractObject<Key, KeyIsComposedAnalysis, AOSubType, type, MappedAOSubType>::
+template<class Key, bool KeyIsComposedAnalysis, class AOSubType, class AOSubTypePtr, AbstractObject::AOType type, class MappedAOSubType>
+AOSubTypePtr MappedAbstractObject<Key, KeyIsComposedAnalysis, AOSubType, AOSubTypePtr, type, MappedAOSubType>::
                                  project(ComposedAnalysis* analysis, PartEdgePtr pedge, Composer* comp, ComposedAnalysis* clientAnalysis) {
+  /*scope s("MappedAbstractObject::project()");
+  dbg << "this="<<str()<<endl;
+  dbg << "KeyIsComposedAnalysis="<<KeyIsComposedAnalysis<<endl;*/
+
   // If they key is a ComposedAnalysis*
   if(KeyIsComposedAnalysis) {
     // Return the sub-AO mapped under the given analysis key
-    typename std::map<Key, boost::shared_ptr<AOSubType> >::iterator ao = aoMap.find(analysis);
+    typename std::map<Key, AOSubTypePtr >::iterator ao = aoMap.find(analysis);
     assert(ao != aoMap.end());
     return ao->second;
 
@@ -1128,15 +1132,18 @@ boost::shared_ptr<AOSubType> MappedAbstractObject<Key, KeyIsComposedAnalysis, AO
     assert(aoMap.size()>0);
 
     // The object that will hold the combination of the results of project() methods on sub-AOs
-    boost::shared_ptr<AOSubType> combinedObject;
-    for(typename std::map<Key, boost::shared_ptr<AOSubType> >::iterator ao=aoMap.begin(); ao!=aoMap.end(); ++ao) {
+    AOSubTypePtr combinedObject;
+    for(typename std::map<Key, AOSubTypePtr >::iterator ao=aoMap.begin(); ao!=aoMap.end(); ++ao) {
+      /*scope s("Current");
+      dbg << "ao="<<ao->second->str()<<endl;*/
       // In the first iteration initialize combinedObject to be the result of calling project() on the first sub-AO
       if(ao==aoMap.begin())
-        combinedObject = boost::dynamic_pointer_cast<AOSubType>(aoMap.begin()->second->project(analysis, pedge, comp, clientAnalysis)->copyAO());
+        combinedObject = boost::dynamic_pointer_cast<AOSubType>(ao->second->project(analysis, pedge, comp, clientAnalysis)->copyAO());
       else {
-        if(isIntersection()) combinedObject->intersectUpdate(aoMap.begin()->second->project(analysis, pedge, comp, clientAnalysis), pedge, comp, clientAnalysis);
-        else                 combinedObject->meetUpdate     (aoMap.begin()->second->project(analysis, pedge, comp, clientAnalysis), pedge, comp, clientAnalysis);
+        if(isIntersection()) combinedObject->intersectUpdate(ao->second->project(analysis, pedge, comp, clientAnalysis), pedge, comp, clientAnalysis);
+        else                 combinedObject->meetUpdate     (ao->second->project(analysis, pedge, comp, clientAnalysis), pedge, comp, clientAnalysis);
       }
+      //dbg << "combinedObject="<<combinedObject->str()<<endl;
     }
 
     assert(combinedObject);
@@ -1145,11 +1152,11 @@ boost::shared_ptr<AOSubType> MappedAbstractObject<Key, KeyIsComposedAnalysis, AO
 }
 
 // Returns true if this AbstractObject corresponds to a concrete value that is statically-known
-template<class Key, bool KeyIsComposedAnalysis, class AOSubType, AbstractObject::AOType type, class MappedAOSubType>
-bool MappedAbstractObject<Key, KeyIsComposedAnalysis, AOSubType, type, MappedAOSubType>::isConcrete() {
+template<class Key, bool KeyIsComposedAnalysis, class AOSubType, class AOSubTypePtr, AbstractObject::AOType type, class MappedAOSubType>
+bool MappedAbstractObject<Key, KeyIsComposedAnalysis, AOSubType, AOSubTypePtr, type, MappedAOSubType>::isConcrete() {
   if(isUnion() && nFull>0) return false;
 
-  typename map<Key, boost::shared_ptr<AOSubType> >::iterator it;
+  typename map<Key, AOSubTypePtr >::iterator it;
   for (it = aoMap.begin(); it != aoMap.end(); ++it) {
     if (isIntersection() && it->second->isConcrete()) return true;
     if (isUnion()        && !it->second->isConcrete()) return false;
@@ -1159,20 +1166,20 @@ bool MappedAbstractObject<Key, KeyIsComposedAnalysis, AOSubType, type, MappedAOS
 }
 
 // Returns the number of concrete values in this set
-template<class Key, bool KeyIsComposedAnalysis, class AOSubType, AbstractObject::AOType type, class MappedAOSubType>
-int MappedAbstractObject<Key, KeyIsComposedAnalysis, AOSubType, type, MappedAOSubType>::concreteSetSize() {
+template<class Key, bool KeyIsComposedAnalysis, class AOSubType, class AOSubTypePtr, AbstractObject::AOType type, class MappedAOSubType>
+int MappedAbstractObject<Key, KeyIsComposedAnalysis, AOSubType, AOSubTypePtr, type, MappedAOSubType>::concreteSetSize() {
   // This is an over-approximation of the set size that assumes that all the concrete sets of
   // the sub-CodeLocs are disjoint
   int size = 0;
-  typename map<Key, boost::shared_ptr<AOSubType> >::iterator it;
+  typename map<Key, AOSubTypePtr >::iterator it;
   for (it = aoMap.begin(); it != aoMap.end(); ++it)
     if (it->second->isConcrete())
       size += it->second->concreteSetSize();
   return size;
 }
 
-template<class Key, bool KeyIsComposedAnalysis, class AOSubType, AbstractObject::AOType type, class MappedAOSubType>
-string MappedAbstractObject<Key, KeyIsComposedAnalysis, AOSubType, type, MappedAOSubType>::str(string indent) const {
+template<class Key, bool KeyIsComposedAnalysis, class AOSubType, class AOSubTypePtr, AbstractObject::AOType type, class MappedAOSubType>
+string MappedAbstractObject<Key, KeyIsComposedAnalysis, AOSubType, AOSubTypePtr, type, MappedAOSubType>::str(string indent) const {
   ostringstream oss;
   oss << "<table border=\"1\">";
   oss << "<tr>";
@@ -1186,7 +1193,7 @@ string MappedAbstractObject<Key, KeyIsComposedAnalysis, AOSubType, type, MappedA
     oss << "<th> Empty </th> </tr>";
   else {
     oss << "</tr>";
-    typename map<Key, boost::shared_ptr<AOSubType> >::const_iterator it =
+    typename map<Key, AOSubTypePtr >::const_iterator it =
         aoMap.begin();
     for (; it != aoMap.end(); ++it) {
       oss << "<tr>";
@@ -1201,9 +1208,9 @@ string MappedAbstractObject<Key, KeyIsComposedAnalysis, AOSubType, type, MappedA
 
 // Returns whether all instances of this class form a hierarchy. Every instance of the same
 // class created by the same analysis must return the same value from this method!
-template<class Key, bool KeyIsComposedAnalysis, class AOSubType, AbstractObject::AOType type, class MappedAOSubType>
-bool MappedAbstractObject<Key, KeyIsComposedAnalysis, AOSubType, type, MappedAOSubType>::isHierarchy() const {
-  /*scope s("MappedAbstractObject<Key, KeyIsComposedAnalysis, AOSubType, type, MappedAOSubType>::isHierarchy()");
+template<class Key, bool KeyIsComposedAnalysis, class AOSubType, class AOSubTypePtr, AbstractObject::AOType type, class MappedAOSubType>
+bool MappedAbstractObject<Key, KeyIsComposedAnalysis, AOSubType, AOSubTypePtr, type, MappedAOSubType>::isHierarchy() const {
+  /*scope s("MappedAbstractObject<Key, KeyIsComposedAnalysis, AOSubType, AOSubTypePtr, type, MappedAOSubType>::isHierarchy()");
   dbg << "#aoMap="<<aoMap.size()<<", aoMap.begin()->second->isHierarchy()="<<aoMap.begin()->second->isHierarchy()<<endl;
   dbg << "aoMap.begin()->second="<<aoMap.begin()->second->str()<<endl;*/
   if(aoMap.size()==1 && aoMap.begin()->second->isHierarchy()) return true;
@@ -1227,7 +1234,7 @@ bool MappedAbstractObject<Key, KeyIsComposedAnalysis, AOSubType, type, MappedAOS
       return false;
   }
 
-  typename map<Key, boost::shared_ptr<AOSubType> >::const_iterator it;
+  typename map<Key, AOSubTypePtr >::const_iterator it;
   for (it = aoMap.begin(); it != aoMap.end(); ++it)
     if (!it->second->isHierarchy())
       return false;
@@ -1235,9 +1242,9 @@ bool MappedAbstractObject<Key, KeyIsComposedAnalysis, AOSubType, type, MappedAOS
 }
 
 // Returns whether all instances of all the AbstractObjects within this MAO form a hierachy
-template<class Key, bool KeyIsComposedAnalysis, class AOSubType, AbstractObject::AOType type, class MappedAOSubType>
-bool MappedAbstractObject<Key, KeyIsComposedAnalysis, AOSubType, type, MappedAOSubType>::membersIsHierarchy() const {
-  typename map<Key, boost::shared_ptr<AOSubType> >::const_iterator it;
+template<class Key, bool KeyIsComposedAnalysis, class AOSubType, class AOSubTypePtr, AbstractObject::AOType type, class MappedAOSubType>
+bool MappedAbstractObject<Key, KeyIsComposedAnalysis, AOSubType, AOSubTypePtr, type, MappedAOSubType>::membersIsHierarchy() const {
+  typename map<Key, AOSubTypePtr >::const_iterator it;
   for (it = aoMap.begin(); it != aoMap.end(); ++it)
     if (!it->second->isHierarchy())
       return false;
@@ -1246,10 +1253,10 @@ bool MappedAbstractObject<Key, KeyIsComposedAnalysis, AOSubType, type, MappedAOS
 
 // Returns a key that uniquely identifies this particular AbstractObject in the
 // set hierarchy.
-template<class Key, bool KeyIsComposedAnalysis, class AOSubType, AbstractObject::AOType type, class MappedAOSubType>
-const AbstractionHierarchy::hierKeyPtr& MappedAbstractObject<Key, KeyIsComposedAnalysis, AOSubType, type, MappedAOSubType>::getHierKey() const {
+template<class Key, bool KeyIsComposedAnalysis, class AOSubType, class AOSubTypePtr, AbstractObject::AOType type, class MappedAOSubType>
+const AbstractionHierarchy::hierKeyPtr& MappedAbstractObject<Key, KeyIsComposedAnalysis, AOSubType, AOSubTypePtr, type, MappedAOSubType>::getHierKey() const {
   assert(aoMap.size()==1);
-  /*scope s("MappedAbstractObject<Key, KeyIsComposedAnalysis, AOSubType, type, MappedAOSubType>::getHierKey()");
+  /*scope s("MappedAbstractObject<Key, KeyIsComposedAnalysis, AOSubType, AOSubTypePtr, type, MappedAOSubType>::getHierKey()");
   dbg << "this="<<str()<<endl;
   dbg << "aoMap.begin()->second="<<aoMap.begin()->second->str()<<endl;*/
   assert(aoMap.begin()->second->isHierarchy());
@@ -1262,68 +1269,68 @@ const AbstractionHierarchy::hierKeyPtr& MappedAbstractObject<Key, KeyIsComposedA
 //  // the set down. As such, a hierarchical key for the intersection of multiple objects
 //  // is just the concatenation of the keys of all the individual objects.
 //  if (!AOSubType::isHierKeyCached) {
-//    /*((MappedAbstractObject<Key, KeyIsComposedAnalysis, AOSubType, type, MappedAOSubType>*) this)->cachedHierKey =
+//    /*((MappedAbstractObject<Key, KeyIsComposedAnalysis, AOSubType, AOSubTypePtr, type, MappedAOSubType>*) this)->cachedHierKey =
 //     boost::make_shared<AOSHierKey>(
-//     ((MappedAbstractObject<Key, KeyIsComposedAnalysis, AOSubType, type, MappedAOSubType>*) this)->shared_from_this());
+//     ((MappedAbstractObject<Key, KeyIsComposedAnalysis, AOSubType, AOSubTypePtr, type, MappedAOSubType>*) this)->shared_from_this());
 //
-//     typename map<Key, boost::shared_ptr<AOSubType> >::const_iterator it;
+//     typename map<Key, AOSubTypePtr >::const_iterator it;
 //     for (it = aoMap.begin(); it != aoMap.end(); ++it) {
 //     AbstractionHierarchyPtr hierIt = boost::dynamic_pointer_cast<
 //     AbstractionHierarchy>(it->second);
 //     ROSE_ASSERT(hierIt);
 //
-//     ((MappedAbstractObject<Key, KeyIsComposedAnalysis, AOSubType, type, MappedAOSubType>*) this)->cachedHierKey->add(
+//     ((MappedAbstractObject<Key, KeyIsComposedAnalysis, AOSubType, AOSubTypePtr, type, MappedAOSubType>*) this)->cachedHierKey->add(
 //     hierIt->getHierKey()->begin(), hierIt->getHierKey()->end());
 //     }*/
 //
 //    map<Key, typename AOSubType::hierKeyPtr> subHierKeys;
-//    for(typename map<Key, boost::shared_ptr<AOSubType> >::const_iterator it = aoMap.begin();
+//    for(typename map<Key, AOSubTypePtr >::const_iterator it = aoMap.begin();
 //        it != aoMap.end(); ++it) {
 //      AbstractionHierarchyPtr hierIt = boost::dynamic_pointer_cast<AbstractionHierarchy>(it->second);
 //      ROSE_ASSERT(hierIt);
 //      subHierKeys[it->first] = hierIt->getHierKey();
 //    }
 //
-//    ((MappedAbstractObject<Key, KeyIsComposedAnalysis, AOSubType, type, MappedAOSubType>*) this)->cachedHierKey =
+//    ((MappedAbstractObject<Key, KeyIsComposedAnalysis, AOSubType, AOSubTypePtr, type, MappedAOSubType>*) this)->cachedHierKey =
 //        boost::make_shared<AbstractionHierarchy::IntersectMappedHierKey<Key> >(subHierKeys);
 //
-//    ((MappedAbstractObject<Key, KeyIsComposedAnalysis, AOSubType, type, MappedAOSubType>*) this)->AOSubType::isHierKeyCached = true;
+//    ((MappedAbstractObject<Key, KeyIsComposedAnalysis, AOSubType, AOSubTypePtr, type, MappedAOSubType>*) this)->AOSubType::isHierKeyCached = true;
 //  }
 //  return AOSubType::cachedHierKey;
 //}
 
 // Returns whether sets of the given type form a partial order
-template<class Key, bool KeyIsComposedAnalysis, class AOSubType, AbstractObject::AOType type, class MappedAOSubType>
-bool MappedAbstractObject<Key, KeyIsComposedAnalysis, AOSubType, type, MappedAOSubType>::isPartialOrder()
+template<class Key, bool KeyIsComposedAnalysis, class AOSubType, class AOSubTypePtr, AbstractObject::AOType type, class MappedAOSubType>
+bool MappedAbstractObject<Key, KeyIsComposedAnalysis, AOSubType, AOSubTypePtr, type, MappedAOSubType>::isPartialOrder()
 { return membersIsHierarchy(); }
 
 // If isPartialOrder() returns true, classes must implement the methods below to establish
 // the partial order relationship among class instances.
-template<class Key, bool KeyIsComposedAnalysis, class AOSubType, AbstractObject::AOType type, class MappedAOSubType>
-bool MappedAbstractObject<Key, KeyIsComposedAnalysis, AOSubType, type, MappedAOSubType>::MappedPartialOrderKey::isPOLessThan(const PartialOrderKey& that_arg)
+template<class Key, bool KeyIsComposedAnalysis, class AOSubType, class AOSubTypePtr, AbstractObject::AOType type, class MappedAOSubType>
+bool MappedAbstractObject<Key, KeyIsComposedAnalysis, AOSubType, AOSubTypePtr, type, MappedAOSubType>::MappedPartialOrderKey::isPOLessThan(const PartialOrderKey& that_arg)
 {
   try{
-    const MappedAbstractObject<Key, KeyIsComposedAnalysis, AOSubType, type, MappedAOSubType>::MappedPartialOrderKey& that =
-        dynamic_cast<const MappedAbstractObject<Key, KeyIsComposedAnalysis, AOSubType, type, MappedAOSubType>::MappedPartialOrderKey& >(that_arg);
+    const MappedAbstractObject<Key, KeyIsComposedAnalysis, AOSubType, AOSubTypePtr, type, MappedAOSubType>::MappedPartialOrderKey& that =
+        dynamic_cast<const MappedAbstractObject<Key, KeyIsComposedAnalysis, AOSubType, AOSubTypePtr, type, MappedAOSubType>::MappedPartialOrderKey& >(that_arg);
     return key < that.key;
   } catch(std::bad_cast c)
   { assert(0); }
 }
 
-template<class Key, bool KeyIsComposedAnalysis, class AOSubType, AbstractObject::AOType type, class MappedAOSubType>
-bool MappedAbstractObject<Key, KeyIsComposedAnalysis, AOSubType, type, MappedAOSubType>::MappedPartialOrderKey::isPOEqual(const PartialOrderKey& that_arg)
+template<class Key, bool KeyIsComposedAnalysis, class AOSubType, class AOSubTypePtr, AbstractObject::AOType type, class MappedAOSubType>
+bool MappedAbstractObject<Key, KeyIsComposedAnalysis, AOSubType, AOSubTypePtr, type, MappedAOSubType>::MappedPartialOrderKey::isPOEqual(const PartialOrderKey& that_arg)
 {
   try{
-    const MappedAbstractObject<Key, KeyIsComposedAnalysis, AOSubType, type, MappedAOSubType>::MappedPartialOrderKey& that =
-        dynamic_cast<const MappedAbstractObject<Key, KeyIsComposedAnalysis, AOSubType, type, MappedAOSubType>::MappedPartialOrderKey& >(that_arg);
+    const MappedAbstractObject<Key, KeyIsComposedAnalysis, AOSubType, AOSubTypePtr, type, MappedAOSubType>::MappedPartialOrderKey& that =
+        dynamic_cast<const MappedAbstractObject<Key, KeyIsComposedAnalysis, AOSubType, AOSubTypePtr, type, MappedAOSubType>::MappedPartialOrderKey& >(that_arg);
     return key == that.key;
   } catch(std::bad_cast c)
   { assert(0); }
 }
 
 // Computes the partial order key that describes this object and stores it in partialOrderKey
-template<class Key, bool KeyIsComposedAnalysis, class AOSubType, AbstractObject::AOType type, class MappedAOSubType>
-void MappedAbstractObject<Key, KeyIsComposedAnalysis, AOSubType, type, MappedAOSubType>::computePartialOrderKey() {
+template<class Key, bool KeyIsComposedAnalysis, class AOSubType, class AOSubTypePtr, AbstractObject::AOType type, class MappedAOSubType>
+void MappedAbstractObject<Key, KeyIsComposedAnalysis, AOSubType, AOSubTypePtr, type, MappedAOSubType>::computePartialOrderKey() {
   // The intersection of multiple objects is just a filtering process from the full
   // set of objects to the exact one, with each key in the hierarchy further filtering
   // the set down. As such, a hierarchical key for the intersection of multiple objects
@@ -1332,7 +1339,7 @@ void MappedAbstractObject<Key, KeyIsComposedAnalysis, AOSubType, type, MappedAOS
     assert(isPartialOrder());
 
     partialOrderKey = boost::make_shared<MappedPartialOrderKey>();
-    for(typename map<Key, boost::shared_ptr<AOSubType> >::const_iterator it = aoMap.begin();
+    for(typename map<Key, AOSubTypePtr >::const_iterator it = aoMap.begin();
         it != aoMap.end(); ++it) {
       AbstractionHierarchyPtr hierIt = boost::dynamic_pointer_cast<AbstractionHierarchy>(it->second);
       ROSE_ASSERT(hierIt);
@@ -1343,8 +1350,8 @@ void MappedAbstractObject<Key, KeyIsComposedAnalysis, AOSubType, type, MappedAOS
 }
 
 // Returns the PartialOrderKey object that defines this Abstraction's location within its partial order
-template<class Key, bool KeyIsComposedAnalysis, class AOSubType, AbstractObject::AOType type, class MappedAOSubType>
-AbstractionPartialOrder::PartialOrderKeyPtr MappedAbstractObject<Key, KeyIsComposedAnalysis, AOSubType, type, MappedAOSubType>::getPOKey() {
+template<class Key, bool KeyIsComposedAnalysis, class AOSubType, class AOSubTypePtr, AbstractObject::AOType type, class MappedAOSubType>
+AbstractionPartialOrder::PartialOrderKeyPtr MappedAbstractObject<Key, KeyIsComposedAnalysis, AOSubType, AOSubTypePtr, type, MappedAOSubType>::getPOKey() {
   computePartialOrderKey();
   return partialOrderKey;
 }
@@ -1354,11 +1361,11 @@ AbstractionPartialOrder::PartialOrderKeyPtr MappedAbstractObject<Key, KeyIsCompo
    ################################################ */
 
 // Creates an empty map with the same keys as the given MappedAbstractObject
-template<class Key, bool KeyIsComposedAnalysis, class AOSubType, AbstractObject::AOType type, class MappedAOSubType>
-MappedAbstractObject<Key, KeyIsComposedAnalysis, AOSubType, type, MappedAOSubType>::ConcreteMAOMap::ConcreteMAOMap
-    (boost::shared_ptr<MappedAbstractObject<Key, KeyIsComposedAnalysis, AOSubType, type, MappedAOSubType> > parent): parent(parent) {
+template<class Key, bool KeyIsComposedAnalysis, class AOSubType, class AOSubTypePtr, AbstractObject::AOType type, class MappedAOSubType>
+MappedAbstractObject<Key, KeyIsComposedAnalysis, AOSubType, AOSubTypePtr, type, MappedAOSubType>::ConcreteMAOMap::ConcreteMAOMap
+    (boost::shared_ptr<MappedAbstractObject<Key, KeyIsComposedAnalysis, AOSubType, AOSubTypePtr, type, MappedAOSubType> > parent): parent(parent) {
   // Initialize data to map the keys in the parent MappedAO to NULL pointers
-  for(typename map<Key, boost::shared_ptr<AOSubType> >::const_iterator aoIter = parent->aoMap.begin();
+  for(typename map<Key, AOSubTypePtr >::const_iterator aoIter = parent->aoMap.begin();
       aoIter!=parent->aoMap.end(); ++aoIter)
   data[aoIter->first] = boost::shared_ptr<void>();
 }
@@ -1366,20 +1373,20 @@ MappedAbstractObject<Key, KeyIsComposedAnalysis, AOSubType, type, MappedAOSubTyp
 // Creates a new map based on the given map:
 // If emptyMap==true: the new map will be created empty but initialized with the keys of the given map
 // Otherwise: the new map will be a shallow copy of the given map (the copy methods of the keys and values are not called)
-template<class Key, bool KeyIsComposedAnalysis, class AOSubType, AbstractObject::AOType type, class MappedAOSubType>
-MappedAbstractObject<Key, KeyIsComposedAnalysis, AOSubType, type, MappedAOSubType>::ConcreteMAOMap::ConcreteMAOMap
+template<class Key, bool KeyIsComposedAnalysis, class AOSubType, class AOSubTypePtr, AbstractObject::AOType type, class MappedAOSubType>
+MappedAbstractObject<Key, KeyIsComposedAnalysis, AOSubType, AOSubTypePtr, type, MappedAOSubType>::ConcreteMAOMap::ConcreteMAOMap
     (const ConcreteMAOMap& that, bool emptyMap) {
   for(typename map<Key, boost::shared_ptr<void> >::const_iterator dIter = that.data.begin(); dIter != that.data.end(); ++dIter)
     data[dIter->first] = (emptyMap? boost::shared_ptr<void>():
                                     dIter->second);
 }
 
-template<class Key, bool KeyIsComposedAnalysis, class AOSubType, AbstractObject::AOType type, class MappedAOSubType>
-void MappedAbstractObject<Key, KeyIsComposedAnalysis, AOSubType, type, MappedAOSubType>::ConcreteMAOMap::set(AbstractionPtr mappedAO_arg, setMapFunc& f) {
-  boost::shared_ptr<MappedAbstractObject<Key, KeyIsComposedAnalysis, AOSubType, type, MappedAOSubType> > mappedAO = boost::dynamic_pointer_cast<MappedAbstractObject<Key, KeyIsComposedAnalysis, AOSubType, type, MappedAOSubType> >(mappedAO_arg);
+template<class Key, bool KeyIsComposedAnalysis, class AOSubType, class AOSubTypePtr, AbstractObject::AOType type, class MappedAOSubType>
+void MappedAbstractObject<Key, KeyIsComposedAnalysis, AOSubType, AOSubTypePtr, type, MappedAOSubType>::ConcreteMAOMap::set(AbstractionPtr mappedAO_arg, setMapFunc& f) {
+  boost::shared_ptr<MappedAbstractObject<Key, KeyIsComposedAnalysis, AOSubType, AOSubTypePtr, type, MappedAOSubType> > mappedAO = boost::dynamic_pointer_cast<MappedAbstractObject<Key, KeyIsComposedAnalysis, AOSubType, AOSubTypePtr, type, MappedAOSubType> >(mappedAO_arg);
   assert(mappedAO);
 
-  for(typename map<Key, boost::shared_ptr<AOSubType> >::const_iterator aoIter = mappedAO->aoMap.begin();
+  for(typename map<Key, AOSubTypePtr >::const_iterator aoIter = mappedAO->aoMap.begin();
       aoIter != mappedAO->aoMap.end(); ++aoIter) {
     typename map<Key, boost::shared_ptr<void> >::iterator dIter = data.find(aoIter->first);
     if(dIter != data.end()) dIter->second = f(aoIter->second, dIter->second, true);
@@ -1387,12 +1394,12 @@ void MappedAbstractObject<Key, KeyIsComposedAnalysis, AOSubType, type, MappedAOS
   }
 }
 
-template<class Key, bool KeyIsComposedAnalysis, class AOSubType, AbstractObject::AOType type, class MappedAOSubType>
-void MappedAbstractObject<Key, KeyIsComposedAnalysis, AOSubType, type, MappedAOSubType>::ConcreteMAOMap::get(AbstractionPtr mappedAO_arg, getMapFunc& f)  {
-  boost::shared_ptr<MappedAbstractObject<Key, KeyIsComposedAnalysis, AOSubType, type, MappedAOSubType> > mappedAO = boost::dynamic_pointer_cast<MappedAbstractObject<Key, KeyIsComposedAnalysis, AOSubType, type, MappedAOSubType> >(mappedAO_arg);
+template<class Key, bool KeyIsComposedAnalysis, class AOSubType, class AOSubTypePtr, AbstractObject::AOType type, class MappedAOSubType>
+void MappedAbstractObject<Key, KeyIsComposedAnalysis, AOSubType, AOSubTypePtr, type, MappedAOSubType>::ConcreteMAOMap::get(AbstractionPtr mappedAO_arg, getMapFunc& f)  {
+  boost::shared_ptr<MappedAbstractObject<Key, KeyIsComposedAnalysis, AOSubType, AOSubTypePtr, type, MappedAOSubType> > mappedAO = boost::dynamic_pointer_cast<MappedAbstractObject<Key, KeyIsComposedAnalysis, AOSubType, AOSubTypePtr, type, MappedAOSubType> >(mappedAO_arg);
   assert(mappedAO);
 
-  for(typename map<Key, boost::shared_ptr<AOSubType> >::const_iterator aoIter = mappedAO->aoMap.begin();
+  for(typename map<Key, AOSubTypePtr >::const_iterator aoIter = mappedAO->aoMap.begin();
       aoIter != mappedAO->aoMap.end(); ++aoIter) {
     typename map<Key, boost::shared_ptr<void> >::iterator dIter = data.find(aoIter->first);
     if(dIter != data.end()) f(aoIter->second, dIter->second, true);
@@ -1401,16 +1408,16 @@ void MappedAbstractObject<Key, KeyIsComposedAnalysis, AOSubType, type, MappedAOS
 }
 
 // Applies the given functor to all the keys in this map
-template<class Key, bool KeyIsComposedAnalysis, class AOSubType, AbstractObject::AOType type, class MappedAOSubType>
-void MappedAbstractObject<Key, KeyIsComposedAnalysis, AOSubType, type, MappedAOSubType>::ConcreteMAOMap::applyStr(applyStrMapFunc& f)  {
+template<class Key, bool KeyIsComposedAnalysis, class AOSubType, class AOSubTypePtr, AbstractObject::AOType type, class MappedAOSubType>
+void MappedAbstractObject<Key, KeyIsComposedAnalysis, AOSubType, AOSubTypePtr, type, MappedAOSubType>::ConcreteMAOMap::applyStr(applyStrMapFunc& f)  {
   for(typename map<Key, boost::shared_ptr<void> >::iterator dIter = data.begin(); dIter != data.end(); ++dIter) {
     f(dIter->first->str(), dIter->second);
   }
 }
 
 // Applies the given functor to all the keys in this map
-template<class Key, bool KeyIsComposedAnalysis, class AOSubType, AbstractObject::AOType type, class MappedAOSubType>
-void MappedAbstractObject<Key, KeyIsComposedAnalysis, AOSubType, type, MappedAOSubType>::ConcreteMAOMap::apply(applyMapFunc& f)  {
+template<class Key, bool KeyIsComposedAnalysis, class AOSubType, class AOSubTypePtr, AbstractObject::AOType type, class MappedAOSubType>
+void MappedAbstractObject<Key, KeyIsComposedAnalysis, AOSubType, AOSubTypePtr, type, MappedAOSubType>::ConcreteMAOMap::apply(applyMapFunc& f)  {
   for(typename map<Key, boost::shared_ptr<void> >::iterator dIter = data.begin(); dIter != data.end(); ++dIter) {
     f(dIter->second);
   }
@@ -1418,16 +1425,16 @@ void MappedAbstractObject<Key, KeyIsComposedAnalysis, AOSubType, type, MappedAOS
 
 // Applies the given functor to all the keys in this map and sets the value returned by each invocation
 // of the function to the key that corresponds to the call
-template<class Key, bool KeyIsComposedAnalysis, class AOSubType, AbstractObject::AOType type, class MappedAOSubType>
-void MappedAbstractObject<Key, KeyIsComposedAnalysis, AOSubType, type, MappedAOSubType>::ConcreteMAOMap::setApply(setApplyMapFunc& f) {
+template<class Key, bool KeyIsComposedAnalysis, class AOSubType, class AOSubTypePtr, AbstractObject::AOType type, class MappedAOSubType>
+void MappedAbstractObject<Key, KeyIsComposedAnalysis, AOSubType, AOSubTypePtr, type, MappedAOSubType>::ConcreteMAOMap::setApply(setApplyMapFunc& f) {
   for(typename map<Key, boost::shared_ptr<void> >::iterator dIter = data.begin(); dIter != data.end(); ++dIter) {
       dIter->second = f(dIter->second);
     }
 }
 
 // Applies f to the keys shared by this map and that map
-template<class Key, bool KeyIsComposedAnalysis, class AOSubType, AbstractObject::AOType type, class MappedAOSubType>
-void MappedAbstractObject<Key, KeyIsComposedAnalysis, AOSubType, type, MappedAOSubType>::ConcreteMAOMap::applyJoin(MAOMapPtr that_arg, applyJoinMapFunc& f) {
+template<class Key, bool KeyIsComposedAnalysis, class AOSubType, class AOSubTypePtr, AbstractObject::AOType type, class MappedAOSubType>
+void MappedAbstractObject<Key, KeyIsComposedAnalysis, AOSubType, AOSubTypePtr, type, MappedAOSubType>::ConcreteMAOMap::applyJoin(MAOMapPtr that_arg, applyJoinMapFunc& f) {
   boost::shared_ptr<ConcreteMAOMap> that = boost::dynamic_pointer_cast<ConcreteMAOMap>(that_arg);
   assert(that);
 
@@ -1440,8 +1447,8 @@ void MappedAbstractObject<Key, KeyIsComposedAnalysis, AOSubType, type, MappedAOS
 
 // Applies f to the keys shared by this map and that map. Assigns the return value of each function
 // call to the key for which the function was called
-template<class Key, bool KeyIsComposedAnalysis, class AOSubType, AbstractObject::AOType type, class MappedAOSubType>
-void MappedAbstractObject<Key, KeyIsComposedAnalysis, AOSubType, type, MappedAOSubType>::ConcreteMAOMap::setJoin(MAOMapPtr that_arg, setJoinMapFunc& f) {
+template<class Key, bool KeyIsComposedAnalysis, class AOSubType, class AOSubTypePtr, AbstractObject::AOType type, class MappedAOSubType>
+void MappedAbstractObject<Key, KeyIsComposedAnalysis, AOSubType, AOSubTypePtr, type, MappedAOSubType>::ConcreteMAOMap::setJoin(MAOMapPtr that_arg, setJoinMapFunc& f) {
   boost::shared_ptr<ConcreteMAOMap> that = boost::dynamic_pointer_cast<ConcreteMAOMap>(that_arg);
   assert(that);
 
@@ -1454,23 +1461,23 @@ void MappedAbstractObject<Key, KeyIsComposedAnalysis, AOSubType, type, MappedAOS
 
 // Applies f to the keys shared by maps this map and all the objects in objs.
 // Assigns the return value of each function call to the key for which the function was called
-template<class Key, bool KeyIsComposedAnalysis, class AOSubType, AbstractObject::AOType type, class MappedAOSubType>
-void MappedAbstractObject<Key, KeyIsComposedAnalysis, AOSubType, type, MappedAOSubType>::ConcreteMAOMap::setObjVecJoin
+template<class Key, bool KeyIsComposedAnalysis, class AOSubType, class AOSubTypePtr, AbstractObject::AOType type, class MappedAOSubType>
+void MappedAbstractObject<Key, KeyIsComposedAnalysis, AOSubType, AOSubTypePtr, type, MappedAOSubType>::ConcreteMAOMap::setObjVecJoin
                  (const std::vector<AbstractionPtr>& objs, setMapObjVecJoinMapFunc& f) {
   // Convert objs, which is a set of generic Abstractions into a vector of MappedAbstractObjects and store it in mappedAOs
-  //scope s("MappedAbstractObject<Key, KeyIsComposedAnalysis, AOSubType, type, MappedAOSubType>::ConcreteMAOMap::setObjVecJoin");
-  vector<boost::shared_ptr<MappedAbstractObject<Key, KeyIsComposedAnalysis, AOSubType, type, MappedAOSubType> > > mappedAOs;
+  //scope s("MappedAbstractObject<Key, KeyIsComposedAnalysis, AOSubType, AOSubTypePtr, type, MappedAOSubType>::ConcreteMAOMap::setObjVecJoin");
+  vector<boost::shared_ptr<MappedAbstractObject<Key, KeyIsComposedAnalysis, AOSubType, AOSubTypePtr, type, MappedAOSubType> > > mappedAOs;
   for(vector<AbstractionPtr>::const_iterator o=objs.begin(); o!=objs.end(); ++o) {
     //dbg << "o="<<(*o? (*o)->str():"NULL")<<endl;
     if(*o) {
-      boost::shared_ptr<MappedAbstractObject<Key, KeyIsComposedAnalysis, AOSubType, type, MappedAOSubType> > mappedAO =
-          boost::dynamic_pointer_cast<MappedAbstractObject<Key, KeyIsComposedAnalysis, AOSubType, type, MappedAOSubType> >(*o);
+      boost::shared_ptr<MappedAbstractObject<Key, KeyIsComposedAnalysis, AOSubType, AOSubTypePtr, type, MappedAOSubType> > mappedAO =
+          boost::dynamic_pointer_cast<MappedAbstractObject<Key, KeyIsComposedAnalysis, AOSubType, AOSubTypePtr, type, MappedAOSubType> >(*o);
       //assert(mappedAO);
       if(mappedAO) mappedAOs.push_back(mappedAO);
-      else mappedAOs.push_back(boost::shared_ptr<MappedAbstractObject<Key, KeyIsComposedAnalysis, AOSubType, type, MappedAOSubType> >());
+      else mappedAOs.push_back(boost::shared_ptr<MappedAbstractObject<Key, KeyIsComposedAnalysis, AOSubType, AOSubTypePtr, type, MappedAOSubType> >());
     // If this object is NULL, add a NULL value for it
     } else
-      mappedAOs.push_back(boost::shared_ptr<MappedAbstractObject<Key, KeyIsComposedAnalysis, AOSubType, type, MappedAOSubType> >());
+      mappedAOs.push_back(boost::shared_ptr<MappedAbstractObject<Key, KeyIsComposedAnalysis, AOSubType, AOSubTypePtr, type, MappedAOSubType> >());
   }
 
   // Iterate over all the keys in this map
@@ -1479,10 +1486,10 @@ void MappedAbstractObject<Key, KeyIsComposedAnalysis, AOSubType, type, MappedAOS
     // Store the values mapped in those objects at the current key in subAOs.
     vector<AbstractObjectPtr> subAOs;
     unsigned int i=0;
-    for(typename vector<typename boost::shared_ptr<MappedAbstractObject<Key, KeyIsComposedAnalysis, AOSubType, type, MappedAOSubType> > >::iterator o=mappedAOs.begin();
+    for(typename vector<typename boost::shared_ptr<MappedAbstractObject<Key, KeyIsComposedAnalysis, AOSubType, AOSubTypePtr, type, MappedAOSubType> > >::iterator o=mappedAOs.begin();
         o!=mappedAOs.end(); ++o, ++i) {
       if(*o) {
-        typename map<Key, boost::shared_ptr<AOSubType> >::const_iterator i=(*o)->aoMap.find(dThisIter->first);
+        typename map<Key, AOSubTypePtr >::const_iterator i=(*o)->aoMap.find(dThisIter->first);
         // If the current key is not found in the current object, skip this key
         if(i==(*o)->aoMap.end()) break;
         subAOs.push_back(i->second);
@@ -1501,17 +1508,17 @@ void MappedAbstractObject<Key, KeyIsComposedAnalysis, AOSubType, type, MappedAOS
 
 // Applies f to the keys shared by maps this map, obj and thatMap. Assigns the return value of each function
 // call to the key for which the function was called
-template<class Key, bool KeyIsComposedAnalysis, class AOSubType, AbstractObject::AOType type, class MappedAOSubType>
-void MappedAbstractObject<Key, KeyIsComposedAnalysis, AOSubType, type, MappedAOSubType>::ConcreteMAOMap::setMapObjMapJoin
+template<class Key, bool KeyIsComposedAnalysis, class AOSubType, class AOSubTypePtr, AbstractObject::AOType type, class MappedAOSubType>
+void MappedAbstractObject<Key, KeyIsComposedAnalysis, AOSubType, AOSubTypePtr, type, MappedAOSubType>::ConcreteMAOMap::setMapObjMapJoin
       (AbstractionPtr mappedAO_arg, MAOMapPtr thatMap_arg, setMapObjMapJoinMapFunc& f) {
   boost::shared_ptr<ConcreteMAOMap> thatMap = boost::dynamic_pointer_cast<ConcreteMAOMap>(thatMap_arg);
   assert(thatMap);
 
-  boost::shared_ptr<MappedAbstractObject<Key, KeyIsComposedAnalysis, AOSubType, type, MappedAOSubType> > mappedAO = boost::dynamic_pointer_cast<MappedAbstractObject<Key, KeyIsComposedAnalysis, AOSubType, type, MappedAOSubType> >(mappedAO_arg);
+  boost::shared_ptr<MappedAbstractObject<Key, KeyIsComposedAnalysis, AOSubType, AOSubTypePtr, type, MappedAOSubType> > mappedAO = boost::dynamic_pointer_cast<MappedAbstractObject<Key, KeyIsComposedAnalysis, AOSubType, AOSubTypePtr, type, MappedAOSubType> >(mappedAO_arg);
   assert(mappedAO);
 
   for(typename map<Key, boost::shared_ptr<void> >::iterator dThisIter = data.begin(); dThisIter != data.end(); ++dThisIter) {
-    typename map<Key, boost::shared_ptr<AOSubType> >::const_iterator aoIter = mappedAO->aoMap.find(dThisIter->first);
+    typename map<Key, AOSubTypePtr >::const_iterator aoIter = mappedAO->aoMap.find(dThisIter->first);
     typename map<Key, boost::shared_ptr<void> >::const_iterator dThatIter = thatMap->data.find(dThisIter->first);
     if(aoIter != mappedAO->aoMap.end() && dThatIter != thatMap->data.end())
       dThisIter->second = f(dThisIter->second, aoIter->second, dThatIter->second);
@@ -1520,8 +1527,8 @@ void MappedAbstractObject<Key, KeyIsComposedAnalysis, AOSubType, type, MappedAOS
 
 // Applies f to the keys shared by maps this map and the other two maps. Assigns the return value of each function
 // call to the key for which the function was called
-template<class Key, bool KeyIsComposedAnalysis, class AOSubType, AbstractObject::AOType type, class MappedAOSubType>
-void MappedAbstractObject<Key, KeyIsComposedAnalysis, AOSubType, type, MappedAOSubType>::ConcreteMAOMap::set3MapJoin
+template<class Key, bool KeyIsComposedAnalysis, class AOSubType, class AOSubTypePtr, AbstractObject::AOType type, class MappedAOSubType>
+void MappedAbstractObject<Key, KeyIsComposedAnalysis, AOSubType, AOSubTypePtr, type, MappedAOSubType>::ConcreteMAOMap::set3MapJoin
       (MAOMapPtr thatMap1_arg, MAOMapPtr thatMap2_arg, set3MapJoinMapFunc& f) {
   boost::shared_ptr<ConcreteMAOMap> thatMap1 = boost::dynamic_pointer_cast<ConcreteMAOMap>(thatMap1_arg);
   assert(thatMap1);
@@ -1538,13 +1545,13 @@ void MappedAbstractObject<Key, KeyIsComposedAnalysis, AOSubType, type, MappedAOS
 
 // Returns a freshly-allocated empty instance of this map type that maps
 // the keys of this map to void pointers
-template<class Key, bool KeyIsComposedAnalysis, class AOSubType, AbstractObject::AOType type, class MappedAOSubType>
-MAOMapPtr MappedAbstractObject<Key, KeyIsComposedAnalysis, AOSubType, type, MappedAOSubType>::ConcreteMAOMap::create() const
+template<class Key, bool KeyIsComposedAnalysis, class AOSubType, class AOSubTypePtr, AbstractObject::AOType type, class MappedAOSubType>
+MAOMapPtr MappedAbstractObject<Key, KeyIsComposedAnalysis, AOSubType, AOSubTypePtr, type, MappedAOSubType>::ConcreteMAOMap::create() const
 { return boost::make_shared<ConcreteMAOMap>(*this, /* emptyMap */ true); }
 
 // Returns a freshly-allocated copy of this map that maps the same keys to the same values as the originl
-template<class Key, bool KeyIsComposedAnalysis, class AOSubType, AbstractObject::AOType type, class MappedAOSubType>
-MAOMapPtr MappedAbstractObject<Key, KeyIsComposedAnalysis, AOSubType, type, MappedAOSubType>::ConcreteMAOMap::copy() const
+template<class Key, bool KeyIsComposedAnalysis, class AOSubType, class AOSubTypePtr, AbstractObject::AOType type, class MappedAOSubType>
+MAOMapPtr MappedAbstractObject<Key, KeyIsComposedAnalysis, AOSubType, AOSubTypePtr, type, MappedAOSubType>::ConcreteMAOMap::copy() const
 { return boost::make_shared<ConcreteMAOMap>(*this, /* emptyMap */ false); }
 
 // Returns an instance of a Mapped Abstraction that corresponds to the
@@ -1552,13 +1559,13 @@ MAOMapPtr MappedAbstractObject<Key, KeyIsComposedAnalysis, AOSubType, type, Mapp
 // in this map are a sub-type of Abstraction that is compatible with the map's
 // implementation. Concretely, maps focused on AbstractObjects will have
 // AbstractObject values and maps focused on Lattices will have Lattice values.
-template<class Key, bool KeyIsComposedAnalysis, class AOSubType, AbstractObject::AOType type, class MappedAOSubType>
-AbstractionPtr MappedAbstractObject<Key, KeyIsComposedAnalysis, AOSubType, type, MappedAOSubType>::ConcreteMAOMap::getMappedObj(uiType ui) {
-  scope s("MappedAbstractObject<Key, KeyIsComposedAnalysis, AOSubType, type, MappedAOSubType>::ConcreteMAOMap::getMappedObj(uiType ui)");
+template<class Key, bool KeyIsComposedAnalysis, class AOSubType, class AOSubTypePtr, AbstractObject::AOType type, class MappedAOSubType>
+AbstractionPtr MappedAbstractObject<Key, KeyIsComposedAnalysis, AOSubType, AOSubTypePtr, type, MappedAOSubType>::ConcreteMAOMap::getMappedObj(uiType ui) {
+  scope s("MappedAbstractObject<Key, KeyIsComposedAnalysis, AOSubType, AOSubTypePtr, type, MappedAOSubType>::ConcreteMAOMap::getMappedObj(uiType ui)");
   // Convert data, which maps Keys to void pointers into a map where AOSubType pointers are values
-  map<Key, boost::shared_ptr<AOSubType> > aoMap;
+  map<Key, AOSubTypePtr > aoMap;
   for(typename map<Key, boost::shared_ptr<void> >::iterator dIter=data.begin(); dIter!=data.end(); ++dIter) {
-    boost::shared_ptr<AOSubType> val = boost::static_pointer_cast<AOSubType>(dIter->second);
+    AOSubTypePtr val = boost::static_pointer_cast<AOSubType>(dIter->second);
     assert(val);
     aoMap[dIter->first] = val;
   }
@@ -1567,8 +1574,8 @@ AbstractionPtr MappedAbstractObject<Key, KeyIsComposedAnalysis, AOSubType, type,
   return boost::make_shared<MappedAOSubType>(ui, 0, parent->analysis, aoMap);
 }
 
-template<class Key, bool KeyIsComposedAnalysis, class AOSubType, AbstractObject::AOType type, class MappedAOSubType>
-MAOMapPtr MappedAbstractObject<Key, KeyIsComposedAnalysis, AOSubType, type, MappedAOSubType>::genMappedAOMap()
+template<class Key, bool KeyIsComposedAnalysis, class AOSubType, class AOSubTypePtr, AbstractObject::AOType type, class MappedAOSubType>
+MAOMapPtr MappedAbstractObject<Key, KeyIsComposedAnalysis, AOSubType, AOSubTypePtr, type, MappedAOSubType>::genMappedAOMap()
 { return boost::make_shared<ConcreteMAOMap>(shared_from_this()); }
 
 /* #########################
@@ -2300,6 +2307,14 @@ void PartEdgeUnionCodeLocObject::setAOToFull() {
   unionCL_p = boost::make_shared<FullCodeLocObject>();
 }
 
+// Gets the portion of this object computed by a given analysis. For individual AbstractObjects this method
+// returns the object itself. For compound objects it searches through the sub-objects inside of it for the
+// individual objects that came from a given analysis and returns their combination. For example, a Union object
+// will implement this method by invoking it on its members, calling meetUpdate on these objects and returning
+// the resulting object.
+CodeLocObjectPtr PartEdgeUnionCodeLocObject::project(ComposedAnalysis* analysis, PartEdgePtr pedge, Composer* comp, ComposedAnalysis* clientAnalysis)
+{ return unionCL_p->project(analysis, pedge, comp, clientAnalysis); }
+
 string PartEdgeUnionCodeLocObject::str(string indent) const {
   ostringstream oss;
   oss << "[UnionCL=" << unionCL_p->str(indent) << "]";
@@ -2665,8 +2680,8 @@ SgType* MappedValueObject<Key, KeyIsComposedAnalysis, MappedAOSubType>::getConcr
   SgType* c_type = NULL;
   // assert that all other objects have the same type
   for(typename map<Key, ValueObjectPtr>::iterator it =
-          MappedAbstractObject<Key, KeyIsComposedAnalysis, ValueObject, AbstractObject::Value, MappedAOSubType>::aoMap.begin();
-      it != MappedAbstractObject<Key, KeyIsComposedAnalysis, ValueObject, AbstractObject::Value, MappedAOSubType>::aoMap.end(); ++it) {
+          MappedAbstractObject<Key, KeyIsComposedAnalysis, ValueObject, ValueObjectPtr, AbstractObject::Value, MappedAOSubType>::aoMap.begin();
+      it != MappedAbstractObject<Key, KeyIsComposedAnalysis, ValueObject, ValueObjectPtr, AbstractObject::Value, MappedAOSubType>::aoMap.end(); ++it) {
     if (it->second->isConcrete()) {
       SgType* votype = it->second->getConcreteType();
       if(c_type==NULL) c_type = votype;
@@ -2679,7 +2694,7 @@ SgType* MappedValueObject<Key, KeyIsComposedAnalysis, MappedAOSubType>::getConcr
 template<class Key, bool KeyIsComposedAnalysis, class MappedAOSubType>
 set<boost::shared_ptr<SgValueExp> > MappedValueObject<Key, KeyIsComposedAnalysis, MappedAOSubType>::getConcreteValue() {
   //scope s("MappedValueObject<Key, KeyIsComposedAnalysis, MappedAOSubType>::getConcreteValue()");
-  if(!MappedAbstractObject<Key, KeyIsComposedAnalysis, ValueObject, AbstractObject::Value, MappedAOSubType>::isConcrete()) assert(0);
+  if(!MappedAbstractObject<Key, KeyIsComposedAnalysis, ValueObject, ValueObjectPtr, AbstractObject::Value, MappedAOSubType>::isConcrete()) assert(0);
   // If this is a union type (defaultMayEq=true), the result is the Union of the sets returned by getConcrete() on all the memRegions.
   // If this is an intersection type (defaultMayEq=false), an object is their Intersection.
 
@@ -2688,8 +2703,8 @@ set<boost::shared_ptr<SgValueExp> > MappedValueObject<Key, KeyIsComposedAnalysis
   // Number of concrete sub-objects
   unsigned int numConcrete=0;
   for(typename map<Key, ValueObjectPtr>::iterator v_it =
-          MappedAbstractObject<Key, KeyIsComposedAnalysis, ValueObject, AbstractObject::Value, MappedAOSubType>::aoMap.begin();
-      v_it != MappedAbstractObject<Key, KeyIsComposedAnalysis, ValueObject, AbstractObject::Value, MappedAOSubType>::aoMap.end(); ++v_it) {
+          MappedAbstractObject<Key, KeyIsComposedAnalysis, ValueObject, ValueObjectPtr, AbstractObject::Value, MappedAOSubType>::aoMap.begin();
+      v_it != MappedAbstractObject<Key, KeyIsComposedAnalysis, ValueObject, ValueObjectPtr, AbstractObject::Value, MappedAOSubType>::aoMap.end(); ++v_it) {
     /*scope s(txt()<<"Value "<<v_it->second->str());
     dbg << "isConcrete = "<<v_it->second->isConcrete()<<endl;*/
     if (v_it->second->isConcrete()) {
@@ -2728,10 +2743,10 @@ set<boost::shared_ptr<SgValueExp> > MappedValueObject<Key, KeyIsComposedAnalysis
   for (std::map<boost::shared_ptr<SgValueExp>, size_t>::iterator i =
       concreteVals.begin(); i != concreteVals.end(); i++) {
     // Union: add every key in concreteMRs to ret
-    if (MappedAbstractObject<Key, KeyIsComposedAnalysis, ValueObject, AbstractObject::Value, MappedAOSubType>::isUnion())
+    if (MappedAbstractObject<Key, KeyIsComposedAnalysis, ValueObject, ValueObjectPtr, AbstractObject::Value, MappedAOSubType>::isUnion())
       ret.insert(i->first);
     // Intersection: only add the keys that appear in every MemRegion in memRegions
-    else if (MappedAbstractObject<Key, KeyIsComposedAnalysis, ValueObject, AbstractObject::Value, MappedAOSubType>::isIntersection() &&
+    else if (MappedAbstractObject<Key, KeyIsComposedAnalysis, ValueObject, ValueObjectPtr, AbstractObject::Value, MappedAOSubType>::isIntersection() &&
              i->second == numConcrete)
       ret.insert(i->first);
   }
@@ -2845,6 +2860,14 @@ SgType* PartEdgeUnionValueObject::getConcreteType() {
 set<boost::shared_ptr<SgValueExp> > PartEdgeUnionValueObject::getConcreteValue() {
   return unionV_p->getConcreteValue();
 }
+
+// Gets the portion of this object computed by a given analysis. For individual AbstractObjects this method
+// returns the object itself. For compound objects it searches through the sub-objects inside of it for the
+// individual objects that came from a given analysis and returns their combination. For example, a Union object
+// will implement this method by invoking it on its members, calling meetUpdate on these objects and returning
+// the resulting object.
+ValueObjectPtr PartEdgeUnionValueObject::project(ComposedAnalysis* analysis, PartEdgePtr pedge, Composer* comp, ComposedAnalysis* clientAnalysis)
+{ return unionV_p->project(analysis, pedge, comp, clientAnalysis); }
 
 string PartEdgeUnionValueObject::str(string indent) const {
   ostringstream oss;
@@ -3273,10 +3296,10 @@ string FullMemRegionObject::str(string indent) const {
 template<class Key, bool KeyIsComposedAnalysis, class MappedAOSubType, class MappedAOValueType>
 SgType* MappedMemRegionObject<Key, KeyIsComposedAnalysis, MappedAOSubType, MappedAOValueType>::getConcreteType() {
   if(!MappedMemRegionObject<Key, KeyIsComposedAnalysis, MappedAOSubType, MappedAOValueType>::isConcrete()) assert(0);
-  typename map<Key, MemRegionObjectPtr>::iterator it = MappedAbstractObject<Key, KeyIsComposedAnalysis, MemRegionObject, AbstractObject::MemRegion, MappedAOSubType>::aoMap.begin();
+  typename map<Key, MemRegionObjectPtr>::iterator it = MappedAbstractObject<Key, KeyIsComposedAnalysis, MemRegionObject, MemRegionObjectPtr, AbstractObject::MemRegion, MappedAOSubType>::aoMap.begin();
   SgType* c_type = it->second->getConcreteType();
   // assert that all other objects have the same type
-  for (++it; it != MappedAbstractObject<Key, KeyIsComposedAnalysis, MemRegionObject, AbstractObject::MemRegion, MappedAOSubType>::aoMap.end(); ++it) {
+  for (++it; it != MappedAbstractObject<Key, KeyIsComposedAnalysis, MemRegionObject, MemRegionObjectPtr, AbstractObject::MemRegion, MappedAOSubType>::aoMap.end(); ++it) {
     SgType* votype = it->second->getConcreteType();
     assert(c_type == votype);
   }
@@ -3291,8 +3314,8 @@ set<SgNode*> MappedMemRegionObject<Key, KeyIsComposedAnalysis, MappedAOSubType, 
 
   // Maps each concrete value to the number of elements in memRegions for which it was returned
   std::map<SgNode*, size_t> concreteMRs;
-  for (typename map<Key, MemRegionObjectPtr>::iterator mr_it = MappedAbstractObject<Key, KeyIsComposedAnalysis, MemRegionObject, AbstractObject::MemRegion, MappedAOSubType>::aoMap.begin();
-       mr_it != MappedAbstractObject<Key, KeyIsComposedAnalysis, MemRegionObject, AbstractObject::MemRegion, MappedAOSubType>::aoMap.end(); ++mr_it) {
+  for (typename map<Key, MemRegionObjectPtr>::iterator mr_it = MappedAbstractObject<Key, KeyIsComposedAnalysis, MemRegionObject, MemRegionObjectPtr, AbstractObject::MemRegion, MappedAOSubType>::aoMap.begin();
+       mr_it != MappedAbstractObject<Key, KeyIsComposedAnalysis, MemRegionObject, MemRegionObjectPtr, AbstractObject::MemRegion, MappedAOSubType>::aoMap.end(); ++mr_it) {
     // Iterate through the current sub-MemRegion's concrete values and increment each
     // concrete value's counter in concreteMRs.
     std::set<SgNode*> c_memregionSet = mr_it->second->getConcrete();
@@ -3317,7 +3340,7 @@ set<SgNode*> MappedMemRegionObject<Key, KeyIsComposedAnalysis, MappedAOSubType, 
       ret.insert(i->first);
     // Intersection: only add the keys that appear in every MemRegion in memRegions
     else if (MappedMemRegionObject<Key, KeyIsComposedAnalysis, MappedAOSubType, MappedAOValueType>::isIntersection() &&
-             i->second == MappedAbstractObject<Key, KeyIsComposedAnalysis, MemRegionObject, AbstractObject::MemRegion, MappedAOSubType>::aoMap.size())
+             i->second == MappedAbstractObject<Key, KeyIsComposedAnalysis, MemRegionObject, MemRegionObjectPtr, AbstractObject::MemRegion, MappedAOSubType>::aoMap.size())
       ret.insert(i->first);
   }
 
@@ -3331,7 +3354,7 @@ ValueObjectPtr MappedMemRegionObject<Key, KeyIsComposedAnalysis, MappedAOSubType
     PartEdgePtr pedge) {
   // Assert for atleast one element in the map
   // Should we handle full MR by returning FullValueObject?
-  if(!MappedAbstractObject<Key, KeyIsComposedAnalysis, MemRegionObject, AbstractObject::MemRegion, MappedAOSubType>::aoMap.size() > 0) assert(0);
+  if(!MappedAbstractObject<Key, KeyIsComposedAnalysis, MemRegionObject, MemRegionObjectPtr, AbstractObject::MemRegion, MappedAOSubType>::aoMap.size() > 0) assert(0);
 
   // getRegionSize on each object returns different ValueObject for each key
   // We cannot do meetUpdate as the objects are from different analysis
@@ -3340,8 +3363,8 @@ ValueObjectPtr MappedMemRegionObject<Key, KeyIsComposedAnalysis, MappedAOSubType
       boost::make_shared<MappedValueObject<Key, KeyIsComposedAnalysis, MappedAOValueType> >(MappedMemRegionObject<Key, KeyIsComposedAnalysis, MappedAOSubType, MappedAOValueType>::ui,
                                                                      MappedMemRegionObject<Key, KeyIsComposedAnalysis, MappedAOSubType, MappedAOValueType>::analysis);
   typename map<Key, MemRegionObjectPtr>::const_iterator it =
-      MappedAbstractObject<Key, KeyIsComposedAnalysis, MemRegionObject, AbstractObject::MemRegion, MappedAOSubType>::aoMap.begin();
-  for (; it != MappedAbstractObject<Key, KeyIsComposedAnalysis, MemRegionObject, AbstractObject::MemRegion, MappedAOSubType>::aoMap.end(); ++it) {
+      MappedAbstractObject<Key, KeyIsComposedAnalysis, MemRegionObject, MemRegionObjectPtr, AbstractObject::MemRegion, MappedAOSubType>::aoMap.begin();
+  for (; it != MappedAbstractObject<Key, KeyIsComposedAnalysis, MemRegionObject, MemRegionObjectPtr, AbstractObject::MemRegion, MappedAOSubType>::aoMap.end(); ++it) {
     ValueObjectPtr vo_p = it->second->getRegionSizeAO(pedge);
     Key k = it->first;
     mvo_p->add(k, vo_p, pedge, /*comp, analysis*/NULL, NULL);
@@ -3366,7 +3389,7 @@ bool MappedMemRegionObject<Key, KeyIsComposedAnalysis, MappedAOSubType, MappedAO
   if (boost::dynamic_pointer_cast<FullMemRegionObject>(that)) return true;
   if (dynamic_cast<FullMemRegionObject*>(this))               return true;
 
-  return MappedAbstractObject<Key, KeyIsComposedAnalysis, MemRegionObject, AbstractObject::MemRegion, MappedAOSubType>::mayEqual(that, pedge, comp, analysis);
+  return MappedAbstractObject<Key, KeyIsComposedAnalysis, MemRegionObject, MemRegionObjectPtr, AbstractObject::MemRegion, MappedAOSubType>::mayEqual(that, pedge, comp, analysis);
 }
 
 // Check whether that is a MemRegionObject and if so, call the version of mustEqual specific to MemRegionObjects
@@ -3385,7 +3408,7 @@ bool MappedMemRegionObject<Key, KeyIsComposedAnalysis, MappedAOSubType, MappedAO
   if (boost::dynamic_pointer_cast<FullMemRegionObject>(that)) return false;
   if (dynamic_cast<FullMemRegionObject*>(this))               return false;
 
-  return MappedAbstractObject<Key, KeyIsComposedAnalysis, MemRegionObject, AbstractObject::MemRegion, MappedAOSubType>::mustEqual(that, pedge, comp, analysis);
+  return MappedAbstractObject<Key, KeyIsComposedAnalysis, MemRegionObject, MemRegionObjectPtr, AbstractObject::MemRegion, MappedAOSubType>::mustEqual(that, pedge, comp, analysis);
 }
 
 // Returns whether the two abstract objects denote the same set of concrete objects
@@ -3401,10 +3424,10 @@ bool MappedMemRegionObject<Key, KeyIsComposedAnalysis, MappedAOSubType, MappedAO
   }
   // If either this or that is a FullMemRegionObject, the two objects only equal only if they're both full.
   // We do this check early because casting to FullMemRegionObject is more efficient than calling isFull.
-  if (boost::dynamic_pointer_cast<FullMemRegionObject>(that)) return MappedAbstractObject<Key, KeyIsComposedAnalysis, MemRegionObject, AbstractObject::MemRegion, MappedAOSubType>::isFull(pedge, comp, analysis);
+  if (boost::dynamic_pointer_cast<FullMemRegionObject>(that)) return MappedAbstractObject<Key, KeyIsComposedAnalysis, MemRegionObject, MemRegionObjectPtr, AbstractObject::MemRegion, MappedAOSubType>::isFull(pedge, comp, analysis);
   if (dynamic_cast<FullMemRegionObject*>(this))               return that->isFull(pedge, comp, analysis);
 
-  return MappedAbstractObject<Key, KeyIsComposedAnalysis, MemRegionObject, AbstractObject::MemRegion, MappedAOSubType>::equalSet(that, pedge, comp, analysis);
+  return MappedAbstractObject<Key, KeyIsComposedAnalysis, MemRegionObject, MemRegionObjectPtr, AbstractObject::MemRegion, MappedAOSubType>::equalSet(that, pedge, comp, analysis);
 }
 
 // Returns whether this abstract object denotes a non-strict subset (the sets may be equal) of the set denoted
@@ -3424,7 +3447,7 @@ bool MappedMemRegionObject<Key, KeyIsComposedAnalysis, MappedAOSubType, MappedAO
   if (boost::dynamic_pointer_cast<FullMemRegionObject>(that)) return true;
   if (dynamic_cast<FullMemRegionObject*>(this))               return that->isFull(pedge, comp, analysis);
 
-  return MappedAbstractObject<Key, KeyIsComposedAnalysis, MemRegionObject, AbstractObject::MemRegion, MappedAOSubType>::subSet(that, pedge, comp, analysis);
+  return MappedAbstractObject<Key, KeyIsComposedAnalysis, MemRegionObject, MemRegionObjectPtr, AbstractObject::MemRegion, MappedAOSubType>::subSet(that, pedge, comp, analysis);
 }
 
 // General version of meetUpdate() that accounts for framework details before routing the call to the derived class'
@@ -3442,10 +3465,10 @@ bool MappedMemRegionObject<Key, KeyIsComposedAnalysis, MappedAOSubType, MappedAO
   }
   // If that is a FullMemRegionObject but this is not, we'll need to make this object full
   if (boost::dynamic_pointer_cast<FullMemRegionObject>(that) &&
-      !MappedAbstractObject<Key, KeyIsComposedAnalysis, MemRegionObject, AbstractObject::MemRegion, MappedAOSubType>::isFull(pedge, comp, analysis))
+      !MappedAbstractObject<Key, KeyIsComposedAnalysis, MemRegionObject, MemRegionObjectPtr, AbstractObject::MemRegion, MappedAOSubType>::isFull(pedge, comp, analysis))
     return this->setToFull(pedge, comp, analysis);
 
-  return MappedAbstractObject<Key, KeyIsComposedAnalysis, MemRegionObject, AbstractObject::MemRegion, MappedAOSubType>::meetUpdate(that, pedge, comp, analysis);
+  return MappedAbstractObject<Key, KeyIsComposedAnalysis, MemRegionObject, MemRegionObjectPtr, AbstractObject::MemRegion, MappedAOSubType>::meetUpdate(that, pedge, comp, analysis);
 }
 
 /* ################################
@@ -3575,6 +3598,14 @@ const AbstractionHierarchy::hierKeyPtr& PartEdgeUnionMemRegionObject::getHierKey
 // represented using unique numbers, which enables efficient data structure implementations.
 bool PartEdgeUnionMemRegionObject::isDisjoint() const
 { return unionMR_p->isDisjoint(); }
+
+// Gets the portion of this object computed by a given analysis. For individual AbstractObjects this method
+// returns the object itself. For compound objects it searches through the sub-objects inside of it for the
+// individual objects that came from a given analysis and returns their combination. For example, a Union object
+// will implement this method by invoking it on its members, calling meetUpdate on these objects and returning
+// the resulting object.
+MemRegionObjectPtr PartEdgeUnionMemRegionObject::project(ComposedAnalysis* analysis, PartEdgePtr pedge, Composer* comp, ComposedAnalysis* clientAnalysis)
+{ return unionMR_p->project(analysis, pedge, comp, clientAnalysis); }
 
 string PartEdgeUnionMemRegionObject::str(string indent) const {
   ostringstream oss;
@@ -4137,7 +4168,7 @@ bool MappedMemLocObject<Key, KeyIsComposedAnalysis, MappedAOSubType, MappedAOVal
   if (boost::dynamic_pointer_cast<FullMemLocObject>(that)) return true;
   if (dynamic_cast<FullMemLocObject*>(this))               return true;
 
-  return MappedAbstractObject<Key, KeyIsComposedAnalysis, MemLocObject, AbstractObject::MemLoc, MappedAOSubType>::mayEqual(that, pedge, comp, analysis);
+  return MappedAbstractObject<Key, KeyIsComposedAnalysis, MemLocObject, MemLocObjectPtr, AbstractObject::MemLoc, MappedAOSubType>::mayEqual(that, pedge, comp, analysis);
 }
 
 // Check whether that is a MemLocObject and if so, call the version of mustEqual specific to MemLocObjects
@@ -4156,7 +4187,7 @@ bool MappedMemLocObject<Key, KeyIsComposedAnalysis, MappedAOSubType, MappedAOVal
   if (boost::dynamic_pointer_cast<FullMemLocObject>(that)) return false;
   if (dynamic_cast<FullMemLocObject*>(this))               return false;
 
-  return MappedAbstractObject<Key, KeyIsComposedAnalysis, MemLocObject, AbstractObject::MemLoc, MappedAOSubType>::mustEqual(that, pedge, comp, analysis);
+  return MappedAbstractObject<Key, KeyIsComposedAnalysis, MemLocObject, MemLocObjectPtr, AbstractObject::MemLoc, MappedAOSubType>::mustEqual(that, pedge, comp, analysis);
 }
 
 // Returns whether the two abstract objects denote the same set of concrete objects
@@ -4175,7 +4206,7 @@ bool MappedMemLocObject<Key, KeyIsComposedAnalysis, MappedAOSubType, MappedAOVal
   if (boost::dynamic_pointer_cast<FullMemLocObject>(that)) return this->isFull(pedge, comp, analysis);
   if (dynamic_cast<FullMemLocObject*>(this))               return that->isFull(pedge, comp, analysis);
 
-  return MappedAbstractObject<Key, KeyIsComposedAnalysis, MemLocObject, AbstractObject::MemLoc, MappedAOSubType>::equalSet(that, pedge, comp, analysis);
+  return MappedAbstractObject<Key, KeyIsComposedAnalysis, MemLocObject, MemLocObjectPtr, AbstractObject::MemLoc, MappedAOSubType>::equalSet(that, pedge, comp, analysis);
 }
 
 // Returns whether this abstract object denotes a non-strict subset (the sets may be equal) of the set denoted
@@ -4195,7 +4226,7 @@ bool MappedMemLocObject<Key, KeyIsComposedAnalysis, MappedAOSubType, MappedAOVal
   if (boost::dynamic_pointer_cast<FullMemLocObject>(that)) return true;
   if (dynamic_cast<FullMemLocObject*>(this))               return that->isFull(pedge, comp, analysis);
 
-  return MappedAbstractObject<Key, KeyIsComposedAnalysis, MemLocObject, AbstractObject::MemLoc, MappedAOSubType>::subSet(that, pedge, comp, analysis);
+  return MappedAbstractObject<Key, KeyIsComposedAnalysis, MemLocObject, MemLocObjectPtr, AbstractObject::MemLoc, MappedAOSubType>::subSet(that, pedge, comp, analysis);
 }
 
 // General version of meetUpdate() that accounts for framework details before routing the call to the derived class'
@@ -4215,7 +4246,7 @@ bool MappedMemLocObject<Key, KeyIsComposedAnalysis, MappedAOSubType, MappedAOVal
   if (boost::dynamic_pointer_cast<FullMemLocObject>(that) && !this->isFull(pedge, comp, analysis))
     return this->setToFull(pedge, comp, analysis);
 
-  return MappedAbstractObject<Key, KeyIsComposedAnalysis, MemLocObject, AbstractObject::MemLoc, MappedAOSubType>::meetUpdate(that, pedge, comp, analysis);
+  return MappedAbstractObject<Key, KeyIsComposedAnalysis, MemLocObject, MemLocObjectPtr, AbstractObject::MemLoc, MappedAOSubType>::meetUpdate(that, pedge, comp, analysis);
 }
 
 
@@ -4419,9 +4450,17 @@ void PartEdgeUnionMemLocObject::setAOToFull() {
   unionML_p = boost::make_shared<FullMemLocObject>();
 }
 
+// Gets the portion of this object computed by a given analysis. For individual AbstractObjects this method
+// returns the object itself. For compound objects it searches through the sub-objects inside of it for the
+// individual objects that came from a given analysis and returns their combination. For example, a Union object
+// will implement this method by invoking it on its members, calling meetUpdate on these objects and returning
+// the resulting object.
+MemLocObjectPtr PartEdgeUnionMemLocObject::project(ComposedAnalysis* analysis, PartEdgePtr pedge, Composer* comp, ComposedAnalysis* clientAnalysis)
+{ return unionML_p->project(analysis, pedge, comp, clientAnalysis); }
+
 string PartEdgeUnionMemLocObject::str(string indent) const {
   ostringstream oss;
-  oss << "[UnionML=" << (unionML_p? unionML_p->str(indent): "NULL") << "]";
+  oss << "[PEUnionML=" << (unionML_p? unionML_p->str(indent): "NULL") << "]";
   return oss.str();
 }
 
@@ -4529,18 +4568,18 @@ template class MappedCodeLocObject  <ComposedAnalysis*, true, GenericMappedCodeL
 template class MappedValueObject    <ComposedAnalysis*, true, GenericMappedValueObject<ComposedAnalysis*, true> > ;
 template class MappedMemRegionObject<ComposedAnalysis*, true, GenericMappedMemRegionObject<ComposedAnalysis*, true>, GenericMappedValueObject<ComposedAnalysis*, true> >;
 template class MappedMemLocObject   <ComposedAnalysis*, true, GenericMappedMemLocObject<ComposedAnalysis*, true>, GenericMappedValueObject<ComposedAnalysis*, true>, GenericMappedMemRegionObject<ComposedAnalysis*, true> >;
-template class MappedAbstractObject<ComposedAnalysis*, true, CodeLocObject,   AbstractObject::CodeLoc,   GenericMappedCodeLocObject<ComposedAnalysis*, true> >;
-template class MappedAbstractObject<ComposedAnalysis*, true, ValueObject,     AbstractObject::Value,     GenericMappedValueObject<ComposedAnalysis*, true> >;
-template class MappedAbstractObject<ComposedAnalysis*, true, MemRegionObject, AbstractObject::MemRegion, GenericMappedMemRegionObject<ComposedAnalysis*, true> >;
-template class MappedAbstractObject<ComposedAnalysis*, true, MemLocObject,    AbstractObject::MemLoc,    GenericMappedMemLocObject<ComposedAnalysis*, true> >;
+template class MappedAbstractObject<ComposedAnalysis*, true, CodeLocObject,   CodeLocObjectPtr,   AbstractObject::CodeLoc,   GenericMappedCodeLocObject<ComposedAnalysis*, true> >;
+template class MappedAbstractObject<ComposedAnalysis*, true, ValueObject,     ValueObjectPtr,     AbstractObject::Value,     GenericMappedValueObject<ComposedAnalysis*, true> >;
+template class MappedAbstractObject<ComposedAnalysis*, true, MemRegionObject, MemRegionObjectPtr, AbstractObject::MemRegion, GenericMappedMemRegionObject<ComposedAnalysis*, true> >;
+template class MappedAbstractObject<ComposedAnalysis*, true, MemLocObject,    MemLocObjectPtr,    AbstractObject::MemLoc,    GenericMappedMemLocObject<ComposedAnalysis*, true> >;
 
 template class MappedCodeLocObject  <UInt, false, CombinedCodeLocObject>;
 template class MappedValueObject    <UInt, false, CombinedValueObject>;
 template class MappedMemRegionObject<UInt, false, CombinedMemRegionObject, CombinedValueObject>;
 template class MappedMemLocObject   <UInt, false, CombinedMemLocObject, CombinedValueObject, CombinedMemRegionObject>;
-template class MappedAbstractObject<UInt, false, CodeLocObject,   AbstractObject::CodeLoc,   CombinedCodeLocObject>;
-template class MappedAbstractObject<UInt, false, ValueObject,     AbstractObject::Value,     CombinedValueObject>;
-template class MappedAbstractObject<UInt, false, MemRegionObject, AbstractObject::MemRegion, CombinedMemRegionObject>;
-template class MappedAbstractObject<UInt, false, MemLocObject,    AbstractObject::MemLoc,    CombinedMemLocObject>;
+template class MappedAbstractObject<UInt, false, CodeLocObject,   CodeLocObjectPtr,   AbstractObject::CodeLoc,   CombinedCodeLocObject>;
+template class MappedAbstractObject<UInt, false, ValueObject,     ValueObjectPtr,     AbstractObject::Value,     CombinedValueObject>;
+template class MappedAbstractObject<UInt, false, MemRegionObject, MemRegionObjectPtr, AbstractObject::MemRegion, CombinedMemRegionObject>;
+template class MappedAbstractObject<UInt, false, MemLocObject,    MemLocObjectPtr,    AbstractObject::MemLoc,    CombinedMemLocObject>;
 
 } //namespace fuse

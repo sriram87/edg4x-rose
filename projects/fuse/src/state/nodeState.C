@@ -95,6 +95,12 @@ const std::map<PartEdgePtr, std::vector<Lattice*> >& NodeState::getLatticeAboveA
 // (read-only access)
 const std::map<PartEdgePtr, std::vector<Lattice*> >& NodeState::getLatticeBelowAll(Analysis* analysis) const
 {
+  if(dfInfoBelow.find(analysis) == dfInfoBelow.end()) {
+    scope s(txt()<<"ERROR: no entry for analysis "<<(dynamic_cast<ComposedAnalysis*>(analysis))->str());
+    dbg << "Entries exist for:"<<endl;
+    for(map<Analysis*, std::map<PartEdgePtr, std::vector<Lattice*> > >::const_iterator i=dfInfoBelow.begin(); i!=dfInfoBelow.end(); ++i)
+      dbg << (dynamic_cast<ComposedAnalysis*>(i->first))->str()<<endl;
+  }
   assert(dfInfoBelow.find(analysis) != dfInfoBelow.end());
   return dfInfoBelow.find(analysis)->second;
 }

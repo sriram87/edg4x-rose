@@ -6,6 +6,7 @@ bin_PROGRAMS = fuse fuseLayout
 INCLUDES = \
 	$(ROSE_INCLUDES) \
 	-I$(srcdir)/analysis \
+	-I$(srcdir)/abstraction \
 	-I$(srcdir)/cfgUtils \
 	-I$(srcdir)/sight/widgets \
 	-I$(srcdir)/lattice \
@@ -15,9 +16,10 @@ INCLUDES = \
 
 include_HEADERS =\
         fuse.h \
-	analysis/abstract_object.h \
-	analysis/abstract_object_map.h \
-	analysis/abstract_object_set.h \
+	abstraction/abstract_object.h \
+	abstraction/abstract_object_map.h \
+	abstraction/abstract_object_set.h \
+	abstraction/concrete_values.h \
 	analysis/analysis.h \
 	analysis/analysis_tester.h \
 	analysis/compose.h \
@@ -85,9 +87,10 @@ fuse_DEPENDENCIES=fuseLayout
 
 fuse_SOURCES = \
         fuse.C \
-	analysis/abstract_object.C \
-	analysis/abstract_object_map.C \
-	analysis/abstract_object_set.C \
+	abstraction/abstract_object.C \
+	abstraction/abstract_object_map.C \
+	abstraction/abstract_object_set.C \
+	abstraction/concrete_values.C \
 	analysis/analysis.C \
 	analysis/analysis_tester.C \
 	analysis/compose.C \

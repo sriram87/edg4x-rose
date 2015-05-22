@@ -6,7 +6,7 @@
 #include <time.h>
 #include <list>
 #include <set>
-#include <string> 
+#include <string>
 #include <utility>
 #include <iostream>
 #include <boost/make_shared.hpp>
@@ -66,7 +66,7 @@ SgValueExp* getSGValueExp(SgExpression* e) {
     }
     return val;
   }
-  
+
   return NULL;
 }
 
@@ -84,7 +84,7 @@ CFGNode getFuncStartCFG(SgFunctionDefinition* func)
   }
   // We should never get here
   assert(0);
-  
+
   /*ROSE_STL_Container<SgNode*> funcParamL = NodeQuery::querySubTree(SageInterface::getSageInterface::getProject()(), V_SgFunctionParameterList);
   assert(funcParamL.size()==1);
   return CFGNode(*funcParamL.begin(), 0);*/
@@ -115,7 +115,7 @@ string genUniqueName()
     {
       char num[2];
       num[0] = '0'+rand()%10;
-      num[1] = 0;                       
+      num[1] = 0;
       name = name + num;
     }
   }
@@ -205,7 +205,7 @@ std::string SgNode2Str(SgNode* sgn)
     for(SgInitializedNamePtrList::iterator a=args.begin(); a!=args.end(); a++) {
       if(a!=args.begin()) oss << ", ";
       oss << common::escape((*a)->unparseToString());
-    }       
+    }
     oss << ") | " << sgn->class_name() << "]";
   } else if(isSgVariableSymbol(sgn)) {
     oss << "[" << common::escape(isSgVariableSymbol(sgn)->get_name().getString()) << " | " << sgn->class_name() << "]";
@@ -220,7 +220,9 @@ std::string SgNode2Str(SgNode* sgn)
 std::string CFGNode2Str(const CFGNode& n)
 {
   ostringstream oss;
-  if(isSgClassType(n.getNode()))
+  if(n.getNode()==NULL)
+    oss << "[NULL]";
+  else if(isSgClassType(n.getNode()))
     oss << "[" << isSgClassType(n.getNode())->unparseToString() << " | " << isSgClassType(n.getNode())->class_name() << " | decl="<<SgNode2Str(isSgClassDeclaration(isSgClassType(n.getNode())->get_declaration())->get_definition())<<"]";
   else if(isSgNullStatement(n.getNode()))
     oss << "[" << n.getNode()->class_name() << " | " << n.getIndex() << "]";
@@ -233,7 +235,7 @@ std::string CFGNode2Str(const CFGNode& n)
     for(SgInitializedNamePtrList::iterator a=args.begin(); a!=args.end(); a++) {
       if(a!=args.begin()) oss << ", ";
       oss << common::escape((*a)->unparseToString());
-    }       
+    }
     oss << ") | " << n.getNode()->class_name() << " | " << n.getIndex() << "]";
   } else if(isSgVariableSymbol(n.getNode())) {
     oss << "[" << common::escape(isSgVariableSymbol(n.getNode())->get_name().getString()) << " | " << n.getNode()->class_name() << " | " << n.getIndex() << "]";

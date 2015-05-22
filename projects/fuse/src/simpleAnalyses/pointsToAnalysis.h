@@ -8,6 +8,7 @@
  */
 
 #include "compose.h"
+#include "composed_analysis.h"
 #include "abstract_object_map.h"
 #include "abstract_object_set.h"
 
@@ -31,9 +32,9 @@ namespace fuse
     // used by the analysis to determine if the states modified or not
     bool modified;
   public:
-    PointsToAnalysisTransfer(PartPtr part, PartPtr supersetPart, CFGNode cn, NodeState& state,
+    PointsToAnalysisTransfer(AnalysisParts& parts, CFGNode cn, NodeState& state,
                              std::map<PartEdgePtr, std::vector<Lattice*> >& dfInfo,
-                             Composer* composer, PointsToAnalysis* analysis);                             
+                             Composer* composer, PointsToAnalysis* analysis);
 
     // Set the pointer of AbstractObjectMap at this PartEdge
     void initLattice();
@@ -64,25 +65,25 @@ namespace fuse
   {
   public:
     PointsToAnalysis(bool useSSA) : FWDataflow(/*trackBase2RefinedPartEdgeMapping*/ false, useSSA) { }
-    
+
     // Returns a shared pointer to a freshly-allocated copy of this ComposedAnalysis object
     ComposedAnalysisPtr copy() { return boost::make_shared<PointsToAnalysis>(useSSA); }
 
-    void genInitLattice(PartPtr part, PartEdgePtr pedge, PartPtr supersetPart,
+    void genInitLattice(const AnalysisParts& parts, const AnalysisPartEdges& pedges,
                         std::vector<Lattice*>& initLattices);
 
-    bool transfer(PartPtr part, CFGNode cn, NodeState& state, 
+    bool transfer(AnalysisParts& parts, CFGNode cn, NodeState& state,
                   std::map<PartEdgePtr, std::vector<Lattice*> >& dfInfo) { assert(false); return false; }
 
-    boost::shared_ptr<DFTransferVisitor> 
-    getTransferVisitor(PartPtr part, PartPtr supersetPart, CFGNode cn, NodeState& state,
+    boost::shared_ptr<DFTransferVisitor>
+    getTransferVisitor(AnalysisParts& parts, CFGNode cn, NodeState& state,
                        std::map<PartEdgePtr, std::vector<Lattice*> >& dfInfo);
-    
+
     // functions called by composer
     MemLocObjectPtr Expr2MemLoc(SgNode* sgn, PartEdgePtr pedge);
     bool implementsExpr2MemLoc   () { return true; }
     implTightness Expr2MemLocTightness()    { return loose; }
-    std::string str(std::string indent) const; 
+    std::string str(std::string indent) const;
 
     friend class PointsToAnalysisTransfer;
 
@@ -113,7 +114,7 @@ namespace fuse
 
     MemRegionObjectPtr getRegion() const;
     ValueObjectPtr     getIndex() const;
-    
+
     // Allocates a copy of this object and returns a pointer to it
     MemLocObjectPtr copyAOType() const;
 
@@ -157,13 +158,13 @@ namespace fuse
   //   // returned by this class for a given SgNode*
   //   boost::shared_ptr<AbstractObjectSet> p_aos;
   // public:
-  //   Expr2MemLocTraversal(Composer* _composer, 
+  //   Expr2MemLocTraversal(Composer* _composer,
   //                        PointsToAnalysis* _analysis,
-  //                        PartEdgePtr _pedge, 
-  //                        AbstractObjectMap* _aom) : 
-  //   composer(_composer), 
-  //   analysis(_analysis), 
-  //   pedge(_pedge), aom(_aom), 
+  //                        PartEdgePtr _pedge,
+  //                        AbstractObjectMap* _aom) :
+  //   composer(_composer),
+  //   analysis(_analysis),
+  //   pedge(_pedge), aom(_aom),
   //   p_aos(boost::shared_ptr<AbstractObjectSet>()) { }
   //   void visit(SgPointerDerefExp* sgn);
   //   void visit(SgVarRefExp* sgn);

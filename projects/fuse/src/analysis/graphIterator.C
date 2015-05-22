@@ -109,7 +109,7 @@ void graphEdgeIterator<GraphEdgePtr, GraphNodePtr>::init(const set<GraphNodePtr>
   worklist->initGivenStart(startEdges);
 
   for(typename set<GraphNodePtr>::const_iterator s=start.begin(); s!=start.end(); s++) {
-//    cout << "s="<<(*s)->str()<<endl;
+    cout << "s="<<(*s)->str()<<endl;
     add(Part2PartEdge(*s));
   }
 }
@@ -139,9 +139,11 @@ GraphEdgePtr graphEdgeIterator<GraphEdgePtr, GraphNodePtr>::Part2PartEdge(GraphN
 template <class GraphEdgePtr, class GraphNodePtr>
 GraphNodePtr graphEdgeIterator<GraphEdgePtr, GraphNodePtr>::PartEdge2DirPart(GraphEdgePtr pedge) const
 {
-/*  cout << "pedge-super="<<pedge->getSupersetPartEdge()->str()<<endl;
-  cout << "pedge="<<pedge->str()<<endl;
-  cout << "dir==fw="<<(dir==fw)<<endl;*/
+/*  scope s("PartEdge2DirPart");
+  dbg << "pedge="<<(pedge? pedge->str(): "NULL")<<endl;
+  dbg << "pedge-input="<<(pedge->getInputPartEdge()? pedge->getInputPartEdge()->str(): "NULL")<<endl;
+  dbg << "dir==fw="<<(dir==fw)<<endl;*/
+
   if(dir==fw) return pedge->target();
   else        return pedge->source();
 }
@@ -1093,7 +1095,7 @@ void GETopoOrderIteratorWorklist<GraphEdgePtr, GraphNodePtr>::initGivenStart(con
   // which belong to the superset graph, which has already been created
   else {
     for(typename set<GraphEdgePtr>::const_iterator e=startEdges.begin(); e!=startEdges.end(); ++e)
-      initialFrontier.insert((*e)->getSupersetPartEdge());
+      initialFrontier.insert((*e)->getInputPartEdge());
   }
 
   // Traverse the graph to calculate the in-degree of all nodes
@@ -1295,7 +1297,7 @@ void GETopoOrderIteratorWorklist<GraphEdgePtr, GraphNodePtr>::add(GraphEdgePtr e
     i=edge2Idx.find(edge);
   // Otherwise, use the edge's superset edge from the fully created superset graph
   else
-    i=edge2Idx.find(edge->getSupersetPartEdge());
+    i=edge2Idx.find(edge->getInputPartEdge());
 
 //dbg << "(i!=edge2Idx.end())="<<(i!=edge2Idx.end())<<endl;
   if(i!=edge2Idx.end()) worklist[i->second].insert(edge);

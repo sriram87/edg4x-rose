@@ -574,7 +574,7 @@ void FuseLabeler::createLabels(SgNode* root) {
 //        assert(num==2);
 //        std::set<FuseCFGNodePtr> nodesEntry = f.GetATSNodes(CFGNode(isSgFunctionDefinition(*i)->get_declaration()->get_parameterList(), 0));
 //        registerLabel(LabelProperty(*i,LabelProperty::LABEL_FUNCTIONENTRY), nodesEntry);
-//        
+//
 //        std::set<FuseCFGNodePtr> nodesExit = f.GetATSNodes(CFGNode(*i, 3));
 //        registerLabel(LabelProperty(*i,LabelProperty::LABEL_FUNCTIONEXIT), nodesExit);
 //      } else if(isSgBasicBlock(*i)) {
@@ -646,7 +646,7 @@ const std::set<Label>& FuseLabeler::getLabels(FuseCFGNodePtr n) const {
     return i->second;
   else
     return emptySet;
-  
+
 }
 
 // Returns the LabelProperty of this label
@@ -660,18 +660,17 @@ LabelProperty& FuseLabeler::getLabelProperty(const Label& l) {
 // Returns the CFGNode denoted by this label
 CFGNode FuseLabeler::getCFGNode(const Label& l) {
   LabelProperty& prop = getLabelProperty(l);
+  SgNode* sgn;
+  if(isSgExprStatement(prop.getNode()))
+    sgn = isSgExprStatement(prop.getNode())->get_expression();
+  else
+    sgn = prop.getNode();
 
-       if(prop.getLabelType() == LabelProperty::LABEL_FUNCTIONCALL)       return CFGNode(prop.getNode(), prop.getLabelType());
-  else if(prop.getLabelType() == LabelProperty::LABEL_FUNCTIONCALLRETURN) return CFGNode(prop.getNode(), prop.getLabelType());
-  else if(prop.getLabelType() == LabelProperty::LABEL_FUNCTIONENTRY)      return CFGNode(prop.getNode(), prop.getLabelType());
-  else if(prop.getLabelType() == LabelProperty::LABEL_FUNCTIONEXIT)       return CFGNode(prop.getNode(), prop.getLabelType());
+       if(prop.getLabelType() == LabelProperty::LABEL_FUNCTIONCALL)       return CFGNode(sgn, 2);
+  else if(prop.getLabelType() == LabelProperty::LABEL_FUNCTIONCALLRETURN) return CFGNode(sgn, 3);
+  else if(prop.getLabelType() == LabelProperty::LABEL_FUNCTIONENTRY)      return CFGNode(sgn, prop.getLabelType());
+  else if(prop.getLabelType() == LabelProperty::LABEL_FUNCTIONEXIT)       return CFGNode(sgn, prop.getLabelType());
   else if(LabelProperty::LABEL_OTHER<=prop.getLabelType() && prop.getLabelType()<LabelProperty::LABEL_FUNCTIONCALL) {
-    SgNode* sgn;
-    if(isSgExprStatement(prop.getNode()))
-      sgn = isSgExprStatement(prop.getNode())->get_expression();
-    else
-      sgn = prop.getNode();
-
     //scope s(txt() << "node: "<<SgNode2Str(prop.getNode())<<", label="<<prop.getLabelType()<<"="<<(prop.getLabelType()-LabelProperty::LABEL_OTHER));
     return CFGNode(sgn, prop.getLabelType()-LabelProperty::LABEL_OTHER);
   } else

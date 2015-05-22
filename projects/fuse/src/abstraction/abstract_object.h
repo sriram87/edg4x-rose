@@ -820,21 +820,21 @@ class MappedAbstractionBase {
 //       must be defined for Key to make it possible to use it as a key in STL maps
 // KeyIsComposedAnalysis : boolean that indicates whether Key is identical to type ComposedAnalysis or not
 //       This makes it possible to write separate code for this special case.
-template<class Key, bool KeyIsComposedAnalysis, class AOSubType, AbstractObject::AOType type, class MappedAOSubType>
+template<class Key, bool KeyIsComposedAnalysis, class AOSubType, class AOSubTypePtr, AbstractObject::AOType type, class MappedAOSubType>
 class MappedAbstractObject: public AOSubType, public MappedAbstractionBase {
   public:
   class ConcreteMAOMap;
   friend class ConcreteMAOMap;
 
-  std::map<Key, boost::shared_ptr<AOSubType> > aoMap;
+  std::map<Key, AOSubTypePtr > aoMap;
 
   public:
   MappedAbstractObject(uiType ui, int nFull, ComposedAnalysis* analysis);
-  MappedAbstractObject(uiType ui, int nFull, ComposedAnalysis* analysis, const std::map<Key, boost::shared_ptr<AOSubType> >& aoMap);
+  MappedAbstractObject(uiType ui, int nFull, ComposedAnalysis* analysis, const std::map<Key, AOSubTypePtr >& aoMap);
   MappedAbstractObject(const MappedAbstractObject& that);
 
-  boost::shared_ptr<MappedAbstractObject<Key, KeyIsComposedAnalysis, AOSubType, type, MappedAOSubType> > shared_from_this()
-  { return boost::static_pointer_cast<MappedAbstractObject<Key, KeyIsComposedAnalysis, AOSubType, type, MappedAOSubType> >(AbstractObject::shared_from_this()); }
+  boost::shared_ptr<MappedAbstractObject<Key, KeyIsComposedAnalysis, AOSubType, AOSubTypePtr, type, MappedAOSubType> > shared_from_this()
+  { return boost::static_pointer_cast<MappedAbstractObject<Key, KeyIsComposedAnalysis, AOSubType, AOSubTypePtr, type, MappedAOSubType> >(AbstractObject::shared_from_this()); }
 
   // Returns true if this is a MappedAbstractObject and false otherwise
   virtual bool isMappedAO();
@@ -846,33 +846,33 @@ class MappedAbstractObject: public AOSubType, public MappedAbstractionBase {
   AbstractObject::AOType getAOType() const;
 
   // Allocates a copy of this object and returns a pointer to it
-  boost::shared_ptr<AOSubType> copyAOType() const;
+  AOSubTypePtr copyAOType() const;
 
-  void add(Key key, boost::shared_ptr<AOSubType> ao, PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis);
-  const std::map<Key, boost::shared_ptr<AOSubType> >& getAOMap() const { return aoMap; }
+  void add(Key key, AOSubTypePtr ao, PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis);
+  const std::map<Key, AOSubTypePtr >& getAOMap() const { return aoMap; }
 
 private:
   //! Helper methods.
-  bool mayEqualWithKey(Key key, const std::map<Key, boost::shared_ptr<AOSubType> >& thatAOMap, PartEdgePtr pedge,
+  bool mayEqualWithKey(Key key, const std::map<Key, AOSubTypePtr >& thatAOMap, PartEdgePtr pedge,
                        Composer* comp, ComposedAnalysis* analysis);
-  bool mustEqualWithKey(Key key, const std::map<Key, boost::shared_ptr<AOSubType> >& thatAOMap, PartEdgePtr pedge,
+  bool mustEqualWithKey(Key key, const std::map<Key, AOSubTypePtr >& thatAOMap, PartEdgePtr pedge,
                         Composer* comp, ComposedAnalysis* analysis);
-  bool equalSetWithKey(Key key,const std::map<Key, boost::shared_ptr<AOSubType> >& thatAOMap, PartEdgePtr pedge,
+  bool equalSetWithKey(Key key,const std::map<Key, AOSubTypePtr >& thatAOMap, PartEdgePtr pedge,
                        Composer* comp, ComposedAnalysis* analysis);
-  bool subSetWithKey(Key key,const std::map<Key, boost::shared_ptr<AOSubType> >& thatAOMap, PartEdgePtr pedge,
+  bool subSetWithKey(Key key,const std::map<Key, AOSubTypePtr >& thatAOMap, PartEdgePtr pedge,
                      Composer* comp, ComposedAnalysis* analysis);
 
 public:
 //  // Returns whether this object may/must be equal to o within the given Part p
 //  // These methods are private to prevent analyses from calling them directly.
-  bool mayEqualAO(boost::shared_ptr<AOSubType> o, PartEdgePtr pedge);
-  bool mustEqualAO(boost::shared_ptr<AOSubType> o, PartEdgePtr pedge);
+  bool mayEqualAO(AOSubTypePtr o, PartEdgePtr pedge);
+  bool mustEqualAO(AOSubTypePtr o, PartEdgePtr pedge);
   // Returns whether this object may/must be equal to o within the given Part p
   virtual bool mayEqual(AbstractObjectPtr o, PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis=NULL);
   virtual bool mustEqual(AbstractObjectPtr o, PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis=NULL);
 
   // Returns whether the two abstract objects denote the same set of concrete objects
-  bool equalSetAO(boost::shared_ptr<AOSubType> o, PartEdgePtr pedge);
+  bool equalSetAO(AOSubTypePtr o, PartEdgePtr pedge);
   // general versions of equalset() that accounts for framework details before routing the call to the
   // derived class' equalset() check. specifically, it routes the call through the composer to make
   // sure the equalset() call gets the right partedge.
@@ -880,7 +880,7 @@ public:
 
   // Returns whether this abstract object denotes a non-strict subset (the sets may be equal) of the set denoted
   // by the given abstract object.
-  bool subSetAO(boost::shared_ptr<AOSubType> o, PartEdgePtr pedge);
+  bool subSetAO(AOSubTypePtr o, PartEdgePtr pedge);
 
   // General versions of subSet() that accounts for framework details before routing the call to the
   // derived class' subSet() check. Specifically, it routes the call through the composer to make
@@ -893,7 +893,7 @@ public:
 
   // Computes the meet of this and that and saves the result in this
   // returns true if this causes this to change and false otherwise
-  bool meetUpdateAO(boost::shared_ptr<AOSubType> that, PartEdgePtr pedge);
+  bool meetUpdateAO(AOSubTypePtr that, PartEdgePtr pedge);
   virtual bool meetUpdate(AbstractObjectPtr that, PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis=NULL);
 
   void setAOToFull();
@@ -911,7 +911,7 @@ public:
   // individual objects that came from a given analysis and returns their combination. For example, a Union object
   // will implement this method by invoking it on its members, calling meetUpdate on these objects and returning
   // the resulting object.
-  boost::shared_ptr<AOSubType> project(ComposedAnalysis* analysis, PartEdgePtr pedge, Composer* comp, ComposedAnalysis* clientAnalysis=NULL);
+  AOSubTypePtr project(ComposedAnalysis* analysis, PartEdgePtr pedge, Composer* comp, ComposedAnalysis* clientAnalysis=NULL);
 
   // Returns true if this ValueObject corresponds to a concrete value that is statically-known
   bool isConcrete();
@@ -961,11 +961,11 @@ public:
   // Concrete implementation that uses a specific key type
   class ConcreteMAOMap : public MAOMap {
     std::map<Key, boost::shared_ptr<void> > data;
-    boost::shared_ptr<MappedAbstractObject<Key, KeyIsComposedAnalysis, AOSubType, type, MappedAOSubType> > parent;
+    boost::shared_ptr<MappedAbstractObject<Key, KeyIsComposedAnalysis, AOSubType, AOSubTypePtr, type, MappedAOSubType> > parent;
     public:
 
     // Creates an empty map with the same keys as the given MappedAbstractObject
-    ConcreteMAOMap(boost::shared_ptr<MappedAbstractObject<Key, KeyIsComposedAnalysis, AOSubType, type, MappedAOSubType> > parent);
+    ConcreteMAOMap(boost::shared_ptr<MappedAbstractObject<Key, KeyIsComposedAnalysis, AOSubType, AOSubTypePtr, type, MappedAOSubType> > parent);
 
     // Creates a new map based on the given map:
     // If emptyMap==true: the new map will be created empty but initialized with the keys of the given map
@@ -1215,20 +1215,20 @@ class FullCodeLocObject : public CodeLocObject
    ############################# */
 
 template<class Key, bool KeyIsComposedAnalysis, class MappedAOSubType>
-class MappedCodeLocObject : public MappedAbstractObject<Key, KeyIsComposedAnalysis, CodeLocObject, AbstractObject::CodeLoc, MappedAOSubType>
+class MappedCodeLocObject : public MappedAbstractObject<Key, KeyIsComposedAnalysis, CodeLocObject, CodeLocObjectPtr, AbstractObject::CodeLoc, MappedAOSubType>
 {
 public:
   MappedCodeLocObject(uiType ui, ComposedAnalysis* analysis) :
-    MappedAbstractObject<Key, KeyIsComposedAnalysis, CodeLocObject, AbstractObject::CodeLoc, MappedAOSubType>(ui, /*nFull*/ 0, analysis)
+    MappedAbstractObject<Key, KeyIsComposedAnalysis, CodeLocObject, CodeLocObjectPtr, AbstractObject::CodeLoc, MappedAOSubType>(ui, /*nFull*/ 0, analysis)
   {}
   MappedCodeLocObject(uiType ui, ComposedAnalysis* analysis, const std::map<Key, CodeLocObjectPtr>& aoMap) :
-    MappedAbstractObject<Key, KeyIsComposedAnalysis, CodeLocObject, AbstractObject::CodeLoc, MappedAOSubType>(ui, /*nFull*/ 0, analysis, aoMap)
+    MappedAbstractObject<Key, KeyIsComposedAnalysis, CodeLocObject, CodeLocObjectPtr, AbstractObject::CodeLoc, MappedAOSubType>(ui, /*nFull*/ 0, analysis, aoMap)
   {}
   MappedCodeLocObject(uiType ui, int nFull, ComposedAnalysis* analysis, const std::map<Key, CodeLocObjectPtr>& aoMap) :
-    MappedAbstractObject<Key, KeyIsComposedAnalysis, CodeLocObject, AbstractObject::CodeLoc, MappedAOSubType>(ui, nFull, analysis, aoMap)
+    MappedAbstractObject<Key, KeyIsComposedAnalysis, CodeLocObject, CodeLocObjectPtr, AbstractObject::CodeLoc, MappedAOSubType>(ui, nFull, analysis, aoMap)
   {}
   MappedCodeLocObject(const MappedCodeLocObject& that) :
-    MappedAbstractObject<Key, KeyIsComposedAnalysis, CodeLocObject, AbstractObject::CodeLoc, MappedAOSubType>(that)
+    MappedAbstractObject<Key, KeyIsComposedAnalysis, CodeLocObject, CodeLocObjectPtr, AbstractObject::CodeLoc, MappedAOSubType>(that)
   {}
 }; // class MappedCodeLocObject
 
@@ -1244,7 +1244,7 @@ class GenericMappedCodeLocObject : public MappedCodeLocObject<Key, KeyIsComposed
 
 extern template class GenericMappedCodeLocObject<ComposedAnalysis*, true>;
 extern template class MappedCodeLocObject<ComposedAnalysis*, true, GenericMappedCodeLocObject<ComposedAnalysis*, true> >;
-extern template class MappedAbstractObject<ComposedAnalysis*, true, CodeLocObject, AbstractObject::CodeLoc, GenericMappedCodeLocObject<ComposedAnalysis*, true> >;
+extern template class MappedAbstractObject<ComposedAnalysis*, true, CodeLocObject, CodeLocObjectPtr, AbstractObject::CodeLoc, GenericMappedCodeLocObject<ComposedAnalysis*, true> >;
 typedef boost::shared_ptr<GenericMappedCodeLocObject<ComposedAnalysis*, true> > AnalMapCodeLocObjectPtr;
 typedef GenericMappedCodeLocObject<ComposedAnalysis*, true> AnalMapCodeLocObject;
 
@@ -1279,6 +1279,14 @@ public:
 
   CodeLocObjectPtr copyAOType() const;
   void setAOToFull();
+
+  // Gets the portion of this object computed by a given analysis. For individual AbstractObjects this method
+  // returns the object itself. For compound objects it searches through the sub-objects inside of it for the
+  // individual objects that came from a given analysis and returns their combination. For example, a Union object
+  // will implement this method by invoking it on its members, calling meetUpdate on these objects and returning
+  // the resulting object.
+  virtual CodeLocObjectPtr project(ComposedAnalysis* analysis, PartEdgePtr pedge, Composer* comp, ComposedAnalysis* clientAnalysis=NULL);
+
   std::string str(std::string indent="") const;
 
   // Returns whether all instances of this class form a hierarchy. Every instance of the same
@@ -1487,20 +1495,20 @@ class FullValueObject : public ValueObject
    ########################### */
 
 template<class Key, bool KeyIsComposedAnalysis, class MappedAOSubType>
-class MappedValueObject : public MappedAbstractObject<Key, KeyIsComposedAnalysis, ValueObject, AbstractObject::Value, MappedAOSubType>
+class MappedValueObject : public MappedAbstractObject<Key, KeyIsComposedAnalysis, ValueObject, ValueObjectPtr, AbstractObject::Value, MappedAOSubType>
 {
   public:
   MappedValueObject(uiType ui, ComposedAnalysis* analysis) :
-    MappedAbstractObject<Key, KeyIsComposedAnalysis, ValueObject, AbstractObject::Value, MappedAOSubType>(ui, /*nFull*/ 0, analysis)
+    MappedAbstractObject<Key, KeyIsComposedAnalysis, ValueObject, ValueObjectPtr, AbstractObject::Value, MappedAOSubType>(ui, /*nFull*/ 0, analysis)
   {}
   MappedValueObject(uiType ui, ComposedAnalysis* analysis, const std::map<Key, ValueObjectPtr>& aoMap) :
-    MappedAbstractObject<Key, KeyIsComposedAnalysis, ValueObject, AbstractObject::Value, MappedAOSubType>(ui, /*nFull*/ 0, analysis, aoMap)
+    MappedAbstractObject<Key, KeyIsComposedAnalysis, ValueObject, ValueObjectPtr, AbstractObject::Value, MappedAOSubType>(ui, /*nFull*/ 0, analysis, aoMap)
   {}
   MappedValueObject(uiType ui, int nFull, ComposedAnalysis* analysis, const std::map<Key, ValueObjectPtr>& aoMap) :
-    MappedAbstractObject<Key, KeyIsComposedAnalysis, ValueObject, AbstractObject::Value, MappedAOSubType>(ui, nFull, analysis, aoMap)
+    MappedAbstractObject<Key, KeyIsComposedAnalysis, ValueObject, ValueObjectPtr, AbstractObject::Value, MappedAOSubType>(ui, nFull, analysis, aoMap)
   {}
   MappedValueObject(const MappedValueObject& that) :
-    MappedAbstractObject<Key, KeyIsComposedAnalysis, ValueObject, AbstractObject::Value, MappedAOSubType>(that)
+    MappedAbstractObject<Key, KeyIsComposedAnalysis, ValueObject, ValueObjectPtr, AbstractObject::Value, MappedAOSubType>(that)
   {}
 
   // Type of concrete value
@@ -1522,7 +1530,7 @@ class GenericMappedValueObject : public MappedValueObject<Key, KeyIsComposedAnal
 
 extern template class GenericMappedValueObject<ComposedAnalysis*, true>;
 extern template class MappedValueObject<ComposedAnalysis*, true, GenericMappedValueObject<ComposedAnalysis*, true> >;
-extern template class MappedAbstractObject<ComposedAnalysis*, true, ValueObject, AbstractObject::Value, GenericMappedValueObject<ComposedAnalysis*, true> >;
+extern template class MappedAbstractObject<ComposedAnalysis*, true, ValueObject, ValueObjectPtr, AbstractObject::Value, GenericMappedValueObject<ComposedAnalysis*, true> >;
 typedef boost::shared_ptr<GenericMappedValueObject<ComposedAnalysis*, true> > AnalMapValueObjectPtr;
 typedef GenericMappedValueObject<ComposedAnalysis*, true> AnalMapValueObject;
 
@@ -1556,6 +1564,14 @@ public:
   int concreteSetSize();
   SgType* getConcreteType();
   std::set<boost::shared_ptr<SgValueExp> > getConcreteValue();
+
+  // Gets the portion of this object computed by a given analysis. For individual AbstractObjects this method
+  // returns the object itself. For compound objects it searches through the sub-objects inside of it for the
+  // individual objects that came from a given analysis and returns their combination. For example, a Union object
+  // will implement this method by invoking it on its members, calling meetUpdate on these objects and returning
+  // the resulting object.
+  virtual ValueObjectPtr project(ComposedAnalysis* analysis, PartEdgePtr pedge, Composer* comp, ComposedAnalysis* clientAnalysis=NULL);
+
   std::string str(std::string indent="") const;
 
   // Returns whether all instances of this class form a hierarchy. Every instance of the same
@@ -1855,20 +1871,20 @@ class FullMemRegionObject : public MemRegionObject/*, public AbstractionHierarch
 };
 
 template<class Key, bool KeyIsComposedAnalysis, class MappedAOSubType, class MappedAOValueType>
-class MappedMemRegionObject : public MappedAbstractObject<Key, KeyIsComposedAnalysis, MemRegionObject, AbstractObject::MemRegion, MappedAOSubType>
+class MappedMemRegionObject : public MappedAbstractObject<Key, KeyIsComposedAnalysis, MemRegionObject, MemRegionObjectPtr, AbstractObject::MemRegion, MappedAOSubType>
 {
   public:
   MappedMemRegionObject(uiType ui, ComposedAnalysis* analysis) :
-    MappedAbstractObject<Key, KeyIsComposedAnalysis, MemRegionObject, AbstractObject::MemRegion, MappedAOSubType>(ui, /*nFull*/ 0, analysis)
+    MappedAbstractObject<Key, KeyIsComposedAnalysis, MemRegionObject, MemRegionObjectPtr, AbstractObject::MemRegion, MappedAOSubType>(ui, /*nFull*/ 0, analysis)
   {}
   MappedMemRegionObject(uiType ui, ComposedAnalysis* analysis, const std::map<Key, MemRegionObjectPtr>& aoMap) :
-    MappedAbstractObject<Key, KeyIsComposedAnalysis, MemRegionObject, AbstractObject::MemRegion, MappedAOSubType>(ui, /*nFull*/ 0, analysis, aoMap)
+    MappedAbstractObject<Key, KeyIsComposedAnalysis, MemRegionObject, MemRegionObjectPtr, AbstractObject::MemRegion, MappedAOSubType>(ui, /*nFull*/ 0, analysis, aoMap)
   {}
   MappedMemRegionObject(uiType ui, int nFull, ComposedAnalysis* analysis, const std::map<Key, MemRegionObjectPtr>& aoMap) :
-    MappedAbstractObject<Key, KeyIsComposedAnalysis, MemRegionObject, AbstractObject::MemRegion, MappedAOSubType>(ui, nFull, analysis, aoMap)
+    MappedAbstractObject<Key, KeyIsComposedAnalysis, MemRegionObject, MemRegionObjectPtr, AbstractObject::MemRegion, MappedAOSubType>(ui, nFull, analysis, aoMap)
   {}
   MappedMemRegionObject(const MappedMemRegionObject& that) :
-    MappedAbstractObject<Key, KeyIsComposedAnalysis, MemRegionObject, AbstractObject::MemRegion, MappedAOSubType>(that)
+    MappedAbstractObject<Key, KeyIsComposedAnalysis, MemRegionObject, MemRegionObjectPtr, AbstractObject::MemRegion, MappedAOSubType>(that)
   {}
 
   // Returns the type of the concrete regions (if there is one)
@@ -1911,7 +1927,7 @@ class GenericMappedMemRegionObject : public MappedMemRegionObject<Key, KeyIsComp
 
 extern template class GenericMappedMemRegionObject<ComposedAnalysis*, true>;
 extern template class MappedMemRegionObject<ComposedAnalysis*, true, GenericMappedMemRegionObject<ComposedAnalysis*, true>, GenericMappedValueObject<ComposedAnalysis*, true> >;
-extern template class MappedAbstractObject<ComposedAnalysis*, true, MemRegionObject, AbstractObject::MemRegion, GenericMappedMemRegionObject<ComposedAnalysis*, true> >;
+extern template class MappedAbstractObject<ComposedAnalysis*, true, MemRegionObject, MemRegionObjectPtr, AbstractObject::MemRegion, GenericMappedMemRegionObject<ComposedAnalysis*, true> >;
 typedef boost::shared_ptr<GenericMappedMemRegionObject<ComposedAnalysis*, true> > AnalMapMemRegionObjectPtr;
 typedef GenericMappedMemRegionObject<ComposedAnalysis*, true> AnalMapMemRegionObject;
 
@@ -1967,6 +1983,13 @@ public:
   // represented using unique numbers, which enables efficient data structure implementations.
   bool isDisjoint() const;
   // AbstractObjects that form a hierarchy must inherit from the AbstractObjectDisjoint class
+
+  // Gets the portion of this object computed by a given analysis. For individual AbstractObjects this method
+  // returns the object itself. For compound objects it searches through the sub-objects inside of it for the
+  // individual objects that came from a given analysis and returns their combination. For example, a Union object
+  // will implement this method by invoking it on its members, calling meetUpdate on these objects and returning
+  // the resulting object.
+  virtual MemRegionObjectPtr project(ComposedAnalysis* analysis, PartEdgePtr pedge, Composer* comp, ComposedAnalysis* clientAnalysis=NULL);
 
   std::string str(std::string indent="") const;
 };
@@ -2291,20 +2314,20 @@ public:
 //! n_FullML != 0 along with empty map determines that the MappedML denotes full set of ML.
 //! n_FullML == 0 and en empty map indicates that the MappedML is empty.
 template<class Key, bool KeyIsComposedAnalysis, class MappedAOSubType, class MappedAOValueType, class MappedAOMemRegionType>
-class MappedMemLocObject : public MappedAbstractObject<Key, KeyIsComposedAnalysis, MemLocObject, AbstractObject::MemLoc, MappedAOSubType>
+class MappedMemLocObject : public MappedAbstractObject<Key, KeyIsComposedAnalysis, MemLocObject, MemLocObjectPtr, AbstractObject::MemLoc, MappedAOSubType>
 {
 public:
   MappedMemLocObject(uiType ui, ComposedAnalysis* analysis) :
-    MappedAbstractObject<Key, KeyIsComposedAnalysis, MemLocObject, AbstractObject::MemLoc, MappedAOSubType>(ui, /*nFull*/ 0, analysis)
+    MappedAbstractObject<Key, KeyIsComposedAnalysis, MemLocObject, MemLocObjectPtr, AbstractObject::MemLoc, MappedAOSubType>(ui, /*nFull*/ 0, analysis)
   {}
   MappedMemLocObject(uiType ui, ComposedAnalysis* analysis, const std::map<Key, MemLocObjectPtr>& aoMap) :
-    MappedAbstractObject<Key, KeyIsComposedAnalysis, MemLocObject, AbstractObject::MemLoc, MappedAOSubType>(ui, /*nFull*/ 0, analysis, aoMap)
+    MappedAbstractObject<Key, KeyIsComposedAnalysis, MemLocObject, MemLocObjectPtr, AbstractObject::MemLoc, MappedAOSubType>(ui, /*nFull*/ 0, analysis, aoMap)
   {}
   MappedMemLocObject(uiType ui, int nFull, ComposedAnalysis* analysis, const std::map<Key, MemLocObjectPtr>& aoMap) :
-    MappedAbstractObject<Key, KeyIsComposedAnalysis, MemLocObject, AbstractObject::MemLoc, MappedAOSubType>(ui, nFull, analysis, aoMap)
+    MappedAbstractObject<Key, KeyIsComposedAnalysis, MemLocObject, MemLocObjectPtr, AbstractObject::MemLoc, MappedAOSubType>(ui, nFull, analysis, aoMap)
   {}
   MappedMemLocObject(const MappedMemLocObject& that) :
-    MappedAbstractObject<Key, KeyIsComposedAnalysis, MemLocObject, AbstractObject::MemLoc, MappedAOSubType>(that)
+    MappedAbstractObject<Key, KeyIsComposedAnalysis, MemLocObject, MemLocObjectPtr, AbstractObject::MemLoc, MappedAOSubType>(that)
   {}
 
   // Allocates a copy of this object and returns a regular pointer to it
@@ -2348,7 +2371,7 @@ class GenericMappedMemLocObject : public MappedMemLocObject<Key, KeyIsComposedAn
 
 extern template class GenericMappedMemLocObject<ComposedAnalysis*, true>;
 extern template class MappedMemLocObject<ComposedAnalysis*, true, GenericMappedMemLocObject<ComposedAnalysis*, true>, GenericMappedValueObject<ComposedAnalysis*, true>, GenericMappedMemRegionObject<ComposedAnalysis*, true> >;
-extern template class MappedAbstractObject<ComposedAnalysis*, true, MemLocObject, AbstractObject::MemLoc, GenericMappedMemLocObject<ComposedAnalysis*, true> >;
+extern template class MappedAbstractObject<ComposedAnalysis*, true, MemLocObject, MemLocObjectPtr, AbstractObject::MemLoc, GenericMappedMemLocObject<ComposedAnalysis*, true> >;
 typedef boost::shared_ptr<GenericMappedMemLocObject<ComposedAnalysis*, true> > AnalMapMemLocObjectPtr;
 typedef GenericMappedMemLocObject<ComposedAnalysis*, true> AnalMapMemLocObject;
 
@@ -2396,6 +2419,14 @@ public:
   int concreteSetSize();
   MemLocObjectPtr copyAOType() const;
   void setAOToFull();
+
+  // Gets the portion of this object computed by a given analysis. For individual AbstractObjects this method
+  // returns the object itself. For compound objects it searches through the sub-objects inside of it for the
+  // individual objects that came from a given analysis and returns their combination. For example, a Union object
+  // will implement this method by invoking it on its members, calling meetUpdate on these objects and returning
+  // the resulting object.
+  virtual MemLocObjectPtr project(ComposedAnalysis* analysis, PartEdgePtr pedge, Composer* comp, ComposedAnalysis* clientAnalysis=NULL);
+
   std::string str(std::string indent="") const;
 
   // Returns whether all instances of this class form a hierarchy. Every instance of the same
@@ -2566,10 +2597,10 @@ extern template class MappedCodeLocObject  <UInt, false, CombinedCodeLocObject>;
 extern template class MappedValueObject    <UInt, false, CombinedValueObject>;
 extern template class MappedMemRegionObject<UInt, false, CombinedMemRegionObject, CombinedValueObject>;
 extern template class MappedMemLocObject   <UInt, false, CombinedMemLocObject, CombinedValueObject, CombinedMemRegionObject>;
-extern template class MappedAbstractObject<UInt, false, CodeLocObject,   AbstractObject::CodeLoc,   CombinedCodeLocObject>;
-extern template class MappedAbstractObject<UInt, false, ValueObject,     AbstractObject::Value,     CombinedValueObject>;
-extern template class MappedAbstractObject<UInt, false, MemRegionObject, AbstractObject::MemRegion, CombinedMemRegionObject>;
-extern template class MappedAbstractObject<UInt, false, MemLocObject,    AbstractObject::MemLoc,    CombinedMemLocObject>;
+extern template class MappedAbstractObject<UInt, false, CodeLocObject,   CodeLocObjectPtr,   AbstractObject::CodeLoc,   CombinedCodeLocObject>;
+extern template class MappedAbstractObject<UInt, false, ValueObject,     ValueObjectPtr,     AbstractObject::Value,     CombinedValueObject>;
+extern template class MappedAbstractObject<UInt, false, MemRegionObject, MemRegionObjectPtr, AbstractObject::MemRegion, CombinedMemRegionObject>;
+extern template class MappedAbstractObject<UInt, false, MemLocObject,    MemLocObjectPtr,    AbstractObject::MemLoc,    CombinedMemLocObject>;
 
 /* ###########################################
    ##### Specific Types of MemLocObjects #####

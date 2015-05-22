@@ -539,7 +539,7 @@ RetType ChainComposer::callServerAnalysisFunc(
   // Set pedge to the PartEdge of the ATS graph on which the server analysis ran
   PartEdgePtr unrolledPEdge = pedge;
   for(int i=0; i<pedgeUnrollCnt; i++)
-    unrolledPEdge = unrolledPEdge->getSupersetPartEdge();
+    unrolledPEdge = unrolledPEdge->getInputPartEdge();
 
   //endMeasure(opMeasure);
   //cout << "server="<<server->str()<<endl;
@@ -1395,10 +1395,10 @@ void ChainComposer::runAnalysis()
     if(doneAnalyses.size()>0) {
       SIGHT_VERB_IF(1, composerDebugLevel)
       set<PartPtr> startStates = GetStartAStates(currentAnalysis);
-      /*{ scope s("startStates");
+      { scope s("startStates");
       for(set<PartPtr>::iterator s=startStates.begin(); s!=startStates.end(); ++s)
-        dbg << (*s)->str()<<endl;
-      }*/
+        dbg << (*s? (*s)->str(): "NULL")<<endl;
+      }
       set<PartPtr> endStates   = GetEndAStates(currentAnalysis);
       ostringstream fName; fName << "ats." << i << "." << doneAnalyses.back()->str();
       ats2dot(fName.str(), "ATS", startStates, endStates);
@@ -1586,6 +1586,38 @@ set<PartPtr> ChainComposer::GetStartAStates_Spec()
 
 set<PartPtr> ChainComposer::GetEndAStates_Spec()
 { return GetEndAStates(this); }
+
+// Given a Part from the ATS on which NodeStates are maintained for the analysis(es) managed by this
+// composer, returns an AnalysisParts object that contains all the Parts relevant for analysis.
+AnalysisParts ChainComposer::NodeState2All(PartPtr part, bool NodeStates_valid, bool indexes_valid, bool inputs_valid) {
+  return AnalysisParts(NodeStates_valid? part:                 NULLPart, NodeStates_valid,
+                       indexes_valid?    part->getInputPart(): NULLPart, indexes_valid,
+                       inputs_valid?     part:                 NULLPart, inputs_valid);
+}
+
+// Given a PartEdge from the ATS on which NodeStates are maintained for the analysis(es) managed by this
+// composer, returns an AnalysisPartEdges object that contains all the PartEdges relevant for analysis.
+AnalysisPartEdges ChainComposer::NodeState2All(PartEdgePtr pedge, bool NodeStates_valid, bool indexes_valid, bool inputs_valid) {
+  return AnalysisPartEdges(NodeStates_valid? pedge:                     NULLPartEdge, NodeStates_valid,
+                           indexes_valid?    pedge->getInputPartEdge(): NULLPartEdge, indexes_valid,
+                           inputs_valid?     pedge:                     NULLPartEdge, inputs_valid);
+}
+
+// Given a Part from the ATS that the analyses managed by this composed take as input,
+// returns an AnalysisParts object that contains the input and index the Parts relevant for analysis.
+AnalysisParts ChainComposer::Input2Index(PartPtr part, bool indexes_valid, bool inputs_valid) {
+  return AnalysisParts(NULLPart,                                         false,
+                       indexes_valid?    part->getInputPart(): NULLPart, indexes_valid,
+                       inputs_valid?     part:                 NULLPart, inputs_valid);
+}
+
+// Given a PartEdge from the ATS that the analyses managed by this composed take as input,
+// returns an AnalysisPartEdges object that contains the input and index the Parts relevant for analysis.
+AnalysisPartEdges ChainComposer::Input2Index(PartEdgePtr pedge, bool indexes_valid, bool inputs_valid) {
+  return AnalysisPartEdges(NULLPartEdge,                                              false,
+                           indexes_valid?    pedge->getInputPartEdge(): NULLPartEdge, indexes_valid,
+                           inputs_valid?     pedge:                     NULLPartEdge, inputs_valid);
+}
 
 string ChainComposer::str(string indent) const {
   ostringstream oss;
@@ -2143,14 +2175,14 @@ set<PartPtr> LooseParallelComposer::GetStartOrEndAStates_Spec(callStartOrEndASta
         // If this is the first analysis, simply copy its curParts into intersection
         if(a==allAnalyses.begin()) {
           for(set<PartPtr>::iterator cur=curParts.begin(); cur!=curParts.end(); cur++)
-            intersection[(*cur)->getSupersetPart()][*a] = *cur;
+            intersection[(*cur)->getInputPart()][*a] = *cur;
         // If this is not the first analysis, intersect curParts with intersection, storing the result in intersection
         } else {
           map<PartPtr, map<ComposedAnalysis*, PartPtr> >::iterator i=intersection.begin();
           set<PartPtr>::iterator curI=curParts.begin();
           while(i!=intersection.end() && curI!=curParts.end()) {
             // If i and curI have the same parent Part, it must be kept in the intersection of intersection and curParts
-            if((*curI)->getSupersetPart() == i->first) {
+            if((*curI)->getInputPart() == i->first) {
               // A single analysis cannot return multiple Parts with the same parent Part
               assert(i->second.find(*a) == i->second.end());
 
@@ -2302,6 +2334,38 @@ set<PartPtr> LooseParallelComposer::GetStartOrEndAStates_Spec(callStartOrEndASta
     return interParts;
   }
 }*/
+
+// Given a Part from the ATS on which NodeStates are maintained for the analysis(es) managed by this
+// composer, returns an AnalysisParts object that contains all the Parts relevant for analysis.
+AnalysisParts LooseParallelComposer::NodeState2All(PartPtr part, bool NodeStates_valid, bool indexes_valid, bool inputs_valid) {
+  return AnalysisParts(NodeStates_valid? part:                 NULLPart, NodeStates_valid,
+                       indexes_valid?    part->getInputPart(): NULLPart, indexes_valid,
+                       inputs_valid?     part:                 NULLPart, inputs_valid);
+}
+
+// Given a PartEdge from the ATS on which NodeStates are maintained for the analysis(es) managed by this
+// composer, returns an AnalysisPartEdges object that contains all the PartEdges relevant for analysis.
+AnalysisPartEdges LooseParallelComposer::NodeState2All(PartEdgePtr pedge, bool NodeStates_valid, bool indexes_valid, bool inputs_valid) {
+  return AnalysisPartEdges(NodeStates_valid? pedge:                     NULLPartEdge, NodeStates_valid,
+                           indexes_valid?    pedge->getInputPartEdge(): NULLPartEdge, indexes_valid,
+                           inputs_valid?     pedge:                     NULLPartEdge, inputs_valid);
+}
+
+// Given a Part from the ATS that the analyses managed by this composed take as input,
+// returns an AnalysisParts object that contains the input and index the Parts relevant for analysis.
+AnalysisParts LooseParallelComposer::Input2Index(PartPtr part, bool indexes_valid, bool inputs_valid) {
+  return AnalysisParts(NULLPart,                                         false,
+                       indexes_valid?    part->getInputPart(): NULLPart, indexes_valid,
+                       inputs_valid?     part:                 NULLPart, inputs_valid);
+}
+
+// Given a PartEdge from the ATS that the analyses managed by this composed take as input,
+// returns an AnalysisPartEdges object that contains the input and index the Parts relevant for analysis.
+AnalysisPartEdges LooseParallelComposer::Input2Index(PartEdgePtr pedge, bool indexes_valid, bool inputs_valid) {
+  return AnalysisPartEdges(NULLPartEdge,                                              false,
+                           indexes_valid?    pedge->getInputPartEdge(): NULLPartEdge, indexes_valid,
+                           inputs_valid?     pedge:                     NULLPartEdge, inputs_valid);
+}
 
 // When Expr2* is queried for a particular analysis on edge pedge, exported by this LooseParallelComposer
 // this function translates from the pedge that the LooseParallelComposer::Expr2* is given to the PartEdge

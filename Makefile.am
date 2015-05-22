@@ -166,7 +166,7 @@ install-exec-local:
 	@echo '*****************************************************************'
 
 install-data-local: uninstall-local
-	-mkdir $(DESTDIR)$(includedir)
+	-mkdir -p $(DESTDIR)$(includedir)
 #	DQ (11/1/2011): The EDG 4.x support does not require a separate include-staging directory.
 #	if !ROSE_USE_NEW_EDG_INTERFACE
 	mkdir -p "$(DESTDIR)$(includedir)/edg"
@@ -303,6 +303,7 @@ docs: FORCE_DOCS_TO_BE_MADE
 	@if [ -f $(top_srcdir)/src/midend/midend.docs ]; then \
 	   echo "    Generate all possible documentation cd docs; make documentation;"; \
 	   $(MAKE) -Ctutorial docs && \
+           $(MAKE) -Ctests/testSupport check && \
 	   $(MAKE) -Ctests/roseTests/astInterfaceTests check && \
 	   $(MAKE) -Ctests/roseTests/ompLoweringTests check && \
 	   $(MAKE) -Ctests/CompileTests/UPC_tests check && \

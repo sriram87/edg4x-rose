@@ -1,4 +1,6 @@
-#include "rose.h"
+// DQ (10/5/2014): This is more strict now that we include rose_config.h in the sage3basic.h.
+// #include "rose.h"
+#include "sage3basic.h"
 
 #include "frontierDetection.h"
 
@@ -226,7 +228,7 @@ computePreviousAndNextNodes(SgGlobal* globalScope, std::vector<FrontierNode*> fr
              }
             else
              {
-               printf ("WARNING: previousNode == NULL: j = %zu can't insert entry into previousAndNextNodeMap: statement = %p = %s \n",j,statement,statement->class_name().c_str());
+               printf ("WARNING: previousNode == NULL: j = %" PRIuPTR " can't insert entry into previousAndNextNodeMap: statement = %p = %s \n",j,statement,statement->class_name().c_str());
              }
 
           previousPreviousNode = previousNode;

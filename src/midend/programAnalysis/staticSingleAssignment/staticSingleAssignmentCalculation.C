@@ -1,7 +1,10 @@
 //Author: George Vulov <georgevulov@hotmail.com>
 //Based on work by Justin Frye <jafrye@tamu.edu>
 
-#include "rose.h"
+// DQ (10/5/2014): This is more strict now that we include rose_config.h in the sage3basic.h.
+// #include "rose.h"
+#include "sage3basic.h"
+
 #include "CallGraph.h"
 #include "staticSingleAssignment.h"
 #include "sageInterface.h"
@@ -268,7 +271,7 @@ void StaticSingleAssignment::run(bool interprocedural, bool treatPointersAsStruc
     }
 
 #ifdef DISPLAY_TIMINGS
-    printf("-- Timing: Inserting all local defs for %zu functions took %.2f seconds.\n",
+    printf("-- Timing: Inserting all local defs for %" PRIuPTR " functions took %.2f seconds.\n",
             interestingFunctions.size(), time.elapsed());
     fflush(stdout);
     time.restart();

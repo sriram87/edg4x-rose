@@ -1,4 +1,3 @@
-#include "sage3basic.h"
 #include "compose.h"
 #include "tight_composer.h"
 #include "const_prop_analysis.h"
@@ -185,8 +184,8 @@ string Fuse::output_nested_results::composerType2Str(composerType type)
 // fuseCmd is the string representation of the composition of analyses that should be executed.
 // Returns 0 on success and a non-zero error code on failure.
 int Fuse::run(SgProject* project, const std::string& fuseCmd) {
-  smatch what;
-  if(regex_match(fuseCmd, what, compSpec)) {
+  boost::xpressive::smatch what;
+  if(boost::xpressive::regex_match(fuseCmd, what, compSpec)) {
     //cout << "MATCH composer\n";
     list<ComposedAnalysis*>  mySubAnalyses;
     output_nested_results::composerType rootComposerType = output_nested_results::unknown;
@@ -286,6 +285,23 @@ std::set<FuseCFGNodePtr> Fuse::GetEndATSNodes(Composer* composer)
 // that refine this CFGNode.
 std::set<FuseCFGNodePtr> Fuse::GetATSNodes(const CFGNode& cn)
 { return GetATSNodes(cn, rootComposer); }
+
+std::set<FuseCFGNodePtr> Fuse::GetATSNodes(SgNode* n, Composer* composer) {
+  CFGNode cn;
+  if(isSgInitializedName(n)) cn = CFGNode(n, 1);
+  else if(isSgBinaryOp(n))   cn = CFGNode(n, 2);
+  else if(isSgUnaryOp(n)) {
+    if(isSgCastExp(n))       cn = CFGNode(n, 0);
+    else if(isSgAddressOfOp(n) || isSgPointerDerefExp(n) || isSgPlusPlusOp(n) || isSgMinusMinusOp(n)) cn = CFGNode(n, 1);
+    else                     cn = CFGNode(n, 2);
+  }
+  else if(isSgValueExp(n))   cn = CFGNode(n, 1);
+  else if(isSgFunctionCallExp(n)) cn = CFGNode(n, 2);
+  else if(isSgWhileStmt(n))  cn = CFGNode(n, 1);
+  else                       cn = CFGNode(n, 0);
+
+  return GetATSNodes(cn, composer);
+}
 
 std::set<FuseCFGNodePtr> Fuse::GetATSNodes(const CFGNode& cn, Composer* composer)
 {
@@ -529,6 +545,59 @@ SgVarRefExp* Fuse::varSymbol2Ref(SgVariableSymbol* sym) {
     return i->second;
 }
 
+bool Fuse::isMayAlias(SgExpression* e1, SgExpression* e2) {
+  std::set<FuseCFGNodePtr> n1 = GetATSNodes(e1);
+  std::map<PartEdgePtr, ValueObjectPtr> vals1;
+  for(std::set<FuseCFGNodePtr>::iterator i1=n1.begin(); i1!=n1.end(); ++i1) {
+    std::vector<FuseCFGEdgePtr> edges = (*i1)->inEdges();
+    for(std::vector<FuseCFGEdgePtr>::iterator e=edges.begin(); e!=edges.end(); ++e) {
+      vals1[(*e)->getPartEdge()] = rootComposer->Expr2Val(e1, (*e)->getPartEdge(), cdip);
+    }
+  }
+
+  std::set<FuseCFGNodePtr> n2 = GetATSNodes(e2);
+  std::map<PartEdgePtr, ValueObjectPtr> vals2;
+  for(std::set<FuseCFGNodePtr>::iterator i2=n2.begin(); i2!=n2.end(); ++i2) {
+    std::vector<FuseCFGEdgePtr> edges = (*i2)->inEdges();
+    for(std::vector<FuseCFGEdgePtr>::iterator e=edges.begin(); e!=edges.end(); ++e) {
+      vals2[(*e)->getPartEdge()] = rootComposer->Expr2Val(e2, (*e)->getPartEdge(), cdip);
+    }
+  }
+
+  for(std::map<PartEdgePtr, ValueObjectPtr>::iterator v1=vals1.begin(); v1!=vals1.end(); ++v1)
+    for(std::map<PartEdgePtr, ValueObjectPtr>::iterator v2=vals2.begin(); v2!=vals2.end(); ++v2)
+      if(v1->second->mayEqual(v2->second, v1->first, rootComposer, cdip)) return true;
+  
+  return false;
+}
+
+bool Fuse::isMustAlias(SgExpression* e1, SgExpression* e2) {
+  std::set<FuseCFGNodePtr> n1 = GetATSNodes(e1);
+  std::map<PartEdgePtr, ValueObjectPtr> vals1;
+  for(std::set<FuseCFGNodePtr>::iterator i1=n1.begin(); i1!=n1.end(); ++i1) {
+    std::vector<FuseCFGEdgePtr> edges = (*i1)->inEdges();
+    for(std::vector<FuseCFGEdgePtr>::iterator e=edges.begin(); e!=edges.end(); ++e) {
+      vals1[(*e)->getPartEdge()] = rootComposer->Expr2Val(e1, (*e)->getPartEdge(), cdip);
+    }
+  }
+
+  std::set<FuseCFGNodePtr> n2 = GetATSNodes(e2);
+  std::map<PartEdgePtr, ValueObjectPtr> vals2;
+  for(std::set<FuseCFGNodePtr>::iterator i2=n2.begin(); i2!=n2.end(); ++i2) {
+    std::vector<FuseCFGEdgePtr> edges = (*i2)->inEdges();
+    for(std::vector<FuseCFGEdgePtr>::iterator e=edges.begin(); e!=edges.end(); ++e) {
+      vals2[(*e)->getPartEdge()] = rootComposer->Expr2Val(e2, (*e)->getPartEdge(), cdip);
+    }
+  }
+
+  for(std::map<PartEdgePtr, ValueObjectPtr>::iterator v1=vals1.begin(); v1!=vals1.end(); ++v1)
+    for(std::map<PartEdgePtr, ValueObjectPtr>::iterator v2=vals2.begin(); v2!=vals2.end(); ++v2)
+      if(v1->second->mustEqual(v2->second, v1->first, rootComposer, cdip)) return true;
+  
+  return false;
+}
+
+
 #define valAttrDebugLevel 0
 
 /***********************
@@ -653,7 +722,7 @@ const std::set<Label>& FuseLabeler::getLabels(FuseCFGNodePtr n) const {
 LabelProperty& FuseLabeler::getLabelProperty(const Label& l) {
   assert(l < mappingLabelToLabelProperty.size());
 
-  return mappingLabelToLabelProperty[l];
+  return Labeler::mappingLabelToLabelProperty[l.getId()];
 }
 
 

@@ -148,7 +148,7 @@ AstNodeMemoryPoolStatistics::AstNodeMemoryPoolStatistics()
   // Initialize the total amount of memory used so that we can report fractional percentage of use per IR node.
      totalMemoryUsed = memoryUsage();
      printf ("Total memory used = %d \n",totalMemoryUsed);
-     printf ("numberOfNodes = %zu \n",numberOfNodes());
+     printf ("numberOfNodes = %" PRIuPTR " \n",numberOfNodes());
 
   // DQ (5/6/2011): Insure++ reports this as an error in the tests/RunTests/AstDeleteTests
      counter = 0;
@@ -473,7 +473,7 @@ void AstNodeMemoryPoolStatistics::visit ( SgNode* node)
           IR_NODE_VISIT_CASE(SgAsmBlock)
           IR_NODE_VISIT_CASE(SgAsmOperandList)
           IR_NODE_VISIT_CASE(SgAsmArmInstruction)
-          IR_NODE_VISIT_CASE(SgAsmx86Instruction)
+          IR_NODE_VISIT_CASE(SgAsmX86Instruction)
           IR_NODE_VISIT_CASE(SgAsmPowerpcInstruction)
           IR_NODE_VISIT_CASE(SgAsmInstruction)
           IR_NODE_VISIT_CASE(SgAsmFunction)

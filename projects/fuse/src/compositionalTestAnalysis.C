@@ -86,9 +86,9 @@ int main(int argc, char** argv)
 
       //cout << "pragma: "<< pragma->get_pragma() << endl;
       sregex pragmaLine = *_s >> as_xpr("fuse") >> *_s >> (s1=+~_n);
-      smatch what;
+      boost::xpressive::smatch what;
 
-      if(regex_match(pragma->get_pragma(), what, pragmaLine)) {
+      if(boost::xpressive::regex_match(pragma->get_pragma(), what, pragmaLine)) {
         assert(what.size()==2);
         fuseCmd.append(what[1]);
       }

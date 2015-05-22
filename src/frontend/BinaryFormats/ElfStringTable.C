@@ -71,11 +71,11 @@ SgAsmElfStringSection::set_size(rose_addr_t newsize)
         if (get_size() > orig_size) {
             /* Add new address space to string table free list */
             rose_addr_t n = get_size() - orig_size;
-            strtab->get_freelist().insert(Extent(orig_size, n));
+            strtab->get_freelist().insert(AddressInterval::baseSize(orig_size, n));
         } else if (get_size() < orig_size) {
             /* Remove deleted address space from string table free list */
             rose_addr_t n = orig_size - get_size();
-            strtab->get_freelist().erase(Extent(get_size(), n));
+            strtab->get_freelist().erase(AddressInterval::baseSize(get_size(), n));
         }
     }
 }
@@ -186,7 +186,7 @@ SgAsmElfStrtab::create_storage(rose_addr_t offset, bool shared)
      * string (see SgAsmStoredString(SgAsmGenericStrtab,const std::string&)). */
     if (p_num_freed>0 && (!p_dont_free || offset!=p_dont_free->get_offset())) {
         fprintf(stderr,
-                "SgAsmElfStrtab::create_storage(%"PRIu64"): %zu other string%s (of %zu created) in [%d] \"%s\""
+                "SgAsmElfStrtab::create_storage(%"PRIu64"): %" PRIuPTR " other string%s (of %" PRIuPTR " created) in [%d] \"%s\""
                 " %s been modified and/or reallocated!\n",
                 offset, p_num_freed, 1==p_num_freed?"":"s", p_storage_list.size(),
                 get_container()->get_id(), get_container()->get_name()->get_string(true).c_str(),
@@ -204,7 +204,7 @@ void
 SgAsmElfStrtab::rebind(SgAsmStringStorage *storage, rose_addr_t offset)
 {
     ROSE_ASSERT(p_dont_free && storage!=p_dont_free && storage->get_offset()==p_dont_free->get_offset());
-    std::string s = get_container()->read_content_local_str(offset);
+    std::string s = get_container()->read_content_local_str(offset, false /*relax*/);
     storage->set_offset(offset);
     storage->set_string(s);
 }
@@ -239,8 +239,9 @@ SgAsmElfStrtab::allocate_overlap(SgAsmStringStorage *storage)
                        0==storage->get_string().compare(need-have, have, existing->get_string())) {
                 /* New string ends with an existing string. Check for, and allocate, free space. */
                 rose_addr_t offset = existing->get_offset() - (need-have); /* positive diffs checked above */
-                if (get_freelist().subtract_from(Extent(offset, need-have)).size()==0) {
-                    get_freelist().allocate_at(Extent(offset, need-have));
+                AddressInterval allocationRequest = AddressInterval::baseSize(offset, need-have);
+                if (get_freelist().contains(allocationRequest)) {
+                    get_freelist().erase(allocationRequest);
                     storage->set_offset(offset);
                     return;
                 }
@@ -264,7 +265,6 @@ SgAsmElfStrtab::unparse(std::ostream &f) const
     }
     
     /* Fill free areas with zero */
-    for (ExtentMap::const_iterator i=get_freelist().begin(); i!=get_freelist().end(); ++i) {
-        container->write(f, i->first.first(), std::string(i->first.size(), '\0'));
-    }
+    BOOST_FOREACH (const AddressInterval &interval, get_freelist().intervals())
+        container->write(f, interval.least(), std::string(interval.size(), '\0'));
 }

@@ -7,12 +7,15 @@
 #include "BinaryControlFlow.h"
 #include "BinaryFunctionCall.h"
 #include "Disassembler.h"
+#include "BaseSemantics2.h"
 
 class SgAsmInstruction;
 class SgAsmBlock;
 class SgAsmFunction;
 class SgAsmInterpretation;
 
+namespace rose {
+namespace BinaryAnalysis {
 
 /** Unparses binary AST into text.
  *
@@ -53,6 +56,7 @@ class SgAsmInterpretation;
  *           <li>InsnFuncEntry (pre): emits function info at entry points when output is organized by address.</li>
  *           <li>InsnRawBytes (pre): emits address and raw bytes of instruction in a hexdump-like format.</li>
  *           <li>InsnBlockEntry (pre): emits info about first instruction of each block when output is organized by address.</li>
+ *           <li>InsnStackDelta (pre): emits stack delta constant if known</li>
  *           <li>InsnBody (unparse): emits the instruction mnemonic and arguments.</li>
  *           <li>InsnNoEffect (post): emits an indication when an instruction is part of a no-effect sequence of
  *               instructions.  This functor only has an effect if the BasicBlockNoopUpdater functor is run as
@@ -68,6 +72,7 @@ class SgAsmInterpretation;
  *           <li>BasicBlockReasons (pre): emits the reasons why this block is part of the function.</li>
  *           <li>BasicBlockPredecessors (pre): emits addresses of basic block control flow predecessors.</li>
  *           <li>BasicBlockBody (unparse): unparses each instruction of the basic block.</li>
+ *           <li>BasicBlockOutgoingStackDelta (post): final stack delta if known.</li>
  *           <li>BasicBlockSuccessors (post): emits addresses of basic block control flow successors.</li>
  *           <li>BasicBlockLineTermination (post): emits a linefeed at the end of each basic block.</li>
  *           <li>BasicBlockCleanup (post): cleans up analysis from BasicBlockNoopUpdater and future built-in functors.</li>
@@ -256,10 +261,10 @@ public:
 
     /** Control Flow Graph type.  The unparser supports the standard binary control flow graph data type.  This could be
      *  templatized, but we're planning to move to a non-template graph type in the near future [RPM 2012-04-18]. */
-    typedef BinaryAnalysis::ControlFlow::Graph CFG;
+    typedef rose::BinaryAnalysis::ControlFlow::Graph CFG;
     typedef boost::graph_traits<CFG>::vertex_descriptor CFG_Vertex;
     typedef std::map<SgAsmBlock*, CFG_Vertex> CFG_BlockMap;
-    typedef BinaryAnalysis::FunctionCall::Graph CG;
+    typedef rose::BinaryAnalysis::FunctionCall::Graph CG;
     typedef boost::graph_traits<CG>::vertex_descriptor CG_Vertex;
     typedef std::map<SgAsmFunction*, CG_Vertex> CG_FunctionMap;
 
@@ -408,6 +413,12 @@ public:
         virtual bool operator()(bool enabled, const InsnArgs &args);
     };
 
+    /** Functor to emit the numeric stack delta at each instruction. */
+    class InsnStackDelta: public UnparserCallback {
+    public:
+        virtual bool operator()(bool enabled, const InsnArgs &args);
+    };
+    
     /** Functor to emit the entire instruction.  Output includes the mnemonic, arguments, and comments. */
     class InsnBody: public UnparserCallback {
     public:
@@ -479,6 +490,12 @@ public:
         virtual bool operator()(bool enabled, const BasicBlockArgs &args);
     };
 
+    /** Functor to emit basic block outgoing stack delta. */
+    class BasicBlockOutgoingStackDelta: public UnparserCallback {
+    public:
+        virtual bool operator()(bool enabled, const BasicBlockArgs &args);
+    };
+    
     /** Functor to emit block successor list.  If the unparser's control flow graph is not empty, then we use it to find
      *  successors, otherwise we consult the successors cached in the AST.  The AST-cached successors were probably cached by
      *  the instruction partitioner (see Partitioner class), which does fairly extensive analysis -- certainly more than just
@@ -730,6 +747,7 @@ public:
     InsnAddress insnAddress;
     InsnRawBytes insnRawBytes;
     InsnBlockEntry insnBlockEntry;
+    InsnStackDelta insnStackDelta;
     InsnBody insnBody;
     InsnNoEffect insnNoEffect;
     InsnComment insnComment;
@@ -741,6 +759,7 @@ public:
     BasicBlockNoopUpdater basicBlockNoopUpdater;
     BasicBlockNoopWarning basicBlockNoopWarning;
     BasicBlockBody basicBlockBody;
+    BasicBlockOutgoingStackDelta basicBlockOutgoingStackDelta;
     BasicBlockSuccessors basicBlockSuccessors;
     BasicBlockLineTermination basicBlockLineTermination;
     BasicBlockCleanup basicBlockCleanup;
@@ -885,7 +904,7 @@ public:
     /** Associates a control flow graph with this unparser.  If a control flow graph is present then certain output callbacks
      *  will be able to use that information.  For instance, the basicBlockPredecessors will emit a list of all the
      *  predecessors of a block.  Passing an empty graph will remove control flow information. */
-    void add_control_flow_graph(const BinaryAnalysis::ControlFlow::Graph &cfg);
+    void add_control_flow_graph(const rose::BinaryAnalysis::ControlFlow::Graph &cfg);
 
     /** Controls printing of skip/back messages during linear output.  Each callback that prints an object that occupies
      *  address space should call start_of_object() and end_of_object() before and after printing the object.  If output is
@@ -1013,5 +1032,8 @@ protected:
         rose_addr_t address;            /**< Address to use when generating a prefix string. */
     } lineprefix;
 };
+
+} // namespace
+} // namespace
 
 #endif

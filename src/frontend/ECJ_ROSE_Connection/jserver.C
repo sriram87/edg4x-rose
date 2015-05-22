@@ -3,6 +3,8 @@
  * http://java.sun.com/j2se/1.4.2/docs/guide/jni/spec/jniTOC.html
  * http://java.sun.com/docs/books/jni/html/invoke.html
  */
+#include "sage3basic.h"
+
 #include <string.h>
 #include <string>
 #include <stdlib.h>
@@ -22,16 +24,16 @@ namespace Rose {
     namespace Frontend {
         namespace Java {
 
-            SgClassDefinition *javaLangPackageDefinition = NULL;
-            SgClassType *ObjectClassType = NULL;
-            SgClassType *StringClassType = NULL;
-            SgClassType *ClassClassType = NULL;
-            SgVariableSymbol *lengthSymbol = NULL;
+            ROSE_DLL_API SgClassDefinition *javaLangPackageDefinition = NULL;
+            ROSE_DLL_API SgClassType *ObjectClassType = NULL;
+            ROSE_DLL_API SgClassType *StringClassType = NULL;
+            ROSE_DLL_API SgClassType *ClassClassType = NULL;
+            ROSE_DLL_API SgVariableSymbol *lengthSymbol = NULL;
 
             namespace Ecj {
                 using namespace std;
 
-                SgProject* Ecj_globalProjectPointer = 0;
+                ROSE_DLL_API SgProject* Ecj_globalProjectPointer = 0;
 
                 typedef struct {
                    JavaVM * jvm;
@@ -48,10 +50,10 @@ namespace Rose {
                 void     jserver_destroy();
                 jclass   jserver_getJavaStringClass();
 
-                jclass currentJavaTraversalClass = NULL;
-                JNIEnv *currentEnvironment = NULL;
+                ROSE_DLL_API jclass currentJavaTraversalClass = NULL;
+                ROSE_DLL_API JNIEnv *currentEnvironment = NULL;
                 jmethodID mainMethod = NULL;
-                jmethodID hasConflictsMethod = NULL;
+                ROSE_DLL_API jmethodID hasConflictsMethod = NULL;
                 jmethodID getTempDirectoryMethod = NULL;
                 jmethodID createTempFileMethod = NULL;
                 jmethodID createTempNamedFileMethod = NULL;

@@ -2,13 +2,15 @@
 #include "AsmUnparser.h"
 #include "AsmUnparser_compat.h" /*FIXME: needed until no longer dependent upon unparseInstruction()*/
 
-using namespace rose;                                   // temporary until this API lives inside the "rose" name space
-using namespace rose::Diagnostics;
+namespace rose {
+namespace BinaryAnalysis {
 
-Sawyer::Message::Facility AsmUnparser::mlog("AsmUnparser");
+using namespace Diagnostics;
+
+Sawyer::Message::Facility AsmUnparser::mlog;
 
 /** Returns a vector of booleans indicating whether an instruction is part of a no-op sequence.  The sequences returned by
- *  SgAsmInstruction::find_noop_subsequences() can overlap, but we cannot assume that removing overlapping sequences will
+ *  SgAsmInstruction::findNoopSubsequences() can overlap, but we cannot assume that removing overlapping sequences will
  *  result in a meaningful basic block.  For instance, consider the following block:
  *
  *  \code
@@ -21,7 +23,7 @@ Sawyer::Message::Facility AsmUnparser::mlog("AsmUnparser");
  *  The subsequences <2,3> and <3,4> are both no-ops when considered independently.  However, we cannot remove all four
  *  instructions because the sequence <1,2,3,4> is not a no-op.
  *
- *  Therefore, this function takes the list returned by find_noop_subsequences and greedily selects the longest non-overlapping
+ *  Therefore, this function takes the list returned by findNoopSubsequences and greedily selects the longest non-overlapping
  *  sequences, and returns a vector indexed by instruction position and containing a boolean to indicate whether that
  *  instruction is part of a selected no-op sequence.  Note that this algorithm does not necessarily maximize the number of
  *  no-op instructions. */
@@ -70,8 +72,8 @@ void AsmUnparser::initDiagnostics() {
     static bool initialized = false;
     if (!initialized) {
         initialized = true;
-        mlog.initStreams(Diagnostics::destination);
-        Diagnostics::facilities.insert(mlog);
+        mlog = Sawyer::Message::Facility("rose::BinaryAnalysis::AsmUnparser", Diagnostics::destination);
+        Diagnostics::mfacilities.insertAndAdjust(mlog);
     }
 }
 
@@ -86,7 +88,8 @@ AsmUnparser::init()
         .append(&insnFuncEntry)                 /* used only for ORGANIZED_BY_ADDRESS */
         //.append(&insnAddress)                 /* Using insnRawBytes instead, which also prints addresses. */
         .append(&insnRawBytes)
-        .append(&insnBlockEntry);               /* used only for ORGANIZED_BY_ADDRESS */
+        .append(&insnBlockEntry)                /* used only for ORGANIZED_BY_ADDRESS */
+        .append(&insnStackDelta);
     insn_callbacks.unparse
         .append(&insnBody);
     insn_callbacks.post
@@ -103,6 +106,7 @@ AsmUnparser::init()
     basicblock_callbacks.unparse
         .append(&basicBlockBody);               /* used only for ORGANIZED_BY_AST */
     basicblock_callbacks.post
+        .append(&basicBlockOutgoingStackDelta)
         .append(&basicBlockSuccessors)
         .append(&basicBlockLineTermination)
         .append(&basicBlockCleanup);
@@ -598,6 +602,20 @@ AsmUnparser::InsnBlockEntry::operator()(bool enabled, const InsnArgs &args)
 }
 
 bool
+AsmUnparser::InsnStackDelta::operator()(bool enabled, const InsnArgs &args) {
+    static const int deltaWidth = 2;                    // min column width for delta digits
+    if (enabled) {
+        int64_t delta = args.insn->get_stackDelta();
+        if (delta != SgAsmInstruction::INVALID_STACK_DELTA) {
+            mfprintf(args.output)("<sp%+-*"PRId64">", deltaWidth+1, delta);
+        } else {
+            args.output <<std::string(deltaWidth+5, ' ');
+        }
+    }
+    return enabled;
+}
+
+bool
 AsmUnparser::InsnBody::operator()(bool enabled, const InsnArgs &args)
 {
     if (enabled)
@@ -649,7 +667,7 @@ AsmUnparser::BasicBlockNoopUpdater::operator()(bool enabled, const BasicBlockArg
     args.unparser->insn_is_noop.clear();
     if (enabled) {
         typedef std::vector<std::pair<size_t, size_t> > NoopSequences; /* array of index,size pairs */
-        NoopSequences noops = args.insns.front()->find_noop_subsequences(args.insns, true, true);
+        NoopSequences noops = args.insns.front()->findNoopSubsequences(args.insns, true, true);
         if (!noops.empty()) {
             args.unparser->insn_is_noop = build_noop_index(noops);
             if (debug) {
@@ -733,6 +751,19 @@ AsmUnparser::BasicBlockBody::operator()(bool enabled, const BasicBlockArgs &args
     if (enabled && ORGANIZED_BY_AST==args.unparser->get_organization()) {
         for (size_t i=0; i<args.insns.size(); i++)
             args.unparser->unparse_insn(enabled, args.output, args.insns[i], i);
+    }
+    return enabled;
+}
+
+bool
+AsmUnparser::BasicBlockOutgoingStackDelta::operator()(bool enabled, const BasicBlockArgs &args)
+{
+    if (enabled) {
+        int64_t n = args.block->get_stackDeltaOut();
+        if (n != SgAsmInstruction::INVALID_STACK_DELTA) {
+            args.output <<args.unparser->line_prefix();
+            mfprintf(args.output)("Outgoing stack delta: %+"PRId64"\n", n);
+        }
     }
     return enabled;
 }
@@ -961,6 +992,7 @@ AsmUnparser::StaticDataDisassembler::init(Disassembler *d, AsmUnparser *u)
         unparser_allocated_here = false;
     } else {
         unparser = new AsmUnparser;
+        unparser->insn_callbacks.pre.erase(&unparser->insnStackDelta); // no stack deltas for data
         unparser->insn_callbacks.unparse.prepend(&data_note);
         unparser_allocated_here = true;
     }
@@ -976,8 +1008,8 @@ AsmUnparser::StaticDataDisassembler::operator()(bool enabled, const StaticDataAr
         SgUnsignedCharList data = args.data->get_raw_bytes();
         MemoryMap map;
         map.insert(AddressInterval::baseSize(args.data->get_address(), data.size()),
-                   MemoryMap::Segment(MemoryMap::ExternBuffer::create(&data[0], data.size()), 0,
-                                      MemoryMap::MM_PROT_RX, "static data block"));
+                   MemoryMap::Segment::staticInstance(&data[0], data.size(), MemoryMap::READABLE|MemoryMap::EXECUTABLE,
+                                                      "static data block"));
         unparser->set_prefix_format(args.unparser->get_prefix_format());
         rose_addr_t offset=0, nskipped=0;
         while (offset < data.size()) {
@@ -1155,9 +1187,14 @@ AsmUnparser::FunctionAttributes::operator()(bool enabled, const FunctionArgs &ar
                 // the usual cases, don't say anything, assume function might return
                 break;
             case SgAsmFunction::RET_NEVER: {
-                args.output <<args.unparser->line_prefix() <<"Function does not return to caller." <<std::endl;
+                args.output <<args.unparser->line_prefix() <<"Function does not return to caller.\n";
                 break;
             }
+        }
+
+        if (args.func->get_stackDelta() != SgAsmInstruction::INVALID_STACK_DELTA) {
+            args.output <<args.unparser->line_prefix();
+            mfprintf(args.output)("Function stack delta: %+"PRId64"\n", args.func->get_stackDelta());
         }
     }
     return enabled;
@@ -1208,3 +1245,6 @@ AsmUnparser::InterpBody::operator()(bool enabled, const InterpretationArgs &args
     }
     return enabled;
 }
+
+} // namespace
+} // namespace

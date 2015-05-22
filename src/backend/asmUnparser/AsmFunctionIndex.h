@@ -8,6 +8,9 @@
 #include "callbacks.h"
 #include "Diagnostics.h"
 
+namespace rose {
+namespace BinaryAnalysis {
+
 /** Functions indexed by entry address.
  *
  *  This class is designed to be a highly-configurable way to print a table describing known functions.  The way it works is
@@ -168,7 +171,7 @@ public:
             return val(a) != val(b);
         }
         size_t val(SgAsmFunction *x) {
-            ExtentMap extent;
+            AddressIntervalSet extent;
             x->get_extent(&extent);
             return extent.size();
         }
@@ -456,6 +459,21 @@ public:
         virtual bool operator()(bool enabled, const DataArgs&);
     } callingConventionCallback;
 
+    /** Print whether function can return. */
+    class MayReturnCallback: public OutputCallback {
+    public:
+        MayReturnCallback(): OutputCallback("Returns", 9) {}
+        virtual bool operator()(bool enabled, const DataArgs&);
+    } mayReturnCallback;
+
+    /** Print stack delta. */
+    class StackDeltaCallback: public OutputCallback {
+    public:
+        StackDeltaCallback(): OutputCallback("Stack", 9) {}
+        virtual bool operator()(bool enabled, const HeadingArgs&);
+        virtual bool operator()(bool enabled, const DataArgs&);
+    } stackDeltaCallback;
+
     /** Function name. Prints function name if known, nothing otherwise. */
     class NameCallback: public OutputCallback {
     public:
@@ -486,5 +504,7 @@ protected:
     ROSE_Callbacks::List<OutputCallback> output_callbacks;
 };
 
-    
+} // namespace
+} // namespace
+
 #endif

@@ -12,7 +12,7 @@ endif
 
 SUBDIRS = DebuggerQt
 
-INCLUDES = . .. $(ROSE_BOOST_PREINCLUDE_PATH) $(ROSE_BOOST_NORMAL_INCLUDE_PATH) -DBOOST_REGEX_MATCH_EXTRA
+INCLUDES = . .. $(ROSE_BOOST_PREINCLUDE_PATH) $(ROSE_BOOST_NORMAL_INCLUDE_PATH)
 
 if ROSE_WITH_ROSEQT
 INCLUDES += $(ROSE_QT_INCLUDE)
@@ -68,7 +68,7 @@ endif
 bin_PROGRAMS  = RuntimeSystemCppTest
 
 RuntimeSystemCppTest_SOURCES = test.cpp
-RuntimeSystemCppTest_LDADD   = libCppRuntimeSystem.la
+RuntimeSystemCppTest_LDADD   = libCppRuntimeSystem.la $(ROSE_LIBS)
 
 
 include_HEADERS = rted_iface_structs.h \

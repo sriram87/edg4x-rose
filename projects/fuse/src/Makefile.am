@@ -32,6 +32,7 @@ include_HEADERS =\
 	analysis/partitions.h \
 	analysis/ssa.h \
 	analysis/stx_analysis.h \
+	analysis/AliasAnalysis.h \
 	cfgUtils/CallGraphTraverse.h \
 	cfgUtils/cfgUtils.h \
 	cfgUtils/DataflowCFG.h \
@@ -102,6 +103,7 @@ fuse_SOURCES = \
 	analysis/ssa_nosight.C \
 	analysis/ssa.C \
 	analysis/stx_analysis.C \
+	analysis/AliasAnalysis.C \
 	cfgUtils/CallGraphTraverse.C \
 	cfgUtils/cfgUtils.C \
 	cfgUtils/DataflowCFG.C \

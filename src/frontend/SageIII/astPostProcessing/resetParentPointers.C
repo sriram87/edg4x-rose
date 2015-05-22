@@ -466,7 +466,7 @@ ResetParentPointers::resetParentPointersInTemplateArgumentList ( const SgTemplat
   // scopes.  This is handled in the get_scope() function which is called by the get_qualified_name() function.
 
   // ROSE_ASSERT(templateArgListPtr != NULL);
-  // printf ("### In resetParentPointersInTemplateArgumentList(): templateArgListPtr->size() = %zu ### \n",templateArgListPtr->size());
+  // printf ("### In resetParentPointersInTemplateArgumentList(): templateArgListPtr->size() = %" PRIuPTR " ### \n",templateArgListPtr->size());
      SgTemplateArgumentPtrList::const_iterator i = templateArgListPtr.begin();
      while (i != templateArgListPtr.end())
         {
@@ -694,7 +694,7 @@ ResetParentPointers::resetParentPointersInTemplateArgumentList ( const SgTemplat
           i++;
         }
 
-  // printf ("### Leaving resetParentPointersInTemplateArgumentList(): templateArgListPtr->size() = %zu ### \n",templateArgListPtr->size());
+  // printf ("### Leaving resetParentPointersInTemplateArgumentList(): templateArgListPtr->size() = %" PRIuPTR " ### \n",templateArgListPtr->size());
    }
 
 
@@ -1638,9 +1638,12 @@ ResetFileInfoParentPointersInMemoryPool::visit(SgNode* node)
 
      SgLocatedNode* locatedNode = isSgLocatedNode(node);
      SgSupport*     support     = isSgSupport(node);
+     SgUntypedNode* untypedNode = isSgUntypedNode(node);
 
+  // DQ (9/15/2014): Skip checking of parent pointers here for SgUntypedNode IR nodes (handle this case seperately).
   // All types should have NULL parent pointers (because types can be shared)
-     if (locatedNode != NULL)
+  // if (locatedNode != NULL)
+     if (locatedNode != NULL && untypedNode == NULL)
         {
           if (locatedNode->get_startOfConstruct() == NULL)
              {
@@ -1769,6 +1772,15 @@ ResetFileInfoParentPointersInMemoryPool::visit(SgNode* node)
                     ROSE_ASSERT(support->get_file_info() == NULL);
                     break;
                   }
+             }
+        }
+
+  // DQ (9/15/2014): Specific checking of parent pointers here for SgUntypedNode IR nodes (skipped handle this case with all SgLocatedNode IR nodes above).
+     if (untypedNode != NULL)
+        {
+          if (untypedNode->get_startOfConstruct() == NULL)
+             {
+               printf ("Warning: untypedNode->get_startOfConstruct() == NULL (untypedNode = %p = %s) \n",untypedNode,untypedNode->class_name().c_str());
              }
         }
    }

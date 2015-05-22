@@ -76,14 +76,14 @@ SgAsmGenericSection::align()
 
     if (get_file_alignment()>0) {
         rose_addr_t old_offset = get_offset();
-        rose_addr_t new_offset = ALIGN_UP(old_offset, get_file_alignment());
+        rose_addr_t new_offset = alignUp(old_offset, get_file_alignment());
         set_offset(new_offset);
         changed = changed ? true : (old_offset!=new_offset);
     }
 
     if (is_mapped() && get_mapped_alignment()>0) {
         rose_addr_t old_rva = get_mapped_preferred_rva();
-        rose_addr_t new_rva = ALIGN_UP(old_rva, get_mapped_alignment());
+        rose_addr_t new_rva = alignUp(old_rva, get_mapped_alignment());
         set_mapped_preferred_rva(new_rva);
         changed = changed ? true : (old_rva!=new_rva);
     }
@@ -401,22 +401,16 @@ SgAsmGenericSection::read_content_str(rose_addr_t abs_offset, bool strict)
 std::string
 SgAsmGenericSection::read_content_local_str(rose_addr_t rel_offset, bool strict)
 {
-    static char *buf=NULL;
-    static size_t nalloc=0;
-    size_t nused=0;
-
+    std::string retval;
     while (1) {
-        if (nused >= nalloc) {
-            nalloc = std::max((size_t)32, 2*nalloc);
-            buf = (char*)realloc(buf, nalloc);
-            ROSE_ASSERT(buf!=NULL);
+        char ch;
+        if (read_content_local(rel_offset+retval.size(), &ch, 1, strict)) {
+            if ('\0'==ch)
+                return retval;
+            retval += ch;
+        } else {
+            return retval;
         }
-
-        unsigned char byte;
-        read_content_local(rel_offset+nused, &byte, 1, strict);
-        if (!byte)
-            return std::string(buf, nused);
-        buf[nused++] = byte;
     }
 }
 
@@ -520,7 +514,7 @@ SgAsmGenericSection::write(std::ostream &f, rose_addr_t offset, size_t bufsize, 
             fprintf(stderr, " in [%d] \"%s\"\n", get_id(), get_name()->get_string(true).c_str());
             fprintf(stderr, "    section is at file offset 0x%08"PRIx64" (%"PRIu64"), size 0x%"PRIx64" (%"PRIu64") bytes\n", 
                     get_offset(), get_offset(), get_size(), get_size());
-            fprintf(stderr, " write %zu byte%s at section offset 0x%08"PRIx64"\n", bufsize, 1==bufsize?"":"s", offset);
+            fprintf(stderr, " write %" PRIuPTR " byte%s at section offset 0x%08"PRIx64"\n", bufsize, 1==bufsize?"":"s", offset);
             fprintf(stderr, "      ");
             HexdumpFormat hf;
             hf.prefix = "      ";
@@ -605,39 +599,40 @@ SgAsmGenericSection::write_sleb128(unsigned char *buf, rose_addr_t offset, int64
 
 /** Returns a list of parts of a single section that have been referenced.  The offsets are relative to the start of the
  *  section. */
-ExtentMap
+AddressIntervalSet
 SgAsmGenericSection::get_referenced_extents() const
 {
-    ExtentMap retval;
     if (0==get_size())
-        return retval;
+        return AddressIntervalSet();
 
-    Extent s(get_offset(), get_size());
-    const ExtentMap &file_extents = get_file()->get_referenced_extents();
-    for (ExtentMap::const_iterator i=file_extents.begin(); i!=file_extents.end(); i++) {
-        Extent e = i->first;
-        if (e.contained_in(s)) {
-            retval.insert(Extent(e.first()-get_offset(), e.size()));
-        } else if (e.left_of(s) || e.right_of(s)) {
-            /*void*/
-        } else if (e.contains(s)) {
-            retval.insert(Extent(0, get_size()));
-        } else if (e.begins_before(s)) {
-            retval.insert(Extent(0, e.first()+e.size()-get_offset()));
-        } else if (e.ends_after(s)) {
-            retval.insert(Extent(e.first()-get_offset(), get_offset()+get_size()-e.first()));
+    AddressIntervalSet retval;
+    AddressInterval segment = AddressInterval::baseSize(get_offset(), get_size());
+    const AddressIntervalSet &fileExtents = get_file()->get_referenced_extents();
+    BOOST_FOREACH (const AddressInterval &interval, fileExtents.intervals()) {
+        if (segment.isContaining(interval)) {
+            retval.insert(AddressInterval::baseSize(interval.least()-get_offset(), interval.size()));
+        } else if (interval.isLeftOf(segment) || interval.isRightOf(segment)) {
+            // no overlap
+        } else if (interval.isContaining(segment)) {
+            retval.insert(AddressInterval::baseSize(0, get_size()));
+            break;                                      // no point in continuing since we've referenced whole segment now
+        } else if (interval.least() < segment.least()) {
+            retval.insert(AddressInterval::baseSize(0, interval.least()+interval.size()-get_offset()));
+        } else if (interval.greatest() > segment.greatest()) {
+            retval.insert(AddressInterval::baseSize(interval.least()-get_offset(), get_offset()+get_size()-interval.least()));
         } else {
-            assert(!"invalid extent overlap category");
-            abort();
+            ASSERT_not_reachable("invalid extent overlap category");
         }
     }
     return retval;
 }
 
-ExtentMap
+AddressIntervalSet
 SgAsmGenericSection::get_unreferenced_extents() const
 {
-    return get_referenced_extents().subtract_from(Extent(0, get_size())); /*complement*/
+    AddressIntervalSet set = get_referenced_extents();
+    set.invert(AddressInterval::baseSize(0, get_size()));
+    return set;
 }
 
 /** Extend a section by some number of bytes during the construction and/or parsing phase. This is function is considered to

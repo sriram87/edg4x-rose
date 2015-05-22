@@ -56,11 +56,11 @@ SgAsmPEStringSection::set_size(rose_addr_t newsize)
     if (get_size() > orig_size) {
         /* Add new address space to string table free list */
         rose_addr_t n = get_size() - orig_size;
-        strtab->get_freelist().insert(Extent(orig_size, n));
+        strtab->get_freelist().insert(AddressInterval::baseSize(orig_size, n));
     } else if (get_size() < orig_size) {
         /* Remove deleted address space from string table free list */
         rose_addr_t n = orig_size - get_size();
-        strtab->get_freelist().erase(Extent(get_size(), n));
+        strtab->get_freelist().erase(AddressInterval::baseSize(get_size(), n));
     }
 }
 
@@ -151,7 +151,7 @@ SgAsmCoffStrtab::create_storage(rose_addr_t offset, bool shared)
      * string (see SgAsmStoredString(SgAsmGenericStrtab,const std::string&)). */
     if (p_num_freed>0 && (!p_dont_free || offset!=p_dont_free->get_offset())) {
         fprintf(stderr,
-                "SgAsmCoffStrtab::create_storage(%"PRIu64"): %zu other string%s (of %zu created) in [%d] \"%s\""
+                "SgAsmCoffStrtab::create_storage(%"PRIu64"): %" PRIuPTR " other string%s (of %" PRIuPTR " created) in [%d] \"%s\""
                 " %s been modified and/or reallocated!\n",
                 offset, p_num_freed, 1==p_num_freed?"":"s", p_storage_list.size(),
                 container->get_id(), container->get_name()->get_string(true).c_str(),
@@ -186,7 +186,6 @@ SgAsmCoffStrtab::unparse(std::ostream &f) const
     }
     
     /* Fill free areas with zero */
-    for (ExtentMap::const_iterator i=get_freelist().begin(); i!=get_freelist().end(); ++i) {
-        container->write(f, i->first.first(), std::string(i->first.size(), '\0'));
-    }
+    BOOST_FOREACH (const AddressInterval &interval, get_freelist().intervals())
+        container->write(f, interval.least(), std::string(interval.size(), '\0'));
 }

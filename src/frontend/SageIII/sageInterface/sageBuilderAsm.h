@@ -1,7 +1,35 @@
 #ifndef ROSE_SageBuilderAsm_H
 #define ROSE_SageBuilderAsm_H
 
+namespace rose {
 namespace SageBuilderAsm {
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Build files
+
+/** Build a new binary composite object.
+ *
+ *  A SgBinaryComposite is the top-level node for binary analysis and holds two lists: a list of file headers representing the
+ *  various executable containers that have been parsed, and a list of interpretations that organize thos headers into
+ *  compatible units.  For instance, a Microsoft Windows executable file will have two headers (DOS and PE) and two
+ *  interpretations (one for the DOS code and data and another for the PE code and data).  If dynamic linking is performed,
+ *  then even more headers will be present, but their code and data will likely be inserted into one of the existing
+ *  interpretations.   An interpretation (SgAsmInterpretation) is analogous to a process.
+ *
+ *  ASTs normally have only one SgBinaryComposite, but an AST can have more than one if the AST is used to analyze two or more
+ *  binaries.  For instance, if we have two related versions of the i586 ELF "login" program and we want to run some analysis
+ *  that compares the two programs, then we probably want two SgBinaryComposite nodes in the AST. Each SgBinaryComposite will
+ *  have a SgAsmInterpretation to represent the i586 "login" process.  Doing it this way will prevent headers and code from one
+ *  version to be confused with headers and code from the other version.
+ *
+ *  A SgProject node will be created if one has not been created already. The segments/sections from the file are mapped into
+ *  process virtual memory in the SgAsmInterpretation but are not disassembled. */
+SgBinaryComposite* buildBinaryComposite(const std::string &fileName);
+
+
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Build data types
 
 // Generic data types
 SgAsmIntegerType* buildTypeU1();                        /**< 1-bit unsigned (Boolean) */
@@ -30,41 +58,39 @@ SgAsmVectorType *buildTypeX86DoubleQuadWord();          /**< Vector of two 64-bi
 SgAsmFloatType *buildTypeM68kFloat96();                 /**< Motorola M68k 96-bit float (16-bits are always zero) */
 
 // x86-specific data types (deprecated [Robb P. Matzke 2014-07-21]; use the functions with X86 in their names)
-SgAsmIntegerType* buildAsmTypeByte() ROSE_DEPRECATED;
-SgAsmIntegerType* buildAsmTypeWord() ROSE_DEPRECATED;
-SgAsmIntegerType* buildAsmTypeDoubleWord() ROSE_DEPRECATED;
-SgAsmIntegerType* buildAsmTypeQuadWord() ROSE_DEPRECATED;
-SgAsmFloatType*   buildAsmTypeSingleFloat() ROSE_DEPRECATED;
-SgAsmFloatType*   buildAsmTypeDoubleFloat() ROSE_DEPRECATED;
-SgAsmFloatType*   buildAsmType128bitFloat() ROSE_DEPRECATED;
-SgAsmFloatType*   buildAsmType80bitFloat() ROSE_DEPRECATED;
-SgAsmVectorType*  buildAsmTypeDoubleQuadWord() ROSE_DEPRECATED;
+SgAsmIntegerType* buildAsmTypeByte() ROSE_DEPRECATED("use buildTypeX86Byte");
+SgAsmIntegerType* buildAsmTypeWord() ROSE_DEPRECATED("use buildTypeX86Word");
+SgAsmIntegerType* buildAsmTypeDoubleWord() ROSE_DEPRECATED("use buildTypeX86DoubleWord");
+SgAsmIntegerType* buildAsmTypeQuadWord() ROSE_DEPRECATED("use buildTypeX86QuadWord");
+SgAsmFloatType*   buildAsmTypeSingleFloat() ROSE_DEPRECATED("use buildTypeX86Float32");
+SgAsmFloatType*   buildAsmTypeDoubleFloat() ROSE_DEPRECATED("use buildTypeX86Float64");
+SgAsmFloatType*   buildAsmType128bitFloat() ROSE_DEPRECATED("use architecture specific type");
+SgAsmFloatType*   buildAsmType80bitFloat() ROSE_DEPRECATED("use buildTypeX86Float80");
+SgAsmVectorType*  buildAsmTypeDoubleQuadWord() ROSE_DEPRECATED("use buildTypeX86DoubleQuadWord");
 
-// Build instruction; some deprecated because of incorrect capitalization [Robb P. Matzke 2014-07-21]
-SgAsmx86Instruction* buildx86Instruction(X86InstructionKind) ROSE_DEPRECATED;
-SgAsmx86Instruction* buildX86Instruction(X86InstructionKind);
-SgAsmx86Instruction* buildx86Instruction(X86InstructionKind, SgAsmExpression *operand) ROSE_DEPRECATED;
-SgAsmx86Instruction* buildX86Instruction(X86InstructionKind, SgAsmExpression *operand);
-SgAsmx86Instruction* buildx86Instruction(X86InstructionKind, SgAsmExpression *lhs, SgAsmExpression *rhs) ROSE_DEPRECATED;
-SgAsmx86Instruction* buildX86Instruction(X86InstructionKind, SgAsmExpression *lhs, SgAsmExpression *rhs);
-SgAsmx86Instruction* buildx86Instruction(X86InstructionKind, SgAsmOperandList *operands) ROSE_DEPRECATED;
-SgAsmInstruction* buildMultibyteNopInstruction(int n) ROSE_DEPRECATED;
-SgAsmx86Instruction *buildX86MultibyteNopInstruction(size_t nBytes);
-
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Build registers. Deprecated because ROSE doesn't have architecture-specific registers anymore. [Robb P. Matzke 2014-07-21]
 // Use the SgAsmDirectRegisterExpression constructor instead.
-SgAsmDirectRegisterExpression* buildSgAsmx86RegisterReferenceExpression(const RegisterDescriptor&) ROSE_DEPRECATED;
-SgAsmDirectRegisterExpression* buildSgAsmArmRegisterReferenceExpression(const RegisterDescriptor&) ROSE_DEPRECATED;
-SgAsmDirectRegisterExpression* buildSgAsmMipsRegisterReferenceExpression(const RegisterDescriptor&) ROSE_DEPRECATED;
-SgAsmDirectRegisterExpression* buildSgAsmPowerpcRegisterReferenceExpression(const RegisterDescriptor&) ROSE_DEPRECATED;
+SgAsmDirectRegisterExpression* buildSgAsmx86RegisterReferenceExpression(const RegisterDescriptor&)
+    ROSE_DEPRECATED("use SgAsmDirectRegisterExpression constructor");
+SgAsmDirectRegisterExpression* buildSgAsmArmRegisterReferenceExpression(const RegisterDescriptor&)
+    ROSE_DEPRECATED("use SgAsmDirectRegisterExpression constructor");
+SgAsmDirectRegisterExpression* buildSgAsmMipsRegisterReferenceExpression(const RegisterDescriptor&)
+    ROSE_DEPRECATED("use SgAsmDirectRegisterExpression constructor");
+SgAsmDirectRegisterExpression* buildSgAsmPowerpcRegisterReferenceExpression(const RegisterDescriptor&)
+    ROSE_DEPRECATED("use SgAsmDirectRegisterExpression constructor");
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Generic value builders
 SgAsmIntegerValueExpression* buildValueInteger(uint64_t value, SgAsmType*);
 SgAsmIntegerValueExpression* buildValueInteger(const Sawyer::Container::BitVector&, SgAsmType*);
 SgAsmFloatValueExpression* buildValueFloat(double value, SgAsmType*);
 SgAsmFloatValueExpression* buildValueFloat(const Sawyer::Container::BitVector&, SgAsmType*);
-   
-// Building integer values generically (one of these per buildType function above)
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Building integer values.
+
+// Build integer values generically (one of these per buildType function above)
 SgAsmIntegerValueExpression* buildValueU1(bool);
 SgAsmIntegerValueExpression* buildValueU8(uint8_t);
 SgAsmIntegerValueExpression* buildValueU16(uint16_t);
@@ -88,18 +114,19 @@ SgAsmFloatValueExpression* buildValueX86Float80(double);
 
 // Building integer values with x86-specific type names.
 // These are deprecated because they lack "X86" in their names [Robb P. Matzke 2014-07-21].
-SgAsmIntegerValueExpression* buildAsmByteValue(uint8_t) ROSE_DEPRECATED;
-SgAsmIntegerValueExpression* buildAsmWordValue(uint16_t) ROSE_DEPRECATED;
-SgAsmIntegerValueExpression* buildAsmDWordValue(uint32_t) ROSE_DEPRECATED;
-SgAsmIntegerValueExpression* buildAsmQWordValue(uint64_t) ROSE_DEPRECATED;
+SgAsmIntegerValueExpression* buildAsmByteValue(uint8_t) ROSE_DEPRECATED("use buildValueX86Byte");
+SgAsmIntegerValueExpression* buildAsmWordValue(uint16_t) ROSE_DEPRECATED("use buildValueX86Word");
+SgAsmIntegerValueExpression* buildAsmDWordValue(uint32_t) ROSE_DEPRECATED("use buildValueX86DWord");
+SgAsmIntegerValueExpression* buildAsmQWordValue(uint64_t) ROSE_DEPRECATED("use buildValueX86QWord");
 
 // Building integer values with x86-specific type names.
 // These are deprecated because they should have been named "build" instead of "make"
-SgAsmIntegerValueExpression* makeByteValue(uint8_t) ROSE_DEPRECATED;
-SgAsmIntegerValueExpression* makeWordValue(uint16_t) ROSE_DEPRECATED;
-SgAsmIntegerValueExpression* makeDWordValue(uint32_t) ROSE_DEPRECATED;
-SgAsmIntegerValueExpression* makeQWordValue(uint64_t) ROSE_DEPRECATED;
+SgAsmIntegerValueExpression* makeByteValue(uint8_t) ROSE_DEPRECATED("use buildValueX86Byte");
+SgAsmIntegerValueExpression* makeWordValue(uint16_t) ROSE_DEPRECATED("use buildValueX86Word");
+SgAsmIntegerValueExpression* makeDWordValue(uint32_t) ROSE_DEPRECATED("use buildValueX86DWord");
+SgAsmIntegerValueExpression* makeQWordValue(uint64_t) ROSE_DEPRECATED("use buildValueX86QWord");
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Operators
 SgAsmBinaryAdd* buildAddExpression(SgAsmExpression *lhs, SgAsmExpression *rhs);
 SgAsmBinarySubtract* buildSubtractExpression(SgAsmExpression *lhs, SgAsmExpression *rhs);
@@ -119,22 +146,27 @@ SgAsmMemoryReferenceExpression* buildMemoryReferenceExpression(SgAsmExpression *
                                                                SgAsmType *type=NULL);
 
 // Operators (deprecated because they should have been named "build" rather than "make" [Robb P. Matzke 2014-07-21])
-SgAsmBinaryAdd* makeAdd(SgAsmExpression *lhs, SgAsmExpression *rhs) ROSE_DEPRECATED;
-SgAsmBinarySubtract* makeSubtract(SgAsmExpression *lhs, SgAsmExpression *rhs) ROSE_DEPRECATED;
-SgAsmBinaryAddPreupdate* makeAddPreupdate(SgAsmExpression *lhs, SgAsmExpression *rhs) ROSE_DEPRECATED;
-SgAsmBinarySubtractPreupdate* makeSubtractPreupdate(SgAsmExpression *lhs, SgAsmExpression *rhs) ROSE_DEPRECATED;
-SgAsmBinaryAddPostupdate* makeAddPostupdate(SgAsmExpression *lhs, SgAsmExpression *rhs) ROSE_DEPRECATED;
-SgAsmBinarySubtractPostupdate* makeSubtractPostupdate(SgAsmExpression *lhs, SgAsmExpression *rhs) ROSE_DEPRECATED;
-SgAsmBinaryMultiply* makeMul(SgAsmExpression *lhs, SgAsmExpression *rhs) ROSE_DEPRECATED;
-SgAsmBinaryLsl* makeLsl(SgAsmExpression *lhs, SgAsmExpression *rhs) ROSE_DEPRECATED;
-SgAsmBinaryLsr* makeLsr(SgAsmExpression *lhs, SgAsmExpression *rhs) ROSE_DEPRECATED;
-SgAsmBinaryAsr* makeAsr(SgAsmExpression *lhs, SgAsmExpression *rhs) ROSE_DEPRECATED;
-SgAsmBinaryRor* makeRor(SgAsmExpression *lhs, SgAsmExpression *rhs) ROSE_DEPRECATED;
-SgAsmUnaryRrx* makeRrx(SgAsmExpression *lhs) ROSE_DEPRECATED;
-SgAsmUnaryArmSpecialRegisterList* makeArmSpecialRegisterList(SgAsmExpression *lhs) ROSE_DEPRECATED;
-SgAsmExprListExp* makeExprListExp() ROSE_DEPRECATED;
+SgAsmBinaryAdd* makeAdd(SgAsmExpression *lhs, SgAsmExpression *rhs) ROSE_DEPRECATED("use buildAddExpression");
+SgAsmBinarySubtract* makeSubtract(SgAsmExpression *lhs, SgAsmExpression *rhs) ROSE_DEPRECATED("use buildSubtractExpression");
+SgAsmBinaryAddPreupdate* makeAddPreupdate(SgAsmExpression *lhs, SgAsmExpression *rhs)
+    ROSE_DEPRECATED("use buildAddPreupdateExpression");
+SgAsmBinarySubtractPreupdate* makeSubtractPreupdate(SgAsmExpression *lhs, SgAsmExpression *rhs)
+    ROSE_DEPRECATED("use buildSubtractPreupdateExpression");
+SgAsmBinaryAddPostupdate* makeAddPostupdate(SgAsmExpression *lhs, SgAsmExpression *rhs)
+    ROSE_DEPRECATED("use buildAddPostupdateExpression");
+SgAsmBinarySubtractPostupdate* makeSubtractPostupdate(SgAsmExpression *lhs, SgAsmExpression *rhs)
+    ROSE_DEPRECATED("use buildSubtractPostupdateExpression");
+SgAsmBinaryMultiply* makeMul(SgAsmExpression *lhs, SgAsmExpression *rhs) ROSE_DEPRECATED("use buildMultiplyExpression");
+SgAsmBinaryLsl* makeLsl(SgAsmExpression *lhs, SgAsmExpression *rhs) ROSE_DEPRECATED("use buildLslExpression");
+SgAsmBinaryLsr* makeLsr(SgAsmExpression *lhs, SgAsmExpression *rhs) ROSE_DEPRECATED("use buildLsrExpression");
+SgAsmBinaryAsr* makeAsr(SgAsmExpression *lhs, SgAsmExpression *rhs) ROSE_DEPRECATED("use buildAsrExpression");
+SgAsmBinaryRor* makeRor(SgAsmExpression *lhs, SgAsmExpression *rhs) ROSE_DEPRECATED("use buildRorExpression");
+SgAsmUnaryRrx* makeRrx(SgAsmExpression *lhs) ROSE_DEPRECATED("use buildRrxExpression");
+SgAsmUnaryArmSpecialRegisterList* makeArmSpecialRegisterList(SgAsmExpression *lhs)
+    ROSE_DEPRECATED("use buildArmSpecialRegisterList");
+SgAsmExprListExp* makeExprListExp() ROSE_DEPRECATED("use buildExprListExpression");
 SgAsmMemoryReferenceExpression* makeMemoryReference(SgAsmExpression *addr, SgAsmExpression *segment=NULL,
-                                                    SgAsmType *type=NULL) ROSE_DEPRECATED;
+                                                    SgAsmType *type=NULL) ROSE_DEPRECATED("use buildMemoryReferenceExpression");
 
 template <typename Insn>
 inline Insn* appendOperand(Insn* insn, SgAsmExpression* op) {
@@ -144,6 +176,34 @@ inline Insn* appendOperand(Insn* insn, SgAsmExpression* op) {
     return insn; // For chaining this operation
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Build instruction; some deprecated because of incorrect capitalization [Robb P. Matzke 2014-07-21]
+SgAsmX86Instruction* buildx86Instruction(X86InstructionKind)
+    ROSE_DEPRECATED("use buildX86Instruction");
+SgAsmX86Instruction* buildX86Instruction(X86InstructionKind);
+SgAsmX86Instruction* buildx86Instruction(X86InstructionKind, SgAsmExpression *operand)
+    ROSE_DEPRECATED("use buildX86Instruction");
+SgAsmX86Instruction* buildX86Instruction(X86InstructionKind, SgAsmExpression *operand);
+SgAsmX86Instruction* buildx86Instruction(X86InstructionKind, SgAsmExpression *lhs, SgAsmExpression *rhs)
+    ROSE_DEPRECATED("use buildX86Instruction");
+SgAsmX86Instruction* buildX86Instruction(X86InstructionKind, SgAsmExpression *lhs, SgAsmExpression *rhs);
+SgAsmX86Instruction* buildx86Instruction(X86InstructionKind, SgAsmOperandList *operands)
+    ROSE_DEPRECATED("use buildX86Instruction");
+SgAsmInstruction* buildMultibyteNopInstruction(int n) ROSE_DEPRECATED("use buildX86MultibyteNopInstruction");
+SgAsmX86Instruction *buildX86MultibyteNopInstruction(size_t nBytes);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Build basic blocks
+SgAsmBlock* buildBasicBlock(const std::vector<SgAsmInstruction*>&);
+SgAsmFunction* buildFunction(rose_addr_t entryVa, const std::vector<SgAsmBlock*>&);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Build data blocks
+SgAsmStaticData* buildStaticData(rose_addr_t startVa, const SgUnsignedCharList &rawData);
+SgAsmBlock* buildDataBlock(SgAsmStaticData*);
+
+
+} // namespace
 } // namespace
 
 #endif

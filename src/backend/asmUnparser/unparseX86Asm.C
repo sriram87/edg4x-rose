@@ -6,11 +6,12 @@
 
 #include <iomanip>
 
-using namespace rose;                                   // temporary until this API lives in the "rose" name space
-using namespace rose::Diagnostics;
+using namespace rose;
+using namespace Diagnostics;
+using namespace BinaryAnalysis;
 
 /** Returns a string containing everthing before the first operand in a typical x86 assembly statement. */
-std::string unparseX86Mnemonic(SgAsmx86Instruction *insn) {
+std::string unparseX86Mnemonic(SgAsmX86Instruction *insn) {
     ASSERT_not_null(insn);
     std::string result;
     if (insn->get_lockPrefix())
@@ -63,21 +64,21 @@ static std::string x86TypeToPtrName(SgAsmType* ty) {
 
     if (SgAsmIntegerType *it = isSgAsmIntegerType(ty)) {
         switch (it->get_nBits()) {
-            case 8: return "BYTE";
-            case 16: return "WORD";
-            case 32: return "DWORD";
-            case 64: return "QWORD";
+            case 8: return "byte";
+            case 16: return "word";
+            case 32: return "dword";
+            case 64: return "qword";
         }
     } else if (SgAsmFloatType *ft = isSgAsmFloatType(ty)) {
         switch (ft->get_nBits()) {
-            case 32: return "FLOAT";
-            case 64: return "DOUBLE";
-            case 80: return "LDOUBLE";
+            case 32: return "float";
+            case 64: return "double";
+            case 80: return "ldouble";
         }
     } else if (ty == SageBuilderAsm::buildTypeVector(2, SageBuilderAsm::buildTypeU64())) {
-        return "DQWORD";
+        return "dqword";
     } else if (SgAsmVectorType *vt = isSgAsmVectorType(ty)) {
-        return "V" + StringUtility::numberToString(vt->get_nElmts()) + x86TypeToPtrName(vt->get_elmtType());
+        return "v" + StringUtility::numberToString(vt->get_nElmts()) + x86TypeToPtrName(vt->get_elmtType());
     }
     ASSERT_not_reachable("unhandled type: " + ty->toString());
 }
@@ -106,7 +107,7 @@ std::string unparseX86Expression(SgAsmExpression *expr, const AsmUnparser::Label
         case V_SgAsmMemoryReferenceExpression: {
             SgAsmMemoryReferenceExpression* mr = isSgAsmMemoryReferenceExpression(expr);
             if (!leaMode) {
-                result += x86TypeToPtrName(mr->get_type()) + " PTR " +
+                result += x86TypeToPtrName(mr->get_type()) + " " +
                           (mr->get_segment() ? unparseX86Expression(mr->get_segment(), labels, registers, false) + ":" : "");
             }
             result += "[" + unparseX86Expression(mr->get_address(), labels, registers, false) + "]";
@@ -145,12 +146,14 @@ std::string unparseX86Expression(SgAsmExpression *expr, const AsmUnparser::Label
 
             // Optional label.  Prefer a label supplied by the caller's LabelMap, but not for single-byte constants.  If
             // there's no caller-supplied label, then consider whether the value expression is relative to some other IR node.
-            std::string label;
-            if (ival->get_significantBits()>8)
-                label =x86ValToLabel(value, labels);
-            if (label.empty())
-                label = ival->get_label();
-            result = StringUtility::appendAsmComment(result, label);
+            if (expr->get_comment().empty()) {
+                std::string label;
+                if (label.empty() && ival->get_significantBits()>8)
+                    label =x86ValToLabel(value, labels);
+                if (label.empty())
+                    label = ival->get_label();
+                result = StringUtility::appendAsmComment(result, label);
+            }
             break;
         }
 
@@ -160,6 +163,7 @@ std::string unparseX86Expression(SgAsmExpression *expr, const AsmUnparser::Label
     }
 
     result = StringUtility::appendAsmComment(result, expr->get_replacement());
+    result = StringUtility::appendAsmComment(result, expr->get_comment());
     return result;
 }
 
@@ -167,9 +171,9 @@ std::string unparseX86Expression(SgAsmExpression *expr, const AsmUnparser::Label
 std::string unparseX86Expression(SgAsmExpression *expr, const AsmUnparser::LabelMap *labels,
                                  const RegisterDictionary *registers) {
     /* Find the instruction with which this expression is associated. */
-    SgAsmx86Instruction *insn = NULL;
+    SgAsmX86Instruction *insn = NULL;
     for (SgNode *node=expr; !insn && node; node=node->get_parent()) {
-        insn = isSgAsmx86Instruction(node);
+        insn = isSgAsmX86Instruction(node);
     }
     ASSERT_not_null(insn);
     return unparseX86Expression(expr, labels, registers, insn->get_kind()==x86_lea);

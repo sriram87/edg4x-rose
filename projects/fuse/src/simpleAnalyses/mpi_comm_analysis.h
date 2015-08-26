@@ -33,9 +33,14 @@ namespace fuse {
   // typedef MPICommValueObject<ComposedAnalysis*, false> UnionAnalMPICommValueObject;
   // typedef boost::shared_ptr<MPICommValueObject<ComposedAnalysis*, false> > UnionAnalMPICommValueObjectPtr;
 
+  /********************
+   * MPICommOpCallExp *
+   ********************/
   struct MPICommOp {
     enum OpType {SEND, 
                  RECV,
+                 INIT,
+                 FINALIZE,
                  NOOP};
   };
 
@@ -51,6 +56,22 @@ namespace fuse {
     SgExpression* getCommOpBufferExpr();
     SgExpression* getCommOpDestExpr();
     SgExpression* getCommOpTagExpr();
+    bool isMPICommOp();
+  };
+
+  /**************************
+   * MPICommOpCallParamList *
+   **************************/
+  //! Class to process arguments of MPICommOp SgFunctionParameterList
+  class MPICommOpCallParamList {
+    Function mpifunc;
+    const SgInitializedNamePtrList& argList;
+    MPICommOp::OpType optype;
+  public:
+    MPICommOpCallParamList(const Function& func, const SgInitializedNamePtrList& argList);
+    MPICommOpCallParamList(const MPICommOpCallParamList& that);
+    SgInitializedName* getCommOpBuffer();
+    SgPointerDerefExp* getCommOpBufferDerefExpr();
     bool isMPICommOp();
   };
 
@@ -71,14 +92,17 @@ namespace fuse {
                             MPICommAnalysis* analysis);
     void visit(SgFunctionParameterList* sgn);
     void visit(SgFunctionCallExp* sgn);
+    void visit(SgPointerDerefExp* sgn);
     void visit(SgNode* sgn);
     bool finish();
 
     //! Get the function from the parameter list
     Function getFunction(SgFunctionParameterList* sgn);
     Function getFunction(SgFunctionCallExp* sgn);
+    Function getFunction(SgNode* sgn);
     //! Check if this function is a MPI call 
     bool isMPIFuncCall(const Function& func) const;
+    bool isMPICommOpFuncCall(const Function& func) const;
   };
 
   /*******************

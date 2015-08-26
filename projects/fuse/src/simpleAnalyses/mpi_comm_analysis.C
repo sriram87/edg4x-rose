@@ -69,14 +69,23 @@ namespace fuse {
   /********************
    * MPICommOpCallExp *
    ********************/
+
+  MPICommOp::OpType buildMPICommOpType(const Function& mpifunc) {
+    MPICommOp::OpType optype;
+    string name = mpifunc.get_name().getString();
+    if(name.compare("MPI_Send") == 0) optype = MPICommOp::SEND;
+    else if(name.compare("MPI_Recv") == 0) optype = MPICommOp::RECV;
+    else if(name.compare("MPI_Init") == 0) optype = MPICommOp::INIT;
+    else if(name.compare("MPI_Finalize") == 0) optype = MPICommOp::FINALIZE;
+    else optype = MPICommOp::NOOP;
+    return optype;
+  }
+
   MPICommOpCallExp::MPICommOpCallExp(const Function& func,
                                      SgExprListExp* arglist) 
     : mpifunc(func),
       argList(arglist) {
-    string name = mpifunc.get_name().getString();
-    if(name.compare("MPI_Send") == 0) optype = MPICommOp::SEND;
-    else if(name.compare("MPI_Recv") == 0) optype = MPICommOp::RECV;
-    else optype = MPICommOp::NOOP;
+    optype = buildMPICommOpType(mpifunc);
   }
 
   MPICommOpCallExp::MPICommOpCallExp(const MPICommOpCallExp& that)
@@ -135,7 +144,37 @@ namespace fuse {
   }
 
   bool MPICommOpCallExp::isMPICommOp() {
-    return optype != MPICommOp::NOOP;
+    return (optype == MPICommOp::SEND ||
+            optype == MPICommOp::RECV);
+  }
+
+  /**************************
+   * MPICommOpCallParamList *
+   **************************/
+  MPICommOpCallParamList::MPICommOpCallParamList(const Function& func, const SgInitializedNamePtrList& argList) 
+    : mpifunc(func), argList(argList) {
+    optype = buildMPICommOpType(mpifunc);
+  }
+
+  MPICommOpCallParamList::MPICommOpCallParamList(const MPICommOpCallParamList& that)
+    : mpifunc(that.mpifunc), argList(that.argList), optype(that.optype) { }
+
+  SgInitializedName* MPICommOpCallParamList::getCommOpBuffer() {
+    return argList[0];
+  }
+
+  SgPointerDerefExp* MPICommOpCallParamList::getCommOpBufferDerefExpr() {
+    SgVariableSymbol* buffSymbol = isSgVariableSymbol(argList[0]->search_for_symbol_from_symbol_table());
+    assert(buffSymbol);
+    SgVarRefExp* buffVarRefExpr = SageBuilder::buildVarRefExp(buffSymbol);
+    SgPointerDerefExp* buffDerefExpr = SageBuilder::buildUnaryExpression<SgPointerDerefExp>(buffVarRefExpr);
+    assert(buffDerefExpr);
+    return buffDerefExpr;
+  }
+
+  bool MPICommOpCallParamList::isMPICommOp() {
+    return (optype == MPICommOp::SEND ||
+            optype == MPICommOp::RECV);
   }
 
   /**************************
@@ -163,17 +202,31 @@ namespace fuse {
     return func;
   }
 
+  Function MPICommAnalysisTransfer::getFunction(SgNode* sgn) {
+    SgFunctionDefinition* defn = SageInterface::getEnclosingFunctionDefinition(sgn);
+    ROSE_ASSERT(defn);
+    Function func(defn);
+    return func;
+  }
+
   bool MPICommAnalysisTransfer::isMPIFuncCall(const Function& func) const {
     if(func.get_name().getString().find("MPI_") != string::npos) return true;
     return false;
+  }
+
+  bool MPICommAnalysisTransfer::isMPICommOpFuncCall(const Function& func) const {
+    string name = func.get_name().getString();
+    if(name.compare("MPI_Send") == 0) return true;
+    else if(name.compare("MPI_Recv") == 0) return true;
+    else return false;
   }
 
   void MPICommAnalysisTransfer::visit(SgFunctionCallExp* sgn) {
     scope("MPICommAnalysisTransfer::visit(SgFunctionCallExp* sgn)", 
           scope::medium, attrGE("mpiCommAnalysisDebugLevel", 2));
     Function func = getFunction(sgn);
-    if(isMPIFuncCall(func)) {
-      MPICommOpCallExp commOpCallExp(func, sgn->get_args());
+    MPICommOpCallExp commOpCallExp(func, sgn->get_args());
+    if(commOpCallExp.isMPICommOp()) {
       // Check if this CFGNode is a outgoing function call cfgIndex=2
       if(Part::isOutgoingFuncCall(cn) && commOpCallExp.isMPICommOp()) {
         SgExpression* buffExpr = commOpCallExp.getCommOpBufferExpr();
@@ -188,8 +241,18 @@ namespace fuse {
   
   void MPICommAnalysisTransfer::visit(SgFunctionParameterList* sgn) {
     Function func = getFunction(sgn);
-    if(isMPIFuncCall(func)) {
-    }
+    MPICommOpCallParamList commOpCallParamList(func, sgn->get_args());
+  }
+
+  void MPICommAnalysisTransfer::visit(SgPointerDerefExp* sgn) {
+    Function func = getFunction(sgn);
+    if(isMPICommOpFuncCall(func)) {
+      Composer* composer = analysis->getComposer();
+      MemLocObjectPtr buffML = composer->Expr2MemLoc(sgn, part->inEdgeFromAny());
+      ValueObjectPtr  buffVO = composer->Expr2Val(sgn, part->inEdgeFromAny());
+        dbg << "buffML=" << buffML->str();
+        dbg << "buffVO=" << buffVO->str();
+    }    
   }
 
   void MPICommAnalysisTransfer::visit(SgNode* sgn) {

@@ -30,19 +30,19 @@ int main(int argc, char* argv[])
   
   // Sequential composer    
   scanalyses.push_back(new FlowInSensAddrTakenAnalysis(project));
-  // scanalyses.push_back(new MPICommContextAnalysis());
-  // scanalyses.push_back(new MPIValueAnalysis());
+  scanalyses.push_back(new MPICommContextAnalysis());
+  scanalyses.push_back(new MPIValueAnalysis());
   scanalyses.push_back(new ConstantPropagationAnalysis());
   // scanalyses.push_back(new DeadPathElimAnalysis());
 
   // Tight composition of analyses
-  //tcanalyses.push_back(new ConstantPropagationAnalysis());
-  //tcanalyses.push_back(new PointsToAnalysis());
-  //tcanalyses.push_back(new MPICommAnalysis());
-  //TightComposer* tightcomposer = new TightComposer(tcanalyses);
+  tcanalyses.push_back(new ConstantPropagationAnalysis());
+  tcanalyses.push_back(new PointsToAnalysis());
+  tcanalyses.push_back(new MPICommAnalysis());
+  TightComposer* tightcomposer = new TightComposer(tcanalyses);
 
   // Add the tight composer to sequential composer
-  //scanalyses.push_back(tightcomposer);
+  scanalyses.push_back(tightcomposer);
   checkDataflowInfoPass* cdip = new checkDataflowInfoPass();
   ChainComposer cc(scanalyses, cdip, false);
 

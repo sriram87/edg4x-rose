@@ -6,7 +6,7 @@ using namespace sight;
 
 namespace fuse
 {
-  DEBUG_LEVEL(pointsToAnalysisDebugLevel, 0);
+  DEBUG_LEVEL(pointsToAnalysisDebugLevel, 2);
 
   /****************************
    * PointsToAnalysisTransfer *
@@ -63,10 +63,19 @@ namespace fuse
     modified = true;
   }
 
+  void PointsToAnalysisTransfer::PointerExprTransfer::visit(SgCastExp* sgn) {
+    SgExpression* operand = sgn->get_operand();
+    operand->accept(*this);
+  }
+
   void PointsToAnalysisTransfer::PointerExprTransfer::visit(SgDotExp* sgn) {
   }
 
   void PointsToAnalysisTransfer::PointerExprTransfer::visit(SgPointerDerefExp* sgn) {
+  }
+
+  void PointsToAnalysisTransfer::PointerExprTransfer::visit(SgExpression* sgn) {
+    dbg << "Unhandled expr=" << SgNode2Str(sgn) << "PointerExprTransfer\n";
   }
 
   MemLocObjectPtr PointsToAnalysisTransfer::PointerExprTransfer::getExpr2MemLoc(SgExpression* sgn, PartEdgePtr pedge) {
@@ -120,7 +129,6 @@ namespace fuse
 
       list<PartEdgePtr>::iterator peIt = succEdges.begin();
       for( ; peIt != succEdges.end(); ++peIt) {
-        if(pointsToAnalysisDebugLevel() >= 2) dbg << "PartEdge=" << (*peIt)->str();
         // Create a new lattice for this edge based on incoming information
         AbstractObjectMap* newL = new AbstractObjectMap(*latticeMapIn);
         newL->setPartEdge(*peIt);
@@ -134,6 +142,10 @@ namespace fuse
         ArgParamMappingList::iterator apmIt = argParamMappingList.begin();
         for( ; apmIt != argParamMappingList.end(); ++apmIt) {
           ArgParamMapping& mapping = *apmIt;
+          if(pointsToAnalysisDebugLevel() >= 2) {
+            dbg << "arg=" << SgNode2Str(mapping.first) << endl;
+            dbg << "param=" << SgNode2Str(mapping.second) << endl;
+          }
           assert(mapping.second->variantT() == V_SgInitializedName);
           MemLocObjectPtr keyML = composer->Expr2MemLoc(mapping.second, funcEntryPart->inEdgeFromAny(), analysis);
           boost::shared_ptr<AbstractObjectSet> latElem = boost::dynamic_pointer_cast<AbstractObjectSet>(latticeMapIn->get(keyML));
@@ -150,6 +162,10 @@ namespace fuse
         }
         // update the edge to lattice mapping
         dfInfo[*peIt].push_back(newL);
+        if(pointsToAnalysisDebugLevel() >= 2) {
+          dbg << "PartEdge=" << (*peIt)->str();
+          dbg << "newL=" << newL->str() << endl;
+        }
       }
     }
   }

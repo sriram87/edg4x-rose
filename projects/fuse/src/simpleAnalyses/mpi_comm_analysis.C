@@ -13,17 +13,81 @@ namespace fuse {
 
   DEBUG_LEVEL(mpiCommAnalysisDebugLevel, 2);
 
+  /********************
+   * MPICommValueKind *
+   ********************/
+  MPICommValueKind::MPICommValueKind(ValueKind kind) : kind(kind) { }
+  
+  MPICommValueKind::ValueKind MPICommValueKind::getKindType() const {
+    return kind;
+  }
+
+  bool MPICommValueKind::mayEqualK(MPICommValueKindPtr that) {
+    if(kind != that->getKindType()) return false;
+    else return mayEqualVK(that);
+  }
+
+  bool MPICommValueKind::mustEqualK(MPICommValueKindPtr that) {
+    if(kind != that->getKindType()) return false;
+    else return mustEqualVK(that);
+  }
+
+  bool MPICommValueKind::equalSetK(MPICommValueKindPtr that) {
+    if(kind != that->getKindType()) return false;
+    else return equalSetVK(that);
+  }
+
+  bool MPICommValueKind::subSetK(MPICommValueKindPtr that) {
+    if(kind != that->getKindType()) return false;
+    else return subSetVK(that);
+  }
+
+  bool MPICommValueKind::meetUpdateK(MPICommValueKindPtr that) {
+  }
+
+  bool MPICommValueKind::isEmptyK() {
+    return false;
+  }
+
+  bool MPICommValueKind::isFullK() {
+    if (kind == ValueKind::unknown) return true;
+    else return false;
+  }
+
+  /****************************
+   * MPICommValueConcreteKind *
+   ****************************/
+
+  /***************************
+   * MPICommValueUnknownKind *
+   ***************************/
+
+
   /**********************
    * MPICommValueObject *
    **********************/
-  MPICommValueObject::MPICommValueObject(PartEdgePtr pedge)
+
+  MPICommValueObject::MPICommValueObject(PartEdgePtr pedge, ValueObjectPtr vo)
     : Lattice(pedge),
-      FiniteLattice(pedge) {
+      FiniteLattice(pedge),
+      ValueObject(*vo.get()) {
+    if(vo->isConcrete()) {
+      kind = boost::make_shared<MPICommValueConcreteKind>(vo->getConcreteType(), vo->getConcreteValue());
+    }
+    else {
+      kind = boost::make_shared<MPICommValueUnknownKind>();
+    }
   }
 
   MPICommValueObject::MPICommValueObject(const MPICommValueObject& that)
     : Lattice(that),
-      FiniteLattice(that) {
+      FiniteLattice(that),
+      ValueObject(that) {
+    kind = that.kind->copyK();
+  }
+
+  MPICommValueKindPtr MPICommValueObject::getKind() const {
+    return kind;
   }
 
   void MPICommValueObject::initialize() {
@@ -31,11 +95,14 @@ namespace fuse {
   }
 
   Lattice* MPICommValueObject::copy() const {
-    assert(0);
+    return (Lattice*) new MPICommValueObject(*this);
   }
    
   bool MPICommValueObject::meetUpdate(Lattice* thatL) {
-    assert(0);
+    MPICommValueObject* thatV = dynamic_cast<MPICommValueObject*>(thatL);
+    assert(thatV);
+
+    return kind->meetUpdateK(thatV->getKind());
   }
 
   bool MPICommValueObject::operator==(Lattice* thatL) {
@@ -61,6 +128,18 @@ namespace fuse {
   bool MPICommValueObject::isEmptyLat() {
     assert(0);
   }
+
+  bool MPICommValueObject::mayEqualV(ValueObjectPtr vo, PartEdgePtr pedge){ }
+  bool MPICommValueObject::mustEqualV(ValueObjectPtr vo, PartEdgePtr pedge){ }
+  bool MPICommValueObject::equalSetV(ValueObjectPtr vo, PartEdgePtr pedge){ }
+  bool MPICommValueObject::subSetV(ValueObjectPtr vo, PartEdgePtr pedge){ }
+  bool MPICommValueObject::meetUpdateV(ValueObjectPtr vo, PartEdgePtr pedge){ }
+  bool MPICommValueObject::isEmptyV(){ }
+  bool MPICommValueObject::isFullV(){ }
+  bool MPICommValueObject::isConcrete(){ }
+  SgType* MPICommValueObject::getConcreteType() { }
+  std::set<boost::shared_ptr<SgValueExp> > MPICommValueObject::getConcreteValue() { }
+  ValueObjectPtr MPICommValueObject::copyV() { }
 
   string MPICommValueObject::str(string indent) const  {
     assert(0);

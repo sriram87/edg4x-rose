@@ -14,7 +14,7 @@ namespace fuse {
    ********************/
   class MPICommValueKind;
   typedef boost::shared_ptr<MPICommValueKind> MPICommValueKindPtr;
-  class MPICommValueKind {
+  class MPICommValueKind : public printable {
   public:
     enum ValueKind{concrete, unknown};
   protected:
@@ -24,7 +24,6 @@ namespace fuse {
     ValueKind getKindType() const;
     bool mayEqualK(MPICommValueKindPtr that);
     bool mustEqualK(MPICommValueKindPtr that);
-    bool meetUpdateK(MPICommValueKindPtr that);
     bool equalSetK(MPICommValueKindPtr that);
     bool subSetK(MPICommValueKindPtr that);
     bool isEmptyK();
@@ -32,10 +31,10 @@ namespace fuse {
 
     virtual MPICommValueKindPtr copyK()=0;
     virtual bool mayEqualVK(MPICommValueVKindPtr thatVK)=0;
-    virtual bool mustEqualVK(MPICommValueVKindPtr thatVK)=0;
-    virtual bool meetUpdateVK(MPICommValueVKindPtr thatVK)=0;
+    virtual bool mustEqualVK(MPICommValueVKindPtr thatVK)=0;    
     virtual bool equalSetVK(MPICommValueVKindPtr thatVK)=0;
     virtual bool subSetVK(MPICommValueVKindPtr thatVK)=0;
+    virtual std::string str(std::string indent="") const=0;
   };
 
   /****************************
@@ -49,11 +48,17 @@ namespace fuse {
     MPICommValueConcreteKind(SgType* valueType, std::set<ConcreteValue> concreteValues);
     MPICommValueConcreteKind(const MPICommValueConcreteKind& that);
     MPICommValueKindPtr copyK();
+
+    SgType* getConcreteType() const;
+    std::set<ConcreteValue> getConcreteValue() const;
+
     bool mayEqualVK(MPICommValueVKindPtr thatVK);
     bool mustEqualVK(MPICommValueVKindPtr thatVK);
-    bool meetUpdateVK(MPICommValueVKindPtr thatVK);
     bool equalSetVK(MPICommValueVKindPtr thatVK);
     bool subSetVK(MPICommValueVKindPtr thatVK);
+    bool unionConcreteValues(MPICommValueConcreteKindPtr thatCK);
+
+    std::string str(std::string indent="") const;
   };
 
   typedef boost::shared_ptr<MPICommValueConcreteKind> MPICommValueConcreteKindPtr;
@@ -67,10 +72,10 @@ namespace fuse {
     MPICommValueUnknownKind(const MPICommValueUnknownKind& that);
     MPICommValueKindPtr copyK();
     bool mayEqualVK(MPICommValueVKindPtr thatVK);
-    bool mustEqualVK(MPICommValueVKindPtr thatVK);
-    bool meetUpdateVK(MPICommValueVKindPtr thatVK);
+    bool mustEqualVK(MPICommValueVKindPtr thatVK);    
     bool equalSetVK(MPICommValueVKindPtr thatVK);
     bool subSetVK(MPICommValueVKindPtr thatVK);
+    std::string str(std::string indent="") const;
   };
 
   typedef boost::shared_ptr<MPICommValueUnknownKind> MPICommValueUnknownKindPtr;

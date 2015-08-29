@@ -14,32 +14,47 @@ namespace fuse {
    ********************/
   class MPICommValueKind;
   typedef boost::shared_ptr<MPICommValueKind> MPICommValueKindPtr;
-  class MPICommValueKind : public printable {
+
+  class MPICommValueKind : public sight::printable {
   public:
-    enum ValueKind{concrete, unknown};
+    enum ValueKind{bottom, concrete, unknown};
   protected:
     ValueKind kind;
   public:
     MPICommValueKind(ValueKind kind);
     ValueKind getKindType() const;
-    bool mayEqualK(MPICommValueKindPtr that);
-    bool mustEqualK(MPICommValueKindPtr that);
-    bool equalSetK(MPICommValueKindPtr that);
-    bool subSetK(MPICommValueKindPtr that);
+
+    virtual bool mayEqualK(MPICommValueKindPtr that)=0;
+    virtual bool mustEqualK(MPICommValueKindPtr that)=0;
+    virtual bool equalSetK(MPICommValueKindPtr that)=0;
+    virtual bool subSetK(MPICommValueKindPtr that)=0;
     bool isEmptyK();
     bool isFullK();
-
     virtual MPICommValueKindPtr copyK()=0;
-    virtual bool mayEqualVK(MPICommValueVKindPtr thatVK)=0;
-    virtual bool mustEqualVK(MPICommValueVKindPtr thatVK)=0;    
-    virtual bool equalSetVK(MPICommValueVKindPtr thatVK)=0;
-    virtual bool subSetVK(MPICommValueVKindPtr thatVK)=0;
     virtual std::string str(std::string indent="") const=0;
+  };
+
+  /***************************
+   * MPICommValueDefaultKind *
+   ***************************/
+  class MPICommValueDefaultKind : public MPICommValueKind {
+  public:
+    MPICommValueDefaultKind();
+    MPICommValueDefaultKind(const MPICommValueDefaultKind& that);
+    MPICommValueKindPtr copyK();
+    bool mayEqualK(MPICommValueKindPtr thatK);
+    bool mustEqualK(MPICommValueKindPtr thatK);    
+    bool equalSetK(MPICommValueKindPtr thatK);
+    bool subSetK(MPICommValueKindPtr thatK);
+    std::string str(std::string indent="") const;
   };
 
   /****************************
    * MPICommValueConcreteKind *
    ****************************/
+  class MPICommValueConcreteKind;
+  typedef boost::shared_ptr<MPICommValueConcreteKind> MPICommValueConcreteKindPtr;
+
   class MPICommValueConcreteKind : public MPICommValueKind {
     SgType* valueType;
     typedef boost::shared_ptr<SgValueExp> ConcreteValue;
@@ -52,16 +67,14 @@ namespace fuse {
     SgType* getConcreteType() const;
     std::set<ConcreteValue> getConcreteValue() const;
 
-    bool mayEqualVK(MPICommValueVKindPtr thatVK);
-    bool mustEqualVK(MPICommValueVKindPtr thatVK);
-    bool equalSetVK(MPICommValueVKindPtr thatVK);
-    bool subSetVK(MPICommValueVKindPtr thatVK);
+    bool mayEqualK(MPICommValueKindPtr thatK);
+    bool mustEqualK(MPICommValueKindPtr thatK);
+    bool equalSetK(MPICommValueKindPtr thatK);
+    bool subSetK(MPICommValueKindPtr thatK);
     bool unionConcreteValues(MPICommValueConcreteKindPtr thatCK);
 
     std::string str(std::string indent="") const;
   };
-
-  typedef boost::shared_ptr<MPICommValueConcreteKind> MPICommValueConcreteKindPtr;
 
   /***************************
    * MPICommValueUnknownKind *
@@ -71,10 +84,10 @@ namespace fuse {
     MPICommValueUnknownKind();
     MPICommValueUnknownKind(const MPICommValueUnknownKind& that);
     MPICommValueKindPtr copyK();
-    bool mayEqualVK(MPICommValueVKindPtr thatVK);
-    bool mustEqualVK(MPICommValueVKindPtr thatVK);    
-    bool equalSetVK(MPICommValueVKindPtr thatVK);
-    bool subSetVK(MPICommValueVKindPtr thatVK);
+    bool mayEqualK(MPICommValueKindPtr thatK);
+    bool mustEqualK(MPICommValueKindPtr thatK);    
+    bool equalSetK(MPICommValueKindPtr thatK);
+    bool subSetK(MPICommValueKindPtr thatK);
     std::string str(std::string indent="") const;
   };
 
@@ -89,6 +102,7 @@ namespace fuse {
   class MPICommValueObject : public FiniteLattice, public ValueObject {
     MPICommValueKindPtr kind;
   public:
+    MPICommValueObject(PartEdgePtr pedge);
     MPICommValueObject(PartEdgePtr pedge, const ValueObjectPtr that);
     MPICommValueObject(const MPICommValueObject& that);
 
@@ -111,16 +125,18 @@ namespace fuse {
     bool equalSetV(ValueObjectPtr vo, PartEdgePtr pedge);
     bool subSetV(ValueObjectPtr vo, PartEdgePtr pedge);
     bool meetUpdateV(ValueObjectPtr vo, PartEdgePtr pedge);
-    bool isEmptyV();
-    bool isFullV();
+    bool isEmptyV(PartEdgePtr pedge);
+    bool isFullV(PartEdgePtr pedge);
     bool isConcrete();
     SgType* getConcreteType();
     std::set<boost::shared_ptr<SgValueExp> > getConcreteValue();
-    ValueObjectPtr copyV();
+    ValueObjectPtr copyV() const;
     
     // printable
     std::string str(std::string indent="") const;
   };
+
+  typedef boost::shared_ptr<MPICommValueObject> MPICommValueObjectPtr;
 
   // typedef MPICommValueObject<ComposedAnalysis*, false> UnionAnalMPICommValueObject;
   // typedef boost::shared_ptr<MPICommValueObject<ComposedAnalysis*, false> > UnionAnalMPICommValueObjectPtr;

@@ -175,10 +175,11 @@ namespace fuse {
   bool MPICommValueConcreteKind::set_intersect(const set<ConcreteValuePtr>& setone, 
                                                const set<ConcreteValuePtr>& settwo) const {
     set<ConcreteValuePtr>::const_iterator oi = setone.begin(), ti = settwo.begin();
-    for( ; oi != setone.end() && ti != settwo.end(); ) {
-      while(*oi < *ti) ++oi;
-      if(*oi == *ti) return true;
-      while(*oi < *ti) ++ti;
+    while(oi != setone.end() && ti != settwo.end()) {
+      if(*oi < *ti) ++oi;
+      else if(*ti < *oi) ++ti;
+      // we found one element that is common in between them
+      else  return true;
     }
     return false;
   }
@@ -192,23 +193,43 @@ namespace fuse {
     return true;
   }
 
+
   bool MPICommValueConcreteKind::set_subset(const set<ConcreteValuePtr>& setone,
                                             const set<ConcreteValuePtr>& settwo) const {
     set<ConcreteValuePtr>::const_iterator oi = setone.begin(), ti = settwo.begin();
-    for( ; oi != setone.end(); ++oi) {
-      if(settwo.find(*oi) == settwo.end()) return false;
+
+    while(ti != settwo.end()) {
+      if(*ti < *oi) ++ti;
+      else if(*oi == *ti) {
+        ++ti; ++oi;
+      }
+      // element not found
+      else return false;
     }
+    // Left over elements not found
+    if(oi != setone.end()) return false;
     return true;
   }
 
   bool MPICommValueConcreteKind::set_union(set<ConcreteValuePtr>& setone,
                                            const set<ConcreteValuePtr>& settwo) {
-    set<ConcreteValuePtr>::const_iterator ti = settwo.begin();
-    int size = setone.size();
-    for( ; ti != settwo.end(); ++ti) {
-      setone.insert(*ti);
+    set<ConcreteValuePtr>::const_iterator oi = setone.begin(), ti = settwo.begin();
+    if(oi == setone.end()) setone.insert(settwo.begin(), settwo.end());
+
+    while(oi != setone.end() && ti != settwo.end()) {
+      if(*ti < *oi) {
+        oi = setone.insert(oi, *ti);
+        ++oi; ++ti;
+      }
+      else if(*oi == *ti) {
+        ++oi; ++ti;
+      }
+      // *oi < *ti
+      else {
+        ++oi;
+      }
     }
-    return (setone.size() != size);
+    if(ti != settwo.end()) setone.insert(ti, settwo.end());
   }
 
   bool MPICommValueConcreteKind::mayEqualK(MPICommValueKindPtr thatK) {
@@ -244,9 +265,11 @@ namespace fuse {
   bool MPICommValueConcreteKind::subSetK(MPICommValueKindPtr thatK) {
     if(thatK->getKindType() == MPICommValueKind::unknown) return true;
     else if(thatK->getKindType() == MPICommValueKind::bottom) return false;
-    MPICommValueConcreteKindPtr thatCK = boost::dynamic_pointer_cast<MPICommValueConcreteKind>(thatK);
-    assert(thatCK);
-    return set_subset(concreteValues, thatCK->getConcreteValuePtrSet());
+    else {
+      MPICommValueConcreteKindPtr thatCK = boost::dynamic_pointer_cast<MPICommValueConcreteKind>(thatK);
+      assert(thatCK);
+      return set_subset(concreteValues, thatCK->getConcreteValuePtrSet());
+    }
   }
 
   bool MPICommValueConcreteKind::unionConcreteValues(MPICommValueConcreteKindPtr thatCK) {
@@ -255,16 +278,16 @@ namespace fuse {
 
   string MPICommValueConcreteKind::str(string indent) const {
     ostringstream oss;
-    oss << "concrete: {";
+    oss << "concrete: [";
     set<ConcreteValuePtr>::const_iterator cit = concreteValues.begin();
-    for( ; cit != concreteValues.end(); ) {
+    while(cit != concreteValues.end()) {
       oss << (*cit)->str();
+      ++cit;
       if(cit != concreteValues.end()) {
         oss << ", ";
-      }
-      ++cit;
+      }   
     }
-    oss << "}";
+    oss << "]";
     return oss.str();
   }
 

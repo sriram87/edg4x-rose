@@ -12,7 +12,7 @@ namespace fuse {
 
   using namespace std;
 
-  DEBUG_LEVEL(addressTakenAnalysisDebugLevel, 2);
+  DEBUG_LEVEL(addressTakenAnalysisDebugLevel, 0);
 
   /*******************
    * VariableIdUtils *

@@ -12,7 +12,7 @@ using namespace sight;
 using namespace boost;
 
 namespace fuse {
-  DEBUG_LEVEL(mpiCommContextAnalysisDebugLevel, 1);
+  DEBUG_LEVEL(mpiCommContextAnalysisDebugLevel, 0);
 
   /*********
    * MPIOp *

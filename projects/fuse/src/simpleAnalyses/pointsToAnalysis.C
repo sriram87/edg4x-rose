@@ -6,7 +6,7 @@ using namespace sight;
 
 namespace fuse
 {
-  DEBUG_LEVEL(pointsToAnalysisDebugLevel, 2);
+  DEBUG_LEVEL(pointsToAnalysisDebugLevel, 0);
 
   /****************************
    * PointsToAnalysisTransfer *

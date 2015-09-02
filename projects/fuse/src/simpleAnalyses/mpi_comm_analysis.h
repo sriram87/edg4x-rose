@@ -55,22 +55,66 @@ namespace fuse {
   class MPICommValueConcreteKind;
   typedef boost::shared_ptr<MPICommValueConcreteKind> MPICommValueConcreteKindPtr;
 
+  typedef boost::shared_ptr<SgValueExp> SgValueExpPtr;
+  typedef std::set<SgValueExpPtr> SgValueExpPtrSet;
+  
+  class ConcreteValue;
+  typedef CompSharedPtr<ConcreteValue> ConcreteValuePtr;
+
+  class ConcreteValue {
+  public:
+    ConcreteValue();
+    ConcreteValue(const ConcreteValue& that);
+    virtual bool operator<(const ConcreteValuePtr& that) const=0;
+    virtual bool operator==(const ConcreteValuePtr& that) const=0;
+    virtual bool operator!=(const ConcreteValuePtr& that) const=0;
+    virtual boost::shared_ptr<SgType> getSgType() const=0;
+    virtual SgValueExpPtr getSgValueExpPtr() const=0;
+    virtual std::string str(std::string indent="") const=0;
+  };  
+
+  class IntegerConcreteValue : public ConcreteValue {
+    int value;
+  public:
+    IntegerConcreteValue(int value);
+    IntegerConcreteValue(const IntegerConcreteValue& that);
+    int get_value() const;
+    bool operator<(const ConcreteValuePtr& that) const;
+    bool operator==(const ConcreteValuePtr& that) const;
+    bool operator!=(const ConcreteValuePtr& that) const;
+
+    boost::shared_ptr<SgType> getSgType() const;
+    boost::shared_ptr<SgValueExp> getSgValueExpPtr() const;
+
+    std::string str(std::string indent="") const;
+  };
+  typedef CompSharedPtr<IntegerConcreteValue> IntegerConcreteValuePtr;
+
+  std::set<ConcreteValuePtr> buildConcreteValueSet(SgType* valueType, const SgValueExpPtrSet& valueExpPtrSet);
+  std::set<ConcreteValuePtr> buildIntegerConcreteValueSet(SgType* valueType, const SgValueExpPtrSet& valueExpPtrSet);
+
   class MPICommValueConcreteKind : public MPICommValueKind {
     SgType* valueType;
-    typedef boost::shared_ptr<SgValueExp> ConcreteValue;
-    std::set<ConcreteValue> concreteValues;   
+    std::set<ConcreteValuePtr> concreteValues;   
   public:
-    MPICommValueConcreteKind(SgType* valueType, std::set<ConcreteValue> concreteValues);
+    MPICommValueConcreteKind(SgType* valueType, const SgValueExpPtrSet& concreteValues);
     MPICommValueConcreteKind(const MPICommValueConcreteKind& that);
     MPICommValueKindPtr copyK();
 
     SgType* getConcreteType() const;
-    std::set<ConcreteValue> getConcreteValue() const;
+    SgValueExpPtrSet getConcreteValue() const;
+    std::set<ConcreteValuePtr> getConcreteValuePtrSet() const;
 
     bool mayEqualK(MPICommValueKindPtr thatK);
     bool mustEqualK(MPICommValueKindPtr thatK);
     bool equalSetK(MPICommValueKindPtr thatK);
     bool subSetK(MPICommValueKindPtr thatK);
+
+    bool set_subset(const std::set<ConcreteValuePtr>& setone, const std::set<ConcreteValuePtr>& settwo) const;
+    bool set_intersect(const std::set<ConcreteValuePtr>& setone, const std::set<ConcreteValuePtr>& settwo) const;
+    bool set_equal(const std::set<ConcreteValuePtr>& setone, const std::set<ConcreteValuePtr>& settwo) const;
+    bool set_union(std::set<ConcreteValuePtr>& setone, const std::set<ConcreteValuePtr>& settwo);
+
     bool unionConcreteValues(MPICommValueConcreteKindPtr thatCK);
 
     std::string str(std::string indent="") const;

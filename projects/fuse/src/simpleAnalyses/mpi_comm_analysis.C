@@ -60,13 +60,89 @@ namespace fuse {
     return "default";
   }
 
+  /*****************
+   * ConcreteValue *
+   *****************/
+  ConcreteValue::ConcreteValue() { }
+  ConcreteValue::ConcreteValue(const ConcreteValue& that) { }
+
+  /************************
+   * IntegerConcreteValue *
+   ************************/
+  IntegerConcreteValue::IntegerConcreteValue(int value)
+    : ConcreteValue(),
+      value(value) { }
+
+  IntegerConcreteValue::IntegerConcreteValue(const IntegerConcreteValue& that)
+    : ConcreteValue(that),
+      value(that.value) { }
+
+  int IntegerConcreteValue::get_value() const {
+    return value;
+  }
+
+  bool IntegerConcreteValue::operator<(const ConcreteValuePtr& that) const {
+    IntegerConcreteValuePtr thatV = dynamicConstPtrCast<IntegerConcreteValue>(that);
+    assert(thatV);
+    return value < thatV->get_value();
+  }
+
+  bool IntegerConcreteValue::operator==(const ConcreteValuePtr& that) const {
+    IntegerConcreteValuePtr thatV = dynamicConstPtrCast<IntegerConcreteValue>(that);
+    assert(thatV);
+    return value == thatV->get_value();
+  }
+
+  bool IntegerConcreteValue::operator!=(const ConcreteValuePtr& that) const {
+    IntegerConcreteValuePtr thatV = dynamicConstPtrCast<IntegerConcreteValue>(that);
+    assert(thatV);
+    return value != thatV->get_value();
+  }
+
+  boost::shared_ptr<SgType> IntegerConcreteValue::getSgType() const {
+    return boost::shared_ptr<SgTypeInt>(SageBuilder::buildIntType());
+  }
+
+  SgValueExpPtr IntegerConcreteValue::getSgValueExpPtr() const {
+    return boost::shared_ptr<SgValueExp>(SageBuilder::buildIntVal(value));
+  }
+
+  string IntegerConcreteValue::str(string indent) const {
+    ostringstream oss;
+    oss << value;
+    return oss.str();
+  }
+
+  set<ConcreteValuePtr> buildConcreteValueSet(SgType* valueType, const SgValueExpPtrSet& valueExpSet) {
+    switch(valueType->variantT()) {
+    case V_SgTypeInt:
+      return buildIntegerConcreteValueSet(valueType, valueExpSet);
+    default:
+      dbg << "type=" << SgNode2Str(valueType) << "not supported\n";
+      assert(0);
+    }
+  }
+
+  set<ConcreteValuePtr> buildIntegerConcreteValueSet(SgType* valueType, const SgValueExpPtrSet& valueExpSet) {
+    set<ConcreteValuePtr> intConcreteValues;
+    SgValueExpPtrSet::const_iterator cIt = valueExpSet.begin();
+    for( ; cIt != valueExpSet.end(); ++cIt) {
+      SgIntVal* val = dynamic_cast<SgIntVal*>(cIt->get());
+      assert(val);
+      IntegerConcreteValuePtr ival = boost::make_shared<IntegerConcreteValue>(val->get_value());
+      intConcreteValues.insert(ival);
+    }
+    return intConcreteValues;
+  }
+  
   /****************************
    * MPICommValueConcreteKind *
    ****************************/
-  MPICommValueConcreteKind::MPICommValueConcreteKind(SgType* valueType, std::set<ConcreteValue> concreteValues) :
+  MPICommValueConcreteKind::MPICommValueConcreteKind(SgType* valueType, const SgValueExpPtrSet& valueExpSet) :
     MPICommValueKind(MPICommValueKind::concrete),
-    valueType(valueType),
-    concreteValues(concreteValues) { }
+    valueType(valueType) { 
+    concreteValues = buildConcreteValueSet(valueType, valueExpSet);
+  }
 
   MPICommValueConcreteKind::MPICommValueConcreteKind(const MPICommValueConcreteKind& that) :
     MPICommValueKind(that),
@@ -81,55 +157,115 @@ namespace fuse {
     return valueType;
   }
 
-  set<MPICommValueConcreteKind::ConcreteValue> MPICommValueConcreteKind::getConcreteValue() const {
+  SgValueExpPtrSet MPICommValueConcreteKind::getConcreteValue() const {
+    SgValueExpPtrSet cvalSet;
+    set<ConcreteValuePtr>::const_iterator cIt = concreteValues.begin();
+    for( ; cIt != concreteValues.end(); ++cIt) {
+      ConcreteValuePtr cval = *cIt;
+      SgValueExpPtr sgValExp = cval->getSgValueExpPtr();
+      cvalSet.insert(sgValExp);
+    }
+    return cvalSet;
+  }
+
+  set<ConcreteValuePtr> MPICommValueConcreteKind::getConcreteValuePtrSet() const {
     return concreteValues;
   }
 
-  bool MPICommValueConcreteKind::mayEqualK(MPICommValueKindPtr thatK) {
-    assert(false);
-    return false;
-
-    if(thatK->getKindType() == unknown) return true;
-    // check if the types are same
-    MPICommValueConcreteKindPtr thatCK;
-    if(thatCK = boost::dynamic_pointer_cast<MPICommValueConcreteKind>(thatK)) {
-      if(valueType->variantT() != thatCK->getConcreteType()->variantT()) return false;
-      // both are same types
+  bool MPICommValueConcreteKind::set_intersect(const set<ConcreteValuePtr>& setone, 
+                                               const set<ConcreteValuePtr>& settwo) const {
+    set<ConcreteValuePtr>::const_iterator oi = setone.begin(), ti = settwo.begin();
+    for( ; oi != setone.end() && ti != settwo.end(); ) {
+      while(*oi < *ti) ++oi;
+      if(*oi == *ti) return true;
+      while(*oi < *ti) ++ti;
     }
     return false;
+  }
+
+  bool MPICommValueConcreteKind::set_equal(const set<ConcreteValuePtr>& setone,
+                                           const set<ConcreteValuePtr>& settwo) const {
+    set<ConcreteValuePtr>::const_iterator oi = setone.begin(), ti = settwo.begin();
+    for( ; oi != setone.end() && ti != settwo.end(); ++oi, ++ti) {
+      if(*oi != *ti) return false;
+    }
+    return true;
+  }
+
+  bool MPICommValueConcreteKind::set_subset(const set<ConcreteValuePtr>& setone,
+                                            const set<ConcreteValuePtr>& settwo) const {
+    set<ConcreteValuePtr>::const_iterator oi = setone.begin(), ti = settwo.begin();
+    for( ; oi != setone.end(); ++oi) {
+      if(settwo.find(*oi) == settwo.end()) return false;
+    }
+    return true;
+  }
+
+  bool MPICommValueConcreteKind::set_union(set<ConcreteValuePtr>& setone,
+                                           const set<ConcreteValuePtr>& settwo) {
+    set<ConcreteValuePtr>::const_iterator ti = settwo.begin();
+    int size = setone.size();
+    for( ; ti != settwo.end(); ++ti) {
+      setone.insert(*ti);
+    }
+    return (setone.size() != size);
+  }
+
+  bool MPICommValueConcreteKind::mayEqualK(MPICommValueKindPtr thatK) {
+    if(thatK->getKindType() == MPICommValueKind::bottom) return false;
+    else if(thatK->getKindType() == MPICommValueKind::unknown) return true;
+    else {
+      // both are concrete
+      MPICommValueConcreteKindPtr thatCK = boost::dynamic_pointer_cast<MPICommValueConcreteKind>(thatK);
+      assert(thatCK);
+      set<ConcreteValuePtr> thatCKSet = thatCK->getConcreteValuePtrSet();
+      return set_intersect(concreteValues, thatCKSet);
+    }    
   }
 
   bool MPICommValueConcreteKind::mustEqualK(MPICommValueKindPtr thatK) {
-    assert(false);
-    return false;
-
-    if(thatK->getKindType() == unknown) return false;
-    MPICommValueConcreteKindPtr thatCK;
-    if(thatCK = boost::dynamic_pointer_cast<MPICommValueConcreteKind>(thatK)) {
-      set<ConcreteValue> thatConcreteValues = thatCK->getConcreteValue();
-      // if they are not of size 1 they are not must equals
-      if(concreteValues.size() != 1 ||
-         thatConcreteValues.size() != 1) return false;      
-    }
+    if(thatK->getKindType() == MPICommValueKind::unknown ||
+       thatK->getKindType() == MPICommValueKind::bottom) return false;
+    MPICommValueConcreteKindPtr thatCK = boost::dynamic_pointer_cast<MPICommValueConcreteKind>(thatK);
+    assert(thatCK);
+    set<ConcreteValuePtr> thatCKSet = thatCK->getConcreteValuePtrSet();
+    if(concreteValues.size() != 1 || thatCKSet.size() != 1) return false;
+    return set_equal(concreteValues, thatCKSet);
   }
   
   bool MPICommValueConcreteKind::equalSetK(MPICommValueKindPtr thatK) {
-    assert(false);
-    return false;
+    if(thatK->getKindType() == MPICommValueKind::unknown ||
+       thatK->getKindType() == MPICommValueKind::bottom) return false;
+    MPICommValueConcreteKindPtr thatCK = boost::dynamic_pointer_cast<MPICommValueConcreteKind>(thatK);
+    assert(thatCK);
+    return set_equal(concreteValues, thatCK->getConcreteValuePtrSet());
   }
   
   bool MPICommValueConcreteKind::subSetK(MPICommValueKindPtr thatK) {
-    assert(false);
-    return false;
+    if(thatK->getKindType() == MPICommValueKind::unknown) return true;
+    else if(thatK->getKindType() == MPICommValueKind::bottom) return false;
+    MPICommValueConcreteKindPtr thatCK = boost::dynamic_pointer_cast<MPICommValueConcreteKind>(thatK);
+    assert(thatCK);
+    return set_subset(concreteValues, thatCK->getConcreteValuePtrSet());
   }
 
   bool MPICommValueConcreteKind::unionConcreteValues(MPICommValueConcreteKindPtr thatCK) {
-    assert(false);
-    return false;
+    return set_union(concreteValues, thatCK->getConcreteValuePtrSet());
   }
 
   string MPICommValueConcreteKind::str(string indent) const {
-    return "concrete";
+    ostringstream oss;
+    oss << "concrete: {";
+    set<ConcreteValuePtr>::const_iterator cit = concreteValues.begin();
+    for( ; cit != concreteValues.end(); ) {
+      oss << (*cit)->str();
+      if(cit != concreteValues.end()) {
+        oss << ", ";
+      }
+      ++cit;
+    }
+    oss << "}";
+    return oss.str();
   }
 
 

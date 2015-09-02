@@ -214,12 +214,17 @@ namespace fuse {
   bool MPICommValueConcreteKind::set_union(set<ConcreteValuePtr>& setone,
                                            const set<ConcreteValuePtr>& settwo) {
     set<ConcreteValuePtr>::const_iterator oi = setone.begin(), ti = settwo.begin();
-    if(oi == setone.end()) setone.insert(settwo.begin(), settwo.end());
+    bool modified = false;
+    if(oi == setone.end()) {
+      setone.insert(settwo.begin(), settwo.end());
+      modified = true;
+    }
 
     while(oi != setone.end() && ti != settwo.end()) {
       if(*ti < *oi) {
         oi = setone.insert(oi, *ti);
         ++oi; ++ti;
+        modified = modified || true;
       }
       else if(*oi == *ti) {
         ++oi; ++ti;
@@ -229,7 +234,11 @@ namespace fuse {
         ++oi;
       }
     }
-    if(ti != settwo.end()) setone.insert(ti, settwo.end());
+    if(ti != settwo.end()) {
+      setone.insert(ti, settwo.end());
+      modified = modified || true;
+    }
+    return modified;
   }
 
   bool MPICommValueConcreteKind::mayEqualK(MPICommValueKindPtr thatK) {

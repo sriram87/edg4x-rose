@@ -1975,7 +1975,7 @@ SgType* MappedValueObject<Key, mostAccurate>::getConcreteType() {
     if(!c_type) c_type = votype;
     assert(c_type == votype);
   }
-  assert(!c_type);
+  assert(c_type);
   return c_type;
 }
 

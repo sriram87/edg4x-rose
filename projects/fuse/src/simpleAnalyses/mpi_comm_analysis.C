@@ -4,7 +4,6 @@
 
 #include "sage3basic.h"
 #include "mpi_comm_analysis.h"
-#include "abstract_object_map.h"
 
 using namespace std;
 using namespace boost;
@@ -621,7 +620,13 @@ namespace fuse {
                                                    NodeState& state,
                                                    std::map<PartEdgePtr, std::vector<Lattice*> >& dfInfo,
                                                    MPICommAnalysis* _analysis)
-    : DFTransferVisitor(part, cfgn, state, dfInfo), analysis(_analysis) { 
+    : DFTransferVisitor(part, cfgn, state, dfInfo), analysis(_analysis), modified(false) {
+    assert(dfInfo.size()==1);
+    PartEdgePtr wildCardPartEdge = part->inEdgeFromAny();
+    assert(dfInfo[wildCardPartEdge][0]);
+    Lattice *l = dfInfo[wildCardPartEdge][0];
+    latticeMap = (dynamic_cast<AbstractObjectMap*>(l));
+    assert(latticeMap);
   }
 
   Function MPICommAnalysisTransfer::getFunction(SgFunctionParameterList* sgn) {
@@ -658,26 +663,9 @@ namespace fuse {
   }
 
   void MPICommAnalysisTransfer::visit(SgFunctionCallExp* sgn) {
-    scope("MPICommAnalysisTransfer::visit(SgFunctionCallExp* sgn)", 
-          scope::medium, attrGE("mpiCommAnalysisDebugLevel", 2));
-    Function func = getFunction(sgn);
-    MPICommOpCallExp commOpCallExp(func, sgn->get_args());
-    if(commOpCallExp.isMPICommOp()) {
-      // Check if this CFGNode is a outgoing function call cfgIndex=2
-      if(Part::isOutgoingFuncCall(cn) && commOpCallExp.isMPICommOp()) {
-        SgExpression* buffExpr = commOpCallExp.getCommOpBufferExpr();
-        Composer* composer = analysis->getComposer();
-        MemLocObjectPtr buffML = composer->OperandExpr2MemLoc(sgn, buffExpr, part->inEdgeFromAny());
-        ValueObjectPtr  buffVO = composer->OperandExpr2Val(sgn, buffExpr, part->inEdgeFromAny());
-        dbg << "buffML=" << buffML->str();
-        dbg << "buffVO=" << buffVO->str();
-      }
-    }
   }
   
   void MPICommAnalysisTransfer::visit(SgFunctionParameterList* sgn) {
-    Function func = getFunction(sgn);
-    MPICommOpCallParamList commOpCallParamList(func, sgn->get_args());
   }
 
   void MPICommAnalysisTransfer::visit(SgPointerDerefExp* sgn) {
@@ -688,6 +676,9 @@ namespace fuse {
       ValueObjectPtr  buffVO = composer->Expr2Val(sgn, part->inEdgeFromAny());
         dbg << "buffML=" << buffML->str();
         dbg << "buffVO=" << buffVO->str();
+        MPICommValueObjectPtr buffmpiVO = boost::make_shared<MPICommValueObject>(part->inEdgeFromAny(), buffVO);
+        modified = latticeMap->insert(buffML, buffmpiVO);
+        dbg << "buffVO=" << buffmpiVO->str() << endl;
     }    
   }
 
@@ -696,6 +687,7 @@ namespace fuse {
   }
 
   bool MPICommAnalysisTransfer::finish() {
+    return modified;
   }
 
 

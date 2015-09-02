@@ -6,6 +6,7 @@
  *****************************************/
 
 #include "compose.h"
+#include "abstract_object_map.h"
 
 namespace fuse {
 
@@ -236,6 +237,8 @@ namespace fuse {
   class MPICommAnalysisTransfer : public DFTransferVisitor {
     // Protected member variable names are part, cn, nodeState, dfInfo
     MPICommAnalysis* analysis;
+    AbstractObjectMap* latticeMap;
+    bool modified;
   public:
     MPICommAnalysisTransfer(PartPtr part,
                             CFGNode cfgn,

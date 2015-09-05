@@ -95,10 +95,10 @@ namespace fuse {
   std::set<ConcreteValuePtr> buildIntegerConcreteValueSet(SgType* valueType, const SgValueExpPtrSet& valueExpPtrSet);
 
   class MPICommValueConcreteKind : public MPICommValueKind {
-    SgType* valueType;
     std::set<ConcreteValuePtr> concreteValues;   
   public:
     MPICommValueConcreteKind(SgType* valueType, const SgValueExpPtrSet& concreteValues);
+    MPICommValueConcreteKind(const std::set<ConcreteValuePtr>& concreteValues);
     MPICommValueConcreteKind(const MPICommValueConcreteKind& that);
     MPICommValueKindPtr copyK();
 
@@ -144,10 +144,12 @@ namespace fuse {
   //! Lattice value associated with MPI buffer
   //! Dataflow states are set of all constants
   //! Set is lifted to form a flat lattice with \bot and \top element
+
   class MPICommValueObject : public FiniteLattice, public ValueObject {
     MPICommValueKindPtr kind;
   public:
     MPICommValueObject(PartEdgePtr pedge);
+    MPICommValueObject(PartEdgePtr pedge, MPICommValueKindPtr kind);
     MPICommValueObject(PartEdgePtr pedge, const ValueObjectPtr that);
     MPICommValueObject(const MPICommValueObject& that);
 
@@ -176,7 +178,7 @@ namespace fuse {
     SgType* getConcreteType();
     std::set<boost::shared_ptr<SgValueExp> > getConcreteValue();
     ValueObjectPtr copyV() const;
-    
+
     // printable
     std::string str(std::string indent="") const;
   };

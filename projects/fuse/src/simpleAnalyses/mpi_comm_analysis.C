@@ -4,9 +4,12 @@
 
 #include "sage3basic.h"
 #include "mpi_comm_analysis.h"
+#include "serialization.h"
+#include <boost/archive/text_iarchive.hpp>
+#include <boost/archive/text_oarchive.hpp>
+#include "serialization_exports.h"
 
 using namespace std;
-using namespace boost;
 
 namespace fuse {
 
@@ -138,14 +141,16 @@ namespace fuse {
    * MPICommValueConcreteKind *
    ****************************/
   MPICommValueConcreteKind::MPICommValueConcreteKind(SgType* valueType, const SgValueExpPtrSet& valueExpSet) :
-    MPICommValueKind(MPICommValueKind::concrete),
-    valueType(valueType) { 
+    MPICommValueKind(MPICommValueKind::concrete) {
     concreteValues = buildConcreteValueSet(valueType, valueExpSet);
   }
 
+  MPICommValueConcreteKind::MPICommValueConcreteKind(const set<ConcreteValuePtr>& concreteValues) :
+    MPICommValueKind(MPICommValueKind::concrete),
+    concreteValues(concreteValues) { }
+
   MPICommValueConcreteKind::MPICommValueConcreteKind(const MPICommValueConcreteKind& that) :
     MPICommValueKind(that),
-    valueType(that.valueType),
     concreteValues(that.concreteValues) { }
 
   MPICommValueKindPtr MPICommValueConcreteKind::copyK() {
@@ -153,7 +158,8 @@ namespace fuse {
   }
 
   SgType* MPICommValueConcreteKind::getConcreteType() const {
-    return valueType;
+    ConcreteValuePtr first = *concreteValues.begin();
+    return first->getSgType().get();
   }
 
   SgValueExpPtrSet MPICommValueConcreteKind::getConcreteValue() const {
@@ -341,6 +347,14 @@ namespace fuse {
       ValueObject(NULL) {
     kind = boost::make_shared<MPICommValueDefaultKind>();
   }
+
+  MPICommValueObject::MPICommValueObject(PartEdgePtr pedge, MPICommValueKindPtr thatK)
+    : Lattice(pedge),
+      FiniteLattice(pedge),
+      ValueObject(0) {
+    kind = thatK->copyK();
+  }
+      
 
   MPICommValueObject::MPICommValueObject(PartEdgePtr pedge, ValueObjectPtr vo)
     : Lattice(pedge),
@@ -679,6 +693,20 @@ namespace fuse {
         MPICommValueObjectPtr buffmpiVO = boost::make_shared<MPICommValueObject>(part->inEdgeFromAny(), buffVO);
         modified = latticeMap->insert(buffML, buffmpiVO);
         dbg << "buffVO=" << buffmpiVO->str() << endl;
+
+        stringstream ss;
+        boost::archive::text_oarchive oa(ss);
+        MPICommValueObject* mvo_p = buffmpiVO.get();
+        oa << mvo_p;
+
+        std::cout << ss.str() << endl;
+
+        boost::archive::text_iarchive ia(ss);
+        MPICommValueObject* mvo_dsp;
+        ia >> mvo_dsp;
+        std::cout << mvo_dsp->str() << endl;
+        
+        assert(false);
     }    
   }
 

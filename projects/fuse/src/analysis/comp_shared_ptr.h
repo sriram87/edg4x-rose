@@ -2,6 +2,7 @@
 #include <boost/bind.hpp>
 #include <boost/enable_shared_from_this.hpp>
 #include <boost/make_shared.hpp>
+#include <boost/serialization/shared_ptr.hpp>
 
 namespace fuse {
 // Wrapper for boost:shared_ptr<Type> that can be used as keys in maps because it wraps comparison 
@@ -57,6 +58,10 @@ class CompSharedPtr : public sight::printable
   operator bool() const { return (bool) ptr.get(); }
   
   //PartPtr operator * () { return ptr; }
+  template<class Archive>
+  void serialize(Archive& ar, const unsigned int version) {
+    ar & ptr;
+  }
   
   std::string str(std::string indent="") const { return ptr->str(indent); }
 };

@@ -59,9 +59,7 @@ class CompSharedPtr : public sight::printable
   
   //PartPtr operator * () { return ptr; }
   template<class Archive>
-  void serialize(Archive& ar, const unsigned int version) {
-    ar & ptr;
-  }
+  void serialize(Archive& ar, const unsigned int version);
   
   std::string str(std::string indent="") const { return ptr->str(indent); }
 };

@@ -2,9 +2,10 @@
  * Author: Sriram Aananthakrishnan, 2015 *
  *****************************************/
 
+#include "mpi.h"
 #include "sage3basic.h"
 #include "mpi_comm_analysis.h"
-#include "serialization.h"
+#include "serialization_impl.h"
 #include <boost/archive/text_iarchive.hpp>
 #include <boost/archive/text_oarchive.hpp>
 #include "serialization_exports.h"
@@ -107,6 +108,10 @@ namespace fuse {
 
   SgValueExpPtr IntegerConcreteValue::getSgValueExpPtr() const {
     return boost::shared_ptr<SgValueExp>(SageBuilder::buildIntVal(value));
+  }
+
+  ConcreteValue* IntegerConcreteValue::copy() const {
+    return new IntegerConcreteValue(*this);
   }
 
   string IntegerConcreteValue::str(string indent) const {
@@ -296,6 +301,7 @@ namespace fuse {
     set<ConcreteValuePtr>::const_iterator cit = concreteValues.begin();
     while(cit != concreteValues.end()) {
       oss << (*cit)->str();
+      oss << ", cval.addr=" << (*cit).get();
       ++cit;
       if(cit != concreteValues.end()) {
         oss << ", ";
@@ -511,7 +517,9 @@ namespace fuse {
 
   string MPICommValueObject::str(string indent) const  {
     ostringstream oss;
-    oss << "[MPICommValueObject: " << kind->str() << "]";
+    oss << "[MPICommValueObject: " << kind->str();
+    oss << ", kind.addr=" << kind.get() << ", kind.use_count=" << kind.use_count();
+    oss << "]";
     return oss.str();
   }
 
@@ -669,11 +677,20 @@ namespace fuse {
     return false;
   }
 
-  bool MPICommAnalysisTransfer::isMPICommOpFuncCall(const Function& func) const {
+  bool MPICommAnalysisTransfer::isMPISendOp(const Function& func) const {
     string name = func.get_name().getString();
     if(name.compare("MPI_Send") == 0) return true;
-    else if(name.compare("MPI_Recv") == 0) return true;
-    else return false;
+    return false;
+  }
+
+  bool MPICommAnalysisTransfer::isMPIRecvOp(const Function& func) const {
+     string name = func.get_name().getString();
+     if(name.compare("MPI_Recv") == 0) return true;
+     return false;
+  }
+ 
+  bool MPICommAnalysisTransfer::isMPICommOpFuncCall(const Function& func) const {
+    return isMPISendOp(func) || isMPIRecvOp(func);    
   }
 
   void MPICommAnalysisTransfer::visit(SgFunctionCallExp* sgn) {
@@ -684,32 +701,48 @@ namespace fuse {
 
   void MPICommAnalysisTransfer::visit(SgPointerDerefExp* sgn) {
     Function func = getFunction(sgn);
-    if(isMPICommOpFuncCall(func)) {
+    int rank;
+    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+    if(isMPISendOp(func)) {
       Composer* composer = analysis->getComposer();
       MemLocObjectPtr buffML = composer->Expr2MemLoc(sgn, part->inEdgeFromAny());
       ValueObjectPtr  buffVO = composer->Expr2Val(sgn, part->inEdgeFromAny());
-        dbg << "buffML=" << buffML->str();
-        dbg << "buffVO=" << buffVO->str();
-        MPICommValueObjectPtr buffmpiVO = boost::make_shared<MPICommValueObject>(part->inEdgeFromAny(), buffVO);
-        modified = latticeMap->insert(buffML, buffmpiVO);
-        dbg << "buffVO=" << buffmpiVO->str() << endl;
-
-        stringstream ss;
-        boost::archive::text_oarchive oa(ss);
-        MPICommValueObject* mvo_p = buffmpiVO.get();
-        oa << mvo_p;
-
-        std::cout << ss.str() << endl;
-
-        boost::archive::text_iarchive ia(ss);
-        MPICommValueObject* mvo_dsp;
-        ia >> mvo_dsp;
-        std::cout << mvo_dsp->str() << endl;
+      dbg << "buffML=" << buffML->str();
+      dbg << "buffVO=" << buffVO->str();
+      MPICommValueObjectPtr buffMVO = boost::make_shared<MPICommValueObject>(part->inEdgeFromAny(), buffVO);
+      // modified = latticeMap->insert(buffML, buffMVO);
         
-        assert(false);
-    }    
-  }
+      dbg << "bserialization=" << buffMVO->str() << endl;
 
+      stringstream ss; {
+        boost::archive::text_oarchive oa(ss);
+        // MPICommValueObject* mvo_p = buffmpiVO.get();
+        oa << buffMVO;
+      }
+
+      // string sdata = ss.str();      
+      // const char* sdata_p = sdata.c_str();
+      // MPI_Send(sdata_p, sdata.size(), MPI_CHAR, 1, 0, MPI_COMM_WORLD);
+    }
+    else if(isMPIRecvOp(func)) {
+    //   char* sdata_p = new char[1000];
+    //   MPI_Status status;
+    //   std::cout << "receiving..\n";
+    //   MPI_Recv(sdata_p, 1000, MPI_CHAR, 0, 0, MPI_COMM_WORLD, &status);
+    //   string sdata(sdata_p);
+    //   stringstream ss;
+    //   ss << sdata;
+
+    //   boost::archive::text_iarchive ia(ss);
+    //   MPICommValueObjectPtr rbuffVO;
+    //   ia >> rbuffVO;
+    //   // Composer* composer = analysis->getComposer();
+    //   // MemLocObjectPtr buffML = composer->Expr2MemLoc(sgn, part->inEdgeFromAny());
+    //   // modified = latticeMap->insert(buffML, rbuffVO);
+    //   std::cout << "rbuffVO=" << rbuffVO->str() << endl;
+    // }
+  }
+ 
   void MPICommAnalysisTransfer::visit(SgNode* sgn) {
     // identity transfer
   }

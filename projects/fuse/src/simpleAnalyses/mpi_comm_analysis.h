@@ -32,6 +32,10 @@ namespace fuse {
     bool isEmptyK();
     bool isFullK();
     virtual MPICommValueKindPtr copyK()=0;
+    template<class Archive>
+    void serialize(Archive& ar, const unsigned int version);
+    friend class boost::serialization::access;
+
     virtual std::string str(std::string indent="") const=0;
   };
 
@@ -47,6 +51,9 @@ namespace fuse {
     bool mustEqualK(MPICommValueKindPtr thatK);    
     bool equalSetK(MPICommValueKindPtr thatK);
     bool subSetK(MPICommValueKindPtr thatK);
+    template<class Archive>
+    void serialize(Archive& ar, const unsigned int version);
+    friend class boost::serialization::access;
     std::string str(std::string indent="") const;
   };
 
@@ -69,8 +76,12 @@ namespace fuse {
     virtual bool operator<(const ConcreteValuePtr& that) const=0;
     virtual bool operator==(const ConcreteValuePtr& that) const=0;
     virtual bool operator!=(const ConcreteValuePtr& that) const=0;
-    virtual boost::shared_ptr<SgType> getSgType() const=0;
+    virtual boost::shared_ptr<SgType> getSgType() const=0;    
     virtual SgValueExpPtr getSgValueExpPtr() const=0;
+    virtual ConcreteValue* copy() const=0;
+    template<class Archive>
+    void serialize(Archive& ar, const unsigned int version);
+    friend class boost::serialization::access;
     virtual std::string str(std::string indent="") const=0;
   };  
 
@@ -86,7 +97,10 @@ namespace fuse {
 
     boost::shared_ptr<SgType> getSgType() const;
     boost::shared_ptr<SgValueExp> getSgValueExpPtr() const;
-
+    ConcreteValue* copy() const;
+    template<class Archive>
+    void serialize(Archive& ar, const unsigned int version);
+    friend class boost::serialization::access;
     std::string str(std::string indent="") const;
   };
   typedef CompSharedPtr<IntegerConcreteValue> IntegerConcreteValuePtr;
@@ -117,6 +131,9 @@ namespace fuse {
     bool set_union(std::set<ConcreteValuePtr>& setone, const std::set<ConcreteValuePtr>& settwo);
 
     bool unionConcreteValues(MPICommValueConcreteKindPtr thatCK);
+    template<class Archive>
+    void serialize(Archive& ar, const unsigned int version);
+    friend class boost::serialization::access;
 
     std::string str(std::string indent="") const;
   };
@@ -133,6 +150,9 @@ namespace fuse {
     bool mustEqualK(MPICommValueKindPtr thatK);    
     bool equalSetK(MPICommValueKindPtr thatK);
     bool subSetK(MPICommValueKindPtr thatK);
+    template<class Archive>
+    void serialize(Archive& ar, const unsigned int version);
+    friend class boost::serialization::access;
     std::string str(std::string indent="") const;
   };
 
@@ -178,6 +198,10 @@ namespace fuse {
     SgType* getConcreteType();
     std::set<boost::shared_ptr<SgValueExp> > getConcreteValue();
     ValueObjectPtr copyV() const;
+
+    template<class Archive>
+    void serialize(Archive& ar, const unsigned int version);
+    friend class boost::serialization::access;
 
     // printable
     std::string str(std::string indent="") const;
@@ -259,6 +283,8 @@ namespace fuse {
     Function getFunction(SgNode* sgn);
     //! Check if this function is a MPI call 
     bool isMPIFuncCall(const Function& func) const;
+    bool isMPISendOp(const Function& func) const;
+    bool isMPIRecvOp(const Function& func) const;
     bool isMPICommOpFuncCall(const Function& func) const;
   };
 

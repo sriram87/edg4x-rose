@@ -698,7 +698,7 @@ class ConstantPropagationAnalysis : virtual public FWDataflow
   implTightness Expr2ValTightness() { return ComposedAnalysis::loose; }
   
   boost::shared_ptr<MemLocObject> Expr2MemLoc(SgNode* n, PartEdgePtr pedge);
-  bool implementsExpr2MemLoc() { return true; }
+  bool implementsExpr2MemLoc() { return false; }
   implTightness Expr2MemLocTightness() { return ComposedAnalysis::loose; }
   
   // pretty print for the object

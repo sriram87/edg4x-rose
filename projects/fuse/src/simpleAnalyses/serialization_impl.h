@@ -113,6 +113,7 @@ namespace fuse {
   void IntegerConcreteValue::serialize(Archive& ar, const unsigned int version) {
     scope reg("IntegerConcreteValue::serialize()", scope::medium, attrGE("serializationDebugLevel", 3));
     ar & boost::serialization::base_object<ConcreteValue>(*this);
+    int value = get_value();
     ar & value;
   }
 

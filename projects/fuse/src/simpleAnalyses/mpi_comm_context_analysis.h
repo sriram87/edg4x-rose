@@ -207,6 +207,7 @@ namespace fuse {
     PartPtr source() const;
     PartPtr target() const;
 
+    PartEdgePtr getParent() const;
     std::list<PartEdgePtr> getOperandPartEdge(SgNode* anchor, SgNode* operand);
     std::map<CFGNode, boost::shared_ptr<SgValueExp> > getPredicateValue();
 

@@ -57,12 +57,10 @@ namespace fuse {
     std::string str(std::string indent="") const;
   };
 
-  /****************************
-   * MPICommValueConcreteKind *
-   ****************************/
-  class MPICommValueConcreteKind;
-  typedef boost::shared_ptr<MPICommValueConcreteKind> MPICommValueConcreteKindPtr;
 
+  /*****************
+   * ConcreteValue *
+   *****************/
   typedef boost::shared_ptr<SgValueExp> SgValueExpPtr;
   typedef std::set<SgValueExpPtr> SgValueExpPtrSet;
   
@@ -76,28 +74,35 @@ namespace fuse {
     virtual bool operator<(const ConcreteValuePtr& that) const=0;
     virtual bool operator==(const ConcreteValuePtr& that) const=0;
     virtual bool operator!=(const ConcreteValuePtr& that) const=0;
-    virtual boost::shared_ptr<SgType> getSgType() const=0;    
-    virtual SgValueExpPtr getSgValueExpPtr() const=0;
-    virtual ConcreteValue* copy() const=0;
+
+    virtual SgValueExpPtr getConcreteValue() const=0;
+    virtual SgType* getConcreteType() const=0;
+
     template<class Archive>
     void serialize(Archive& ar, const unsigned int version);
     friend class boost::serialization::access;
-    virtual std::string str(std::string indent="") const=0;
-  };  
 
+    virtual std::string str(std::string indent="") const=0;
+  };
+
+  /************************
+   * IntegerConcreteValue *
+   ************************/
   class IntegerConcreteValue : public ConcreteValue {
-    int value;
+    boost::shared_ptr<SgIntVal> value;
   public:
     IntegerConcreteValue(int value);
     IntegerConcreteValue(const IntegerConcreteValue& that);
-    int get_value() const;
+    ConcreteValue* copy() const;
+
     bool operator<(const ConcreteValuePtr& that) const;
     bool operator==(const ConcreteValuePtr& that) const;
     bool operator!=(const ConcreteValuePtr& that) const;
 
-    boost::shared_ptr<SgType> getSgType() const;
-    boost::shared_ptr<SgValueExp> getSgValueExpPtr() const;
-    ConcreteValue* copy() const;
+    SgValueExpPtr getConcreteValue() const;
+    SgType* getConcreteType() const;
+    int get_value() const;
+
     template<class Archive>
     void serialize(Archive& ar, const unsigned int version);
     friend class boost::serialization::access;
@@ -105,13 +110,18 @@ namespace fuse {
   };
   typedef CompSharedPtr<IntegerConcreteValue> IntegerConcreteValuePtr;
 
-  std::set<ConcreteValuePtr> buildConcreteValueSet(SgType* valueType, const SgValueExpPtrSet& valueExpPtrSet);
-  std::set<ConcreteValuePtr> buildIntegerConcreteValueSet(SgType* valueType, const SgValueExpPtrSet& valueExpPtrSet);
+  /****************************
+   * MPICommValueConcreteKind *
+   ****************************/
+  class MPICommValueConcreteKind;
+  typedef boost::shared_ptr<MPICommValueConcreteKind> MPICommValueConcreteKindPtr;
 
+  //! Represents the concrete set of values
+  //! Stores stl set of ConcreteValue objects
   class MPICommValueConcreteKind : public MPICommValueKind {
     std::set<ConcreteValuePtr> concreteValues;   
   public:
-    MPICommValueConcreteKind(SgType* valueType, const SgValueExpPtrSet& concreteValues);
+    MPICommValueConcreteKind(const SgValueExpPtrSet& concreteValues);
     MPICommValueConcreteKind(const std::set<ConcreteValuePtr>& concreteValues);
     MPICommValueConcreteKind(const MPICommValueConcreteKind& that);
     MPICommValueKindPtr copyK();
@@ -136,6 +146,7 @@ namespace fuse {
     friend class boost::serialization::access;
 
     std::string str(std::string indent="") const;
+    ~MPICommValueConcreteKind();
   };
 
   /***************************
@@ -170,10 +181,11 @@ namespace fuse {
   public:
     MPICommValueObject(PartEdgePtr pedge);
     MPICommValueObject(PartEdgePtr pedge, MPICommValueKindPtr kind);
-    MPICommValueObject(PartEdgePtr pedge, const ValueObjectPtr that);
+    // MPICommValueObject(PartEdgePtr pedge, const ValueObjectPtr that);
     MPICommValueObject(const MPICommValueObject& that);
 
     MPICommValueKindPtr getKind() const;
+    void setKind(MPICommValueKindPtr thatK);
     
     // Lattice interface
     void initialize();

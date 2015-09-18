@@ -358,6 +358,10 @@ namespace fuse {
     return tgt;
   }
 
+  PartEdgePtr CommATSPartEdge::getParent() const {
+    return base;
+  }
+
   //! MPICommContextAnalysis is not responsible for evaluating all possible paths
   //! an operand reaches an expression.
   //! Simply wrap parent OperandPartEdges with CommATSPartEdge

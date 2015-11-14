@@ -348,6 +348,23 @@ namespace fuse {
     return "unknown";
   }
 
+  /******************
+   * Helper Methods *
+   ******************/
+
+  MPICommValueKindPtr createMPICommValueKind(ValueObjectPtr vo, PartEdgePtr pedge) {
+    if(vo->isConcrete()) {
+      SgValueExpPtrSet cvalues = vo->getConcreteValue();
+      return boost::make_shared<MPICommValueConcreteKind>(cvalues);
+    }
+    else if(vo->isEmptyV(pedge)) {
+      return boost::make_shared<MPICommValueDefaultKind>();
+    }
+    else if(vo->isFullV(pedge)) {
+      return boost::make_shared<MPICommValueUnknownKind>();
+    }
+  }
+
   /**********************
    * MPICommValueObject *
    **********************/
@@ -366,19 +383,6 @@ namespace fuse {
 
   }
       
-
-  // MPICommValueObject::MPICommValueObject(PartEdgePtr pedge, ValueObjectPtr vo)
-  //   : Lattice(pedge),
-  //     FiniteLattice(pedge),
-  //     ValueObject(*vo.get()) {
-  //   if(vo->isConcrete()) {
-  //     kind = boost::make_shared<MPICommValueConcreteKind>(vo->getConcreteType(), vo->getConcreteValue());
-  //   }
-  //   else {
-  //     kind = boost::make_shared<MPICommValueUnknownKind>();
-  //   }
-  // }
-
   MPICommValueObject::MPICommValueObject(const MPICommValueObject& that)
     : Lattice(that),
       FiniteLattice(that),
@@ -478,7 +482,7 @@ namespace fuse {
   bool MPICommValueObject::equalSetV(ValueObjectPtr vo, PartEdgePtr pedge) {
     MPICommValueObjectPtr thatV = boost::dynamic_pointer_cast<MPICommValueObject>(vo);
     assert(thatV);
-    return kind->equalSetK(thatV->getKind());
+  typedef boost::shared_ptr<MPICommValueUnknownKind> MPICommValueUnknownKindPtr;    return kind->equalSetK(thatV->getKind());
   }
 
   bool MPICommValueObject::subSetV(ValueObjectPtr vo, PartEdgePtr pedge) {
@@ -532,119 +536,78 @@ namespace fuse {
     return oss.str();
   }
 
-  /********************
-   * MPICommOpCallExp *
-   ********************/
-
-  MPICommOp::OpType buildMPICommOpType(const Function& mpifunc) {
-    MPICommOp::OpType optype;
+  /*************
+   * MPICommOp *
+   *************/
+  MPICommOp::MPICommOp(const Function& func) 
+    : mpifunc(func) {
     string name = mpifunc.get_name().getString();
     if(name.compare("MPI_Send") == 0) optype = MPICommOp::SEND;
     else if(name.compare("MPI_Recv") == 0) optype = MPICommOp::RECV;
-    else if(name.compare("MPI_Init") == 0) optype = MPICommOp::INIT;
-    else if(name.compare("MPI_Finalize") == 0) optype = MPICommOp::FINALIZE;
-    else optype = MPICommOp::NOOP;
-    return optype;
+    else assert(0);    
   }
 
-  MPICommOpCallExp::MPICommOpCallExp(const Function& func,
-                                     SgExprListExp* arglist) 
-    : mpifunc(func),
-      argList(arglist) {
-    optype = buildMPICommOpType(mpifunc);
+  MPICommOp::MPICommOp(const MPICommOp& that)
+    : mpifunc(that.mpifunc), optype(that.optype) {
   }
 
-  MPICommOpCallExp::MPICommOpCallExp(const MPICommOpCallExp& that)
-    : mpifunc(that.mpifunc),
-      argList(that.argList),
-      optype(that.optype) { }
-
-
-  SgExpression* MPICommOpCallExp::getCommOpBufferExpr() {
-    SgExpressionPtrList& exprPtrList = argList->get_expressions();
-    SgExpression* expr0 = exprPtrList[0];
-    SgExpression* buffExpr;
-    buffExpr = expr0;
-    switch(expr0->variantT()) {
-    case V_SgCastExp:
-      buffExpr = isSgCastExp(expr0)->get_operand();
-      break;
-    case V_SgVarRefExp:
-      buffExpr = expr0;
-      break;
-    default: assert(0);
+  SgPointerDerefExp* MPICommOp::getCommOpBufferDerefExpr() const {
+    SgPointerDerefExp* buffDerefExpr;
+    if(isMPICommSendOp() || isMPICommRecvOp()) {
+      SgInitializedNamePtrList* arglist_p = mpifunc.get_args();
+      SgInitializedNamePtrList& arglist = *arglist_p;
+      SgVariableSymbol* buffSymbol = isSgVariableSymbol(arglist[0]->search_for_symbol_from_symbol_table());
+      assert(buffSymbol);
+      SgVarRefExp* buffVarRefExpr = SageBuilder::buildVarRefExp(buffSymbol);
+      buffDerefExpr = SageBuilder::buildUnaryExpression<SgPointerDerefExp>(buffVarRefExpr);
+      assert(buffDerefExpr);
     }
-    if(isSgAddressOfOp(buffExpr)) {
-      SgExpression* operand = isSgAddressOfOp(buffExpr)->get_operand();
-      buffExpr = operand;
-    }
-    return buffExpr;
-  }
-
-  SgExpression* MPICommOpCallExp::getCommOpDestExpr() {
-    SgExpressionPtrList& exprPtrList = argList->get_expressions();
-    SgExpression* expr3 = exprPtrList[3];
-    SgExpression* destExpr;
-    switch(expr3->variantT()) {
-    case V_SgIntVal:
-    case V_SgVarRefExp:
-    case V_SgAddOp:
-    case V_SgSubtractOp:
-      destExpr = expr3;
-      break;
-    default: 
-      dbg << "destExpr=" << SgNode2Str(expr3) << endl;
-      assert(0);
-    }
-    return destExpr;
-  }
-
-  SgExpression* MPICommOpCallExp::getCommOpTagExpr() {
-    SgExpressionPtrList& exprPtrList = argList->get_expressions();
-    SgExpression* expr4 = exprPtrList[4];
-    SgExpression* tagExpr;
-    switch(expr4->variantT()) {
-    case V_SgIntVal:
-    case V_SgVarRefExp:
-      tagExpr = expr4;
-      break;
-    default: assert(0);
-    }
-    return tagExpr;
-  }
-
-  bool MPICommOpCallExp::isMPICommOp() {
-    return (optype == MPICommOp::SEND ||
-            optype == MPICommOp::RECV);
-  }
-
-  /**************************
-   * MPICommOpCallParamList *
-   **************************/
-  MPICommOpCallParamList::MPICommOpCallParamList(const Function& func, const SgInitializedNamePtrList& argList) 
-    : mpifunc(func), argList(argList) {
-    optype = buildMPICommOpType(mpifunc);
-  }
-
-  MPICommOpCallParamList::MPICommOpCallParamList(const MPICommOpCallParamList& that)
-    : mpifunc(that.mpifunc), argList(that.argList), optype(that.optype) { }
-
-  SgInitializedName* MPICommOpCallParamList::getCommOpBuffer() {
-    return argList[0];
-  }
-
-  SgPointerDerefExp* MPICommOpCallParamList::getCommOpBufferDerefExpr() {
-    SgVariableSymbol* buffSymbol = isSgVariableSymbol(argList[0]->search_for_symbol_from_symbol_table());
-    assert(buffSymbol);
-    SgVarRefExp* buffVarRefExpr = SageBuilder::buildVarRefExp(buffSymbol);
-    SgPointerDerefExp* buffDerefExpr = SageBuilder::buildUnaryExpression<SgPointerDerefExp>(buffVarRefExpr);
-    assert(buffDerefExpr);
+    else assert(false);
     return buffDerefExpr;
   }
 
-  bool MPICommOpCallParamList::isMPICommOp() {
-    return (optype == MPICommOp::SEND ||
-            optype == MPICommOp::RECV);
+  SgInitializedName* MPICommOp::getCommOpTarget() const {
+    SgInitializedName* target;
+    if(isMPICommSendOp() || isMPICommRecvOp()) {
+      SgInitializedNamePtrList* arglist_p = mpifunc.get_args();
+      SgInitializedNamePtrList& arglist = *arglist_p;
+      target = arglist[3];
+    }
+    else assert(false);
+    assert(target);
+    return target;
+  }
+
+  SgInitializedName* MPICommOp::getCommOpTag() const {
+    SgInitializedName* tag;
+    if(isMPICommSendOp() || isMPICommRecvOp()) {
+      SgInitializedNamePtrList* arglist_p = mpifunc.get_args();
+      SgInitializedNamePtrList& arglist = *arglist_p;
+      tag = arglist[4];
+    }
+    else assert(false);
+    assert(tag);
+    return tag;
+  }
+
+  SgInitializedName* MPICommOp::getCommOpComm() const {
+    SgInitializedName* comm;
+    if(isMPICommSendOp() || isMPICommRecvOp()) {
+      SgInitializedNamePtrList* arglist_p = mpifunc.get_args();
+      SgInitializedNamePtrList& arglist = *arglist_p;
+      comm = arglist[5];
+    }
+    else assert(false);
+    assert(comm);
+    return comm;
+  }
+
+  bool MPICommOp::isMPICommSendOp() const {
+    return optype == MPICommOp::SEND;
+  }
+
+  bool MPICommOp::isMPICommRecvOp() const {
+    return optype == MPICommOp::RECV;
   }
 
   /**************************
@@ -706,97 +669,140 @@ namespace fuse {
     return isMPISendOp(func) || isMPIRecvOp(func);    
   }
 
+  MPICommAnalysisTransfer::ValueObject2Int::ValueObject2Int(Composer* composer, PartEdgePtr pedge, ComposedAnalysis* analysis)
+    : composer(composer), pedge(pedge), analysis(analysis) { }
+
+  int MPICommAnalysisTransfer::ValueObject2Int::operator()(SgInitializedName* sgn) {
+    scope("MPICommAnalysisTransfer::ValueObject2Int", scope::medium, 
+          attrGE("mpiCommAnalysisDebugLevel", 2));
+    if(mpiCommAnalysisDebugLevel() >= 2) {
+      dbg << "sgn=" << SgNode2Str(sgn) << endl;
+      dbg << "pedge=" << pedge->str() << endl;
+    }
+
+    ValueObjectPtr vo = composer->Expr2Val(sgn, pedge, analysis);
+
+    if(mpiCommAnalysisDebugLevel() >= 2) {
+      dbg << vo->str() << endl;
+    }
+    assert(vo->isConcrete() && vo->getConcreteType()->variantT() == V_SgTypeInt);
+    SgValueExpPtrSet cvalues = vo->getConcreteValue();
+    assert(cvalues.size() == 1);
+    SgValueExpPtr sgval = *cvalues.begin();
+    SgIntVal* val = dynamic_cast<SgIntVal*>(sgval.get());
+    assert(val);
+    return val->get_value();
+  }
+
+  string MPICommAnalysisTransfer::serialize(MPICommValueObjectPtr mvo) {
+    stringstream ss;
+    boost::archive::text_oarchive oa(ss);
+    oa << mvo;
+    return ss.str();
+  }
+
+  MPICommValueObjectPtr MPICommAnalysisTransfer::deserialize(string data) {
+    MPICommValueObjectPtr mvo;
+    stringstream ss(data);
+    boost::archive::text_iarchive ia(ss);
+    ia >> mvo;
+    assert(mvo);
+    return mvo;
+  }
+
+
   void MPICommAnalysisTransfer::visit(SgFunctionCallExp* sgn) {
-    // Function func = getFunction(sgn);
-    // SgExprListExp* args = sgn->get_args();
-    // MPICommOpCallExp op(func, args);
-    // if(op.isMPICommOp()) {
-    //   Composer* composer = analysis->getComposer();
-    //   SgExpression* expr = op.getCommOpBufferExpr(); assert(expr);
-    //   MemLocObjectPtr buffML = composer->Expr2MemLoc(expr, part->inEdgeFromAny());
-    //   ValueObjectPtr  buffVO = composer->Expr2Val(expr, part->inEdgeFromAny());
-    //   dbg << "buffML=" << buffML->str() << endl;
-    //   dbg << "buffVO=" << buffVO->str() << endl;
-    //   LatticePtr lat = latticeMap->get(buffML);
-    //   MPICommValueObjectPtr mvo = boost::dynamic_pointer_cast<MPICommValueObject>(lat);
-
-    //   if(buffVO->isConcrete()) {
-    //     MPICommValueKindPtr kind = boost::make_shared<MPICommValueConcreteKind>(buffVO->getConcreteType(),
-    //                                                                             buffVO->getConcreteValue());
-    //     mvo->setKind(kind);
-    //     modified = latticeMap->insert(buffML, mvo) || modified;
-    //   }
-      
-      // stringstream ss; {
-      //   boost::archive::text_oarchive oa(ss);
-      //   // MPICommValueObject* mvo_p = buffmpiVO.get();
-      //   oa << buffMVO;
-      // }
-
-      // string sdata = ss.str();      
-      // const char* sdata_p = sdata.c_str();
-      // MPI_Send(sdata_p, sdata.size(), MPI_CHAR, 1, 0, MPI_COMM_WORLD);
-    // }
   }
   
   void MPICommAnalysisTransfer::visit(SgFunctionParameterList* sgn) {
   }
 
+  void MPICommAnalysisTransfer::transferMPISendOp(SgPointerDerefExp* sgn, const MPICommOp& commop) {
+    scope("MPICommAnalysisTransfer::transferMPISendOp", scope::medium, 
+          attrGE("mpiCommAnalysisDebugLevel", 2));
+    assert(commop.isMPICommSendOp());
+
+    Composer* composer = analysis->getComposer();
+    ValueObjectPtr  bvo = composer->Expr2Val(sgn, part->inEdgeFromAny(), analysis);
+    if(mpiCommAnalysisDebugLevel() >= 2) {
+      dbg << "VO=" << bvo->str() << endl;      
+    }
+   
+    // Build MPICommValueObject based on this ValueObject
+    MPICommValueKindPtr kind = createMPICommValueKind(bvo, part->inEdgeFromAny());
+    MPICommValueObjectPtr mvo = boost::make_shared<MPICommValueObject>(part->inEdgeFromAny(), kind);
+
+    ValueObject2Int vo2int(composer, part->inEdgeFromAny(), analysis);
+
+    SgInitializedName* target_sgn = commop.getCommOpTarget();
+    int target = vo2int(target_sgn);
+
+    SgInitializedName* tag_sgn = commop.getCommOpTag();
+    int tag = vo2int(tag_sgn);
+
+    SgInitializedName* comm_sgn = commop.getCommOpComm();
+    MPI_Comm comm = (MPI_Comm) vo2int(comm_sgn);
+
+    if(mpiCommAnalysisDebugLevel() >= 2) {
+      dbg << "target=" << target << ", tag= " << tag << ", MPI_Comm= " << comm << endl;
+    }
+
+    string sdata = serialize(mvo);
+    const char* sdata_p = sdata.c_str();
+
+    // Issue the MPI_Send operation to runtime from analysis
+    // MPI_Send(sdata_p, sdata.size(), MPI_CHAR, target, tag, comm);    
+  }
+
+  void MPICommAnalysisTransfer::transferMPIRecvOp(SgPointerDerefExp* sgn, const MPICommOp& commop) {
+    scope("MPICommAnalysisTransfer::transferMPIRecvOp", scope::medium, 
+          attrGE("mpiCommAnalysisDebugLevel", 2));
+    assert(commop.isMPICommRecvOp());
+
+    Composer* composer = analysis->getComposer();
+    ValueObject2Int vo2int(composer, part->inEdgeFromAny(), analysis);
+
+    SgInitializedName* source_sgn = commop.getCommOpTarget();
+    int source = vo2int(source_sgn);
+
+    SgInitializedName* tag_sgn = commop.getCommOpTag();
+    int tag = vo2int(tag_sgn);
+
+    SgInitializedName* comm_sgn = commop.getCommOpComm();
+    MPI_Comm comm = (MPI_Comm) vo2int(comm_sgn);
+    
+    // space of 1000 char to receive dataflow info
+    char* sdata_p = new char[1000];
+
+    // Issue the MPI_Recv operation to runtime from analysis
+    MPI_Status status;
+    // MPI_Recv(sdata_p, 1000, MPI_CHAR, source, tag, comm, &status);
+
+    // deserialize
+    string sdata(sdata_p);
+    MPICommValueObjectPtr mvo = deserialize(sdata);
+
+    // Update the latticeMap
+    MemLocObjectPtr buffML = composer->Expr2MemLoc(sgn, part->inEdgeFromAny(), analysis);
+    modified = latticeMap->insert(buffML, mvo) || modified;
+  }
+
   void MPICommAnalysisTransfer::visit(SgPointerDerefExp* sgn) {
     Function func = getFunction(sgn);
     if(isMPISendOp(func)) {
-      Composer* composer = analysis->getComposer();
-      MemLocObjectPtr buffML = composer->Expr2MemLoc(sgn, part->inEdgeFromAny(), analysis);
-      ValueObjectPtr  buffVO = composer->Expr2Val(sgn, part->inEdgeFromAny(), analysis);
-      dbg << "buffML=" << buffML->str();
-      dbg << "buffVO=" << buffVO->str();
-      LatticePtr lat = latticeMap->get(buffML);
-      MPICommValueObjectPtr mvo = boost::dynamic_pointer_cast<MPICommValueObject>(lat);
-
-      if(buffVO->isConcrete()) {
-        MPICommValueKindPtr kind = boost::make_shared<MPICommValueConcreteKind>(buffVO->getConcreteValue());
-        MPICommValueObjectPtr bmvo = boost::make_shared<MPICommValueObject>(part->inEdgeFromAny(), kind);
-        modified = latticeMap->insert(buffML, bmvo) || modified;
-        stringstream ss; {
-          boost::archive::text_oarchive oa(ss);
-          oa << bmvo;
-        }      
-        string sdata(ss.str());
-        const char* sdata_p = sdata.c_str();
-        MPI_Send(sdata_p, sdata.size(), MPI_CHAR, 1, 0, MPI_COMM_WORLD);
-      }
+      MPICommOp sendop(func);
+      transferMPISendOp(sgn, sendop);
     }
     else if(isMPIRecvOp(func)) {
-      char* sdata_p = new char[1000];
-      MPI_Status status;
-      MPI_Recv(sdata_p, 1000, MPI_CHAR, 0, 0, MPI_COMM_WORLD, &status);
-      string sdata(sdata_p);
-      stringstream ss;
-      ss << sdata;
-
-      boost::archive::text_iarchive ia(ss);
-      MPICommValueObjectPtr rbuffVO;
-      ia >> rbuffVO;
-      dbg << rbuffVO << endl;
-      Composer* composer = analysis->getComposer();
-      MemLocObjectPtr buffML = composer->Expr2MemLoc(sgn, part->inEdgeFromAny(), analysis);
-      modified = latticeMap->insert(buffML, rbuffVO) || modified;
-      std::cout << latticeMap->str() << endl;
-      // ValueObjectPtr  buffVO = composer->Expr2Val(sgn, part->inEdgeFromAny(), analysis);
-
-      // dbg << "buffVO=" << buffVO->str() << endl;
-
-      // if(buffVO->isConcrete()) {
-      //   MPICommValueKindPtr kind = boost::make_shared<MPICommValueConcreteKind>(buffVO->getConcreteValue());
-      //   MPICommValueObjectPtr bmvo = boost::make_shared<MPICommValueObject>(part->inEdgeFromAny(), kind);
-      //   modified = latticeMap->insert(buffML, bmvo) || modified;
-      // }
+      MPICommOp recvop(func);
+      transferMPIRecvOp(sgn, recvop);
     }
   }
  
   void MPICommAnalysisTransfer::visit(SgNode* sgn) {
     // identity transfer
   }
+
 
   bool MPICommAnalysisTransfer::finish() {
     return modified;

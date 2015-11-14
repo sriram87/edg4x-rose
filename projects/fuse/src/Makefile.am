@@ -1,7 +1,7 @@
 include $(top_srcdir)/config/Makefile.for.ROSE.includes.and.libs
 include $(ROSE_WITH_SIGHT_INSTALL_PATH)/Makefile.extern
 
-bin_PROGRAMS = fuse fuseTight fuseMPI fuseLayout
+bin_PROGRAMS = fuse fuseTight fuseMPI fuseLayout typeVisitor
 
 INCLUDES = \
 	$(ROSE_INCLUDES) \
@@ -74,6 +74,15 @@ fuseLayout_CXXFLAGS = $(SIGHT_CFLAGS)
 fuseLayout_LDFLAGS = $(ROSE_LIBS) $(LIBS_WITH_RPATH) $(SIGHT_LAYOUT_DYNAMIC_LINKFLAGS)
 fuseLayout_SOURCES = \
 	sight/widgets/ats_graph_layout.C
+
+###############
+# TypeVisitor #
+###############
+typeVisitor_CXXFLAGS = -DROSE_PREFIX="\"${top_builddir}\""
+typeVisitor_LDFLAGS = $(ROSE_LIBS) $(LIBS_WITH_RPATH)
+typeVisitor_LDADD = -lrose
+typeVisitor_SOURCES = typeVisitorTest.cpp
+
 ########
 # FUSE #
 ########

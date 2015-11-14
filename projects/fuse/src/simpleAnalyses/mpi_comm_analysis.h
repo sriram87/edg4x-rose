@@ -166,8 +166,12 @@ namespace fuse {
     friend class boost::serialization::access;
     std::string str(std::string indent="") const;
   };
-
   typedef boost::shared_ptr<MPICommValueUnknownKind> MPICommValueUnknownKindPtr;
+
+  /******************
+   * Helper Methods *
+   ******************/
+  MPICommValueKindPtr createMPICommValueKind(ValueObjectPtr vo, PartEdgePtr pedge);
 
   /**********************
    * MPICommValueObject *
@@ -221,49 +225,24 @@ namespace fuse {
 
   typedef boost::shared_ptr<MPICommValueObject> MPICommValueObjectPtr;
 
-  // typedef MPICommValueObject<ComposedAnalysis*, false> UnionAnalMPICommValueObject;
-  // typedef boost::shared_ptr<MPICommValueObject<ComposedAnalysis*, false> > UnionAnalMPICommValueObjectPtr;
-
-  /********************
-   * MPICommOpCallExp *
-   ********************/
-  struct MPICommOp {
-    enum OpType {SEND, 
-                 RECV,
-                 INIT,
-                 FINALIZE,
-                 NOOP};
-  };
-
-  //! Class to process arguments of MPICommOp call expression
-  class MPICommOpCallExp {
-    Function mpifunc;
-    SgExprListExp* argList;
-    MPICommOp::OpType optype;
-        
-  public:
-    MPICommOpCallExp(const Function& func, SgExprListExp* arglist);
-    MPICommOpCallExp(const MPICommOpCallExp& that);
-    SgExpression* getCommOpBufferExpr();
-    SgExpression* getCommOpDestExpr();
-    SgExpression* getCommOpTagExpr();
-    bool isMPICommOp();
-  };
-
   /**************************
    * MPICommOpCallParamList *
    **************************/
   //! Class to process arguments of MPICommOp SgFunctionParameterList
-  class MPICommOpCallParamList {
+  class MPICommOp {
+    enum OpType { SEND,
+                  RECV };
     Function mpifunc;
-    const SgInitializedNamePtrList& argList;
     MPICommOp::OpType optype;
   public:
-    MPICommOpCallParamList(const Function& func, const SgInitializedNamePtrList& argList);
-    MPICommOpCallParamList(const MPICommOpCallParamList& that);
-    SgInitializedName* getCommOpBuffer();
-    SgPointerDerefExp* getCommOpBufferDerefExpr();
-    bool isMPICommOp();
+    MPICommOp(const Function& func);;
+    MPICommOp(const MPICommOp& that);
+    SgPointerDerefExp* getCommOpBufferDerefExpr() const;
+    SgInitializedName* getCommOpTarget() const;
+    SgInitializedName* getCommOpTag() const;
+    SgInitializedName* getCommOpComm() const;
+    bool isMPICommSendOp() const;
+    bool isMPICommRecvOp() const;
   };
 
   /**************************
@@ -283,12 +262,6 @@ namespace fuse {
                             NodeState& state,
                             std::map<PartEdgePtr, std::vector<Lattice*> >& dfInfo,
                             MPICommAnalysis* analysis);
-    void visit(SgFunctionParameterList* sgn);
-    void visit(SgFunctionCallExp* sgn);
-    void visit(SgPointerDerefExp* sgn);
-    void visit(SgNode* sgn);
-    bool finish();
-
     //! Get the function from the parameter list
     Function getFunction(SgFunctionParameterList* sgn);
     Function getFunction(SgFunctionCallExp* sgn);
@@ -298,6 +271,27 @@ namespace fuse {
     bool isMPISendOp(const Function& func) const;
     bool isMPIRecvOp(const Function& func) const;
     bool isMPICommOpFuncCall(const Function& func) const;
+
+    class ValueObject2Int {
+      Composer* composer;
+      PartEdgePtr pedge;
+      ComposedAnalysis* analysis;
+    public:
+      ValueObject2Int(Composer* composer, PartEdgePtr pedge, ComposedAnalysis* analysis);
+      int operator()(SgInitializedName* sgn);
+    };
+
+    std::string serialize(MPICommValueObjectPtr mvo);
+    MPICommValueObjectPtr deserialize(std::string data);
+
+    void visit(SgPointerDerefExp* sgn);
+    void transferMPISendOp(SgPointerDerefExp* sgn, const MPICommOp& commop);
+    void transferMPIRecvOp(SgPointerDerefExp* sgn, const MPICommOp& commop);
+
+    void visit(SgFunctionParameterList* sgn);
+    void visit(SgFunctionCallExp* sgn);
+    void visit(SgNode* sgn);
+    bool finish();
   };
 
   /*******************

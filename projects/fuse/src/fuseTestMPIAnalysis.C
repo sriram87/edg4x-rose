@@ -13,11 +13,30 @@
 
 using namespace std;
 using namespace fuse;
+using namespace sight;
+
+void FuseMPIInit(int argc, char** argv) {
+  // Command to set up the enviroment variable to find the binary fuseLayout
+  // fuseLayout is required to run fuse
+  // fuseLayout binary is at the same level as fuse in the build tree
+  // When compiling fuse ROSE_PREFIX is defined as -DROSE_PREFIX="\"${top_builddir}\"" which
+  // is top of the build tree
+  // If fuse fails to find fuseLayout set up this environment variable appropriately. 
+  setenv("SIGHT_LAYOUT_EXEC", (txt()<<ROSE_PREFIX<<"/projects/fuse/src/fuseLayout").c_str(), 1);
+
+  int flag = false;
+  MPI_Initialized(&flag); assert(flag);
+  int rank;
+  MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+  string title = (txt() << "Process " << rank << " Debug Output").c_str();
+  string workdir = (txt() << "dbg" << rank).c_str();
+  SightInit(argc, argv, title, workdir);
+}
 
 int main(int argc, char* argv[])
 {
-  FuseInit(argc, argv);
   MPI_Init(&argc, &argv);
+  FuseMPIInit(argc, argv);
   cout << "========== S T A R T ==========\n";
 
   // Run the front end

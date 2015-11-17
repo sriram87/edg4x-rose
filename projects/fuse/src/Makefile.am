@@ -552,7 +552,7 @@ check-local: check-fuse check-fusetight check-cxx
 # CLEAN RULES #
 ###############
 clean-debug:
-	rm -rf *.dot *.png dbg/
+	rm -rf *.dot *.png dbg*/
 
 clean-check:
 	rm -f *.passed *.failed *.out *.err

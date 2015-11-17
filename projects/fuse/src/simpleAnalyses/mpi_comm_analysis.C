@@ -673,7 +673,7 @@ namespace fuse {
     : composer(composer), pedge(pedge), analysis(analysis) { }
 
   int MPICommAnalysisTransfer::ValueObject2Int::operator()(SgInitializedName* sgn) {
-    scope("MPICommAnalysisTransfer::ValueObject2Int", scope::medium, 
+    scope("MPICommAnalysisTransfer::ValueObject2Int", scope::low, 
           attrGE("mpiCommAnalysisDebugLevel", 2));
     if(mpiCommAnalysisDebugLevel() >= 2) {
       dbg << "sgn=" << SgNode2Str(sgn) << endl;
@@ -685,13 +685,28 @@ namespace fuse {
     if(mpiCommAnalysisDebugLevel() >= 2) {
       dbg << vo->str() << endl;
     }
-    assert(vo->isConcrete() && vo->getConcreteType()->variantT() == V_SgTypeInt);
+    assert(vo->isConcrete());
+
     SgValueExpPtrSet cvalues = vo->getConcreteValue();
     assert(cvalues.size() == 1);
     SgValueExpPtr sgval = *cvalues.begin();
-    SgIntVal* val = dynamic_cast<SgIntVal*>(sgval.get());
-    assert(val);
-    return val->get_value();
+
+    switch(sgval.get()->variantT()) {      
+      case V_SgIntVal: {
+        return isSgIntVal(sgval.get())->get_value();
+      }
+      case V_SgLongIntVal: {
+        return isSgLongIntVal(sgval.get())->get_value();
+      }
+      case V_SgLongLongIntVal: {
+        return isSgLongLongIntVal(sgval.get())->get_value();
+      }
+      // TODO: Fill out cases for other int types
+      default: {
+        dbg << "unhandled type=" << SgNode2Str(sgval.get()) << endl;
+        assert(0);      
+      } // end default
+    } // end switch case
   }
 
   string MPICommAnalysisTransfer::serialize(MPICommValueObjectPtr mvo) {
@@ -718,30 +733,36 @@ namespace fuse {
   }
 
   void MPICommAnalysisTransfer::transferMPISendOp(SgPointerDerefExp* sgn, const MPICommOp& commop) {
-    scope("MPICommAnalysisTransfer::transferMPISendOp", scope::medium, 
+    scope("MPICommAnalysisTransfer::transferMPISendOp", scope::low, 
           attrGE("mpiCommAnalysisDebugLevel", 2));
     assert(commop.isMPICommSendOp());
 
     Composer* composer = analysis->getComposer();
     ValueObjectPtr  bvo = composer->Expr2Val(sgn, part->inEdgeFromAny(), analysis);
     if(mpiCommAnalysisDebugLevel() >= 2) {
-      dbg << "VO=" << bvo->str() << endl;      
+      dbg << "buffer value=" << bvo->str() << endl;      
     }
    
     // Build MPICommValueObject based on this ValueObject
     MPICommValueKindPtr kind = createMPICommValueKind(bvo, part->inEdgeFromAny());
     MPICommValueObjectPtr mvo = boost::make_shared<MPICommValueObject>(part->inEdgeFromAny(), kind);
 
+    // Generic functor to get value object given an sage expression
+    // Forwards the query to the compoer
     ValueObject2Int vo2int(composer, part->inEdgeFromAny(), analysis);
 
-    SgInitializedName* target_sgn = commop.getCommOpTarget();
-    int target = vo2int(target_sgn);
+    SgInitializedName* targetExpr = commop.getCommOpTarget();
+    if(mpiCommAnalysisDebugLevel() >= 2) {
+      dbg << "targetExpr=" << SgNode2Str(targetExpr) << endl;
+    }
+    int target = vo2int(targetExpr);
 
     SgInitializedName* tag_sgn = commop.getCommOpTag();
     int tag = vo2int(tag_sgn);
 
     SgInitializedName* comm_sgn = commop.getCommOpComm();
     MPI_Comm comm = (MPI_Comm) vo2int(comm_sgn);
+    //TODO: verify we are communicating in MPI_COMM_WORLD
 
     if(mpiCommAnalysisDebugLevel() >= 2) {
       dbg << "target=" << target << ", tag= " << tag << ", MPI_Comm= " << comm << endl;
@@ -751,7 +772,7 @@ namespace fuse {
     const char* sdata_p = sdata.c_str();
 
     // Issue the MPI_Send operation to runtime from analysis
-    // MPI_Send(sdata_p, sdata.size(), MPI_CHAR, target, tag, comm);    
+    MPI_Send(sdata_p, sdata.size(), MPI_CHAR, target, tag, comm);    
   }
 
   void MPICommAnalysisTransfer::transferMPIRecvOp(SgPointerDerefExp* sgn, const MPICommOp& commop) {
@@ -770,13 +791,14 @@ namespace fuse {
 
     SgInitializedName* comm_sgn = commop.getCommOpComm();
     MPI_Comm comm = (MPI_Comm) vo2int(comm_sgn);
+    //TODO: verify we are communicating in MPI_COMM_WORLD
     
     // space of 1000 char to receive dataflow info
     char* sdata_p = new char[1000];
 
     // Issue the MPI_Recv operation to runtime from analysis
     MPI_Status status;
-    // MPI_Recv(sdata_p, 1000, MPI_CHAR, source, tag, comm, &status);
+    MPI_Recv(sdata_p, 1000, MPI_CHAR, source, tag, comm, &status);
 
     // deserialize
     string sdata(sdata_p);

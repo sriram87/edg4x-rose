@@ -436,6 +436,27 @@ CPValueObject::CPValueObject(const CPValueObject & that) : Lattice(that.latPEdge
   this->kind = that.kind;
 }
 
+// Create this CPValueObject from another ValueObject
+// Check if the value object is concrete
+// If its concret create a concrete kind with the set of values
+CPValueObject::CPValueObject(ValueObjectPtr vo, PartEdgePtr pedge) 
+  : Lattice(pedge), FiniteLattice(pedge), ValueObject(NULL) {
+  assert(vo);
+  if(vo->isFullV(pedge)) kind = boost::make_shared<CPUnknownKind>();
+  else if(vo->isEmptyV(pedge)) kind = boost::make_shared<CPUninitializedKind>();
+  else if(vo->isConcrete()) {
+    set<boost::shared_ptr<SgValueExp> > cvals = vo->getConcreteValue();
+    assert(cvals.size() > 0);
+    set<boost::shared_ptr<SgValueExp> >::iterator vIt = cvals.begin();
+    kind  = boost::make_shared<CPConcreteKind>(*vIt);
+    for(++vIt; vIt != cvals.end(); ++vIt) {
+      CPValueKindPtr icpvk = boost::make_shared<CPConcreteKind>(*vIt);
+      kind->meetUpdateV(icpvk);
+    }
+  }
+  else assert(0);    
+}
+
 CPValueKindPtr CPValueObject::getKind() const {
   return kind;
 }
@@ -933,7 +954,11 @@ CPValueKindPtr CPConcreteKind::op(SgUnaryOp* op) {
       default: return doUnaryIntegralOp(~ boost::lambda::_1);
     }
   } else if(isSgCastExp(op)) {
-    switch(isSgCastExp(op)->get_type()->variantT()) {
+    // Get the base type if get_type is SgTypedefType
+    SgType* baseType;
+    if(isSgTypedefType(op->get_type())) baseType = op->get_type()->findBaseType();
+    else baseType = op->get_type();
+    switch(baseType->variantT()) {
       case V_SgTypeBool:               return doUnaryOp(boost::lambda::ll_static_cast<bool>              (boost::lambda::_1)); 
       case V_SgTypeComplex:            assert(0);             
       case V_SgTypeFloat:              return doUnaryOp(boost::lambda::ll_static_cast<float>             (boost::lambda::_1));
@@ -3289,22 +3314,8 @@ std::string CPMemLocObject::str(std::string indent) const { // pretty print for 
 //   }
 // }
 
-CPValueObjectPtr ConstantPropagationAnalysisTransfer::createConcreteCPValueObject(ValueObjectPtr vo_p) {
-  assert(vo_p->isConcrete());
-  set<boost::shared_ptr<SgValueExp> > cvals = vo_p->getConcreteValue();
-  assert(cvals.size() > 0);
-  set<boost::shared_ptr<SgValueExp> >::iterator vIt = cvals.begin();
-  CPValueKindPtr cpvk_p = boost::make_shared<CPConcreteKind>(*vIt);
-  for(++vIt; vIt != cvals.end(); ++vIt) {
-    CPValueKindPtr vItcpvk_p = boost::make_shared<CPConcreteKind>(*vIt);
-    pair<bool, CPValueKindPtr> meetVal = cpvk_p->meetUpdateV(vItcpvk_p);
-    if(meetVal.first) cpvk_p = meetVal.second;
-  }
-  return boost::make_shared<CPValueObject>(cpvk_p, part->inEdgeFromAny());
-}
-
 CPValueObjectPtr ConstantPropagationAnalysisTransfer::getLattice(SgExpression *sgn) {
-  scope s("ConstantPropagationAnalysisTransfer::getLatticeOperand()", scope::medium, attrGE("constantPropagationAnalysisDebugLevel", 2));
+  scope s("ConstantPropagationAnalysisTransfer::getLattice()", scope::medium, attrGE("constantPropagationAnalysisDebugLevel", 2));
   MemLocObjectPtr p = composer->Expr2MemLoc(sgn, part->inEdgeFromAny(), analysis);
   // First look up in the constant propagation lattice map
   CPValueObjectPtr cpv_p = boost::dynamic_pointer_cast<CPValueObject>
@@ -3317,7 +3328,7 @@ CPValueObjectPtr ConstantPropagationAnalysisTransfer::getLattice(SgExpression *s
     ValueObjectPtr vo_p = composer->Expr2Val(sgn, part->inEdgeFromAny(), analysis);
     if(vo_p->isConcrete()) {
       // Create a CPValueObject from the generic ValueObject
-      cpv_p = createConcreteCPValueObject(vo_p);
+      cpv_p = boost::make_shared<CPValueObject>(vo_p, part->inEdgeFromAny());
     }
   }
   if(constantPropagationAnalysisDebugLevel() >= 2) 
@@ -3328,23 +3339,32 @@ CPValueObjectPtr ConstantPropagationAnalysisTransfer::getLattice(SgExpression *s
 // Returns a Lattice object that corresponds to the memory location denoted by the given operand of sgn 
 // in the current part
 CPValueObjectPtr ConstantPropagationAnalysisTransfer::getLatticeOperand(SgNode *sgn, SgExpression* operand) {
-  scope s("ConstantPropagationAnalysisTransfer::getLatticeOperand()", scope::medium, attrGE("constantPropagationAnalysisDebugLevel", 2));    
+  scope s("ConstantPropagationAnalysisTransfer::getLatticeOperand()", 
+          scope::medium, attrGE("constantPropagationAnalysisDebugLevel", 2));    
   MemLocObjectPtr p = composer->OperandExpr2MemLoc(sgn, operand, part->inEdgeFromAny(), analysis);
   CPValueObjectPtr cpv_p = boost::dynamic_pointer_cast<CPValueObject>
     (VariableStateTransfer<CPValueObject, ConstantPropagationAnalysis>::getLattice(p));
   assert(cpv_p);
 
+  if(constantPropagationAnalysisDebugLevel() >= 2) {
+    dbg << "cpMap's cpv_p=" << cpv_p->str() << endl;
+  }
+
   if(!cpv_p->isConcrete()) {
     // If the lattice is uninitialized or unknown,
     // query the composer to check if its concrete
     ValueObjectPtr vo_p = composer->OperandExpr2Val(sgn, operand, part->inEdgeFromAny(), analysis);
+    if(constantPropagationAnalysisDebugLevel() >= 2) {
+      dbg << "Composer's vo_p=" << vo_p->str() << endl;
+    }
+
     if(vo_p->isConcrete()) {
       // Create a CPValueObject from the generic ValueObject
-      cpv_p = createConcreteCPValueObject(vo_p);
+      cpv_p = boost::make_shared<CPValueObject>(vo_p, part->inEdgeFromAny());
     }
   }
   if(constantPropagationAnalysisDebugLevel() >= 2) 
-    dbg << "ML(" << SgNode2Str(sgn) << ")=" << p->str() << ", CPValue=" << cpv_p->str() << endl;
+    dbg << "ML(" << SgNode2Str(operand) << ")=" << p->str() << ", CPValue=" << cpv_p->str() << endl;
   return cpv_p;
 }
 
@@ -3548,7 +3568,10 @@ void ConstantPropagationAnalysisTransfer::visit(SgCastExp *sgn) {
   CPValueObjectPtr arg1Lat;//, arg2Lat;//, resLat_tmp;
   getLattices(sgn, arg1Lat);//, arg2Lat);//, resLat_tmp);
   CPValueObjectPtr resLat = arg1Lat->op(sgn);
-//prodLat->setToEmpty();
+  if(constantPropagationAnalysisDebugLevel() >= 2) {
+    dbg << "type=" << SgNode2Str(sgn->get_type()) << endl;
+    dbg << "resLat=" << resLat->str() << endl;
+  }
   setLattice(sgn, resLat);
 }
 
@@ -3711,110 +3734,165 @@ ConstantPropagationAnalysis::getTransferVisitor(PartPtr part, CFGNode cn, NodeSt
   return boost::shared_ptr<DFTransferVisitor>(t);
 }
 
-ValueObjectPtr ConstantPropagationAnalysis::Expr2Val(SgNode* n, PartEdgePtr pedge)
-{
-  scope s(txt()<<"ConstantPropagationAnalysis::Expr2Val(n="<<SgNode2Str(n)<<", pedge="<<pedge->str()<<")", scope::medium, attrGE("constantPropagationAnalysisDebugLevel", 1));
-  
+ValueObjectPtr ConstantPropagationAnalysis::Expr2Val(SgNode* n, PartEdgePtr pedge) {
+  scope s(txt()<<"ConstantPropagationAnalysis::Expr2Val(n="<<SgNode2Str(n)
+          <<", pedge="<<pedge->str()<<")", 
+          scope::medium, attrGE("constantPropagationAnalysisDebugLevel", 1));
+
   MemLocObjectPtr ml = getComposer()->Expr2MemLoc(n, pedge, this);
-  if(constantPropagationAnalysisDebugLevel()>=1) dbg << "ml="<<(ml? ml->str(): "NULL")<<endl;
-  
-  // If pedge doesn't have wildcards
-  if(pedge->source() && pedge->target()) {
-    // Get the NodeState at the source of this edge
-    NodeState* state = NodeState::getNodeState(this, pedge->source());
-    if(constantPropagationAnalysisDebugLevel()>=1) dbg << "state="<<state->str(this)<<endl;
-    
-    // Get the value map at the current edge
-    AbstractObjectMap* cpMap = dynamic_cast<AbstractObjectMap*>(state->getLatticeBelow(this, pedge, 0));
-    if(cpMap == NULL) {
-      Lattice* l = state->getLatticeBelow(this, pedge, 0);
-      dbg << "l="<<l->str()<<endl;
-    }
-    assert(cpMap);
-    
-    // We currently can only handle requests for the SgNode that corresponds to the current Part
-    set<CFGNode> nodes = pedge->source()->CFGNodes();
-    assert(nodes.size()==1);
-    assert(nodes.begin()->getNode() == n);
-    
-    // Get the MemLoc at the source part
-    if(constantPropagationAnalysisDebugLevel()>=2) {
-      indent ind;
-      dbg << "cpMap Below="<<cpMap<<"="<<cpMap->str()<<endl;
-      dbg << "nodeState = "<<state->str()<<endl;
-    }
-
-    // Return the lattice associated with n's expression
-    CPValueObjectPtr val = boost::dynamic_pointer_cast<CPValueObject>(cpMap->get(ml));
-    assert(val);
-    if(constantPropagationAnalysisDebugLevel()>=1) dbg << "val="<<val->str()<<endl;
-    
-    return val->copyV();
-  // If the target of this edge is a wildcard
-  } else if(pedge->source()) {
-    // Get the NodeState at the source of this edge
-    NodeState* state = NodeState::getNodeState(this, pedge->source());
-    //dbg << "state="<<state->str(this)<<endl;
-        
-    map<PartEdgePtr, vector<Lattice*> >& e2lats = state->getLatticeBelowAllMod(this);
-    assert(e2lats.size()>=1);
-    CPValueObjectPtr mergedVal;
-    for(map<PartEdgePtr, vector<Lattice*> >::iterator lats=e2lats.begin(); lats!=e2lats.end(); lats++) {
-      PartEdge* edgePtr = lats->first.get();
-      assert(edgePtr->source() == pedge.get()->source());
-      scope sEdge(txt()<<"edge "<<lats->first.get()->str(), scope::medium, attrGE("constantPropagationAnalysisDebugLevel", 1));
-      
-      // Get the value map at the current edge
-      AbstractObjectMap* cpMap = dynamic_cast<AbstractObjectMap*>(state->getLatticeBelow(this, lats->first, 0));
-      assert(cpMap);
-      
-      //MemLocObjectPtr p = composer->Expr2MemLoc(n, pedge, this);
-      // We currently can only handle requests for the SgNode that corresponds to the current Part
-      set<CFGNode> nodes = pedge->source()->CFGNodes();
-      assert(nodes.size()==1);
-      assert(nodes.begin()->getNode() == n);
-
-      if(constantPropagationAnalysisDebugLevel()>=2) {
-        indent ind;
-        dbg << "cpMap="<<cpMap<<"="<<cpMap->str()<<endl;
-      }
-      
-      CPValueObjectPtr val = boost::dynamic_pointer_cast<CPValueObject> (boost::dynamic_pointer_cast<ValueObject>(cpMap->get(ml)));
-      if(constantPropagationAnalysisDebugLevel()>=1) dbg << "val="<<val->str()<<endl;
-
-      if(lats==e2lats.begin())
-        mergedVal = boost::dynamic_pointer_cast<CPValueObject>(val->copyV());
-      else 
-        mergedVal->meetUpdate(val.get());
-      
-      if(constantPropagationAnalysisDebugLevel()>=1) dbg << "mergedVal="<<mergedVal->str()<<endl;
-    }
-    return mergedVal;
-  
-  // If the source of this edge is a wildcard
-  } else if(pedge->target()) {
-    // Get the NodeState at the target of this edge
-    NodeState* state = NodeState::getNodeState(this, pedge->target());
-    if(constantPropagationAnalysisDebugLevel()>=2) dbg << "state="<<state->str()<<endl;
-    
-    // Get the value map at the NULL edge, which denotes the meet over all incoming edges
-    AbstractObjectMap* cpMap = dynamic_cast<AbstractObjectMap*>(state->getLatticeAbove(this, pedge, 0));
-    assert(cpMap);
-    
-    if(constantPropagationAnalysisDebugLevel()>=2) {
-      indent ind;
-      dbg << "cpMap="<<cpMap<<"="<<cpMap->str()<<endl;
-    }
-
-    // Return the lattice associated with n's expression since that is likely to be more precise
-    CPValueObjectPtr val = boost::dynamic_pointer_cast<CPValueObject>(cpMap->get(ml));
-    assert(val);
-    if(constantPropagationAnalysisDebugLevel()>=1) dbg << "val="<<val->str()<<endl;
-    
-    return val->copyV();
+  if(constantPropagationAnalysisDebugLevel() >= 1) {
+    dbg << "ml=" << (ml? ml->str(): NULL) << endl;
   }
-  assert(0);
+
+  NodeState* state;
+  Lattice* latticeMap;
+
+  // If the flow is forward then edge to this function is
+  // of the form: * -> target
+  if(pedge->target()) {
+    state = NodeState::getNodeState(this, pedge->target());
+    assert(state);
+    // for forward flow dataflow info is above this node
+    latticeMap = state->getLatticeAbove(this, pedge, 0);
+
+  }
+  // If the flow is backward then edge to this function is
+  // of the form: source -> *
+  else if(pedge->source()) {
+    state = NodeState::getNodeState(this, pedge->source());
+    assert(state);
+    // for backward flow has dataflow info is below this node
+    latticeMap = state->getLatticeBelow(this, pedge, 0);
+  }
+  else assert(0);
+  assert(latticeMap);
+    
+  AbstractObjectMap* cpMap = dynamic_cast<AbstractObjectMap*>(latticeMap);
+  assert(cpMap);
+
+  CPValueObjectPtr cpVal = boost::dynamic_pointer_cast<CPValueObject>(cpMap->get(ml));
+  assert(cpVal);
+  if(constantPropagationAnalysisDebugLevel()>=1) {
+    dbg << "cpMap's cpVal=" << cpVal->str() << endl;
+  }
+
+  if(cpVal->isEmptyV(pedge)) {
+    ValueObjectPtr val = composer->Expr2Val(n, pedge, this);
+    if(val->isConcrete()) {
+      cpVal = boost::make_shared<CPValueObject>(val, pedge);
+    }
+
+    if(constantPropagationAnalysisDebugLevel() >= 1) {
+      dbg << "Composer's cpVal=" << cpVal->str() << endl;
+    }
+  }
+  return cpVal->copyV();
 }
+
+// ValueObjectPtr ConstantPropagationAnalysis::Expr2Val(SgNode* n, PartEdgePtr pedge)
+// {
+//   scope s(txt()<<"ConstantPropagationAnalysis::Expr2Val(n="<<SgNode2Str(n)<<", pedge="<<pedge->str()<<")", scope::medium, attrGE("constantPropagationAnalysisDebugLevel", 1));
+  
+//   MemLocObjectPtr ml = getComposer()->Expr2MemLoc(n, pedge, this);
+//   if(constantPropagationAnalysisDebugLevel()>=1) dbg << "ml="<<(ml? ml->str(): "NULL")<<endl;
+  
+//   // If pedge doesn't have wildcards
+//   if(pedge->source() && pedge->target()) {
+//     // Get the NodeState at the source of this edge
+//     NodeState* state = NodeState::getNodeState(this, pedge->source());
+//     if(constantPropagationAnalysisDebugLevel()>=1) dbg << "state="<<state->str(this)<<endl;
+    
+//     // Get the value map at the current edge
+//     AbstractObjectMap* cpMap = dynamic_cast<AbstractObjectMap*>(state->getLatticeBelow(this, pedge, 0));
+//     if(cpMap == NULL) {
+//       Lattice* l = state->getLatticeBelow(this, pedge, 0);
+//       dbg << "l="<<l->str()<<endl;
+//     }
+//     assert(cpMap);
+    
+//     // We currently can only handle requests for the SgNode that corresponds to the current Part
+//     set<CFGNode> nodes = pedge->source()->CFGNodes();
+//     assert(nodes.size()==1);
+//     assert(nodes.begin()->getNode() == n);
+    
+//     // Get the MemLoc at the source part
+//     if(constantPropagationAnalysisDebugLevel()>=2) {
+//       indent ind;
+//       dbg << "cpMap Below="<<cpMap<<"="<<cpMap->str()<<endl;
+//       dbg << "nodeState = "<<state->str()<<endl;
+//     }
+
+//     // Return the lattice associated with n's expression
+//     CPValueObjectPtr val = boost::dynamic_pointer_cast<CPValueObject>(cpMap->get(ml));
+//     assert(val);
+//     if(constantPropagationAnalysisDebugLevel()>=1) dbg << "val="<<val->str()<<endl;
+    
+//     return val->copyV();
+//   // If the target of this edge is a wildcard
+//   } else if(pedge->source()) {
+//     // Get the NodeState at the source of this edge
+//     NodeState* state = NodeState::getNodeState(this, pedge->source());
+//     //dbg << "state="<<state->str(this)<<endl;
+        
+//     map<PartEdgePtr, vector<Lattice*> >& e2lats = state->getLatticeBelowAllMod(this);
+//     assert(e2lats.size()>=1);
+//     CPValueObjectPtr mergedVal;
+//     for(map<PartEdgePtr, vector<Lattice*> >::iterator lats=e2lats.begin(); lats!=e2lats.end(); lats++) {
+//       PartEdge* edgePtr = lats->first.get();
+//       assert(edgePtr->source() == pedge.get()->source());
+//       scope sEdge(txt()<<"edge "<<lats->first.get()->str(), scope::medium, attrGE("constantPropagationAnalysisDebugLevel", 1));
+      
+//       // Get the value map at the current edge
+//       AbstractObjectMap* cpMap = dynamic_cast<AbstractObjectMap*>(state->getLatticeBelow(this, lats->first, 0));
+//       assert(cpMap);
+      
+//       //MemLocObjectPtr p = composer->Expr2MemLoc(n, pedge, this);
+//       // We currently can only handle requests for the SgNode that corresponds to the current Part
+//       set<CFGNode> nodes = pedge->source()->CFGNodes();
+//       assert(nodes.size()==1);
+//       assert(nodes.begin()->getNode() == n);
+
+//       if(constantPropagationAnalysisDebugLevel()>=2) {
+//         indent ind;
+//         dbg << "cpMap="<<cpMap<<"="<<cpMap->str()<<endl;
+//       }
+      
+//       CPValueObjectPtr val = boost::dynamic_pointer_cast<CPValueObject> (boost::dynamic_pointer_cast<ValueObject>(cpMap->get(ml)));
+//       if(constantPropagationAnalysisDebugLevel()>=1) dbg << "val="<<val->str()<<endl;
+
+//       if(lats==e2lats.begin())
+//         mergedVal = boost::dynamic_pointer_cast<CPValueObject>(val->copyV());
+//       else 
+//         mergedVal->meetUpdate(val.get());
+      
+//       if(constantPropagationAnalysisDebugLevel()>=1) dbg << "mergedVal="<<mergedVal->str()<<endl;
+//     }
+//     return mergedVal;
+  
+//   // If the source of this edge is a wildcard
+//   } else if(pedge->target()) {
+//     // Get the NodeState at the target of this edge
+//     NodeState* state = NodeState::getNodeState(this, pedge->target());
+//     if(constantPropagationAnalysisDebugLevel()>=2) dbg << "state="<<state->str()<<endl;
+    
+//     // Get the value map at the NULL edge, which denotes the meet over all incoming edges
+//     AbstractObjectMap* cpMap = dynamic_cast<AbstractObjectMap*>(state->getLatticeAbove(this, pedge, 0));
+//     assert(cpMap);
+    
+//     if(constantPropagationAnalysisDebugLevel()>=2) {
+//       indent ind;
+//       dbg << "cpMap="<<cpMap<<"="<<cpMap->str()<<endl;
+//     }
+
+//     // Return the lattice associated with n's expression since that is likely to be more precise
+//     CPValueObjectPtr val = boost::dynamic_pointer_cast<CPValueObject>(cpMap->get(ml));
+//     assert(val);
+//     if(constantPropagationAnalysisDebugLevel()>=1) dbg << "val="<<val->str()<<endl;
+    
+//     return val->copyV();
+//   }
+//   assert(0);
+// }
 
 MemLocObjectPtr ConstantPropagationAnalysis::Expr2MemLoc(SgNode* n, PartEdgePtr pedge) {
   scope s(txt()<<"ConstantPropagationAnalysis::Expr2MemLoc(n="<<SgNode2Str(n)<<", pedge="<<pedge->str()<<")", scope::medium, attrGE("constantPropagationAnalysisDebugLevel", 1));

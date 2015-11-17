@@ -148,6 +148,9 @@ class CPValueObject : public FiniteLattice, public ValueObject {
   //CPValueObject(SgValueExp* val, PartEdgePtr pedge);
   
   CPValueObject(CPValueKindPtr kind, PartEdgePtr pedge);
+
+  // Create a CPValueObject from another ValueObject
+  CPValueObject(ValueObjectPtr vo, PartEdgePtr pedge);
   
   // Do we need th copy constructor?
   CPValueObject(const CPValueObject & X);
@@ -717,9 +720,6 @@ class ConstantPropagationAnalysisTransfer : public VariableStateTransfer<CPValue
 
   public:
 
-  //! Create a CPValueObject from the generic ValueObject
-  //! Input ValueObject should be concrete
-  CPValueObjectPtr createConcreteCPValueObject(ValueObjectPtr vo_p);
   virtual CPValueObjectPtr getLattice(SgExpression *sgn);
   virtual CPValueObjectPtr getLatticeOperand(SgNode *sgn, SgExpression* operand);
   //  void visit(SgNode *);

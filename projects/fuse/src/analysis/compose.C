@@ -186,6 +186,111 @@ bool Composer::isLive(AbstractObjectPtr ao, PartEdgePtr pedge, ComposedAnalysis*
   assert(0);
 }
 
+
+bool Composer::HavocLattices(vector<Lattice*>& lats) {
+  bool modified = false;
+  vector<Lattice*>::iterator it = lats.begin();
+  for( ; it != lats.end(); ++it) {
+    Lattice* lat_p = *it;
+    modified = lat_p->setToFull() || modified;
+  }
+  return modified;  
+}
+
+bool Composer::HavocNodeState(ComposedAnalysis* client, PartEdgePtr pedge) {
+  PartPtr part;
+  if(client->getDirection() == ComposedAnalysis::fw) {
+    part = pedge->target();
+    NodeState* state = NodeState::getNodeState(client, part);
+    vector<Lattice*>& lats = state->getLatticeAboveMod(client, pedge);
+    return HavocLattices(lats);
+  }
+  else if(client->getDirection() == ComposedAnalysis::bw) {
+    part = pedge->source();
+    NodeState* state = NodeState::getNodeState(client, part);
+    vector<Lattice*>& lats = state->getLatticeBelowMod(client, pedge);
+    return HavocLattices(lats);
+  }
+}
+
+//!
+//! Havoc the value of expression denoted by SgNode*.
+//! 1. Get the NodeState corresponding to the client at pedge.
+//! 2. Call lattice->setMLtoFull of all lattices in NodeState by passing
+//! the MemLocObjectPtr
+//!
+bool Composer::HavocMLValue(MemLocObjectPtr ml, std::map<PartEdgePtr, std::vector<Lattice*> >& dfInfo) {
+  map<PartEdgePtr, vector<Lattice*> >::iterator mIt = dfInfo.begin();
+  for( ; mIt != dfInfo.end(); ++mIt) {
+    vector<Lattice*>& lats = mIt->second;
+    vector<Lattice*>::iterator vIt = lats.begin();
+    for( ; vIt != lats.end(); ++vIt) {
+      Lattice* lat = *vIt;
+      lat->setMLValueToFull(ml);
+    }
+  }
+}
+
+MemLocObjectPtr PointerExpr2MemLoc(SgExpression* expr, ComposedAnalysis* client, PartEdgePtr pedge, Composer* composer) {
+  switch(expr->variantT()) {
+  case V_SgAddressOfOp: {
+    return PointerExpr2MemLoc(isSgAddressOfOp(expr)->get_operand(), client, pedge, composer);
+  }
+  case V_SgCastExp: {
+    return PointerExpr2MemLoc(isSgCastExp(expr)->get_operand(), client, pedge, composer);
+  }
+  case V_SgVarRefExp:
+  case V_SgDotExp:
+  case V_SgPointerDerefExp:
+  case V_SgPntrArrRefExp: {
+    SgType* exprType = expr->get_type();
+    if(exprType->variantT() == V_SgPointerType ||
+       exprType->variantT() == V_SgArrayType) {      
+      // dbg << "exprType=" << SgNode2Str(exprType) << ", expr=" << SgNode2Str(expr) << endl;
+      assert(false);
+      return boost::make_shared<FullMemLocObject>();
+    }
+    else
+      return composer->Expr2MemLoc(expr, pedge, client);
+  }
+  default: assert(false);
+  }
+}
+
+//!
+//! Havoc the values of expressions affected by the function.
+//! For this we are going to rely on user to annotate functions side-effects.
+//! If the function's source is unavaliable it is annotated with the
+//! AstAttribute fuse:UnknownSideEffectsAttribute.
+//! Similarly, the arguments of the SgFunctionCallExp are annotated with the
+//! attribute fuse:ValueUnknownAttribute.
+//! Scan through the argument list of SgFunctionCallExp and check for
+//! fuse:ValueUnknownAttribute.
+//! If found havoc its value using havocMLValue method
+//! The arguments need some processing before havocing them.
+//! The arguments are SgExpression* and they denote some memory location.
+//! If they are temporary expression they have no effect on the rest of the code.
+//! If they denote a memory location for instance SgVarRefExp, SgPointerDerefExp
+//! then they have influence on the rest of the program.
+//! Identify the actual memory location modified before havocing them using havocMLValue.
+//!
+bool Composer::HavocFuncSideEffects(SgFunctionCallExp* sgn, ComposedAnalysis* client, PartEdgePtr pedge,
+                                    map<PartEdgePtr, vector<Lattice*> >& dfInfo) {
+  assert(sgn->getAttribute("fuse:UnknownSideEffectsAttribute"));
+  SgExprListExp* args = sgn->get_args();
+  const SgExpressionPtrList& argsExprList = args->get_expressions();
+  SgExpressionPtrList::const_iterator it = argsExprList.begin();
+  bool modified = false;
+  for( ; it != argsExprList.end(); ++it) {
+    SgExpression* expr = *it;
+    if(expr->getAttribute("fuse:ValueUnknownAttribute")) {
+      MemLocObjectPtr ml = PointerExpr2MemLoc(expr, client, pedge, this);
+      modified = HavocMLValue(ml, dfInfo) || modified;
+    }
+  }
+  return modified;
+}
+
 /* // Returns whether dom is a dominator of part
 std::set<PartPtr> Composer::isDominator(PartPtr part, PartPtr dom, ComposedAnalysis* client)
 {

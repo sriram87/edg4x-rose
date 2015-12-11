@@ -403,7 +403,7 @@ struct plain_return_type_2<arithmetic_action<Act>, long double, wchar_t> {
 }
 
 namespace fuse {
-DEBUG_LEVEL(constantPropagationAnalysisDebugLevel, 2);
+DEBUG_LEVEL(constantPropagationAnalysisDebugLevel, 0);
 
 // ************************
 // **** CPValueObject *****
@@ -3607,6 +3607,15 @@ void ConstantPropagationAnalysisTransfer::visit(SgValueExp *val) {
   setLattice(val, boost::make_shared<CPValueObject>(boost::make_shared<CPConcreteKind>(valCopy), part->inEdgeFromAny()));
 }
 
+void ConstantPropagationAnalysisTransfer::visit(SgFunctionCallExp* sgn) {
+  if(Part::isIncomingFuncCall(cn)) {
+    if(sgn->getAttribute("fuse:UnknownSideEffectsAttribute")) {
+      dbg << "Havocing Function callexp=" << SgNode2Str(sgn) << endl;
+      modified = composer->HavocFuncSideEffects(sgn, analysis, part->inEdgeFromAny(), dfInfo);
+    }
+  }
+}
+
 
 bool
 ConstantPropagationAnalysisTransfer::finish()
@@ -3776,7 +3785,7 @@ ValueObjectPtr ConstantPropagationAnalysis::Expr2Val(SgNode* n, PartEdgePtr pedg
     dbg << "cpMap's cpVal=" << cpVal->str() << endl;
   }
 
-  if(cpVal->isEmptyV(pedge)) {
+  if(cpVal->isFullV(pedge)) {
     ValueObjectPtr val = composer->Expr2Val(n, pedge, this);
     if(val->isConcrete()) {
       cpVal = boost::make_shared<CPValueObject>(val, pedge);

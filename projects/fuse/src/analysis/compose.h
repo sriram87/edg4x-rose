@@ -190,6 +190,28 @@ class Composer
   virtual std::set<PartPtr> GetStartAStates(ComposedAnalysis* client)=0;
   // There may be multiple terminal points in the application (multiple calls to exit(), returns from main(), etc.)
   virtual std::set<PartPtr> GetEndAStates(ComposedAnalysis* client)=0;
+  /*!
+   *! Function to havoc the NodeState
+   *! Returns true or false if the state is modified
+   *! @param client Client analysis whose state will be havoced 
+   *! @param pedge NodeState at pedge will be havoced
+   */
+  virtual bool HavocNodeState(ComposedAnalysis* client, PartEdgePtr pedge);
+  bool HavocLattices(std::vector<Lattice*>& lattices);
+  /*!
+   *! Function to havoc the value denoted by given expression
+   *! Return true or false if the state is modified
+   *! @param sgn Value of the expression denoted by sgn will be havoced
+   *! @param client Client analysis whose state will be havoced
+   *! @param pedge Edge at which value of sgn will be havoced
+   */
+  virtual bool HavocMLValue(MemLocObjectPtr ml, std::map<PartEdgePtr, std::vector<Lattice*> >& dfInfo);
+  /*! 
+   *! Function to havoc the side-effects of a function.
+   *! Returns true or false if the state was modified as a result of havoc.
+   */
+  virtual bool HavocFuncSideEffects(SgFunctionCallExp* sgn, ComposedAnalysis* client, PartEdgePtr pedge,
+                                    std::map<PartEdgePtr, std::vector<Lattice*> >& dfInfo);
   
   /*
   // Returns whether dom is a dominator of part

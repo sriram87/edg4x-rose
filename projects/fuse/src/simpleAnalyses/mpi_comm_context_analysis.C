@@ -12,7 +12,7 @@ using namespace sight;
 using namespace boost;
 
 namespace fuse {
-  DEBUG_LEVEL(mpiCommContextAnalysisDebugLevel, 0);
+  DEBUG_LEVEL(mpiCommContextAnalysisDebugLevel, 3);
 
   /*********
    * MPIOp *
@@ -116,18 +116,18 @@ namespace fuse {
   /******************
    * MPICommContext *
    ******************/
-  MPICommContext::MPICommContext(MPIOpAbsPtr mpiopabs_p)
-  : CommContext(), mpiopabs_p(mpiopabs_p) { }
+  MPICommContext::MPICommContext(MPIOpAbsPtr mpiopabs_p, PartPtr callsite)
+    : CommContext(), mpiopabs_p(mpiopabs_p), callsite(callsite) { }
 
   MPICommContext::MPICommContext(const MPICommContext& that)
-  : CommContext(that), mpiopabs_p(that.mpiopabs_p) { }
+    : CommContext(that), mpiopabs_p(that.mpiopabs_p), callsite(that.callsite) { }
 
   //! Returns a list of PartContextPtr objects that denote more detailed context information about
   //! this PartContext's internal contexts. If there aren't any, the function may just return a list containing
   //! this PartContext itself.
   list<PartContextPtr> MPICommContext::getSubPartContexts() const {
     list<PartContextPtr> listOfMe;
-    listOfMe.push_back(makePtr<MPICommContext>(mpiopabs_p));
+    listOfMe.push_back(makePtr<MPICommContext>(mpiopabs_p, callsite));
     return listOfMe;
   }
 
@@ -159,6 +159,10 @@ namespace fuse {
 
   CommContextPtr MPICommContext::copy() const {
     return makePtr<MPICommContext>(*this);
+  }
+
+  PartPtr MPICommContext::getCallSite() const {
+    return callsite;
   }
 
   string MPICommContext::str(string indent) const {
@@ -246,12 +250,19 @@ namespace fuse {
     list<PartEdgePtr>::iterator oe = oedges.begin();
 
     NodeState* state = NodeState::getNodeState(mpicommanalysis_p, base);
-    for( ; oe != oedges.end(); ++oe) {
+    for( ; oe != oedges.end(); ++oe) {        
       CommContextLattice* ccl_p = dynamic_cast<CommContextLattice*>(state->getLatticeBelow(mpicommanalysis_p, *oe, 0));
       ROSE_ASSERT(ccl_p);
 
+      if(mpiCommContextAnalysisDebugLevel() >= 3) {
+        dbg << "baseEdge=" << oe->str() << endl;
+        dbg << "ccl_p=" << ccl_p->str() << endl;
+      }
+
       // Get the CommATSPartSet from outgoing map for this CommATSPart
       const CommATSPartSet& caPartSet = ccl_p->getOutGoingCommATSPartSet(get_shared_this());
+      if(caPartSet.size() == 0) continue;
+      
       // Set should be non-empty as the baseEdge *oe has non NULL targets
       ROSE_ASSERT(caPartSet.size() > 0);
       // For each element of the set build CommATSPartEdge
@@ -259,7 +270,6 @@ namespace fuse {
       for( ; sit != caPartSet.end(); ++sit) {
         CommATSPartEdgePtr caPartEdge = makePtr<CommATSPartEdge>(*oe, mpicommanalysis_p, get_shared_this(), *sit);
         if(mpiCommContextAnalysisDebugLevel() >= 3) {
-          dbg << "baseEdge=" << oe->str() << endl;
           dbg << "CommATSPartEdge=" << caPartEdge->str() << endl;
         }
         caPartOutEdges.push_back(caPartEdge);
@@ -727,15 +737,19 @@ namespace fuse {
   const CommATSPartMap& CommContextLattice::getInComingMap() const {
     return incoming;
   }
-  const CommATSPartSet& CommContextLattice::getOutGoingCommATSPartSet(CommATSPartPtr caPart) const {
+  
+  CommATSPartSet CommContextLattice::getOutGoingCommATSPartSet(CommATSPartPtr caPart) const {
+    CommATSPartSet targets;
     CommATSPartMap::const_iterator it = outgoing.find(caPart);
-    ROSE_ASSERT(it != outgoing.end());
-    return it->second;
+    if(it != outgoing.end()) targets = it->second;
+    return targets;
   }
-  const CommATSPartSet& CommContextLattice::getInComingCommATSPartSet(CommATSPartPtr caPart) const {
+  
+  CommATSPartSet CommContextLattice::getInComingCommATSPartSet(CommATSPartPtr caPart) const {
+    CommATSPartSet targets;
     CommATSPartMap::const_iterator it = incoming.find(caPart);
-    ROSE_ASSERT(it != incoming.end());
-    return it->second;
+    if(it != outgoing.end()) targets = it->second;
+    return targets;
   }
 
   /******************
@@ -799,8 +813,6 @@ namespace fuse {
     list<PartEdgePtr> oedges = part->outEdges();    
     if(oedges.size() == 0) return true;
 
-    dfInfo.clear();
-
     // First obtain the src CommATSPartPtr for the current part
     // CommATSPartPtr for the current part will be in the outgoing map of incoming dataflow info
     // Iterate through the map keys
@@ -818,10 +830,12 @@ namespace fuse {
       dbg << "inCCL=" << inCCL->str() << endl;
       dbg<< "current_part=" << part->str() << endl;
       dbg << "</b>";
+      return false;
     }
 
     // We should have least one CommATSPart in the outgoing map whose getParent() == current_part
     ROSE_ASSERT(caPartSet.size() > 0);
+    dfInfo.clear();
 
     dbg << "<b> oedges.size() = " << oedges.size() << "</b>\n";
     list<PartEdgePtr>::iterator oe = oedges.begin();
@@ -836,9 +850,23 @@ namespace fuse {
         //   dbg << "parent=" << part->str() << endl;
         //   dbg << "commATSPart=" << currCommATSPartPtr->str() << endl;
         // }
-        // Build the target part based on the current CommATSPart
-        CommATSPartPtr tgtCommATSPartPtr = buildCommATSPart(tgt, currCommATSPartPtr);
-        modified = outCCL->outGoingInsert(currCommATSPartPtr, tgtCommATSPartPtr) || modified;
+        
+        // Build the target part based on the current CommATSPart        
+        set<CommATSPartPtr> tgtCommATSPartPtrs = buildTargetCommATSPart(tgt, currCommATSPartPtr);
+        if(tgtCommATSPartPtrs.size() > 0) {
+          set<CommATSPartPtr>::iterator tIt = tgtCommATSPartPtrs.begin();
+          for( ; tIt != tgtCommATSPartPtrs.end(); ++tIt) {
+            CommATSPartPtr tgtCommATSPartPtr = *tIt;
+            if(mpiCommContextAnalysisDebugLevel() >=2 ) {
+              dbg << "currCommATSPart=" << currCommATSPartPtr->str()
+                  << ", target=" << tgtCommATSPartPtr->str() << endl;
+            }
+            modified = outCCL->outGoingInsert(currCommATSPartPtr, tgtCommATSPartPtr) || modified;  
+          }
+        }
+        else {
+          dbg << "No matching call found for currCommATSPart=" << currCommATSPartPtr->str() << "on this edge=" << oe->str() << endl;
+        }
       }
       // Populate the incoming map based on outgoing map
       outCCL->createIncomingMapfromOutgoingMap();
@@ -903,29 +931,53 @@ namespace fuse {
     return ccl_p;
   }
 
-  CommATSPartPtr MPICommContextAnalysis::buildCommATSPart(PartPtr base, CommATSPartPtr parentCommATSPart) {
+  //! This function builds the target CommATSPart
+  //! @param base: Base ATS part over which the CommATSPart will be built
+  //! @param sourceCommATSPart: Source part of the CommATSPartEdge
+  set<CommATSPartPtr> MPICommContextAnalysis::buildTargetCommATSPart(PartPtr base, CommATSPartPtr sourceCommATSPart) {
     // If its a MPI call create CommATSPart with MPICommContext
     set<CFGNode> cfgnodes;
-    CommATSPartPtr commATSPart;
+    set<CommATSPartPtr> retCommATSParts;
     typedef bool (*isMPICallFuncPtr)(CFGNode);
     isMPICallFuncPtr mpifnptr_p = isMPIFuncCall;
+
+    // base is the base ATS part for which we are creating CommATSPart
+    // If the base is SgFunctionCallExp callsite that is entering a  function
     if(base->mustOutgoingFuncCall(cfgnodes) && base->filterAll(mpifnptr_p)) {
+      // If that function is MPI function
       // Create MPI abstraction using call site
       MPIOpAbsPtr mpiop = createMPIOpAbs(base);
-      CommContextPtr cc = makePtr<MPICommContext>(mpiop);
-      commATSPart = makePtr<CommATSPart>(base, this, cc);
+      CommContextPtr cc = makePtr<MPICommContext>(mpiop, base);
+      CommATSPartPtr commATSPart = makePtr<CommATSPart>(base, this, cc);
+      retCommATSParts.insert(commATSPart);
     }
-    else if(parentCommATSPart->mustIncomingFuncCall(cfgnodes) && parentCommATSPart->filterAll(isMPIFuncCall)) {
+    // If sourceCommATSPart is SgFunctionDefintion that is leaving the function
+    // and the target base ptr is a MPI function call
+    else if(sourceCommATSPart->mustFuncExit(cfgnodes) && base->filterAll(mpifnptr_p)) {
+      MPICommContextPtr cc = dynamicPtrCast<MPICommContext>(sourceCommATSPart->getCommContext());
+      assert(cc);
+      PartPtr callsite = cc->getCallSite();
+      // First check if the base part is a matching call site
+      if(base->mustMatchFuncCall(callsite)) {
+        CommATSPartPtr commATSPart = makePtr<CommATSPart>(base, this, cc);
+        retCommATSParts.insert(commATSPart);
+      }
+    }
+    // If sourceCommATSPart is SgFunctionCallExp that has returned back to the function
+    // SgFunctionCallExp with index=3
+    else if(sourceCommATSPart->mustIncomingFuncCall(cfgnodes) && sourceCommATSPart->filterAll(mpifnptr_p)) {
       // Switch back to NonMPI context
       CommContextPtr cc = makePtr<NonMPICommContext>(base->getPartContext());
-      commATSPart = makePtr<CommATSPart>(base, this, cc);
+      CommATSPartPtr commATSPart = makePtr<CommATSPart>(base, this, cc);
+      retCommATSParts.insert(commATSPart);
     }
     else {
-      CommContextPtr cc = parentCommATSPart->getCommContext();
-      commATSPart = makePtr<CommATSPart>(base, this, cc);
+      CommContextPtr cc = sourceCommATSPart->getCommContext();
+      CommATSPartPtr commATSPart = makePtr<CommATSPart>(base, this, cc);
+      retCommATSParts.insert(commATSPart);
     }
-    ROSE_ASSERT(commATSPart.get());
-    return commATSPart;
+
+    return retCommATSParts;
   }
 
   // CommATSPartEdgePtr MPICommContextAnalysis::buildCommATSPartEdge(PartEdgePtr baseEdge) {

@@ -125,13 +125,16 @@ namespace fuse {
   //! Each context is executed at least once by the communication analysis.
   class MPICommContext : public CommContext {
     MPIOpAbsPtr mpiopabs_p;
+    //! Store the callsite to disambiguate func exit edges
+    PartPtr callsite;
   public:
-    MPICommContext(MPIOpAbsPtr mpiopabs_p);
+    MPICommContext(MPIOpAbsPtr mpiopabs_p, PartPtr callsite);
     MPICommContext(const MPICommContext& that);
     std::list<PartContextPtr> getSubPartContexts() const;
     bool operator<(const PartContextPtr& that) const;
     bool operator==(const PartContextPtr& that) const;
     CommContextPtr copy() const;
+    PartPtr getCallSite() const;
     std::string str(std::string indent="") const;
   };
   typedef CompSharedPtr<MPICommContext> MPICommContextPtr;
@@ -270,8 +273,8 @@ namespace fuse {
     //! Access methods
     const CommATSPartMap& getOutGoingMap() const;
     const CommATSPartMap& getInComingMap() const;
-    const CommATSPartSet& getOutGoingCommATSPartSet(CommATSPartPtr caPart) const;
-    const CommATSPartSet& getInComingCommATSPartSet(CommATSPartPtr caPart) const;
+    CommATSPartSet getOutGoingCommATSPartSet(CommATSPartPtr caPart) const;
+    CommATSPartSet getInComingCommATSPartSet(CommATSPartPtr caPart) const;
   };
 
   /*******************
@@ -320,7 +323,7 @@ namespace fuse {
     //! @param pedge Lattice info along this pedge
     CommContextLattice* getCommContextLatticeBelow(PartPtr part, PartEdgePtr pedge);
 
-    CommATSPartPtr buildCommATSPart(PartPtr base, CommATSPartPtr parentCommATSPart);
+    std::set<CommATSPartPtr> buildTargetCommATSPart(PartPtr base, CommATSPartPtr parentCommATSPart);
     // CommATSPartEdgePtr buildCommATSPartEdge(PartEdgePtr pedge);
   };
 };

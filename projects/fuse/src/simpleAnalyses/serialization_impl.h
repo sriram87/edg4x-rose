@@ -25,7 +25,7 @@ namespace fuse {
     scope reg("load_construct_data(MPICommValueObject*)", scope::medium, attrGE("serializationDebugLevel", 3));
     MPICommValueKindPtr kind;
     ar & kind;
-    ::new(mvo_p) MPICommValueObject(NULLPartEdge, kind);
+    ::new(mvo_p) MPICommValueObject(kind, NULLPartEdge);
   }
 
   template<class Archive>

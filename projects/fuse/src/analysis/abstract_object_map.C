@@ -38,8 +38,15 @@ bool AbstractObjectMap::setToEmpty()
 // Return true if this causes the object to change and false otherwise.
 bool AbstractObjectMap::setMLValueToFull(MemLocObjectPtr ml)
 {
+  scope s("AbstractObjectMap::setMLValueToFull()", scope::medium, attrGE("AbstractObjectMapDebugLevel", 2));
+  if(AbstractObjectMapDebugLevel() >= 2) {
+    dbg << "ml=" << ml->str() << endl;
+  }
   bool modified = false;
-  
+  bool found = false;
+  if(AbstractObjectMapDebugLevel() >= 2) {
+    
+  }
   // Iterate through all the keys in the items list. If any key is mayEqual(ml) then its associated 
   // value is set to full. Note that this works even if the keys are not MemLobObjectPtrs since in 
   // that case mustEqual will return false.
@@ -47,7 +54,18 @@ bool AbstractObjectMap::setMLValueToFull(MemLocObjectPtr ml)
     AbstractObjectPtr keyElement = it->first;
     if(keyElement->mayEqual(ml, latPEdge, comp, analysis)) {
       modified = it->second->setToFull() || modified;
+      if(!found) found = true;
     }
+  }
+
+  if(!found) {
+    LatticePtr fullLat(defaultLat->copy());
+    fullLat->setToFull();
+    items.push_front(MapElement(ml, fullLat));
+    if(AbstractObjectMapDebugLevel() >= 2) {
+      dbg << str() << endl;
+    }
+    modified = true;
   }
   return modified;
 }

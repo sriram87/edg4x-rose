@@ -42,10 +42,10 @@ map<CFGNode, CFGNode> Exit2Entry;
 // Flag that indicates whether the above maps have been initialized.
 bool FuncEntryExit_initialized=false;
 
-class UnknownSideEffectsAttribute : public AstAttribute {
-  public:
-  string toString() { return "UnknownSideEffectsAttribute"; }
-};
+// class UnknownSideEffectsAttribute : public AstAttribute {
+//   public:
+//   string toString() { return "UnknownSideEffectsAttribute"; }
+// };
 
 class FuncEntryExitFunctor
 {

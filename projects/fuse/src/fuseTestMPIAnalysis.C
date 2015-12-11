@@ -5,9 +5,11 @@
 #include "dead_path_elim_analysis.h"
 #include "tight_composer.h"
 #include "mpi_comm_context_analysis.h"
+#include "call_context_sensitivity_analysis.h"
 #include "pointsToAnalysis.h"
 #include "mpi_comm_analysis.h"
 #include "address_taken_analysis.h"
+#include "mpi_annotate_ast.h"
 #include "sight.h"
 #include "mpi.h"
 
@@ -42,6 +44,9 @@ int main(int argc, char* argv[])
   // Run the front end
   SgProject* project = frontend(argc, argv);
 
+  AnnotateMPISideEffects annotateMPI;
+  annotateMPI.traverseInputFiles(project, preorder);
+
   printf("Frontend done\n");fflush(stdout);
 
   std::list<ComposedAnalysis*> scanalyses;
@@ -49,6 +54,8 @@ int main(int argc, char* argv[])
   
   // Sequential composer    
   // scanalyses.push_back(new FlowInSensAddrTakenAnalysis(project));
+
+  // scanalyses.push_back(new CallContextSensitivityAnalysis(1, CallContextSensitivityAnalysis::callSite));
   scanalyses.push_back(new MPICommContextAnalysis());
   scanalyses.push_back(new MPIValueAnalysis());
   scanalyses.push_back(new ConstantPropagationAnalysis());

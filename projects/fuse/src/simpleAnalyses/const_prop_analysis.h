@@ -739,6 +739,7 @@ class ConstantPropagationAnalysisTransfer : public VariableStateTransfer<CPValue
   void visit(SgNotOp* sgn);
   
   void visit(SgValueExp *val);
+  void visit(SgFunctionCallExp* sgn);
    
   bool finish();
    

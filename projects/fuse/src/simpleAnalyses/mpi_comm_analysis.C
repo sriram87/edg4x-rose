@@ -375,12 +375,27 @@ namespace fuse {
     kind = boost::make_shared<MPICommValueDefaultKind>();
   }
 
-  MPICommValueObject::MPICommValueObject(PartEdgePtr pedge, MPICommValueKindPtr thatK)
+  MPICommValueObject::MPICommValueObject(MPICommValueKindPtr thatK, PartEdgePtr pedge)
     : Lattice(pedge),
       FiniteLattice(pedge),
       ValueObject(0),
       kind(thatK) {
 
+  }
+
+  MPICommValueObject::MPICommValueObject(ValueObjectPtr that, PartEdgePtr pedge)
+    : Lattice(pedge),
+      FiniteLattice(pedge),
+      ValueObject(0) {
+    if(that->isEmptyV(pedge)) {
+      kind = boost::make_shared<MPICommValueDefaultKind>();
+    }
+    else if(that->isFullV(pedge)) {
+      kind = boost::make_shared<MPICommValueUnknownKind>();
+    }
+    else if(that->isConcrete()) {
+      kind = boost::make_shared<MPICommValueConcreteKind>(that->getConcreteValue());
+    }
   }
       
   MPICommValueObject::MPICommValueObject(const MPICommValueObject& that)
@@ -727,6 +742,16 @@ namespace fuse {
 
 
   void MPICommAnalysisTransfer::visit(SgFunctionCallExp* sgn) {
+    if(Part::isIncomingFuncCall(cn)) {
+      Function call = getFunction(sgn);
+      string name = call.get_name().getString();
+      if(name.compare("MPI_Comm_rank") == 0 ||
+         name.compare("MPI_Comm_size") == 0) {
+        assert(sgn->getAttribute("fuse:UnknownSideEffectsAttribute"));
+        Composer* composer = analysis->getComposer();
+        modified = composer->HavocFuncSideEffects(sgn, analysis, part->inEdgeFromAny(), dfInfo);
+      }
+    }
   }
   
   void MPICommAnalysisTransfer::visit(SgFunctionParameterList* sgn) {
@@ -738,14 +763,16 @@ namespace fuse {
     assert(commop.isMPICommSendOp());
 
     Composer* composer = analysis->getComposer();
+    MemLocObjectPtr bml = composer->Expr2MemLoc(sgn, part->inEdgeFromAny(), analysis);
+
     ValueObjectPtr  bvo = composer->Expr2Val(sgn, part->inEdgeFromAny(), analysis);
     if(mpiCommAnalysisDebugLevel() >= 2) {
       dbg << "buffer value=" << bvo->str() << endl;      
     }
-   
     // Build MPICommValueObject based on this ValueObject
     MPICommValueKindPtr kind = createMPICommValueKind(bvo, part->inEdgeFromAny());
-    MPICommValueObjectPtr mvo = boost::make_shared<MPICommValueObject>(part->inEdgeFromAny(), kind);
+    MPICommValueObjectPtr bmvo = boost::make_shared<MPICommValueObject>(kind, part->inEdgeFromAny());               
+    modified = latticeMap->insert(bml, bmvo) || modified;
 
     // Generic functor to get value object given an sage expression
     // Forwards the query to the compoer
@@ -768,7 +795,7 @@ namespace fuse {
       dbg << "target=" << target << ", tag= " << tag << ", MPI_Comm= " << comm << endl;
     }
 
-    string sdata = serialize(mvo);
+    string sdata = serialize(bmvo);
     const char* sdata_p = sdata.c_str();
 
     // Issue the MPI_Send operation to runtime from analysis
@@ -883,9 +910,57 @@ namespace fuse {
     dbg << "latticeMap=" << latticeMap->str() << endl;
     LatticePtr latVal = latticeMap->get(ml);
     assert(latVal);
+
     MPICommValueObjectPtr mvo = boost::dynamic_pointer_cast<MPICommValueObject>(latVal); assert(mvo);
+    if(mvo->isFullV(pedge)) {
+      ValueObjectPtr vo = composer->Expr2Val(sgn, pedge, this);
+      mvo = boost::make_shared<MPICommValueObject>(vo, pedge);
+    }
     return mvo;
   }
+
+  // bool MPICommAnalysis::controllingAgentInitiate() {
+  //   for(int p = 1; p < size; ++p) {
+  //     MPI_Send()
+  //   }
+  // }
+
+  // void MPICommAnalysis::runControllingAgent() {
+  //   int terminate = 0;
+  //   while(!terminate) {
+  //     MPI_Iprobe();
+  //     MPI_Iprobe();
+
+  //     while(state == active) {
+  //       runAnalysis;
+  //     }
+  //   }
+  // }
+
+  // void MPICommAnalysis::runNonControllingAgent() {
+  //   int terminate = 0;
+  //   while(!terminate) {
+  //     // Listen for control message from controlling agent on the controlComm
+  //     MPI_Iprobe();
+  //     // Listen for dataflow message from any process on the general MPI_COMM_WORLD
+  //     MPI_Iprobe();
+      
+  //     while(state==active) {
+  //       runAnalysis();
+  //     }
+  //   }
+  //   state = idle;
+    
+    
+  // }
+
+  // void MPICommAnalysis::runMPIAnalysis() {
+  //   if(isControllingAgent()) {
+  //     controllingAgentInitiate();
+  //   }
+  //   else {
+  //   }
+  // }
 
   string MPICommAnalysis::str(std::string indent) const {
     return "MPICommAnalysis";

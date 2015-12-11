@@ -184,8 +184,8 @@ namespace fuse {
     MPICommValueKindPtr kind;
   public:
     MPICommValueObject(PartEdgePtr pedge);
-    MPICommValueObject(PartEdgePtr pedge, MPICommValueKindPtr kind);
-    // MPICommValueObject(PartEdgePtr pedge, const ValueObjectPtr that);
+    MPICommValueObject(MPICommValueKindPtr kind, PartEdgePtr pedge);
+    MPICommValueObject(ValueObjectPtr that, PartEdgePtr pedge);
     MPICommValueObject(const MPICommValueObject& that);
 
     MPICommValueKindPtr getKind() const;
@@ -285,7 +285,17 @@ namespace fuse {
     MPICommValueObjectPtr deserialize(std::string data);
 
     void visit(SgPointerDerefExp* sgn);
+    /*!
+     * The sender sends the dataflow state by querying for ValueObject,
+     * serializing the ValueObject and sending it through MPI runtime.
+     */
     void transferMPISendOp(SgPointerDerefExp* sgn, const MPICommOp& commop);
+    /*!
+     * Each analysis is also constantly probing the incoming channel.
+     * When a message is present on the channel, it receives the message,
+     * deserialize the value object and updates the MemLoc->ValueObject mapping
+     * at the corresponding call site of the receiver.
+     */
     void transferMPIRecvOp(SgPointerDerefExp* sgn, const MPICommOp& commop);
 
     void visit(SgFunctionParameterList* sgn);
@@ -298,7 +308,47 @@ namespace fuse {
    * MPICommAnalysis *
    *******************/
 
+  /*! 
+   * MPICommAnalysis is distributed approach to analyze MPI programs.
+   * An instance of MPICommAnalysis is associated with each process.
+   * The lattice is a mapping of MemLoc :=> ValueObject
+   * Each analysis computes its local fixpoint.
+   * Global fixpoint is a sequence of local fixpoints.
+   * MPICommAnalysis is responsible for carrying out MPI semantics.
+   * It implements transfer functions for MPI operations.
+   * MPICommAnalysis talks to other MPICommAnalysis using MPI runtime.
+   * 
+   * Distributed Termination:
+   * Each analysis iterates towards its local fixpoint.
+   * When analyses communicate, the dataflow state is merged at the receiver.
+   * The join causes new worklist tems to be added to the fixpoint iteration.
+   * Each analysis therefore are operating on different points on the worklist.
+   * The whole system terminates when every analysis reaches its own fixpoint.
+   * To detect this we employ a distributed termination detection scheme.
+   * The algorithm is similar to weight throwing scheme.
+   * The system has a controlloing agent which is the root process 0.
+   * Every process is initially in the idle state.
+   * They become active on the reception of a message from the controlling agent.
+   * Each active process maintains a counter.
+   * Every time a message is sent to a single process the counter is decreased by 1.
+   * Every time a message is sent to multiple processes the counter is decreasd by m.
+   * 'm' is the number of processes the message was sent to.
+   * Consequently, when the controlling agent initiates other processes it decrements its counter by N-1.
+   * Every time a message is received, the counter is increased by 1.
+   * Similarly, if a message is received from multiple processes the counter is increased by m.
+   * When the worklist is empty all non-controlling agents go to idle state.
+   * They remain in this state until they get woken up by a new message from an active process.
+   * When a process goes to idle state, it sends the the value of the counter to the controlling agent
+   * The controlling agent adds the value received to its own counter.
+   * The entire system has terminated if the controlling agent's counter counts back to 0.
+   * When the controlling agent determines termination, it sends a termination signal for all process to exit.
+   */
   class MPICommAnalysis : public FWDataflow {
+
+  public:
+    enum state {active, idle};
+  private:
+    int _mcounter;
   public:
     MPICommAnalysis();
 
@@ -322,6 +372,12 @@ namespace fuse {
     ValueObjectPtr Expr2Val(SgNode* sgn, PartEdgePtr pedge);
 
     bool implementsATSGraph() { return false; }
+
+    // Helper Methods
+    // bool isControllingAgent() const;
+    // bool controllingAgentInitiate();
+    
+    void runMPIAnalysis();
 
     // pretty print for the object
     std::string str(std::string indent="") const;

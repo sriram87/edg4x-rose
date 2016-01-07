@@ -403,7 +403,7 @@ struct plain_return_type_2<arithmetic_action<Act>, long double, wchar_t> {
 }
 
 namespace fuse {
-DEBUG_LEVEL(constantPropagationAnalysisDebugLevel, 0);
+DEBUG_LEVEL(constantPropagationAnalysisDebugLevel, 2);
 
 // ************************
 // **** CPValueObject *****
@@ -3607,11 +3607,82 @@ void ConstantPropagationAnalysisTransfer::visit(SgValueExp *val) {
   setLattice(val, boost::make_shared<CPValueObject>(boost::make_shared<CPConcreteKind>(valCopy), part->inEdgeFromAny()));
 }
 
+// Simple AST walker that finds the inner expression modified
+// Example: &x, (int)x  
+SgExpression* getModExpr(SgExpression* expr) {
+  switch(expr->variantT()) {
+  case V_SgAddressOfOp: {
+    return getModExpr(isSgAddressOfOp(expr)->get_operand());
+  }
+  case V_SgCastExp: {
+    return getModExpr(isSgCastExp(expr)->get_operand());
+  }
+  case V_SgVarRefExp:
+  case V_SgDotExp: {
+      return expr;
+  }
+  default: assert(false);
+  }
+}
+
 void ConstantPropagationAnalysisTransfer::visit(SgFunctionCallExp* sgn) {
-  if(Part::isIncomingFuncCall(cn)) {
+  scope reg(txt() << "visit(SgFunctionCallExp sgn=" << SgNode2Str(sgn) << ")",
+            scope::medium,
+            attrGE("constantPropagationAnalysisDebugLevel", 2));
+
+  if(Part::isOutgoingFuncCall(cn)) {
+    // Check if it has side-effects attribute
     if(sgn->getAttribute("fuse:UnknownSideEffectsAttribute")) {
-      dbg << "Havocing Function callexp=" << SgNode2Str(sgn) << endl;
-      modified = composer->HavocFuncSideEffects(sgn, analysis, part->inEdgeFromAny(), dfInfo);
+      SgExprListExp* args = sgn->get_args();
+      const SgExpressionPtrList& argsExprList = args->get_expressions();
+      SgExpressionPtrList::const_iterator it = argsExprList.begin();
+      // Iterate through the argument list
+      // Check for ValueUnknownAttribute
+      // Query a prior analysis to see if it knows about the value
+      for( ; it != argsExprList.end(); ++it) {
+        SgExpression* uexpr = *it;
+        if(uexpr->getAttribute("fuse:ValueUnknownAttribute")) {
+          // Find the expr whose value was modified by this function
+          // It could be hiding under address of expr: &x
+          // It could be hiding under cast expr: (int) x
+          SgExpression* mexpr = getModExpr(uexpr);
+          MemLocObjectPtr ml = composer->Expr2MemLoc(mexpr, part->inEdgeFromAny(), analysis);
+          modified = composer->HavocMLValue(ml, dfInfo);
+        }
+      }
+    }
+  }
+  // If this the entry back into the caller
+  else if(Part::isIncomingFuncCall(cn)) {
+    // Check if it has side-effects attribute
+    if(sgn->getAttribute("fuse:UnknownSideEffectsAttribute")) {
+      SgExprListExp* args = sgn->get_args();
+      const SgExpressionPtrList& argsExprList = args->get_expressions();
+      SgExpressionPtrList::const_iterator it = argsExprList.begin();
+      // Iterate through the argument list
+      // Check for ValueUnknownAttribute
+      // Query a prior analysis to see if it knows about the value
+      for( ; it != argsExprList.end(); ++it) {
+        SgExpression* uexpr = *it;
+        if(uexpr->getAttribute("fuse:ValueUnknownAttribute")) {
+          // Find the expr whose value was modified by this function
+          // It could be hiding under address of expr: &x
+          // It could be hiding under cast expr: (int) x
+          SgExpression* mexpr = getModExpr(uexpr);
+          // Check if the composer has a value
+          ValueObjectPtr val = composer->Expr2Val(mexpr, part->inEdgeFromAny(), analysis);
+          if(constantPropagationAnalysisDebugLevel() >= 2) {
+            dbg << "mexpr = " << SgNode2Str(mexpr) << endl;
+            dbg << "ValueObject=" << val->str() << endl;
+          }
+
+          // If the value is concrete add it to the map
+          if(val->isConcrete()) {
+            CPValueObjectPtr cpval = boost::make_shared<CPValueObject>(val, part->inEdgeFromAny());
+            setLattice(mexpr, cpval);
+          }
+        }
+      }
     }
   }
 }
@@ -3770,6 +3841,9 @@ ValueObjectPtr ConstantPropagationAnalysis::Expr2Val(SgNode* n, PartEdgePtr pedg
   else if(pedge->source()) {
     state = NodeState::getNodeState(this, pedge->source());
     assert(state);
+    if(constantPropagationAnalysisDebugLevel() >= 2) {
+      dbg << "state=" << state->str() << endl;
+    }
     // for backward flow has dataflow info is below this node
     latticeMap = state->getLatticeBelow(this, pedge, 0);
   }

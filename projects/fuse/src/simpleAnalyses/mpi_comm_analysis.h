@@ -111,6 +111,56 @@ namespace fuse {
   typedef CompSharedPtr<IntegerConcreteValue> IntegerConcreteValuePtr;
 
   /****************************
+   * LongIntConcreteValue *
+   ****************************/
+  class LongIntConcreteValue : public ConcreteValue {
+    boost::shared_ptr<SgLongIntVal> value;
+  public:
+    LongIntConcreteValue(long value);
+    LongIntConcreteValue(const LongIntConcreteValue& that);
+    ConcreteValue* copy() const;
+
+    bool operator<(const ConcreteValuePtr& that) const;
+    bool operator==(const ConcreteValuePtr& that) const;
+    bool operator!=(const ConcreteValuePtr& that) const;
+
+    SgValueExpPtr getConcreteValue() const;
+    SgType* getConcreteType() const;
+    long get_value() const;
+
+    template<class Archive>
+    void serialize(Archive& ar, const unsigned int version);
+    friend class boost::serialization::access;
+    std::string str(std::string indent="") const;
+  };
+  typedef CompSharedPtr<LongIntConcreteValue> LongIntConcreteValuePtr;
+
+  /****************************
+   * LongLongIntConcreteValue *
+   ****************************/
+  class LongLongIntConcreteValue : public ConcreteValue {
+    boost::shared_ptr<SgLongLongIntVal> value;
+  public:
+    LongLongIntConcreteValue(long value);
+    LongLongIntConcreteValue(const LongLongIntConcreteValue& that);
+    ConcreteValue* copy() const;
+
+    bool operator<(const ConcreteValuePtr& that) const;
+    bool operator==(const ConcreteValuePtr& that) const;
+    bool operator!=(const ConcreteValuePtr& that) const;
+
+    SgValueExpPtr getConcreteValue() const;
+    SgType* getConcreteType() const;
+    long long get_value() const;
+
+    template<class Archive>
+    void serialize(Archive& ar, const unsigned int version);
+    friend class boost::serialization::access;
+    std::string str(std::string indent="") const;
+  };
+  typedef CompSharedPtr<LongLongIntConcreteValue> LongLongIntConcreteValuePtr;
+
+  /****************************
    * MPICommValueConcreteKind *
    ****************************/
   class MPICommValueConcreteKind;
@@ -297,6 +347,7 @@ namespace fuse {
      * at the corresponding call site of the receiver.
      */
     void transferMPIRecvOp(SgPointerDerefExp* sgn, const MPICommOp& commop);
+    list<PartEdgePtr> outGoingEdgesMPICallExp(PartPtr part, string funcname);
 
     void visit(SgFunctionParameterList* sgn);
     void visit(SgFunctionCallExp* sgn);
@@ -309,15 +360,6 @@ namespace fuse {
    *******************/
 
   /*! 
-   * MPICommAnalysis is distributed approach to analyze MPI programs.
-   * An instance of MPICommAnalysis is associated with each process.
-   * The lattice is a mapping of MemLoc :=> ValueObject
-   * Each analysis computes its local fixpoint.
-   * Global fixpoint is a sequence of local fixpoints.
-   * MPICommAnalysis is responsible for carrying out MPI semantics.
-   * It implements transfer functions for MPI operations.
-   * MPICommAnalysis talks to other MPICommAnalysis using MPI runtime.
-   * 
    * Distributed Termination:
    * Each analysis iterates towards its local fixpoint.
    * When analyses communicate, the dataflow state is merged at the receiver.
@@ -342,13 +384,38 @@ namespace fuse {
    * The controlling agent adds the value received to its own counter.
    * The entire system has terminated if the controlling agent's counter counts back to 0.
    * When the controlling agent determines termination, it sends a termination signal for all process to exit.
+   *
+   * MPICommAnalysis is distributed approach to analyze MPI programs.
+   * An instance of MPICommAnalysis is associated with each process.
+   * Global fixpoint is a product of local fixpoints.
+   * MPICommAnalysis is responsible for carrying out MPI semantics.
+   * It implements transfer functions for MPI operations.
+   * MPICommAnalysis talks to other MPICommAnalysis using MPI runtime.
+   * 
    */
-  class MPICommAnalysis : public FWDataflow {
 
+  /*!
+   * A simple pair container to store the received value object.
+   * ml: ML is the memloc corresponding to the buffer
+   * value: value is the ValueObject received through MPI_Recv
+   */
+  class RecvMLVal : public sight::printable {
+    MemLocObjectPtr ml;
+    MPICommValueObjectPtr value;
   public:
-    enum state {active, idle};
-  private:
-    int _mcounter;
+    RecvMLVal();
+    RecvMLVal(MemLocObjectPtr ml, MPICommValueObjectPtr val);
+    MPICommValueObjectPtr getValueObject() const;
+    MemLocObjectPtr getMemLocObject() const;
+    std::string str(std::string indent="") const;
+  };
+  typedef boost::shared_ptr<RecvMLVal> RecvMLValPtr;
+
+
+  class MPICommAnalysis : public FWDataflow {
+    
+    //! Analysis store the received objects on the edge that immediately follows
+    std::map<PartEdgePtr, RecvMLValPtr> recvMLValMap;
   public:
     MPICommAnalysis();
 
@@ -371,12 +438,15 @@ namespace fuse {
 
     ValueObjectPtr Expr2Val(SgNode* sgn, PartEdgePtr pedge);
 
+    std::list<PartEdgePtr> matchingPartEdges(PartEdgePtr pedge) const;
+    bool insertRecvMLVal(PartEdgePtr pedge, MemLocObjectPtr ml, MPICommValueObjectPtr mvalue);
+    std::list<RecvMLValPtr> getRecvMLVal(PartEdgePtr pedge) const;
+    MPICommValueObjectPtr mergeMayEqualMLVal(MemLocObjectPtr ml, PartEdgePtr pedge, std::list<RecvMLValPtr>& rmlvals);
+    
+    std::string stringifyRecvMLValMap() const;
+       
     bool implementsATSGraph() { return false; }
 
-    // Helper Methods
-    // bool isControllingAgent() const;
-    // bool controllingAgentInitiate();
-    
     void runMPIAnalysis();
 
     // pretty print for the object

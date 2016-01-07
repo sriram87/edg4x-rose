@@ -11,6 +11,7 @@
 #include "serialization_exports.h"
 
 using namespace std;
+using namespace sight;
 
 namespace fuse {
 
@@ -121,6 +122,113 @@ namespace fuse {
     return oss.str();
   }
 
+  /************************
+   * LongIntConcreteValue *
+   ************************/
+  LongIntConcreteValue::LongIntConcreteValue(long val)
+    : ConcreteValue() {
+    value = boost::shared_ptr<SgLongIntVal>(SageBuilder::buildLongIntVal(val));
+  }
+
+  LongIntConcreteValue::LongIntConcreteValue(const LongIntConcreteValue& that)
+    : ConcreteValue(that),
+      value(that.value) { }
+
+  long LongIntConcreteValue::get_value() const {
+    return value->get_value();
+  }
+
+  bool LongIntConcreteValue::operator<(const ConcreteValuePtr& that) const {
+    LongIntConcreteValuePtr thatV = dynamicConstPtrCast<LongIntConcreteValue>(that);
+    assert(thatV);
+    return value->get_value() < thatV->get_value();
+  }
+
+  bool LongIntConcreteValue::operator==(const ConcreteValuePtr& that) const {
+    LongIntConcreteValuePtr thatV = dynamicConstPtrCast<LongIntConcreteValue>(that);
+    assert(thatV);
+    return value->get_value() == thatV->get_value();
+  }
+
+  bool LongIntConcreteValue::operator!=(const ConcreteValuePtr& that) const {
+    LongIntConcreteValuePtr thatV = dynamicConstPtrCast<LongIntConcreteValue>(that);
+    assert(thatV);
+    return value->get_value() != thatV->get_value();
+  }
+
+  SgType* LongIntConcreteValue::getConcreteType() const {
+    return value->get_type();
+  }
+
+  SgValueExpPtr LongIntConcreteValue::getConcreteValue() const {
+    return boost::dynamic_pointer_cast<SgValueExp>(value);
+  }
+
+  ConcreteValue* LongIntConcreteValue::copy() const {
+    return new LongIntConcreteValue(*this);
+  }
+
+  string LongIntConcreteValue::str(string indent) const {
+    ostringstream oss;
+    oss << value->get_value();
+    return oss.str();
+  }
+
+  /****************************
+   * LongLongIntConcreteValue *
+   ****************************/
+  LongLongIntConcreteValue::LongLongIntConcreteValue(long val)
+    : ConcreteValue() {
+    value = boost::shared_ptr<SgLongLongIntVal>(SageBuilder::buildLongLongIntVal(val));
+  }
+
+  LongLongIntConcreteValue::LongLongIntConcreteValue(const LongLongIntConcreteValue& that)
+    : ConcreteValue(that),
+      value(that.value) { }
+
+  long long LongLongIntConcreteValue::get_value() const {
+    return value->get_value();
+  }
+
+  bool LongLongIntConcreteValue::operator<(const ConcreteValuePtr& that) const {
+    LongLongIntConcreteValuePtr thatV = dynamicConstPtrCast<LongLongIntConcreteValue>(that);
+    assert(thatV);
+    return value->get_value() < thatV->get_value();
+  }
+
+  bool LongLongIntConcreteValue::operator==(const ConcreteValuePtr& that) const {
+    LongLongIntConcreteValuePtr thatV = dynamicConstPtrCast<LongLongIntConcreteValue>(that);
+    assert(thatV);
+    return value->get_value() == thatV->get_value();
+  }
+
+  bool LongLongIntConcreteValue::operator!=(const ConcreteValuePtr& that) const {
+    LongLongIntConcreteValuePtr thatV = dynamicConstPtrCast<LongLongIntConcreteValue>(that);
+    assert(thatV);
+    return value->get_value() != thatV->get_value();
+  }
+
+  SgType* LongLongIntConcreteValue::getConcreteType() const {
+    return value->get_type();
+  }
+
+  SgValueExpPtr LongLongIntConcreteValue::getConcreteValue() const {
+    return boost::dynamic_pointer_cast<SgValueExp>(value);
+  }
+
+  ConcreteValue* LongLongIntConcreteValue::copy() const {
+    return new LongLongIntConcreteValue(*this);
+  }
+
+  string LongLongIntConcreteValue::str(string indent) const {
+    ostringstream oss;
+    oss << value->get_value();
+    return oss.str();
+  }
+  
+  /*********************
+   * Utility Functions *
+   *********************/
   ConcreteValuePtr makeConcreteValue(const SgValueExpPtr sgvalue) {
     switch(sgvalue->variantT()) {
     case V_SgIntVal: 
@@ -128,7 +236,18 @@ namespace fuse {
         boost::shared_ptr<SgIntVal> ivalue = boost::dynamic_pointer_cast<SgIntVal>(sgvalue);
         return boost::make_shared<IntegerConcreteValue>(ivalue->get_value());
       }
+    case V_SgLongIntVal:
+      {
+        boost::shared_ptr<SgLongIntVal> ivalue = boost::dynamic_pointer_cast<SgLongIntVal>(sgvalue);
+        return boost::make_shared<LongIntConcreteValue>(ivalue->get_value());
+      }
+    case V_SgLongLongIntVal:
+      {
+        boost::shared_ptr<SgLongLongIntVal> ivalue = boost::dynamic_pointer_cast<SgLongLongIntVal>(sgvalue);
+        return boost::make_shared<LongLongIntConcreteValue>(ivalue->get_value());
+      }
     default:
+      dbg << "sgvalue=" << SgNode2Str(sgvalue.get()) << endl;
       assert(false);
     }
   }
@@ -147,11 +266,11 @@ namespace fuse {
 
   // do we need a deep copy here?
   MPICommValueConcreteKind::MPICommValueConcreteKind(const MPICommValueConcreteKind& that) :
-    MPICommValueKind(that), concreteValues(concreteValues) {
+    MPICommValueKind(that), concreteValues(that.concreteValues) {
   }
 
-  MPICommValueConcreteKind::MPICommValueConcreteKind(const std::set<ConcreteValuePtr>& concreteValues) :
-    MPICommValueKind(MPICommValueKind::concrete), concreteValues(concreteValues) {
+  MPICommValueConcreteKind::MPICommValueConcreteKind(const std::set<ConcreteValuePtr>& thatConcreteValues) :
+    MPICommValueKind(MPICommValueKind::concrete), concreteValues(thatConcreteValues) {
   }
 
   MPICommValueConcreteKind::~MPICommValueConcreteKind() {
@@ -387,6 +506,7 @@ namespace fuse {
     : Lattice(pedge),
       FiniteLattice(pedge),
       ValueObject(0) {
+    dbg << "that:" << that->str() << endl;
     if(that->isEmptyV(pedge)) {
       kind = boost::make_shared<MPICommValueDefaultKind>();
     }
@@ -422,6 +542,9 @@ namespace fuse {
   }
    
   bool MPICommValueObject::meetUpdate(Lattice* thatL) {
+    scope reg(txt() << "MPICommValueObject::meetUpdate(thisL=" << str() << "thatL=" << thatL->str() << ")",
+              scope::medium,
+              attrGE("mpiCommAnalysisDebugLevel", 3));
     MPICommValueObject* thatV = dynamic_cast<MPICommValueObject*>(thatL); assert(thatV);
     MPICommValueKindPtr thatK = thatV->getKind(); assert(thatK);
     
@@ -433,6 +556,9 @@ namespace fuse {
     // if this is bottom copy thatK into this
     else if(kind->getKindType() == MPICommValueKind::bottom) {
       kind = thatK->copyK();
+      if(mpiCommAnalysisDebugLevel() >=3) {
+        dbg << "After join thisL=" << str() << endl;
+      }
       return true;
     }
     // if that is unknown and this is not -> this is unknown now
@@ -634,12 +760,12 @@ namespace fuse {
                                                    std::map<PartEdgePtr, std::vector<Lattice*> >& dfInfo,
                                                    MPICommAnalysis* _analysis)
     : DFTransferVisitor(part, cfgn, state, dfInfo), analysis(_analysis), modified(false) {
-    assert(dfInfo.size()==1);
-    PartEdgePtr wildCardPartEdge = part->inEdgeFromAny();
-    assert(dfInfo[wildCardPartEdge][0]);
-    Lattice *l = dfInfo[wildCardPartEdge][0];
-    latticeMap = (dynamic_cast<AbstractObjectMap*>(l));
-    assert(latticeMap);
+    // assert(dfInfo.size()==1);
+    // PartEdgePtr wildCardPartEdge = part->inEdgeFromAny();
+    // assert(dfInfo[wildCardPartEdge][0]);
+    // Lattice *l = dfInfo[wildCardPartEdge][0];
+    // latticeMap = (dynamic_cast<AbstractObjectMap*>(l));
+    // assert(latticeMap);
   }
 
   Function MPICommAnalysisTransfer::getFunction(SgFunctionParameterList* sgn) {
@@ -688,7 +814,7 @@ namespace fuse {
     : composer(composer), pedge(pedge), analysis(analysis) { }
 
   int MPICommAnalysisTransfer::ValueObject2Int::operator()(SgInitializedName* sgn) {
-    scope("MPICommAnalysisTransfer::ValueObject2Int", scope::low, 
+    scope reg("MPICommAnalysisTransfer::ValueObject2Int", scope::low, 
           attrGE("mpiCommAnalysisDebugLevel", 2));
     if(mpiCommAnalysisDebugLevel() >= 2) {
       dbg << "sgn=" << SgNode2Str(sgn) << endl;
@@ -703,6 +829,12 @@ namespace fuse {
     assert(vo->isConcrete());
 
     SgValueExpPtrSet cvalues = vo->getConcreteValue();
+    if(mpiCommAnalysisDebugLevel() >= 2) {
+      SgValueExpPtrSet::iterator it = cvalues.begin();
+      for(int i = 0; it != cvalues.end(); ++it, ++i) {
+        dbg << "cvalues[" << i << "]=" << SgNode2Str(it->get()) << endl;
+      }
+    }
     assert(cvalues.size() == 1);
     SgValueExpPtr sgval = *cvalues.begin();
 
@@ -752,13 +884,14 @@ namespace fuse {
         modified = composer->HavocFuncSideEffects(sgn, analysis, part->inEdgeFromAny(), dfInfo);
       }
     }
+    modified = dynamic_cast<BoolAndLattice*>(dfInfo[part->inEdgeFromAny()][0])->set(true);
   }
   
   void MPICommAnalysisTransfer::visit(SgFunctionParameterList* sgn) {
   }
 
   void MPICommAnalysisTransfer::transferMPISendOp(SgPointerDerefExp* sgn, const MPICommOp& commop) {
-    scope("MPICommAnalysisTransfer::transferMPISendOp", scope::low, 
+    scope reg("MPICommAnalysisTransfer::transferMPISendOp", scope::low, 
           attrGE("mpiCommAnalysisDebugLevel", 2));
     assert(commop.isMPICommSendOp());
 
@@ -772,7 +905,7 @@ namespace fuse {
     // Build MPICommValueObject based on this ValueObject
     MPICommValueKindPtr kind = createMPICommValueKind(bvo, part->inEdgeFromAny());
     MPICommValueObjectPtr bmvo = boost::make_shared<MPICommValueObject>(kind, part->inEdgeFromAny());               
-    modified = latticeMap->insert(bml, bmvo) || modified;
+    // modified = latticeMap->insert(bml, bmvo) || modified;
 
     // Generic functor to get value object given an sage expression
     // Forwards the query to the compoer
@@ -790,6 +923,7 @@ namespace fuse {
     SgInitializedName* comm_sgn = commop.getCommOpComm();
     MPI_Comm comm = (MPI_Comm) vo2int(comm_sgn);
     //TODO: verify we are communicating in MPI_COMM_WORLD
+    assert(comm == MPI_COMM_WORLD);
 
     if(mpiCommAnalysisDebugLevel() >= 2) {
       dbg << "target=" << target << ", tag= " << tag << ", MPI_Comm= " << comm << endl;
@@ -802,8 +936,8 @@ namespace fuse {
     MPI_Send(sdata_p, sdata.size(), MPI_CHAR, target, tag, comm);    
   }
 
-  void MPICommAnalysisTransfer::transferMPIRecvOp(SgPointerDerefExp* sgn, const MPICommOp& commop) {
-    scope("MPICommAnalysisTransfer::transferMPIRecvOp", scope::medium, 
+   void MPICommAnalysisTransfer::transferMPIRecvOp(SgPointerDerefExp* sgn, const MPICommOp& commop) {
+    scope reg("MPICommAnalysisTransfer::transferMPIRecvOp", scope::medium, 
           attrGE("mpiCommAnalysisDebugLevel", 2));
     assert(commop.isMPICommRecvOp());
 
@@ -819,6 +953,7 @@ namespace fuse {
     SgInitializedName* comm_sgn = commop.getCommOpComm();
     MPI_Comm comm = (MPI_Comm) vo2int(comm_sgn);
     //TODO: verify we are communicating in MPI_COMM_WORLD
+    assert(comm == MPI_COMM_WORLD);
     
     // space of 1000 char to receive dataflow info
     char* sdata_p = new char[1000];
@@ -831,9 +966,22 @@ namespace fuse {
     string sdata(sdata_p);
     MPICommValueObjectPtr mvo = deserialize(sdata);
 
-    // Update the latticeMap
+    // Find the outgoing edges of MPI call expression part
+    list<PartEdgePtr> callExpEdges = outGoingEdgesMPICallExp(part, "MPI_Recv");
+    
+    // Update the RecvValueObjectMap corresponding to each edge in callExpEdges list
     MemLocObjectPtr buffML = composer->Expr2MemLoc(sgn, part->inEdgeFromAny(), analysis);
-    modified = latticeMap->insert(buffML, mvo) || modified;
+    list<PartEdgePtr>::iterator ce = callExpEdges.begin();
+    
+    for( ; ce != callExpEdges.end(); ++ce) {
+      analysis->insertRecvMLVal(*ce, buffML, mvo);
+    }
+
+    if(mpiCommAnalysisDebugLevel() >= 3) {
+      dbg << analysis->stringifyRecvMLValMap() << endl;
+    }
+    
+    // modified = latticeMap->insert(buffML, mvo) || modified;
   }
 
   void MPICommAnalysisTransfer::visit(SgPointerDerefExp* sgn) {
@@ -846,17 +994,87 @@ namespace fuse {
       MPICommOp recvop(func);
       transferMPIRecvOp(sgn, recvop);
     }
+    modified = dynamic_cast<BoolAndLattice*>(dfInfo[part->inEdgeFromAny()][0])->set(true);
   }
  
   void MPICommAnalysisTransfer::visit(SgNode* sgn) {
     // identity transfer
+    modified = dynamic_cast<BoolAndLattice*>(dfInfo[part->inEdgeFromAny()][0])->set(true);
   }
 
+  bool mpiFuncCallExpFilter(string funcname, CFGNode cfgn) {
+    SgNode* sgn = cfgn.getNode();
+    if(!isSgFunctionCallExp(sgn)) return false;
+    SgFunctionCallExp* funcall = isSgFunctionCallExp(sgn);
+    Function func(funcall);
+    string mpifuncname = func.get_name().getString();
+    return (mpifuncname.compare(funcname) == 0);
+  }
+
+  list<PartEdgePtr> MPICommAnalysisTransfer::outGoingEdgesMPICallExp(PartPtr srcPart, string funcname) {
+    scope reg("MPICommAnalysisTransfer::outGoingEdgesMPICallExp", scope::medium, attrGE("mpiCommAnalysisDebugLevel", 3));
+    list<PartEdgePtr> pedges;
+    // Find the first edge outgoing from ATS part corresponding to MPI function call expression
+    fw_dataflowGraphEdgeIterator<PartEdgePtr, PartPtr> fe;
+    fe.addStart(part);
+    PartContextPtr context = srcPart->getPartContext();
+    assert(context);
+
+    if(mpiCommAnalysisDebugLevel() >=3) {
+      dbg << "srcPart=" << srcPart->str() << endl;
+      dbg << "funcname=" << funcname << endl;
+      dbg << "context=" << context->str() << endl;
+    }
+
+    fe.pushAllDescendants();
+    fe++;
+    while(fe != fw_dataflowGraphEdgeIterator<PartEdgePtr, PartPtr>::end()) {
+      PartPtr part = fe.getPart();
+      PartEdgePtr pe = *fe;
+
+      // boost::function<bool (CFGNode)> filter = boost::bind(mpiFuncCallExpFilter, funcname, _1);
+      // PartPtr source = pe->source();
+      // if(source && source->mapCFGNodeALL<bool>(filter)) {        
+      //   pedges.push_back(pe);
+      // }
+      if(mpiCommAnalysisDebugLevel() >= 3) dbg << "Edge match: " << pe->str() << endl;
+      pedges.push_back(pe);
+
+      if(part->getPartContext() == context) {
+        fe.pushAllDescendants();
+      }
+      fe++;
+    }
+
+    assert(pedges.size() > 0);
+    return pedges;
+  }
 
   bool MPICommAnalysisTransfer::finish() {
     return modified;
   }
 
+  /*************
+   * RecvMLVal *
+   *************/
+  RecvMLVal::RecvMLVal() { }
+
+  RecvMLVal::RecvMLVal(MemLocObjectPtr ml, MPICommValueObjectPtr mval) : ml(ml), value(mval) { }
+
+  MemLocObjectPtr RecvMLVal::getMemLocObject() const {
+    return ml;
+  }
+
+  MPICommValueObjectPtr RecvMLVal::getValueObject() const {
+    return value;
+  }
+
+  string RecvMLVal::str(string indent) const {
+    ostringstream oss;
+    oss << "ML=" << ml->str() << ",";
+    oss << "Val=" << value->str() << endl;
+    return oss.str();
+  }
 
   /*******************
    * MPICommAnalysis *
@@ -870,11 +1088,12 @@ namespace fuse {
 
   void MPICommAnalysis::genInitLattice(PartPtr part, PartEdgePtr pedge, 
                                        std::vector<Lattice*>& initLattices) {
-    AbstractObjectMap* aomap = new AbstractObjectMap(boost::make_shared<MPICommValueObject>(pedge), 
-                                                     pedge, 
-                                                     getComposer(), 
-                                                     this);
-    initLattices.push_back(aomap);
+    // AbstractObjectMap* aomap = new AbstractObjectMap(boost::make_shared<MPICommValueObject>(pedge), 
+    //                                                  pedge, 
+    //                                                  getComposer(), 
+    //                                                  this);
+    // initLattices.push_back(aomap);
+    initLattices.push_back(new BoolAndLattice(0, pedge));
   }
 
   boost::shared_ptr<DFTransferVisitor> MPICommAnalysis::getTransferVisitor(PartPtr part, 
@@ -884,83 +1103,200 @@ namespace fuse {
     return boost::shared_ptr<MPICommAnalysisTransfer>(new MPICommAnalysisTransfer(part, cn, state, dfInfo, this));
   }
 
-  ValueObjectPtr MPICommAnalysis::Expr2Val(SgNode* sgn, PartEdgePtr pedge) {
-    scope(sight::txt() << "MPICommAnalysis::Expr2Val(sgn=" << SgNode2Str(sgn) << ",pedge=" << pedge->str() << ")",
-          scope::medium,
-          attrGE("mpiCommAnalysisDebugLevel", 2));
-    Composer* composer = getComposer();
-    MemLocObjectPtr ml = composer->Expr2MemLoc(sgn, pedge, this);
-
-    AbstractObjectMap* latticeMap;
-    if(pedge->target()) {
-      PartPtr part = pedge->target();
-      NodeState* state = NodeState::getNodeState(this, part);
-      assert(state);
-      latticeMap = dynamic_cast<AbstractObjectMap*>(state->getLatticeAbove(this, pedge, 0));
+  bool MPICommAnalysis::insertRecvMLVal(PartEdgePtr pedge, MemLocObjectPtr ml, MPICommValueObjectPtr mval) {
+    scope reg(txt() << "MPICommAnalysis::insertRecvMLVal(pedge=" << pedge->str()
+              << ", ml=" << ml->str() << "mval=" << mval->str() << ")",
+              scope::medium,
+              attrGE("mpiCommAnalysisDebugLevel", 3));
+    assert(pedge->source() && pedge->target());
+    map<PartEdgePtr, RecvMLValPtr>::iterator melem;
+    melem = recvMLValMap.find(pedge);
+    // When this is the first time we insert into the map
+    if(melem == recvMLValMap.end()) {      
+      RecvMLValPtr rmlval = boost::make_shared<RecvMLVal>(ml, mval);
+      recvMLValMap.insert(std::pair<PartEdgePtr, RecvMLValPtr>(pedge, rmlval));
+      return true;
     }
-    else if(pedge->source()) {
-      PartPtr part = pedge->source();     
-      NodeState* state = NodeState::getNodeState(this, part);
-      assert(state);
-      latticeMap = dynamic_cast<AbstractObjectMap*>(state->getLatticeBelow(this, pedge, 0));
+    // When we already have information on this edge
+    else {
+      // First assert ML is the same
+      RecvMLValPtr relem = melem->second;
+      assert(ml->mayEqualML(relem->getMemLocObject(), pedge));
+      MPICommValueObjectPtr oldval = relem->getValueObject();
+      bool ret = mval->meetUpdateV(oldval, pedge);
+      if(ret) {
+        RecvMLValPtr newelem = boost::make_shared<RecvMLVal>(ml, mval);
+        recvMLValMap.insert(std::pair<PartEdgePtr, RecvMLValPtr>(pedge, newelem));
+      }
+      return ret;
     }
-    else assert(0);
-
-    assert(latticeMap);
-    dbg << "latticeMap=" << latticeMap->str() << endl;
-    LatticePtr latVal = latticeMap->get(ml);
-    assert(latVal);
-
-    MPICommValueObjectPtr mvo = boost::dynamic_pointer_cast<MPICommValueObject>(latVal); assert(mvo);
-    if(mvo->isFullV(pedge)) {
-      ValueObjectPtr vo = composer->Expr2Val(sgn, pedge, this);
-      mvo = boost::make_shared<MPICommValueObject>(vo, pedge);
-    }
-    return mvo;
   }
 
-  // bool MPICommAnalysis::controllingAgentInitiate() {
-  //   for(int p = 1; p < size; ++p) {
-  //     MPI_Send()
-  //   }
-  // }
+  string MPICommAnalysis::stringifyRecvMLValMap() const {
+    ostringstream oss;
+    map<PartEdgePtr, RecvMLValPtr>::const_iterator it = recvMLValMap.begin();
+    oss << "<table>";
+    oss << "<th> RecvMLValMap </th>";
+    for( ; it != recvMLValMap.end(); ++it) {
+      PartEdgePtr pedge = it->first;
+      RecvMLValPtr rmlval = it->second;
+      oss << "<tr>";
+      oss << "<td>" << pedge->str() << "</td>";
+      oss << "<td>" << rmlval->str() << "</td>";
+      oss << "</tr>";
+    }
+    oss << "</table>";
+    return oss.str();
+  }
 
-  // void MPICommAnalysis::runControllingAgent() {
-  //   int terminate = 0;
-  //   while(!terminate) {
-  //     MPI_Iprobe();
-  //     MPI_Iprobe();
+  // Return all matching PartEdges corresponding to pedge
+  list<PartEdgePtr> MPICommAnalysis::matchingPartEdges(PartEdgePtr pedge) const {
+    scope reg(txt() << "MPICommAnalysis::matchingPartEdges(pedge=" << pedge->str() << ")",
+              scope::medium,
+              attrGE("mpiCommAnalysisDebugLevel", 3));
+    list<PartEdgePtr> pedges;
+    int count=0;
+    map<PartEdgePtr, RecvMLValPtr>::const_iterator elem;
+    // Edge has both source and target
+    if(pedge->source() && pedge->target()) {
+      elem = recvMLValMap.find(pedge);
+      if(elem != recvMLValMap.end()) {
+        pedges.push_back(elem->first);
+        if(mpiCommAnalysisDebugLevel() >= 3) {
+          dbg << "pedges[" << count++ << "]=" << elem->first->str() << endl;
+        }
+      }
+    }
+    // wildcard edge of the form source -> *
+    else if(pedge->source()) {
+      map<PartEdgePtr, RecvMLValPtr>::const_iterator it = recvMLValMap.begin();
+      for( ; it != recvMLValMap.end(); ++it) {
+        PartEdgePtr pe = it->first;
+        if(pe->source() == pedge->source()) {
+          pedges.push_back(pe);
+          if(mpiCommAnalysisDebugLevel() >= 3) {
+            dbg << "pedges[" << count++ << "]=" << pe->str() << endl;
+          }          
+        }
+      }
+    }
+    // wildcard edge of the form * -> target
+    else if(pedge->target()) {
+      map<PartEdgePtr, RecvMLValPtr>::const_iterator it = recvMLValMap.begin();
+      for( ; it != recvMLValMap.end(); ++it) {
+        PartEdgePtr pe = it->first;
+        if(pe->target() == pedge->target()) {
+          pedges.push_back(pe);
+          if(mpiCommAnalysisDebugLevel() >= 3) {
+            dbg << "pedges[" << count++ << "]=" << pe->str() << endl;
+          }          
+        }
+      }
+    }
+    else {
+      map<PartEdgePtr, RecvMLValPtr>::const_iterator it = recvMLValMap.begin();
+      for( ; it != recvMLValMap.end(); ++it) {
+        PartEdgePtr pe = it->first;
+        pedges.push_back(pe);
+        if(mpiCommAnalysisDebugLevel() >= 3) {
+          dbg << "pedges[" << count++ << "]=" << pe->str() << endl;
+        }                  
+      }
+    }
+    return pedges;
+  }
 
-  //     while(state == active) {
-  //       runAnalysis;
-  //     }
-  //   }
-  // }
+  list<RecvMLValPtr> MPICommAnalysis::getRecvMLVal(PartEdgePtr pedge) const {
+    scope reg(txt() << "MPICommAnalysis::getRecvMLVal(pedge" << pedge->str() << ")",
+              scope::medium,
+              attrGE("mpiCommAnalysisDebugLevel", 3));
+    list<RecvMLValPtr> rmlvals;
+    list<PartEdgePtr> pedges = matchingPartEdges(pedge);
+    int count = 0;
+    list<PartEdgePtr>::const_iterator it = pedges.begin();
+    for( ; it != pedges.end(); ++it) {
+      PartEdgePtr pe = *it;
+      map<PartEdgePtr, RecvMLValPtr>::const_iterator elem;
+      elem = recvMLValMap.find(pe);
+      assert(elem != recvMLValMap.end());
+      rmlvals.push_back(elem->second);
+      if(mpiCommAnalysisDebugLevel() >= 3) {
+        dbg << "rmlvals[" << count++ << "]=" << elem->second->str() << endl;
+      }
+    }
+    return rmlvals;
+  }
 
-  // void MPICommAnalysis::runNonControllingAgent() {
-  //   int terminate = 0;
-  //   while(!terminate) {
-  //     // Listen for control message from controlling agent on the controlComm
-  //     MPI_Iprobe();
-  //     // Listen for dataflow message from any process on the general MPI_COMM_WORLD
-  //     MPI_Iprobe();
-      
-  //     while(state==active) {
-  //       runAnalysis();
-  //     }
-  //   }
-  //   state = idle;
-    
-    
-  // }
+  MPICommValueObjectPtr MPICommAnalysis::mergeMayEqualMLVal(MemLocObjectPtr ml, PartEdgePtr pedge,
+                                                            list<RecvMLValPtr>& rmlvals) {
+    scope reg(txt() << "MPICommAnalysis::getMayEqualMLVal(ml=" << ml->str() << ")",
+              scope::medium,
+              attrGE("mpiCommAnalysisDebugLevel", 3));
+    MPICommValueObjectPtr retV = boost::make_shared<MPICommValueObject>(pedge);
+    list<RecvMLValPtr>::const_iterator it = rmlvals.begin();
+    for( ; it != rmlvals.end(); ++it) {
+      MemLocObjectPtr that = (*it)->getMemLocObject();
+      if(ml->mayEqualML(that, pedge)) {
+        MPICommValueObjectPtr thatV = (*it)->getValueObject();
+        retV->meetUpdateV(thatV, pedge);
+        if(mpiCommAnalysisDebugLevel() >=3 ) {
+          dbg << "thatV=" << thatV->str() << endl;
+          dbg << "retV=" << retV->str() << endl;
+        }
+      }
+    }
+    return retV;
+  }
+  
+  ValueObjectPtr MPICommAnalysis::Expr2Val(SgNode* sgn, PartEdgePtr pedge) {
+    scope reg(sight::txt() << "MPICommAnalysis::Expr2Val(sgn=" << SgNode2Str(sgn) << ",pedge=" << pedge->str() << ")",
+          scope::medium,
+          attrGE("mpiCommAnalysisDebugLevel", 2));
+    list<RecvMLValPtr> rmlvals = getRecvMLVal(pedge);
+    MPICommValueObjectPtr mvo;
+    if(rmlvals.size() != 0) {
+      MemLocObjectPtr ml = getComposer()->Expr2MemLoc(sgn, pedge, this);
+      mvo = mergeMayEqualMLVal(ml, pedge, rmlvals);
+    }
+    else {
+      ValueObjectPtr val = getComposer()->Expr2Val(sgn, pedge, this);
+      if(mpiCommAnalysisDebugLevel() >= 2) {
+        dbg << "Composer Val=" << val->str() << endl;
+      }
+      mvo = boost::make_shared<MPICommValueObject>(val, pedge);
+    }
+    assert(mvo->getKind());
+    return mvo;
+    // Composer* composer = getComposer();
+    // MemLocObjectPtr ml = composer->Expr2MemLoc(sgn, pedge, this);
 
-  // void MPICommAnalysis::runMPIAnalysis() {
-  //   if(isControllingAgent()) {
-  //     controllingAgentInitiate();
-  //   }
-  //   else {
-  //   }
-  // }
+    // AbstractObjectMap* latticeMap;
+    // if(pedge->target()) {
+    //   PartPtr part = pedge->target();
+    //   NodeState* state = NodeState::getNodeState(this, part);
+    //   assert(state);
+    //   latticeMap = dynamic_cast<AbstractObjectMap*>(state->getLatticeAbove(this, pedge, 0));
+    // }
+    // else if(pedge->source()) {
+    //   PartPtr part = pedge->source();     
+    //   NodeState* state = NodeState::getNodeState(this, part);
+    //   assert(state);
+    //   latticeMap = dynamic_cast<AbstractObjectMap*>(state->getLatticeBelow(this, pedge, 0));
+    // }
+    // else assert(0);
+
+    // assert(latticeMap);
+    // dbg << "latticeMap=" << latticeMap->str() << endl;
+    // LatticePtr latVal = latticeMap->get(ml);
+    // assert(latVal);
+
+    // MPICommValueObjectPtr mvo = boost::dynamic_pointer_cast<MPICommValueObject>(latVal); assert(mvo);
+    // if(mvo->isFullV(pedge)) {
+    //   ValueObjectPtr vo = composer->Expr2Val(sgn, pedge, this);
+    //   mvo = boost::make_shared<MPICommValueObject>(vo, pedge);
+    // }
+  }
+
 
   string MPICommAnalysis::str(std::string indent) const {
     return "MPICommAnalysis";

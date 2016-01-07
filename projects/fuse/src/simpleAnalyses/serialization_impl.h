@@ -89,11 +89,17 @@ namespace fuse {
     ar & boost::serialization::base_object<MPICommValueKind>(*this);
   }
 
+  /*****************
+   * ConcreteValue *
+   *****************/
   template<class Archive>
   void ConcreteValue::serialize(Archive& ar, const unsigned int version) {
     scope reg("ConcreteValue::serialize()", scope::medium, attrGE("serializationDebugLevel", 3));
   }
 
+  /************************
+   * IntegerConcreteValue *
+   ************************/
   template<class Archive>
   void save_construct_data(Archive& ar, const IntegerConcreteValue* icv_p, const unsigned int version) {
     scope reg("save_construct_data(IntegerConcreteValue*)", scope::medium, attrGE("serializationDebugLevel", 3));
@@ -117,6 +123,61 @@ namespace fuse {
     ar & value;
   }
 
+  /************************
+   * LongIntConcreteValue *
+   ************************/
+  template<class Archive>
+  void save_construct_data(Archive& ar, const LongIntConcreteValue* icv_p, const unsigned int version) {
+    scope reg("save_construct_data(LongIntConcreteValue*)", scope::medium, attrGE("serializationDebugLevel", 3));
+    long value = icv_p->get_value();
+    ar & value;
+  }
+
+  template<class Archive>
+  void load_construct_data(Archive& ar, LongIntConcreteValue* icv_p, const unsigned int version) {
+    scope reg("load_construct_data(LongIntConcreteValue*)", scope::medium, attrGE("serializationDebugLevel", 3));
+    long value;
+    ar & value;
+    ::new(icv_p) LongIntConcreteValue(value);
+  }
+
+  template<class Archive>
+  void LongIntConcreteValue::serialize(Archive& ar, const unsigned int version) {
+    scope reg("LongIntConcreteValue::serialize()", scope::medium, attrGE("serializationDebugLevel", 3));
+    ar & boost::serialization::base_object<ConcreteValue>(*this);
+    long value = get_value();
+    ar & value;
+  }
+
+  /****************************
+   * LongLongIntConcreteValue *
+   ****************************/
+  template<class Archive>
+  void save_construct_data(Archive& ar, const LongLongIntConcreteValue* icv_p, const unsigned int version) {
+    scope reg("save_construct_data(LongLongIntConcreteValue*)", scope::medium, attrGE("serializationDebugLevel", 3));
+    long long value = icv_p->get_value();
+    ar & value;
+  }
+
+  template<class Archive>
+  void load_construct_data(Archive& ar, LongLongIntConcreteValue* icv_p, const unsigned int version) {
+    scope reg("load_construct_data(LongLongIntConcreteValue*)", scope::medium, attrGE("serializationDebugLevel", 3));
+    long long value;
+    ar & value;
+    ::new(icv_p) LongLongIntConcreteValue(value);
+  }
+
+  template<class Archive>
+  void LongLongIntConcreteValue::serialize(Archive& ar, const unsigned int version) {
+    scope reg("LongLongIntConcreteValue::serialize()", scope::medium, attrGE("serializationDebugLevel", 3));
+    ar & boost::serialization::base_object<ConcreteValue>(*this);
+    long long value = get_value();
+    ar & value;
+  }
+
+  /*****************
+   * CompSharedPtr *
+   *****************/
   template<class Type> template<class Archive>
   void CompSharedPtr<Type>::serialize(Archive& ar, const unsigned int version) {
     scope reg("CompSharedPtr::serialize", scope::medium, attrGE("serializationDebugLevel", 3));

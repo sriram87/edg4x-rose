@@ -233,7 +233,7 @@ void ComposedAnalysis::runAnalysis()
   map<PartPtr, anchor> nextTransferAnchors;
   
   // graph widget that visualizes the flow of the worklist algorithm
-  atsGraph worklistGraph((getDirection() == fw? startingParts: ultimateParts), partAnchors, getDirection() == fw, attrGE("composedAnalysisDebugLevel", 1));
+  atsGraph worklistGraph((getDirection() == fw? startingParts: ultimateParts), partAnchors, getDirection() == fw, attrGE("composedAnalysisDebugLevel", 3));
   
   /*{ scope itreg("Initial curNodeIt", scope::medium, attrGE("composedAnalysisDebugLevel", 1));
     dbg << curNodeIt->str()<<endl; }*/

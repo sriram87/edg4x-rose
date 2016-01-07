@@ -87,6 +87,8 @@ class DeadPathElimPart : public Part//, public boost::enable_shared_from_this<De
   
   bool equal(const PartPtr& o) const;
   bool less(const PartPtr& o)  const;
+
+  PartContextPtr getPartContext() const;
   
   // Pretty print for the object
   std::string str(std::string indent="") const;

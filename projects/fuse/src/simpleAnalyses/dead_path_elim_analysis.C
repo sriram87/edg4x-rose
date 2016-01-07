@@ -196,6 +196,10 @@ PartEdgePtr DeadPathElimPart::outEdgeToAny() {
 //                                        getParent()->outEdgeToAny(), analysis);
 }
 
+PartContextPtr DeadPathElimPart::getPartContext() const {
+  return getParent()->getPartContext();
+}
+
 bool DeadPathElimPart::equal(const PartPtr& o) const
 {
   const DeadPathElimPartPtr that = dynamicConstPtrCast<DeadPathElimPart>(o);

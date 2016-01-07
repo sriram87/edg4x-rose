@@ -546,6 +546,14 @@ bool AbstractObjectMap::meetUpdate(Lattice* thatL)
         dbg << (it->first)->first->str() << " =&gt; " << (it->second).first->second->str() << endl;
       }
     }
+
+    if(AbstractObjectMapDebugLevel() >= 2) {
+      scope mustEqBool(txt() << "thatMustEq bool list", scope::medium, attrGE("AbstractObjectMapDebugLevel", 2));
+      list<bool>::iterator b = thatMustEq.begin();
+      for(int i = 0; b != thatMustEq.end(); ++b, ++i) {
+        dbg << "thatMustEq[" << i << "]=" << *b << endl;
+      }
+    }
     
     { scope insreg("inserting that->this", scope::medium, attrGE("AbstractObjectMapDebugLevel", 2));
     
@@ -567,10 +575,25 @@ bool AbstractObjectMap::meetUpdate(Lattice* thatL)
       // Copy over all the mappings from that->items from thatIt to meIt's partner in that->items
       // if they have not already been copied because elements that are mustEqual to each other were ordered
       // differently in this->items and that->items
+      if(AbstractObjectMapDebugLevel() >= 2) {
+        scope idxComp("thatThisIndexCompare", scope::low, attrGE("AbstractObjectMapDebugLevel", 2));
+        dbg << "meIt->second.second=" << meIt->second.second << ", thatIdx=" << thatIdx << endl;
+      }
       if(meIt->second.second >= thatIdx) {
+        if(AbstractObjectMapDebugLevel() >= 2) {
+          scope thatItComp("MapElementCompare", scope::low, attrGE("AbstractObjectMapDebugLevel", 2));
+          dbg << "thatIt.ML=" << thatIt->first->str() << endl;
+          dbg << "meIt->second.first.ML=" << meIt->second.first->first->str() << endl;
+        }
+        
         for(; thatIt!=meIt->second.first; thatIt++, thatIdx++, thatMEIt++) {
           // Copy over the current element from that->items if it doesn't have a mustEqual 
           // partner in this->items (i.e. its already been handled)
+          if(AbstractObjectMapDebugLevel() >= 2) {
+            dbg << "thatIdx=" << thatIdx << endl;
+            dbg << "thatMEIt=" << *thatMEIt << endl;
+          }
+          
           if(!(*thatMEIt)) {
             if(AbstractObjectMapDebugLevel()>=2) dbg << "Inserting at meIt->first="<<(meIt->first)->first->str()<<" mapping "<<thatIt->first->str()<<" ==&gt; "<<thatIt->second->str()<<endl;
             // NOTE: we do not currently update the part field in the lattice thatIt->second
@@ -584,6 +607,7 @@ bool AbstractObjectMap::meetUpdate(Lattice* thatL)
         // of the current entry in this->items
         thatIt++;
         thatIdx++;
+        thatMEIt++;
       }
       //if(AbstractObjectMapDebugLevel()>=2) dbg << "modified="<<modified<<endl;
     }

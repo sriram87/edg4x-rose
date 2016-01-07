@@ -770,8 +770,11 @@ public:
   
   // Returns whether this AbstractObject denotes the set of all possible execution prefixes.
   bool isFullV(PartEdgePtr pedge);
+
   // Returns whether this AbstractObject denotes the empty set.
   bool isEmptyV(PartEdgePtr pedge);
+  // Auxilary for isEmptyV
+  boost::function<bool (bool, bool)> getIsEmptyFunctor();
 
   // Is this object enumerable?
   bool isConcrete();

@@ -1872,9 +1872,47 @@ bool MappedValueObject<Key, mostAccurate>::isEmptyV() {
   return false;
 }
 
+bool andop(bool op1, bool op2) {
+  return op1 && op2;
+}
+
+bool orop(bool op1, bool op2) {
+  return op1 || op2;
+}
+
+template<class Key, bool mostAccurate>
+boost::function<bool (bool, bool)> MappedValueObject<Key, mostAccurate>::getIsEmptyFunctor() {
+  boost::function<bool (bool, bool)> reduce = boost::bind(&andop, _1, _2);
+  return reduce;
+}
+
 template<class Key, bool mostAccurate>
 bool MappedValueObject<Key, mostAccurate>::isEmptyV(PartEdgePtr pedge) {
-  return isEmptyV();
+  // this object is full
+  if(isFullV(pedge)) return false;
+  // this object contains no elements
+  else if(n_FullV == 0 && valuesMap.size() == 0) return true;
+  // this objects contain some elements that are not full
+  else {
+    // Check if individual entries are empty
+    // if intersect_ -> it is sufficient to check only one entry
+    // if union_ -> all entries should be empty
+    boost::function<bool (bool, bool)> reduce = getIsEmptyFunctor();
+    bool result = false;
+    typename map<Key, ValueObjectPtr>::iterator it = valuesMap.begin();
+    for( ; it != valuesMap.end(); ++it) {      
+      bool isempty = it->second->isEmptyV(pedge);
+      // If this is the first value
+      // reduction is started with true for union_ and false for intersect_
+      if(it == valuesMap.begin()) {
+        result = reduce(true, isempty);
+      }
+      else {
+        result = reduce(result, isempty);
+      }
+    }
+    return result;
+  }
 }
 
 template<class Key, bool mostAccurate>

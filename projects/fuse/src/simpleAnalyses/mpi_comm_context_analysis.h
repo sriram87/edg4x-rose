@@ -185,6 +185,8 @@ namespace fuse {
     PartEdgePtr outEdgeToAny();
     PartEdgePtr inEdgeFromAny();
 
+    PartContextPtr getPartContext() const;
+
     bool equal(const PartPtr& that) const;
     bool less(const PartPtr& that) const;
 
@@ -214,11 +216,17 @@ namespace fuse {
     std::list<PartEdgePtr> getOperandPartEdge(SgNode* anchor, SgNode* operand);
     std::map<CFGNode, boost::shared_ptr<SgValueExp> > getPredicateValue();
 
+    std::list<CommATSPartEdgePtr> getOperandCommATSPartEdge(PartEdgePtr base);
+
+    CommContextPtr getCommContextSrc() const;
+    CommContextPtr getCommContextTgt() const;
+
     bool equal(const PartEdgePtr& that) const;
     bool less(const PartEdgePtr& that) const;
 
     std::string str(std::string indent="") const;
   };
+
 
   /**********************
    * CommContextLattice *
@@ -256,6 +264,8 @@ namespace fuse {
     bool inComingInsert(CommATSPartPtr src, CommATSPartPtr target);
   private:
     bool parentPartEqual(CommATSPartPtr caPartPtr, PartPtr parent);
+    bool parentCommContextEqual(CommATSPartPtr caPartPTr, PartPtr parent, CommContextPtr cc);
+    
     std::set<CommATSPartPtr> applyMapFilterWithKey(CommATSPartMap& commATSPartMap, 
                                                     CommATSPartPtr key, 
                                                     boost::function<bool (CommATSPartPtr)> filter);
@@ -265,6 +275,9 @@ namespace fuse {
     std::set<CommATSPartPtr> parentPartFilterOutgoingMap(PartPtr parent);
     //! Find all CommATSPartPtr in outgoing map whose getParent()=parent
     std::set<CommATSPartPtr> parentPartFilterOutgoingMap(CommATSPartPtr key, PartPtr parent);
+    //! Find all CommATSPartPtr in outgoing map where getParent()=parent and CommContext=cc
+    std::set<CommATSPartPtr> parentCommContextFilterOutgoingMap(PartPtr parent, CommContextPtr cc);
+    std::set<CommATSPartPtr> parentCommContextFilterOutgoingMap(CommATSPartPtr key, PartPtr parent, CommContextPtr cc);
   private:
     bool mergeCommATSPartMaps(CommATSPartMap& toMap, CommATSPartMap& fromMap);
     bool mergeCommATSPartSets(CommATSPartSet& setto, CommATSPartSet& setfrom);

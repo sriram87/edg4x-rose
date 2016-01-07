@@ -131,12 +131,17 @@ namespace fuse {
                        MPIValueAnalysis* _analysis);
 
     void visit(SgFunctionCallExp* sgn);
+    void visit(SgPointerDerefExp* sgn);
+    
     void transferCommRank(SgFunctionCallExp* sgn);
+    void transferCommRank(SgPointerDerefExp* sgn, const Function& mpifunc);
     SgExpression* getOpCastExpr(SgExpression* exp);
     SgExpression* getOpAddrOfExpr(SgExpression* exp);
     void transferCommSize(SgFunctionCallExp* sgn);
+    void transferCommSize(SgPointerDerefExp* sgn, const Function& mpifunc);
 
     bool setLattice(SgExpression* expr, MPIValueObjectPtr mvo_p);
+    Function getFunction(SgNode* sgn);
     //! Return true if the function call is an MPI operation
     bool isMPIFuncCall(const Function& func);
     bool finish();

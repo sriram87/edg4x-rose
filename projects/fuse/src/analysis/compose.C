@@ -188,6 +188,7 @@ bool Composer::isLive(AbstractObjectPtr ao, PartEdgePtr pedge, ComposedAnalysis*
 
 
 bool Composer::HavocLattices(vector<Lattice*>& lats) {
+  assert(0);
   bool modified = false;
   vector<Lattice*>::iterator it = lats.begin();
   for( ; it != lats.end(); ++it) {
@@ -198,6 +199,7 @@ bool Composer::HavocLattices(vector<Lattice*>& lats) {
 }
 
 bool Composer::HavocNodeState(ComposedAnalysis* client, PartEdgePtr pedge) {
+  assert(0);
   PartPtr part;
   if(client->getDirection() == ComposedAnalysis::fw) {
     part = pedge->target();
@@ -220,6 +222,8 @@ bool Composer::HavocNodeState(ComposedAnalysis* client, PartEdgePtr pedge) {
 //! the MemLocObjectPtr
 //!
 bool Composer::HavocMLValue(MemLocObjectPtr ml, std::map<PartEdgePtr, std::vector<Lattice*> >& dfInfo) {
+  scope reg(txt() << "Composer::HavocMLValue(" << ml->str() << ")", scope::medium,
+            attrGE("composerDebugLevel", 2));  
   map<PartEdgePtr, vector<Lattice*> >::iterator mIt = dfInfo.begin();
   for( ; mIt != dfInfo.end(); ++mIt) {
     vector<Lattice*>& lats = mIt->second;
@@ -228,6 +232,10 @@ bool Composer::HavocMLValue(MemLocObjectPtr ml, std::map<PartEdgePtr, std::vecto
       Lattice* lat = *vIt;
       lat->setMLValueToFull(ml);
     }
+  }
+
+  if(composerDebugLevel() >= 2) {
+    dbg << "dfInfo After:" << NodeState::str(dfInfo) << endl;
   }
 }
 

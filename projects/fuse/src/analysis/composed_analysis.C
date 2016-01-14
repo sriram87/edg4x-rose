@@ -233,7 +233,7 @@ void ComposedAnalysis::runAnalysis()
   map<PartPtr, anchor> nextTransferAnchors;
   
   // graph widget that visualizes the flow of the worklist algorithm
-  atsGraph worklistGraph((getDirection() == fw? startingParts: ultimateParts), partAnchors, getDirection() == fw, attrGE("composedAnalysisDebugLevel", 3));
+  atsGraph worklistGraph((getDirection() == fw? startingParts: ultimateParts), partAnchors, getDirection() == fw, attrGE("composedAnalysisDebugLevel", 2));
   
   /*{ scope itreg("Initial curNodeIt", scope::medium, attrGE("composedAnalysisDebugLevel", 1));
     dbg << curNodeIt->str()<<endl; }*/
@@ -630,9 +630,7 @@ void ComposedAnalysis::propagateDF2Desc(ComposedAnalysis* analysis,
       }
     }
     
-    NodeState* nextState = NodeState::getNodeState(analysis, nextPart);
-    
-    if(composedAnalysisDebugLevel()>=1) dbg << "nextState="<<nextState->str()<<endl;
+    NodeState* nextState = NodeState::getNodeState(analysis, nextPart);  
 
     // Make sure that dfInfo has a key for this descendant
     assert(dfInfo.find(*de) != dfInfo.end());
@@ -653,6 +651,14 @@ void ComposedAnalysis::propagateDF2Desc(ComposedAnalysis* analysis,
     // visited, add it to the processing queue.
     if(composedAnalysisDebugLevel()>=1) 
       dbg << "Final modified="<<modified<<", visited="<<(visited.find(nextPart)!=visited.end())<<" nextPart="<<nextPart->str()<<endl;
+
+    if(composedAnalysisDebugLevel() >=3) {      
+      scope curNextStateInfo("Current and NextState", scope::medium, attrGE("composedAnalysisDebugLevel", 3));
+      NodeState* currState = NodeState::getNodeState(analysis, part);
+      dbg << "---CURRENT STATE---\n" << currState->str() << endl;
+      dbg << "---NEXT STATE---\n" << nextState->str() << endl;
+    }
+
 
     dbg << "modified=" << modified << endl;
     if(modified || visited.find(nextPart)==visited.end()) {   

@@ -53,6 +53,9 @@ bool AbstractObjectMap::setMLValueToFull(MemLocObjectPtr ml)
   for(list<MapElement>::iterator it = items.begin(); it != items.end(); it++) {
     AbstractObjectPtr keyElement = it->first;
     if(keyElement->mayEqual(ml, latPEdge, comp, analysis)) {
+      // First copy the lattice and then set it to full
+      // Not doing this will result in painful long debugging session!!!
+      it->second = LatticePtr(it->second->copy());
       modified = it->second->setToFull() || modified;
       if(!found) found = true;
     }
@@ -441,7 +444,7 @@ bool AbstractObjectMap::meetUpdate(Lattice* thatL)
       dbg << "latPEdge="<<latPEdge->str()<<endl;
       { scope thisreg("this", scope::medium);
       dbg << str()<<endl; }
-      { scope thisreg("that", scope::medium);
+      { scope thatreg("that", scope::medium);
       dbg << that->str()<<endl; }
     }
     

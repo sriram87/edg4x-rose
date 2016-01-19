@@ -15,7 +15,7 @@ using namespace sight;
 
 namespace fuse {
 
-  DEBUG_LEVEL(mpiCommAnalysisDebugLevel, 0);
+  DEBUG_LEVEL(mpiCommAnalysisDebugLevel, 3);
 
   /********************
    * MPICommValueKind *
@@ -506,7 +506,6 @@ namespace fuse {
     : Lattice(pedge),
       FiniteLattice(pedge),
       ValueObject(0) {
-    dbg << "that:" << that->str() << endl;
     if(that->isEmptyV(pedge)) {
       kind = boost::make_shared<MPICommValueDefaultKind>();
     }
@@ -521,8 +520,9 @@ namespace fuse {
   MPICommValueObject::MPICommValueObject(const MPICommValueObject& that)
     : Lattice(that),
       FiniteLattice(that),
-      ValueObject(that),
-      kind(that.kind) {
+      ValueObject(that)
+  {
+    kind = that.kind->copyK();
   }
 
   MPICommValueKindPtr MPICommValueObject::getKind() const {
@@ -966,6 +966,10 @@ namespace fuse {
     string sdata(sdata_p);
     MPICommValueObjectPtr mvo = deserialize(sdata);
 
+    if(mpiCommAnalysisDebugLevel() >= 2) {
+      dbg << "Recv VO:" << mvo->str() << endl;
+    }
+
     // Find the outgoing edges of MPI call expression part
     list<PartEdgePtr> callExpEdges = outGoingEdgesMPICallExp(part, "MPI_Recv");
     
@@ -1103,45 +1107,111 @@ namespace fuse {
     return boost::shared_ptr<MPICommAnalysisTransfer>(new MPICommAnalysisTransfer(part, cn, state, dfInfo, this));
   }
 
+  /** 
+   * Inserting into stl map with PartEdgePtr as key.
+   * Working with the assumption that all keys are full defined.
+   * Each PartEdgePtr has well defined source and target PartPtr.
+   * Each key PartEdgePtr do not contain any wildcard edges.
+   * @param pedge key.
+   * @param ml, mval MemLocObject and ValueObject corresponding the Recv buffer.
+   * ValueObject mval is first copied and only copied objects are inserted into the map.
+   * This is to ensure proper usage of shared_ptrs.
+   * Analysis is free to modify the ValueObjectPtr however they want and their changes
+   * shouldn't impact the ValueObject stored in the map.
+   * Two cases: tuple <pedge, ml, mval> (i) already exists(ii) doesnt exist in the map.
+   * If the tuple already exists join the values using meetUpdateV to create a new ValueObject.
+   * Remove the old mapping and insert the tuple.
+   * If this is the first insertion insert the tuple into the map.
+   */
   bool MPICommAnalysis::insertRecvMLVal(PartEdgePtr pedge, MemLocObjectPtr ml, MPICommValueObjectPtr mval) {
-    scope reg(txt() << "MPICommAnalysis::insertRecvMLVal(pedge=" << pedge->str()
-              << ", ml=" << ml->str() << "mval=" << mval->str() << ")",
+    scope reg(txt() << "MPICommAnalysis::insertRecvMLVal",
               scope::medium,
-              attrGE("mpiCommAnalysisDebugLevel", 3));
+              attrGE("mpiCommAnalysisDebugLevel", 2));
+    if(mpiCommAnalysisDebugLevel() >= 2) {
+      dbg << "pedge=" << pedge->str() << endl;
+      dbg << "ml=" << ml->str() << endl;
+      dbg << "mval=" << mval->str() << endl;
+    }
+
+    // First copy the ValueObject
+    MPICommValueObjectPtr mvalc = boost::dynamic_pointer_cast<MPICommValueObject>(mval->copyV());
+    
+    bool insertR = false;
     assert(pedge->source() && pedge->target());
+        
     map<PartEdgePtr, RecvMLValPtr>::iterator melem;
     melem = recvMLValMap.find(pedge);
-    // When this is the first time we insert into the map
-    if(melem == recvMLValMap.end()) {      
-      RecvMLValPtr rmlval = boost::make_shared<RecvMLVal>(ml, mval);
-      recvMLValMap.insert(std::pair<PartEdgePtr, RecvMLValPtr>(pedge, rmlval));
-      return true;
-    }
-    // When we already have information on this edge
-    else {
+    // If the key exists in the map
+    if(melem != recvMLValMap.end()) {
       // First assert ML is the same
       RecvMLValPtr relem = melem->second;
-      assert(ml->mayEqualML(relem->getMemLocObject(), pedge));
-      MPICommValueObjectPtr oldval = relem->getValueObject();
-      bool ret = mval->meetUpdateV(oldval, pedge);
-      if(ret) {
-        RecvMLValPtr newelem = boost::make_shared<RecvMLVal>(ml, mval);
-        recvMLValMap.insert(std::pair<PartEdgePtr, RecvMLValPtr>(pedge, newelem));
+      if(ml->mayEqualML(relem->getMemLocObject(), pedge)) {
+        MPICommValueObjectPtr oval = relem->getValueObject();        
+        if(mpiCommAnalysisDebugLevel() >= 2) dbg << "OldVal=" << oval->str() << endl;
+        // Join the current value into old value
+        insertR = oval->meetUpdateV(mval, pedge);
+        if(mpiCommAnalysisDebugLevel() >= 2) {
+          dbg << "newV=" << oval->str() << endl;
+          dbg << "insertR=" << insertR << endl;
+        }
+        // If the value changes remove the old mapping and insert the new mapping
+        if(insertR) {
+          RecvMLValPtr newelem = boost::make_shared<RecvMLVal>(ml, oval);
+          // Erase the mapping first (melem no longer is valid after this point)
+          // Also stl insert doesnt insert if key already exists!
+          recvMLValMap.erase(pedge);
+          // Insert the new mapping
+          recvMLValMap.insert(std::pair<PartEdgePtr, RecvMLValPtr>(pedge, newelem));
+        }
       }
-      return ret;
+      // This case is a little bit more complicated
+      // We have a key pedge in the map but the tuple's ml does not mayEqual the ml to be inserted        
+      // This case arises when multiple different recv operation contexts are approximated into one.
+      else {
+        // The conservative solution is to join the two ml and their values
+        MemLocObjectPtr oml = relem->getMemLocObject();
+        MPICommValueObjectPtr oval = relem->getValueObject();
+        if(mpiCommAnalysisDebugLevel() >= 2) {
+          dbg << "oldML=" << oml->str() << endl;
+          dbg << "oldV=" << oval->str() << endl;
+        }
+        // First copy the ML
+        MemLocObjectPtr omlc = oml->copyML();
+        // Join the already mapped ML and the ml to be inserted
+        omlc->meetUpdateML(ml, pedge);
+        // Now merge the values
+        oval->meetUpdateV(mval, pedge);
+        RecvMLValPtr newelem = boost::make_shared<RecvMLVal>(omlc, oval);
+        // Erase the mapping first (melem no longer is valid after this point)
+        // Also stl insert doesnt insert if key already exists!
+        recvMLValMap.erase(pedge);          
+        recvMLValMap.insert(std::pair<PartEdgePtr, RecvMLValPtr>(pedge, newelem));
+        insertR = true;
+        if(mpiCommAnalysisDebugLevel() >= 2) {
+          dbg << "newML=" << oml->str() << endl;
+          dbg << "newV=" << oval->str() << endl;
+        }
+      }
     }
+    // When this is the first time we insert into the map
+    else {
+      RecvMLValPtr rmlval = boost::make_shared<RecvMLVal>(ml, mvalc);
+      recvMLValMap.insert(std::pair<PartEdgePtr, RecvMLValPtr>(pedge, rmlval));
+      insertR = true;
+    }    
+    return insertR;
   }
 
   string MPICommAnalysis::stringifyRecvMLValMap() const {
     ostringstream oss;
     map<PartEdgePtr, RecvMLValPtr>::const_iterator it = recvMLValMap.begin();
-    oss << "<table>";
+    oss << "<table border=\"1\">";
     oss << "<th> RecvMLValMap </th>";
     for( ; it != recvMLValMap.end(); ++it) {
       PartEdgePtr pedge = it->first;
       RecvMLValPtr rmlval = it->second;
       oss << "<tr>";
-      oss << "<td>" << pedge->str() << "</td>";
+      oss << "<td width=\"40%\"> " << pedge->str() << "</td>";
       oss << "<td>" << rmlval->str() << "</td>";
       oss << "</tr>";
     }
@@ -1252,6 +1322,7 @@ namespace fuse {
     scope reg(sight::txt() << "MPICommAnalysis::Expr2Val(sgn=" << SgNode2Str(sgn) << ",pedge=" << pedge->str() << ")",
           scope::medium,
           attrGE("mpiCommAnalysisDebugLevel", 2));
+    
     list<RecvMLValPtr> rmlvals = getRecvMLVal(pedge);
     MPICommValueObjectPtr mvo;
     if(rmlvals.size() != 0) {
@@ -1266,6 +1337,9 @@ namespace fuse {
       mvo = boost::make_shared<MPICommValueObject>(val, pedge);
     }
     assert(mvo->getKind());
+    if(mpiCommAnalysisDebugLevel() >= 2) {
+      dbg << "Expr2Val(sgn)=" << mvo->str() << endl;
+    }
     return mvo;
     // Composer* composer = getComposer();
     // MemLocObjectPtr ml = composer->Expr2MemLoc(sgn, pedge, this);

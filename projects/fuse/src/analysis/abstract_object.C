@@ -2036,7 +2036,7 @@ string MappedValueObject<Key, mostAccurate>::str(string indent) const {
     typename map<Key, ValueObjectPtr>::const_iterator it = valuesMap.begin();
     for( ; it != valuesMap.end(); ++it) {
       oss << "<tr>";
-      oss << "<td>" << (it->first)->str(indent) << "</td>";
+      oss << "<td>" << (it->first)->str(indent).substr(0, 25) << "</td>";
       oss << "<td>" << (it->second)->str(indent) << "</td>";
       oss << "</tr>";
     }
@@ -3050,7 +3050,7 @@ string MappedMemRegionObject<Key, mostAccurate>::str(string indent) const {
     typename map<Key, MemRegionObjectPtr>::const_iterator it = memRegionsMap.begin();
     for( ; it != memRegionsMap.end(); ++it) {
       oss << "<tr>";
-      oss << "<td>" << (it->first)->str(indent) << "</td>";
+      oss << "<td>" << (it->first)->str(indent).substr(0, 25) << "</td>";
       oss << "<td>" << (it->second)->str(indent) << "</td>";
       oss << "</tr>";
     }
@@ -3983,7 +3983,7 @@ string MappedMemLocObject<Key, mostAccurate>::str(string indent) const {
     typename map<Key, MemLocObjectPtr>::const_iterator it = memLocsMap.begin();
     for( ; it != memLocsMap.end(); ++it) {
       oss << "<tr>";
-      oss << "<td>" << (it->first)->str(indent) << "</td>";
+      oss << "<td>" << (it->first)->str(indent).substr(0, 25) << "</td>";
       oss << "<td>" << (it->second)->str(indent) << "</td>";
       oss << "</tr>";
     }

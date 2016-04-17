@@ -347,6 +347,9 @@ namespace fuse {
      * at the corresponding call site of the receiver.
      */
     void transferMPIRecvOp(SgPointerDerefExp* sgn, const MPICommOp& commop);
+
+    void transferMPIBarrier();
+    
     list<PartEdgePtr> outGoingEdgesMPICallExp(PartPtr part, string funcname);
 
     void visit(SgFunctionParameterList* sgn);

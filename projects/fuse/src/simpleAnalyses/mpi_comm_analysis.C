@@ -888,8 +888,18 @@ namespace fuse {
   }
   
   void MPICommAnalysisTransfer::visit(SgFunctionParameterList* sgn) {
+    Function call = getFunction(sgn);
+    string name = call.get_name().getString();
+
+    if(name.compare("MPI_Barrier") == 0) {
+      transferMPIBarrier();
+    }
   }
 
+  void MPICommAnalysisTransfer::transferMPIBarrier() {
+    MPI_Barrier(MPI_COMM_WORLD);
+  }
+  
   void MPICommAnalysisTransfer::transferMPISendOp(SgPointerDerefExp* sgn, const MPICommOp& commop) {
     scope reg("MPICommAnalysisTransfer::transferMPISendOp", scope::low, 
           attrGE("mpiCommAnalysisDebugLevel", 2));

@@ -56,9 +56,12 @@ namespace fuse {
           sgn->setAttribute("fuse:UnknownSideEffectsAttribute", new UnknownSideEffectsAttribute());
           annotateExprValueUnknown(argsList[0]);
         }
+        else if(name.compare("MPI_Barrier") == 0){
+          sgn->setAttribute("fuse:UnknowSideEffectsAttribute", new UnknownSideEffectsAttribute());
+        }        
         else if(name.compare("MPI_Bcast") == 0){
           assert(0);
-        }
+        }        
         else if(name.compare("MPI_Reduce") == 0){
           assert(0);
         }
@@ -72,6 +75,12 @@ namespace fuse {
           assert(0);
         }
         else if(name.compare("MPI_Allreduce") == 0){
+          assert(0);
+        }
+        else if(name.compare("MPI_Init") == 0) { }
+        else if(name.compare("MPI_Finalize") == 0) { }
+        else if(name.find("MPI_", 0) != string::npos) {
+          cout << name << endl;
           assert(0);
         }
       } // end isSgFunctionRefExp

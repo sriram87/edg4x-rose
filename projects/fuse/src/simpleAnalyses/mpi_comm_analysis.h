@@ -160,6 +160,31 @@ namespace fuse {
   };
   typedef CompSharedPtr<LongLongIntConcreteValue> LongLongIntConcreteValuePtr;
 
+  /***********************
+   * StringConcreteValue *
+   ***********************/
+  class StringConcreteValue : public ConcreteValue {
+    boost::shared_ptr<SgStringVal> value;
+  public:
+    StringConcreteValue(std::string string);
+    StringConcreteValue(const StringConcreteValue& that);
+    ConcreteValue* copy() const;
+
+    bool operator<(const ConcreteValuePtr& that) const;
+    bool operator==(const ConcreteValuePtr& that) const;
+    bool operator!=(const ConcreteValuePtr& that) const;
+
+    SgValueExpPtr getConcreteValue() const;
+    SgType* getConcreteType() const;
+    std::string get_value() const;
+
+    template<class Archive>
+    void serialize(Archive& ar, const unsigned int version);
+    friend class boost::serialization::access;
+    std::string str(std::string indent="") const;
+  };
+  typedef CompSharedPtr<StringConcreteValue> StringConcreteValuePtr;
+
   /****************************
    * MPICommValueConcreteKind *
    ****************************/

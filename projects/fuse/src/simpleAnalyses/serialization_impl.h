@@ -175,6 +175,32 @@ namespace fuse {
     ar & value;
   }
 
+  /***********************
+   * StringConcreteValue *
+   ***********************/
+  template<class Archive>
+  void save_construct_data(Archive& ar, const StringConcreteValue* scv_p, const unsigned int version) {
+    scope reg("save_construct_data(StringConcreteValue*)", scope::medium, attrGE("serializationDebugLevel", 3));
+    string value = scv_p->get_value();
+    ar & value;
+  }
+
+  template<class Archive>
+  void load_construct_data(Archive& ar, StringConcreteValue* scv_p, const unsigned int version) {
+    scope reg("load_construct_data(StringConcreteValue*)", scope::medium, attrGE("serializationDebugLevel", 3));
+    string value;
+    ar & value;
+    ::new(scv_p) StringConcreteValue(value);
+  }
+
+  template<class Archive>
+  void StringConcreteValue::serialize(Archive& ar, const unsigned int version) {
+    scope reg("StringConcreteValue::serialize()", scope::medium, attrGE("serializationDebugLevel", 3));
+    ar & boost::serialization::base_object<ConcreteValue>(*this);
+    string value = get_value();
+    ar & value;
+  }
+
   /*****************
    * CompSharedPtr *
    *****************/

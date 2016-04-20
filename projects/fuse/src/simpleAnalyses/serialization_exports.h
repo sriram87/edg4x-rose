@@ -9,6 +9,7 @@ BOOST_CLASS_EXPORT_GUID(fuse::ConcreteValue, "concretevalue")
 BOOST_CLASS_EXPORT_GUID(fuse::IntegerConcreteValue, "integerconcretevalue")
 BOOST_CLASS_EXPORT_GUID(fuse::LongIntConcreteValue, "longintconcretevalue")
 BOOST_CLASS_EXPORT_GUID(fuse::LongLongIntConcreteValue, "longlongintconcretevalue")
+BOOST_CLASS_EXPORT_GUID(fuse::StringConcreteValue, "stringconcretevalue")
 BOOST_CLASS_EXPORT_GUID(fuse::MPICommValueConcreteKind, "mpicommvalueconcretekind")
 BOOST_CLASS_EXPORT_GUID(fuse::MPICommValueUnknownKind, "mpicommvalueunknownkind")
 

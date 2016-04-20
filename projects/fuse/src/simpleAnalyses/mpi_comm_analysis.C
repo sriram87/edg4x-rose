@@ -225,7 +225,59 @@ namespace fuse {
     oss << value->get_value();
     return oss.str();
   }
+
+  /***********************
+   * StringConcreteValue *
+   ***********************/
+  StringConcreteValue::StringConcreteValue(string val)
+    : ConcreteValue() {
+    value = boost::shared_ptr<SgStringVal>(SageBuilder::buildStringVal(val));
+  }
+
+  StringConcreteValue::StringConcreteValue(const StringConcreteValue& that)
+    : ConcreteValue(that),
+      value(that.value) { }
   
+  string StringConcreteValue::get_value() const {
+    return value->get_value();
+  }
+
+  bool StringConcreteValue::operator<(const ConcreteValuePtr& that) const {
+    StringConcreteValuePtr thatV = dynamicConstPtrCast<StringConcreteValue>(that);
+    assert(thatV);
+    return (value->get_value().compare(thatV->get_value()) < 0);
+  }
+
+  bool StringConcreteValue::operator==(const ConcreteValuePtr& that) const {
+    StringConcreteValuePtr thatV = dynamicConstPtrCast<StringConcreteValue>(that);
+    assert(thatV);
+    return (value->get_value().compare(thatV->get_value()) == 0);
+  }
+
+  bool StringConcreteValue::operator!=(const ConcreteValuePtr& that) const {
+    StringConcreteValuePtr thatV = dynamicConstPtrCast<StringConcreteValue>(that);
+    assert(thatV);
+    return (value->get_value().compare(thatV->get_value()) > 0);
+  }
+
+  SgType* StringConcreteValue::getConcreteType() const {
+    return value->get_type();
+  }
+
+  SgValueExpPtr StringConcreteValue::getConcreteValue() const {
+    return boost::dynamic_pointer_cast<SgValueExp>(value);
+  }
+
+  ConcreteValue* StringConcreteValue::copy() const {
+    return new StringConcreteValue(*this);
+  }
+
+  string StringConcreteValue::str(string indent) const {
+    ostringstream oss;
+    oss << value->get_value();
+    return oss.str();
+  }
+    
   /*********************
    * Utility Functions *
    *********************/
@@ -246,6 +298,11 @@ namespace fuse {
         boost::shared_ptr<SgLongLongIntVal> ivalue = boost::dynamic_pointer_cast<SgLongLongIntVal>(sgvalue);
         return boost::make_shared<LongLongIntConcreteValue>(ivalue->get_value());
       }
+    case V_SgStringVal:
+      {
+        boost::shared_ptr<SgStringVal> svalue = boost::dynamic_pointer_cast<SgStringVal>(sgvalue);
+        return boost::make_shared<StringConcreteValue>(svalue->get_value());
+      }      
     default:
       dbg << "sgvalue=" << SgNode2Str(sgvalue.get()) << endl;
       assert(false);
@@ -1335,6 +1392,7 @@ namespace fuse {
     
     list<RecvMLValPtr> rmlvals = getRecvMLVal(pedge);
     MPICommValueObjectPtr mvo;
+    dbg << "rmlvals.size()=" << rmlvals.size() << endl;
     if(rmlvals.size() != 0) {
       MemLocObjectPtr ml = getComposer()->Expr2MemLoc(sgn, pedge, this);
       mvo = mergeMayEqualMLVal(ml, pedge, rmlvals);

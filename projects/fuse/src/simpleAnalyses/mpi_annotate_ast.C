@@ -56,6 +56,9 @@ namespace fuse {
           sgn->setAttribute("fuse:UnknownSideEffectsAttribute", new UnknownSideEffectsAttribute());
           annotateExprValueUnknown(argsList[0]);
         }
+        else if(name.compare("MPI_Send") == 0) {
+          sgn->setAttribute("fuse:UnknowSideEffectsAttribute", new UnknownSideEffectsAttribute());
+        }
         else if(name.compare("MPI_Barrier") == 0){
           sgn->setAttribute("fuse:UnknowSideEffectsAttribute", new UnknownSideEffectsAttribute());
         }        

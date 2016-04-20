@@ -8,6 +8,7 @@
 #include "call_context_sensitivity_analysis.h"
 #include "pointsToAnalysis.h"
 #include "mpi_comm_analysis.h"
+#include "mpi_dot_value_analysis.h"
 #include "address_taken_analysis.h"
 #include "mpi_annotate_ast.h"
 #include "sight.h"
@@ -86,20 +87,24 @@ public:
   }
 };
 
-sregex seqcomp, tightcomp, constprop, mpicommcontext,
-  mpivalue, mpicomm, deadpath, pointsto, analysis,
-  analysisList, composer, atailseq, scommand, ctailseq, tailseq, headseq, command;
+// to add new analysis
+// 1. add a new sregex globally
+// 2. initialize it under init_sregex and also modify analysis regex
+// 3. add the analysis creation in match_analysis()
+sregex seqcomp, tightcomp, constprop, mpicommcontext, mpivalue, mpicomm, mpidotvalue, deadpath, pointsto, analysis, analysisList, composer, atailseq, scommand, ctailseq, tailseq, headseq, command;
 
 void init_sregex() {
   constprop = icase("cp");
   mpicommcontext = icase("mcc");
   mpivalue = icase("mv");
   mpicomm = icase("mco");
+  mpidotvalue = icase("mdv");
   pointsto = icase("pt");
   deadpath = icase("dp");
   seqcomp = icase("seq");
   tightcomp = icase("tight");
-  analysis = by_ref(constprop) | by_ref(mpicommcontext) | by_ref(mpivalue) | by_ref(mpicomm) | by_ref(pointsto) | by_ref(deadpath);
+  analysis = by_ref(constprop) | by_ref(mpicommcontext) | by_ref(mpivalue) | by_ref(mpicomm)
+    | by_ref(mpidotvalue) | by_ref(pointsto) | by_ref(deadpath);
   composer = by_ref(seqcomp) | by_ref(tightcomp);
   atailseq = *_s >> as_xpr(',') >> *_s >> analysis >> *_s;
   analysisList = '(' >> *_s >> analysis >> *by_ref(atailseq) >> ')';
@@ -162,6 +167,9 @@ void match_analysis(smatch what, CompositionalCommand& cc) {
   else if(regex_match(analysis_s, mpicomm)) {
     cc.push_back(new MPICommAnalysis());
     // cout << "analysis=mpicomm" << endl;
+  }
+  else if(regex_match(analysis_s, mpidotvalue)) {
+    cc.push_back(new MPIDotValueAnalysis());
   }
   else if(regex_match(analysis_s, pointsto)) {
     cc.push_back(new PointsToAnalysis());

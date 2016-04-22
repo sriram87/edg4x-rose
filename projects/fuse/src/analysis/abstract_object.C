@@ -3431,6 +3431,30 @@ void CombinedMemLocObject<defaultMayEq>::add(MemLocObjectPtr memLoc) {
   memLocs.push_back(memLoc);
 }
 
+// template<bool defaultMayEq>
+// MemRegionObjectPtr CombinedMemLocObject<defaultMayEq>::getRegion() {
+//   list<MemRegionObjectPtr> memRegionList;    
+//   list<MemLocObjectPtr>::iterator it = memLocs.begin();  
+//   for( ; it != memLocs.end(); ++it) {
+//     MemLocObjectPtr iml = *it;
+//     MemRegionObjectPtr imr = iml->getRegion();
+//     memRegionList.push_back(imr);
+//   }
+//   return boost::make_shared<CombinedMemRegionObject<defaultMayEq> >(memRegionList);
+// }
+
+// template<bool defaultMayEq>
+// ValueObjectPtr CombinedMemLocObject<defaultMayEq>::getIndex() {
+//   list<ValueObjectPtr> valueObjectList;
+//   list<MemLocObjectPtr>::iterator it = memLocs.begin();
+//   for( ; it != memLocs.end(); ++it) {
+//     MemLocObjectPtr iml = *it;
+//     ValueObjectPtr iv = iml->getIndex();
+//     valueObjectList.push_back(iv);
+//   }
+//   return boost::make_shared<CombinedValueObject<defaultMayEq> >(valueObjectList);
+// }
+
 // Returns whether this object may/must be equal to o within the given Part p
 template <bool defaultMayEq>
 bool CombinedMemLocObject<defaultMayEq>::mayEqualML(MemLocObjectPtr o, PartEdgePtr pedge)

@@ -356,6 +356,21 @@ namespace fuse
     }
   }
 
+  // MemRegionObjectPtr PTMemLocObject::getRegion() {
+  //   MemRegionObjectPtr mr;
+  //   AbstractObjectSet::const_iterator ci = aos_p->begin();
+  //   for( ; ci != aos_p->end(); ci++) {
+  //     const AbstractObjectPtr ao = *ci;
+  //     MemLocObjectPtr ml = boost::dynamic_pointer_cast<MemLocObject>(ao); assert(ml);
+  //     MemRegionObjectPtr imr = ml->getRegion();
+  //     dbg << "imr=" << imr->str() << endl;
+  //     assert(false);
+  //   }
+  // }
+
+  // ValueObjectPtr PTMemLocObject::getIndex() {
+  // }
+
   const AbstractObjectSet& PTMemLocObject::getMLSet() const {
     return *(aos_p.get());
   }

@@ -687,9 +687,10 @@ namespace fuse {
     ostringstream oss;
     string node_s;
     SgNode* sgn = cfgn.getNode();
-    node_s = SageInterface::get_name(sgn);
-    if(node_s.length() > 20) {
-      node_s.resize(20); node_s += "...";
+    //node_s = SageInterface::get_name(sgn);
+    node_s = CFGNode2Str(cfgn);
+    if(node_s.length() > 25) {
+      node_s.resize(25); node_s += "...";
     }
     oss << node_s << "\n<" << sgn->class_name() << "> "
         << " line:" << sgn->get_startOfConstruct()->get_line();

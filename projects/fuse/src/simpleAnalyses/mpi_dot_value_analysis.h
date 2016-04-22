@@ -30,7 +30,7 @@ namespace fuse {
     std::string dotvalue;
   public:
     MPIDotValueObject(PartEdgePtr pedge);
-    MPIDotValueObject(const CFGNode& cn, PartEdgePtr pedge);
+    MPIDotValueObject(PartPtr part, PartEdgePtr pedge);
     MPIDotValueObject(ValueObjectPtr v, PartEdgePtr pedge);
     MPIDotValueObject(const MPIDotValueObject& that);
 
@@ -198,6 +198,24 @@ namespace fuse {
 
     // pretty print for the object
     std::string str(std::string indent="") const;
+  };
+
+  class MPIDotGraphGenerator {
+    std::ostringstream nodess;
+    std::ostringstream edgess;
+    MPIDotValueAnalysis* analysis;
+  public:
+    MPIDotGraphGenerator(MPIDotValueAnalysis* analysis);
+    std::string cfgn2str(CFGNode cfgn);
+    std::string part2str(PartPtr part);
+    std::string part2dot(PartPtr part);
+    std::string partedge2dotstr(PartEdgePtr pedge);
+
+    string getRecvMPIDotValue(PartPtr part);
+    bool isRecvOpATSNode(PartPtr part);
+    bool isMPIOpATSNode(PartPtr part);
+    void generateDot();
+    void generateDotFile();
   };
 }; // end namespace fuse
 #endif

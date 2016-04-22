@@ -92,6 +92,7 @@ public:
 // 2. initialize it under init_sregex and also modify analysis regex
 // 3. add the analysis creation in match_analysis()
 sregex seqcomp, tightcomp, constprop, mpicommcontext, mpivalue, mpicomm, mpidotvalue, deadpath, pointsto, analysis, analysisList, composer, atailseq, scommand, ctailseq, tailseq, headseq, command;
+MPIDotValueAnalysis* mdvanalysis;
 
 void init_sregex() {
   constprop = icase("cp");
@@ -366,25 +367,26 @@ int main(int argc, char* argv[])
 
   init_sregex();
 
-  run_analysis_composition_cmd(seq_cmd_s);
+  // run_analysis_composition_cmd(seq_cmd_s);
 
-  MPI_Barrier(MPI_COMM_WORLD);
+  // MPI_Barrier(MPI_COMM_WORLD);
 
-  run_analysis_composition_cmd(tc_cmd_s);
+  // run_analysis_composition_cmd(tc_cmd_s);
   
   // Sequential composer    
   // scanalyses.push_back(new FlowInSensAddrTakenAnalysis(project));
 
   // scanalyses.push_back(new CallContextSensitivityAnalysis(1, CallContextSensitivityAnalysis::callSite));
-  // scanalyses.push_back(new MPICommContextAnalysis());
-  // scanalyses.push_back(new PointsToAnalysis());
-  // scanalyses.push_back(new ConstantPropagationAnalysis());
-  // scanalyses.push_back(new MPIValueAnalysis());
-  // scanalyses.push_back(new ConstantPropagationAnalysis());
-  // scanalyses.push_back(new DeadPathElimAnalysis());
-  // scanalyses.push_back(new PointsToAnalysis());  
-  // scanalyses.push_back(new ConstantPropagationAnalysis());
-  // scanalyses.push_back(new MPICommAnalysis());
+  scanalyses.push_back(new MPICommContextAnalysis());
+  scanalyses.push_back(new PointsToAnalysis());
+  scanalyses.push_back(new ConstantPropagationAnalysis());
+  scanalyses.push_back(new MPIValueAnalysis());
+  scanalyses.push_back(new ConstantPropagationAnalysis());
+  scanalyses.push_back(new DeadPathElimAnalysis());  
+  scanalyses.push_back(new MPIDotValueAnalysis());
+  scanalyses.push_back(new MPICommAnalysis());
+  MPIDotValueAnalysis* mdvanalysis = new MPIDotValueAnalysis();
+  scanalyses.push_back(mdvanalysis);
   // scanalyses.push_back(new ConstantPropagationAnalysis());
   // scanalyses.push_back(new MPICommAnalysis());
   // scanalyses.push_back(new ConstantPropagationAnalysis());
@@ -395,14 +397,17 @@ int main(int argc, char* argv[])
   // TightComposer* tightcomposer = new TightComposer(tcanalyses);
   // scanalyses.push_back(tightcomposer);
   
-  // checkDataflowInfoPass* cdip = new checkDataflowInfoPass();
-  // ChainComposer cc(scanalyses, cdip, false);
+  checkDataflowInfoPass* cdip = new checkDataflowInfoPass();
+  ChainComposer cc(scanalyses, cdip, false);
 
-  // cc.runAnalysis();
+  cc.runAnalysis();
 
   // if(cdip->getNumErrors() > 0) cout << cdip->getNumErrors() << " Errors Reported!"<<endl;
   // else                         cout << "PASS"<<endl;
 
+  MPIDotGraphGenerator dotgen(mdvanalysis);
+  dotgen.generateDot();
+  dotgen.generateDotFile();
   MPI_Finalize();
 
   cout << "==========  E  N  D  ==========\n";

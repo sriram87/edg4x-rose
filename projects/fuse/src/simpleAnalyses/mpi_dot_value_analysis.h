@@ -30,7 +30,7 @@ namespace fuse {
     std::string dotvalue;
   public:
     MPIDotValueObject(PartEdgePtr pedge);
-    MPIDotValueObject(PartPtr part, PartEdgePtr pedge);
+    MPIDotValueObject(std::string dotvalue, PartEdgePtr pedge);
     MPIDotValueObject(ValueObjectPtr v, PartEdgePtr pedge);
     MPIDotValueObject(const MPIDotValueObject& that);
 
@@ -169,9 +169,10 @@ namespace fuse {
   //! FWDataflow allows this analysis to be composed tightly with other analyses
   //! Analysis produces a stringstream emitting dot graph for the ATS
   class MPIDotValueAnalysis : public FWDataflow {
-
+    int contextid;
+    std::map<PartContextPtr, std::string> context2DotStrMap;
   public:
-    MPIDotValueAnalysis() { }
+    MPIDotValueAnalysis() : contextid(0) { }
     virtual void initAnalysis(std::set<PartPtr>& startingParts);
 
     ComposedAnalysisPtr copy() { return boost::make_shared<MPIDotValueAnalysis>(); }
@@ -196,6 +197,11 @@ namespace fuse {
 
     ValueObjectPtr Expr2Val(SgNode* sgn, PartEdgePtr pedge);
 
+    // Auxillary functions for dotid creation
+    void createContext2dotid(PartContextPtr context);
+    std::string context2dotid(PartContextPtr context) const;
+    std::string part2dotid(PartPtr part) const;
+
     // pretty print for the object
     std::string str(std::string indent="") const;
   };
@@ -206,10 +212,11 @@ namespace fuse {
     MPIDotValueAnalysis* analysis;
   public:
     MPIDotGraphGenerator(MPIDotValueAnalysis* analysis);
-    std::string cfgn2str(CFGNode cfgn);
-    std::string part2str(PartPtr part);
+    std::string cfgn2label(CFGNode cfgn);
+    std::string part2label(PartPtr part);
     std::string part2dot(PartPtr part);
-    std::string partedge2dotstr(PartEdgePtr pedge);
+    std::string partedge2dot(PartEdgePtr pedge);
+    std::string commedge2dot(string sdotvalue, PartPtr target);
 
     string getRecvMPIDotValue(PartPtr part);
     bool isRecvOpATSNode(PartPtr part);

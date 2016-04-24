@@ -7,6 +7,7 @@
 #include <boost/uuid/uuid.hpp>
 #include <boost/uuid/uuid_generators.hpp>
 #include <boost/uuid/uuid_io.hpp>
+#include <algorithm>
 
 
 namespace fuse {
@@ -16,27 +17,13 @@ namespace fuse {
   /*********************
    * MPIDotValueObject *
    *********************/
-  string part2dotid(PartPtr part) {
-    int flag;
-    MPI_Initialized(&flag); assert(flag);
-    int rank; MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-
-    set<CFGNode> cfgnset = part->CFGNodes();
-    assert(cfgnset.size() == 1);
-    CFGNode cn = *cfgnset.begin();
-    ostringstream oss;
-    oss << cn.id() << "_rank_" << rank;
-    return oss.str();
-  }
-  
   MPIDotValueObject::MPIDotValueObject(PartEdgePtr pedge)
      : Lattice(pedge), FiniteLattice(pedge), ValueObject(0) {
     dotvalue="";
   }
   
-  MPIDotValueObject::MPIDotValueObject(PartPtr part, PartEdgePtr pedge)
-    : Lattice(pedge), FiniteLattice(pedge), ValueObject(0) {    
-    dotvalue = part2dotid(part);
+  MPIDotValueObject::MPIDotValueObject(string dotvalue, PartEdgePtr pedge)
+    : Lattice(pedge), FiniteLattice(pedge), ValueObject(0), dotvalue(dotvalue) {    
   }
 
   MPIDotValueObject::MPIDotValueObject(ValueObjectPtr v, PartEdgePtr pedge)
@@ -574,7 +561,8 @@ namespace fuse {
     MPISendOpCallSite sendcs(mpif_, sgn);
     SgNode* bexpr = sendcs.getSendBuffer();
     MemLocObjectPtr bml = analysis->getComposer()->Expr2MemLoc(bexpr, part->inEdgeFromAny(), analysis);
-    MPIDotValueObjectPtr mdv = boost::make_shared<MPIDotValueObject>(part, part->inEdgeFromAny());
+    string dotvalue = analysis->part2dotid(part);
+    MPIDotValueObjectPtr mdv = boost::make_shared<MPIDotValueObject>(dotvalue, part->inEdgeFromAny());
     if(mpiDotValueAnalysisDebugLevel() >= 2) {    
       dbg << "bml=" << bml->str() << endl;
       dbg << "mdv=" << mdv->str() << endl;
@@ -624,11 +612,46 @@ namespace fuse {
     assert(false);
   }
 
+  void MPIDotValueAnalysis::createContext2dotid(PartContextPtr pcontext) {
+    if(context2DotStrMap.find(pcontext) != context2DotStrMap.end()) return;
+    ostringstream oss;
+    oss << "cc" << contextid++;
+    context2DotStrMap[pcontext] = oss.str();
+  }
+
+  string MPIDotValueAnalysis::context2dotid(PartContextPtr pcontext) const {
+    map<PartContextPtr, string>::const_iterator f = context2DotStrMap.find(pcontext);
+    assert(f != context2DotStrMap.end());
+    return f->second;
+  }
+
+  string MPIDotValueAnalysis::part2dotid(PartPtr part) const {
+    int flag;
+    MPI_Initialized(&flag); assert(flag);
+    int rank; MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+
+    set<CFGNode> cfgnset = part->CFGNodes();
+    assert(cfgnset.size() == 1);
+    CFGNode cn = *cfgnset.begin();
+
+    ostringstream oss;    
+    oss << cn.id() << "_rank_" << rank << "_" << context2dotid(part->getPartContext());
+    string id = oss.str();
+
+    // Sanity checks
+    std::replace(id.begin(), id.end(), ' ', '_');
+    std::replace(id.begin(), id.end(), ':', '_');
+
+    return id;
+  }
+  
   boost::shared_ptr<DFTransferVisitor>
   MPIDotValueAnalysis::getTransferVisitor(PartPtr part, 
                                           CFGNode cfgn, 
                                           NodeState& state, 
                                           map<PartEdgePtr, vector<Lattice*> >& dfInfo) {
+    // For each new context create a dot id
+    createContext2dotid(part->getPartContext());    
     // can't use boost::make_shared here
     return boost::shared_ptr<MDVTransferVisitor>(new MDVTransferVisitor(part,cfgn,state,dfInfo, this));
   }
@@ -683,39 +706,6 @@ namespace fuse {
     return false;       
   }
 
-  string MPIDotGraphGenerator::cfgn2str(CFGNode cfgn) {
-    ostringstream oss;
-    string node_s;
-    SgNode* sgn = cfgn.getNode();
-    //node_s = SageInterface::get_name(sgn);
-    node_s = CFGNode2Str(cfgn);
-    if(node_s.length() > 25) {
-      node_s.resize(25); node_s += "...";
-    }
-    oss << node_s << "\n<" << sgn->class_name() << "> "
-        << " line:" << sgn->get_startOfConstruct()->get_line();
-    return oss.str();
-  }
-
-  string MPIDotGraphGenerator::part2str(PartPtr part) {
-    set<CFGNode> cfgnset = part->CFGNodes();
-    ostringstream oss;
-    set<CFGNode>::iterator ci = cfgnset.begin();
-    for( ; ci != cfgnset.end(); ) {      
-      oss << cfgn2str(*ci);
-      ++ci;
-      if(ci != cfgnset.end()) oss << ", ";      
-    }
-
-    int flag;
-    MPI_Initialized(&flag);
-    if(flag) {
-      int rank; MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-      oss << " rank: " << rank;
-    }    
-    return oss.str();
-  }
-
   bool MPIDotGraphGenerator::isMPIOpATSNode(PartPtr part) {
     SgFunctionCallExp* callexp = part->mustSgNodeAll<SgFunctionCallExp>();
     if(callexp) {
@@ -725,16 +715,14 @@ namespace fuse {
     return false;
   }
 
-  string MPIDotGraphGenerator::part2dot(PartPtr part) {
-    ostringstream oss;
-    string nodeColor = "black";
-    if (part->mustSgNodeAll<SgStatement>()) nodeColor = "blue";
-    else if (isMPIOpATSNode(part)) nodeColor = "firebrick1";
-    else if (part->mustSgNodeAll<SgExpression>()) nodeColor = "darkgreen";
-    else if (part->mustSgNodeAll<SgInitializedName>()) nodeColor = "brown";
-    oss << "[label=\"" << escapeString(part2str(part)) << "\""
-        << ", color=" << nodeColor << "];\n";
-    return oss.str();
+  bool MPIDotGraphGenerator::isRecvOpATSNode(PartPtr part) {
+    SgFunctionCallExp* callexp = part->mustSgNodeAll<SgFunctionCallExp>();
+    if(callexp) {
+      Function mpif_(callexp);
+      MPIRecvOpCallSite recvcs(mpif_, callexp);
+      if(recvcs.isRecvOp()) return true;
+    }
+    return false;
   }
 
   string MPIDotGraphGenerator::getRecvMPIDotValue(PartPtr part) {
@@ -751,16 +739,71 @@ namespace fuse {
     return mdv->get_dot_value();    
   }
 
-  bool MPIDotGraphGenerator::isRecvOpATSNode(PartPtr part) {
-    SgFunctionCallExp* callexp = part->mustSgNodeAll<SgFunctionCallExp>();
-    if(callexp) {
-      Function mpif_(callexp);
-      MPIRecvOpCallSite recvcs(mpif_, callexp);
-      if(recvcs.isRecvOp()) return true;
+  string MPIDotGraphGenerator::cfgn2label(CFGNode cfgn) {
+    ostringstream oss;
+    string node_s;
+    SgNode* sgn = cfgn.getNode();
+    node_s = SageInterface::get_name(sgn);
+    //node_s = CFGNode2Str(cfgn);
+    if(node_s.length() > 25) {
+      node_s.resize(25); node_s += "...";
     }
-    return false;
+    oss << node_s << "\n<" << sgn->class_name() << "> "
+        << " line:" << sgn->get_startOfConstruct()->get_line();
+    return oss.str();
   }
 
+  string MPIDotGraphGenerator::part2label(PartPtr part) {
+    set<CFGNode> cfgnset = part->CFGNodes();
+    ostringstream oss;
+    set<CFGNode>::iterator ci = cfgnset.begin();
+    for( ; ci != cfgnset.end(); ) {      
+      oss << cfgn2label(*ci);
+      ++ci;
+      if(ci != cfgnset.end()) oss << ", ";      
+    }
+
+    int flag;
+    MPI_Initialized(&flag);
+    if(flag) {
+      int rank; MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+      oss << " rank: " << rank;
+    }
+    return oss.str();
+  }
+  
+  string MPIDotGraphGenerator::part2dot(PartPtr part) {
+    ostringstream oss;
+    string nodeColor = "black";
+    if (part->mustSgNodeAll<SgStatement>()) nodeColor = "blue";
+    else if (isMPIOpATSNode(part)) nodeColor = "firebrick1";
+    else if (part->mustSgNodeAll<SgExpression>()) nodeColor = "darkgreen";
+    else if (part->mustSgNodeAll<SgInitializedName>()) nodeColor = "brown";
+    // First write the id
+    oss << analysis->part2dotid(part) << " ";
+    // Write the attributes
+    oss << "[label=\"" << escapeString(part2label(part)) << "\""
+        << ", color=" << nodeColor << "];\n";
+    return oss.str();
+  }
+
+  string MPIDotGraphGenerator::partedge2dot(PartEdgePtr pedge) {
+    ostringstream oss;
+    PartPtr s = pedge->source();
+    PartPtr t = pedge->target();
+    // First write the dot edge
+    oss << analysis->part2dotid(s) << " -> " << analysis->part2dotid(t);
+    oss << " [color=\"black\"];" << endl;
+    return oss.str();
+  }
+
+  string MPIDotGraphGenerator::commedge2dot(string sdotvalue, PartPtr target) {
+    ostringstream oss;
+    string tdotvalue = analysis->part2dotid(target);    
+    oss << sdotvalue << " -> " << tdotvalue << " [color=\"firebrick1\"];" << endl;
+    return oss.str();
+  }
+  
   void MPIDotGraphGenerator::generateDot() {
     Composer* composer = analysis->getComposer();
     set<PartPtr> initial = composer->GetStartAStates(analysis);
@@ -771,27 +814,41 @@ namespace fuse {
       ei.addStart(*ip);
     }
 
+    int flag;
+    MPI_Initialized(&flag);
+    int rank = 0;
+    if(flag) {
+      MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+    }
+
+    nodess.clear(); edgess.clear();
+
+    nodess << "\n subgraph cluster_" << rank << " {\n";
+    string indent = "    ";
+
     while(ei != fw_dataflowGraphEdgeIterator<PartEdgePtr, PartPtr>::end()) {
-      PartPtr part = ei.getPart();      
-      nodess << part2dotid(part) << " " << part2dot(part);
+      PartPtr part = ei.getPart();
+      // Write the node
+      nodess << indent << part2dot(part);
+
+      // Write the edges
       list<PartEdgePtr> oedges = part->outEdges();
       list<PartEdgePtr>::iterator oe = oedges.begin();
       for( ; oe != oedges.end(); ++oe) {
-        PartPtr tgt = (*oe)->target();
-        edgess << part2dotid(part) << "->" << part2dotid(tgt) << endl;
+        edgess << indent << partedge2dot(*oe);               
       }
 
+      // Write comm edges if any
       set<CFGNode> cfgnodes;
+      // Check if we have a commuication edge on this SgFunctionCallExp for MPI_Recv
       if(isRecvOpATSNode(part) && part->mustIncomingFuncCall(cfgnodes)) {
         string rdotvalue = getRecvMPIDotValue(part);
-        edgess << rdotvalue << "->" << part2dotid(part)
-               << " [color=\"firebrick1\"];" << endl;
+        edgess << indent << commedge2dot(rdotvalue, part);               
       }
-
-      ei.pushAllDescendants();
-      
+      ei.pushAllDescendants();      
       ei++;
     }
+    nodess << indent << "}" << endl;
   }
 
   void MPIDotGraphGenerator::generateDotFile() {
@@ -814,7 +871,10 @@ namespace fuse {
     if(rank == 0) {
       oss << "digraph G {" << endl;
     }
-    oss << nodess.str() << edgess.str() << endl;
+    
+    oss << nodess.str();
+    oss << edgess.str() << endl;
+
     if(rank == size-1) {
       oss << "}";
     }
@@ -835,5 +895,4 @@ namespace fuse {
     MPI_File_close(&file);
     delete c_buff;    
   }
-
 }; // end namespace

@@ -61,7 +61,8 @@ include_HEADERS =\
 	sparse/pointerAnalysis.h \
 	sparse/SSAVariableStateTransfer.h \
 	sparse/valueNumbering.h \
-	state/nodeState.h
+	state/nodeState.h \
+	fuseCommandParser.h
 
 ##################
 # TEST VARIABLES #
@@ -302,6 +303,7 @@ fuseMPI_SOURCES = \
 	simpleAnalyses/saveDotAnalysis.C \
 	simpleAnalyses/taintAnalysis.C \
 	state/nodeState.C \
+	fuseCommandParser.C \
 	fuseTestMPIAnalysis.C
 
 .PHONY: clean-fusempi

@@ -743,10 +743,10 @@ namespace fuse {
     ostringstream oss;
     string node_s;
     SgNode* sgn = cfgn.getNode();
-    node_s = SageInterface::get_name(sgn);
-    //node_s = CFGNode2Str(cfgn);
-    if(node_s.length() > 25) {
-      node_s.resize(25); node_s += "...";
+    // node_s = SageInterface::get_name(sgn);
+    node_s = CFGNode2Str(cfgn);
+    if(node_s.length() > 20) {
+      node_s.resize(20); node_s += "...";
     }
     oss << node_s << "\n<" << sgn->class_name() << "> "
         << " line:" << sgn->get_startOfConstruct()->get_line();
@@ -800,7 +800,7 @@ namespace fuse {
   string MPIDotGraphGenerator::commedge2dot(string sdotvalue, PartPtr target) {
     ostringstream oss;
     string tdotvalue = analysis->part2dotid(target);    
-    oss << sdotvalue << " -> " << tdotvalue << " [color=\"firebrick1\"];" << endl;
+    oss << sdotvalue << " -> " << tdotvalue << " [color=\"firebrick1\", constraint=false, weight=20];" << endl;
     return oss.str();
   }
   
@@ -893,6 +893,6 @@ namespace fuse {
     int offset = rank * buffsize * sizeof(char);
     MPI_File_write_at(file, offset, c_buff, buffsize, MPI_CHAR, MPI_STATUS_IGNORE);
     MPI_File_close(&file);
-    delete c_buff;    
+    //delete c_buff;    
   }
 }; // end namespace

@@ -45,6 +45,7 @@ include_HEADERS =\
 	simpleAnalyses/mpi_comm_context_analysis.h \
 	simpleAnalyses/mpi_comm_analysis.h \
 	simpleAnalyses/mpi_dot_value_analysis.h \
+	simpleAnalyses/ortho_array_analysis.h \
 	simpleAnalyses/pointsToAnalysis.h \
 	simpleAnalyses/printAnalysisStates.h \
 	simpleAnalyses/saveDotAnalysis.h \
@@ -298,6 +299,7 @@ fuseMPI_SOURCES = \
 	simpleAnalyses/mpi_comm_analysis.C \
 	simpleAnalyses/mpi_dot_value_analysis.C \
 	simpleAnalyses/mpi_value_analysis.C \
+	simpleAnalyses/ortho_array_analysis.C \
 	simpleAnalyses/pointsToAnalysis.C \
 	simpleAnalyses/printAnalysisStates.C \
 	simpleAnalyses/saveDotAnalysis.C \

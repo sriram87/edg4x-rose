@@ -9,6 +9,7 @@
 #include "mpi_comm_analysis.h"
 #include "mpi_dot_value_analysis.h"
 #include "address_taken_analysis.h"
+#include "ortho_array_analysis.h"
 #include <boost/xpressive/xpressive.hpp>
 #include "fuseCommandParser.h"
 
@@ -140,11 +141,19 @@ namespace fuse {
     mpicomm = icase("mco");
     mpidotvalue = icase("mdv");
     pointsto = icase("pt");
+    array = icase("arr");
     deadpath = icase("dp");
     seqcomp = icase("seq");
     tightcomp = icase("tight");
-    analysis = by_ref(constprop) | by_ref(mpicommcontext) | by_ref(mpivalue) | by_ref(mpicomm)
-      | by_ref(mpidotvalue) | by_ref(pointsto) | by_ref(deadpath);
+    analysis = by_ref(constprop)
+      | by_ref(mpicommcontext) 
+      | by_ref(mpivalue) 
+      | by_ref(mpicomm)
+      | by_ref(mpidotvalue) 
+      | by_ref(pointsto) 
+      | by_ref(deadpath)
+      | by_ref(array);
+    
     composer = by_ref(seqcomp) | by_ref(tightcomp);
     atailseq = *_s >> as_xpr(',') >> *_s >> analysis >> *_s;
     analysisList = '(' >> *_s >> analysis >> *by_ref(atailseq) >> ')';
@@ -184,6 +193,9 @@ namespace fuse {
     else if(regex_match(analysis_s, deadpath)) {
       cc.push_back(new DeadPathElimAnalysis());
       // cout << "analysis=deadpath" << endl;
+    }
+    else if(regex_match(analysis_s, array)) {
+      cc.push_back(new ArrayAnalysis());
     }
     else {
       ostringstream oss;

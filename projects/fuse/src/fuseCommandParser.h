@@ -77,7 +77,15 @@ namespace fuse {
     // 1. add a new sregex
     // 2. initialize it under FuseCommandParser and also modify analysis regex
     // 3. add the analysis creation in matchAnalysisToken
-    boost::xpressive::sregex constprop, mpicommcontext, mpivalue, mpicomm, mpidotvalue, deadpath, pointsto, analysis;
+    boost::xpressive::sregex constprop, 
+      mpicommcontext, 
+      mpivalue, 
+      mpicomm, 
+      mpidotvalue, 
+      deadpath, 
+      pointsto,
+      array,
+      analysis;
     
     boost::xpressive::sregex composer;
     boost::xpressive::sregex analysisList, atailseq, scommand, ctailseq, tailseq, headseq, command;

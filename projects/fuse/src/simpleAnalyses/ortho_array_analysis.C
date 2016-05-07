@@ -49,8 +49,8 @@ namespace fuse {
        thatML->getMType() == ArrayML::full) return true;
 
     // When the two types are not the same
-    else if((mtype == ArrayML::array && thatML->getMtype() == ArrayML::notarray) ||
-            (mtype == ArrayML::notarray && thatML->getMtype() == ArrayML::array)) {
+    else if((mtype == ArrayML::array && thatML->getMType() == ArrayML::notarray) ||
+            (mtype == ArrayML::notarray && thatML->getMType() == ArrayML::array)) {
     }
 
     // When both ArrayML are 'notarray' type

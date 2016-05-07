@@ -330,6 +330,7 @@ namespace fuse {
     std::set<PartPtr> GetStartAStates_Spec();
     std::set<PartPtr> GetEndAStates_Spec();
 
+  public:
     std::string str(std::string indent="") const;
 
   }; // end TightComposer

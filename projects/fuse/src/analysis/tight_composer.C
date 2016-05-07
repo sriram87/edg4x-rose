@@ -813,6 +813,6 @@ namespace fuse {
   }
 
   std::string TightComposer::str(std::string indent) const {
-    return txt() << "TightComposer";
+    return "TightComposer";
   }
 };

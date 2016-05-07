@@ -33,6 +33,19 @@ namespace fuse {
     ~FuseCommand();
   };
 
+  /**************************
+   * FuseMPIDotValueCommand *
+   **************************/
+  class FuseMPIDotValueCommand {
+    MPIDotValueAnalysis* mdvanalysis;
+    list<ComposedAnalysis*> subanalyses;
+    ComposedAnalysis* root;
+  public:
+    FuseMPIDotValueCommand();
+    void execute();
+    void generateDot();
+  };
+
   /******************
    * MatchException *
    ******************/

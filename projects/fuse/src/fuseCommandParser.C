@@ -102,6 +102,34 @@ namespace fuse {
     return oss.str();
   }
 
+  /**************************
+   * FuseMPIDotValueCommand *
+   **************************/
+  FuseMPIDotValueCommand::FuseMPIDotValueCommand() {
+    subanalyses.push_back(new MPICommContextAnalysis());
+    subanalyses.push_back(new PointsToAnalysis());
+    subanalyses.push_back(new ConstantPropagationAnalysis());
+    subanalyses.push_back(new MPIValueAnalysis());
+    subanalyses.push_back(new ConstantPropagationAnalysis());
+    subanalyses.push_back(new DeadPathElimAnalysis());
+    subanalyses.push_back(new MPIDotValueAnalysis());
+    subanalyses.push_back(new MPICommAnalysis());
+    mdvanalysis = new MPIDotValueAnalysis();
+    subanalyses.push_back(mdvanalysis);    
+  }
+
+  void FuseMPIDotValueCommand::execute() {
+    checkDataflowInfoPass* cdip = new checkDataflowInfoPass();
+    root = new ChainComposer(subanalyses, cdip, true);
+    ((ChainComposer*)root)->runAnalysis();
+  }
+
+  void FuseMPIDotValueCommand::generateDot() {
+    MPIDotGraphGenerator dotgen(mdvanalysis);
+    dotgen.generateDot();
+    dotgen.generateDotFile();
+  }
+
   /*********************
    * FuseCommandParser *
    *********************/

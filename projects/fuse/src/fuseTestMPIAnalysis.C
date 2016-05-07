@@ -92,6 +92,10 @@ int main(int argc, char* argv[])
     dotgen.generateDotFile();
   }
 
+  // FuseMPIDotValueCommand dotvalueanaysis;
+  // dotvalueanaysis.execute();
+  // dotvalueanaysis.generateDot();
+
   // init_sregex();
 
   // run_analysis_composition_cmd(seq_cmd_s);

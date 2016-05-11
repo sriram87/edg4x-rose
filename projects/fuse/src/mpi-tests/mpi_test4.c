@@ -2,6 +2,8 @@
 
 int CompDebugAssert(int expr);
 
+#pragma fuse seq(mcc, pt, cp,mv, cp, dp, mdv, mco, mdv)
+
 int main(int argc, char* argv[]) {
   int rank, size;
   MPI_Init(&argc, &argv);
@@ -12,15 +14,15 @@ int main(int argc, char* argv[]) {
     x = 2;
     MPI_Send(&x, 1, MPI_INT, rank+1, 0, MPI_COMM_WORLD);
     y = 3;
-    MPI_Send(&y, 1, MPI_INT, rank+1, 0, MPI_COMM_WORLD);
+    MPI_Send(&x, 1, MPI_INT, rank+1, 0, MPI_COMM_WORLD);
   }
   else if(rank == 1) {
     MPI_Status status;
     MPI_Recv(&x, 1, MPI_INT, rank-1, 0, MPI_COMM_WORLD, &status);
-    MPI_Recv(&y, 1, MPI_INT, rank-1, 0, MPI_COMM_WORLD, &status);
+    MPI_Recv(&x, 1, MPI_INT, rank-1, 0, MPI_COMM_WORLD, &status);
   }
 
-  CompDebugAssert(y == 3);
+  CompDebugAssert(x == 3);
 
   MPI_Finalize();
   return 0;

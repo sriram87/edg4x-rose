@@ -1,6 +1,8 @@
-#include <stdio.h>
-#include <math.h>
+//#include <stdio.h>
+//#include <math.h>
 #include "_mpi.h"
+
+#pragma fuse seq(mcc, pt, cp, mv, cp, dp, arr, pt, mdv, mco, mdv)
 
 /* This example handles a 12 x 12 mesh, on 4 processors only. */
 #define maxn 12
@@ -19,7 +21,7 @@ int main(int argc, char* argv[] )
   MPI_Comm_rank( MPI_COMM_WORLD, &rank );
   MPI_Comm_size( MPI_COMM_WORLD, &size );
 
-  if (size != 4) MPI_Abort( MPI_COMM_WORLD, 1 );
+  // if (size != 4) MPI_Abort( MPI_COMM_WORLD, 1 );
 
   /* xlocal[][0] is lower ghostpoints, xlocal[][maxn+2] is upper */
 
@@ -31,8 +33,8 @@ int main(int argc, char* argv[] )
   if (rank == size - 1) i_last--;
 
   /* Fill the data as specified */
-  for (i=1; i<=maxn/size; i++) 
-  for (j=0; j<maxn; j++) 
+  for (i=1; i<=maxn/size; i++)
+  for (j=0; j<maxn; j++)
    xlocal[i][j] = rank;
   for (j=0; j<maxn; j++) {
   xlocal[i_first-1][j] = -1;
@@ -58,24 +60,24 @@ int main(int argc, char* argv[] )
 		MPI_COMM_WORLD, &status );
     
     /* Compute new values (but not on boundary) */
-       itcnt ++;
+    itcnt ++;
     diffnorm = 0.0;
     for (i=i_first; i<=i_last; i++) 
-     for (j=1; j<maxn-1; j++) {
+    for (j=1; j<maxn-1; j++) {
     xnew[i][j] = (xlocal[i][j+1] + xlocal[i][j-1] +
     		      xlocal[i+1][j] + xlocal[i-1][j]) / 4.0;
-    	diffnorm += (xnew[i][j] - xlocal[i][j]) * 
+    	diffnorm += (xnew[i][j] - xlocal[i][j]) *
     	  (xnew[i][j] - xlocal[i][j]);
     }
-    /* Only transfer the interior points */
-    for (i=i_first; i<=i_last; i++) 
-    for (j=1; j<maxn-1; j++) 
+    // Only transfer the interior points
+    for (i=i_first; i<=i_last; i++)
+    for (j=1; j<maxn-1; j++)
     	xlocal[i][j] = xnew[i][j];
 
     //MPI_Allreduce( &diffnorm, &gdiffnorm, 1, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD );
-    gdiffnorm = sqrt( gdiffnorm );
-    if (rank == 0) printf( "At iteration %d, diff is %e\n", itcnt, 
-    			   gdiffnorm );
+    /* gdiffnorm = sqrt( gdiffnorm ); */
+    //if (rank == 0) printf( "At iteration %d, diff is %e\n", itcnt, 
+    //			   gdiffnorm );
   } while (gdiffnorm > 1.0e-2 && itcnt < 100);
 
   MPI_Finalize( );

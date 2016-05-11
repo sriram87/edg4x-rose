@@ -55,8 +55,9 @@ namespace fuse
       void visit(SgVarRefExp*);
       void visit(SgDotExp*);
       void visit(SgPointerDerefExp*);
+      void visit(SgPntrArrRefExp*);
       void visit(SgCastExp*);
-      void visit(SgExpression*);
+      void visit(SgExpression*);      
 
       bool isLatElemModified() const;
       MemLocObjectPtr getExpr2MemLoc(SgExpression* sgn, PartEdgePtr pedge);

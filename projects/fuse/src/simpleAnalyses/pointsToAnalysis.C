@@ -76,6 +76,12 @@ namespace fuse
 
   void PointsToAnalysisTransfer::PointerExprTransfer::visit(SgExpression* sgn) {
     dbg << "Unhandled expr=" << SgNode2Str(sgn) << "PointerExprTransfer\n";
+    assert(false);
+  }
+
+  void PointsToAnalysisTransfer::PointerExprTransfer::visit(SgPntrArrRefExp* sgn) {
+    MemLocObjectPtr toML = getExpr2MemLoc(sgn, pedge);
+    modified = latElem->insert(toML);
   }
 
   MemLocObjectPtr PointsToAnalysisTransfer::PointerExprTransfer::getExpr2MemLoc(SgExpression* sgn, PartEdgePtr pedge) {
@@ -109,6 +115,20 @@ namespace fuse
       latElem->setToEmpty();
       PointerExprTransfer* exprTransfer = new PointerExprTransfer(latElem, sgn, part->inEdgeFromAny(), latticeMapIn, *this);
       rexpr->accept(*exprTransfer);
+      if(exprTransfer->isLatElemModified()) {
+        PointsToRelation prel = make_pointsto(keyML, latElem);
+        modified = updateLatticeMap(latticeMapIn, prel);
+      }
+      delete exprTransfer;
+    }
+    else if(isSgPointerType(lexpr->get_type()) &&
+            !isSgPointerType(rexpr->get_type())) {
+      MemLocObjectPtr keyML = getLatticeMapKeyML(sgn, lexpr, part->inEdgeFromAny());
+      boost::shared_ptr<AbstractObjectSet> latElem = boost::dynamic_pointer_cast<AbstractObjectSet>(latticeMapIn->get(keyML));
+      assert(latElem);
+      latElem->setToEmpty();
+      PointerExprTransfer* exprTransfer = new PointerExprTransfer(latElem, sgn, part->inEdgeFromAny(), latticeMapIn, *this);
+      rexpr->accept(*exprTransfer);      
       if(exprTransfer->isLatElemModified()) {
         PointsToRelation prel = make_pointsto(keyML, latElem);
         modified = updateLatticeMap(latticeMapIn, prel);
@@ -303,8 +323,8 @@ namespace fuse
       }
 
       boost::shared_ptr<AbstractObjectSet> aos_p = boost::dynamic_pointer_cast<AbstractObjectSet>(aom_p->get(opML_p));
-      assert(!aos_p->isEmptyLat());
       if(pointsToAnalysisDebugLevel() >= 2) dbg << "MLSet=" << aos_p->str() << endl;
+      assert(!aos_p->isEmptyLat());
       ptML_p->add(aos_p, pedge);
       break;
     }

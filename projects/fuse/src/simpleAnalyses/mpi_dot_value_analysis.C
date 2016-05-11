@@ -862,60 +862,73 @@ namespace fuse {
 
   void MPIDotGraphGenerator::generateDotFile() {
     MPI_File file;
-    
-    SgProject* project = SageInterface::getProject();
-    SgFile* sgfile = project->get_files()[0]; assert(sgfile);
-    string filename = StringUtility::stripPathFromFileName(sgfile->getFileName()) + ".comm.ats.dot"; 
-    MPI_File_open(MPI_COMM_WORLD, filename.c_str(),
-                  MPI_MODE_CREATE | MPI_MODE_WRONLY,
-                  MPI_INFO_NULL, &file);
 
     int iflag;
     MPI_Initialized(&iflag);
     assert(iflag);
-    int rank; MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-    int size; MPI_Comm_size(MPI_COMM_WORLD, &size);
-
-    ostringstream oss;
-    if(rank == 0) {
-      oss << "digraph G {" << endl;
-    }
+    if(iflag) {
     
-    oss << nodess.str();
-    oss << edgess.str() << endl;
+      SgProject* project = SageInterface::getProject();
+      SgFile* sgfile = project->get_files()[0]; assert(sgfile);
+      string filename = StringUtility::stripPathFromFileName(sgfile->getFileName()) + ".comm.ats.dot"; 
+      MPI_File_open(MPI_COMM_WORLD, filename.c_str(),
+                    MPI_MODE_CREATE | MPI_MODE_WRONLY,
+                    MPI_INFO_NULL, &file);
 
-    if(rank == size-1) {
-      oss << "}";
-    }
-    
-    string buff = oss.str();
-    char * writable = new char[buff.size() + 1];
-    std::copy(buff.begin(), buff.end(), writable);
-    writable[buff.size()] = '\0'; // don't forget the terminating 0
-    unsigned int buffsize = strlen(writable) + 1;
+      int rank; MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+      int size; MPI_Comm_size(MPI_COMM_WORLD, &size);
 
-    MPI_Offset offset, c_offset;
-    offset = (long long) rank * buffsize * sizeof(char);
-    MPI_File_seek(file, offset, MPI_SEEK_SET);
-    MPI_File_get_position(file, &c_offset);
-    MPI_Status status;
-    MPI_File_write(file, writable, buffsize, MPI_CHAR, &status);
+      ostringstream oss;
+      if(rank == 0) {
+        oss << "digraph G {" << endl;
+      }
     
-    // MPI_File_get_position(fh, &my_current_offset);
+      oss << nodess.str();
+      oss << edgess.str() << endl;
+
+      if(rank == size-1) {
+        oss << "}";
+      }
+    
+      string buff = oss.str();
+      char * writable = new char[buff.size() + 1];
+      std::copy(buff.begin(), buff.end(), writable);
+      writable[buff.size()] = '\0'; // don't forget the terminating 0
+      unsigned int buffsize = strlen(writable);
+
+      // do all gather
+
+      MPI_Barrier(MPI_COMM_WORLD);
+      unsigned int bufflen[size]; //offsets is where a process need to start writing from
+      MPI_Allgather(&buffsize, 1, MPI_UNSIGNED, bufflen, 1, MPI_UNSIGNED, MPI_COMM_WORLD);
+
+      unsigned int offsets[size];
+      int reduce = 0;
+      for(int oi = 1; oi < size; ++oi) {
+        reduce = reduce + bufflen[oi-1];
+        offsets[oi] = reduce;        
+      }
+      offsets[0] = 0;
+
+      MPI_Offset offset, c_offset;
+      offset = (long long) offsets[rank] * sizeof(char);
+
+      // MPI_File_seek(file, offset, MPI_SEEK_SET);
+      MPI_Status status;
+      MPI_File_write_at(file, offset, writable, buffsize, MPI_CHAR, &status);
+
+      // MPI_File_get_position(fh, &my_current_offset);
   
-    // printf ("%3d: my current offset is %lld\n", my_rank, my_current_offset);
+      // printf ("%3d: my current offset is %lld\n", my_rank, my_current_offset);
 
-    MPI_File_close(&file);
+      MPI_File_close(&file);
     
-    // MPI_File_set_view(file, rank * buffsize * sizeof(char),
-    //                    MPI_CHAR, MPI_CHAR, "native",
-    //                    MPI_INFO_NULL);
-    // MPI_File_set_atomicity(file, 1);
+      // MPI_File_set_view(file, rank * buffsize * sizeof(char),
+      //                    MPI_CHAR, MPI_CHAR, "native",
+      //                    MPI_INFO_NULL);
+      // MPI_File_set_atomicity(file, 1);
 
-    // MPI_Status status;
-    // int offset = rank * buffsize * sizeof(char);
-    // MPI_File_write_at(file, offset, writable, buffsize, MPI_CHAR, &status);
-    // MPI_File_close(&file);
-    delete[] writable;
+      delete[] writable;
+    } // end if flag
   }
 }; // end namespace

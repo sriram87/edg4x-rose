@@ -3481,35 +3481,35 @@ void ConstantPropagationAnalysisTransfer::visit(SgPntrArrRefExp *paRef) {
       assert(core);
     } else assert(0);
   } else assert(0);*/
-  MemLocObjectPtr ml = composer->OperandExpr2MemLoc(paRef, paRef->get_lhs_operand(), part->inEdgeFromAny(), analysis);
-  if(constantPropagationAnalysisDebugLevel()>=1) dbg << "ml="<<(ml? ml->str(): "NULL")<<endl;
-  UnionMemLocObjectPtr mlUnion = boost::dynamic_pointer_cast<UnionMemLocObject>(ml);
-  assert(mlUnion);
-  const std::list<MemLocObjectPtr>& mlVals = mlUnion->getMemLocs();
-  assert(mlVals.size()==1);
-  CPMemLocObjectPtr core = boost::dynamic_pointer_cast<CPMemLocObject>(*mlVals.begin());
-  assert(core);
-  if(constantPropagationAnalysisDebugLevel()>=1) dbg << "core="<<(core? core->str(): "NULL")<<endl;
+//   MemLocObjectPtr ml = composer->OperandExpr2MemLoc(paRef, paRef->get_lhs_operand(), part->inEdgeFromAny(), analysis);
+//   if(constantPropagationAnalysisDebugLevel()>=1) dbg << "ml="<<(ml? ml->str(): "NULL")<<endl;
+//   UnionMemLocObjectPtr mlUnion = boost::dynamic_pointer_cast<UnionMemLocObject>(ml);
+//   assert(mlUnion);
+//   const std::list<MemLocObjectPtr>& mlVals = mlUnion->getMemLocs();
+//   assert(mlVals.size()==1);
+//   CPMemLocObjectPtr core = boost::dynamic_pointer_cast<CPMemLocObject>(*mlVals.begin());
+//   assert(core);
+//   if(constantPropagationAnalysisDebugLevel()>=1) dbg << "core="<<(core? core->str(): "NULL")<<endl;
 
-  // In expression array[i], the value location denoted by "i"
-  ValueObjectPtr val = composer->OperandExpr2Val(paRef, paRef->get_rhs_operand(), part->inEdgeFromAny(), analysis);
-  if(constantPropagationAnalysisDebugLevel()>=1) dbg << "val="<<val->str()<<endl;
-  UnionValueObjectPtr indexUnion = boost::dynamic_pointer_cast<UnionValueObject>(val);
-  assert(indexUnion);
-  const std::list<ValueObjectPtr>& indexVals = indexUnion->getVals();
-  assert(indexVals.size()==1);
-  CPValueObjectPtr index = boost::dynamic_pointer_cast<CPValueObject>(*indexVals.begin());
-  assert(index);
-  if(constantPropagationAnalysisDebugLevel()>=1) dbg << "index="<<index->str()<<endl;
+//   // In expression array[i], the value location denoted by "i"
+//   ValueObjectPtr val = composer->OperandExpr2Val(paRef, paRef->get_rhs_operand(), part->inEdgeFromAny(), analysis);
+//   if(constantPropagationAnalysisDebugLevel()>=1) dbg << "val="<<val->str()<<endl;
+//   UnionValueObjectPtr indexUnion = boost::dynamic_pointer_cast<UnionValueObject>(val);
+//   assert(indexUnion);
+//   const std::list<ValueObjectPtr>& indexVals = indexUnion->getVals();
+//   assert(indexVals.size()==1);
+//   CPValueObjectPtr index = boost::dynamic_pointer_cast<CPValueObject>(*indexVals.begin());
+//   assert(index);
+//   if(constantPropagationAnalysisDebugLevel()>=1) dbg << "index="<<index->str()<<endl;
   
-  // Compute the offset into the region of the core MemLoc that results from the arraypntr reference expression
-  CPValueObjectPtr offset = core->getCPIndex()->op(paRef, index);
-  if(constantPropagationAnalysisDebugLevel()>=1) dbg << "offset="<<offset->str()<<endl;
+//   // Compute the offset into the region of the core MemLoc that results from the arraypntr reference expression
+//   CPValueObjectPtr offset = core->getCPIndex()->op(paRef, index);
+//   if(constantPropagationAnalysisDebugLevel()>=1) dbg << "offset="<<offset->str()<<endl;
   
-  CPMemLocObjectPtr paRefML = boost::make_shared<CPMemLocObject>(core->getRegion(), offset, paRef, part->inEdgeFromAny(), analysis);
-  if(constantPropagationAnalysisDebugLevel()>=1) dbg << "paRefML="<<(paRefML? paRefML->str(): "NULL")<<endl;
-  //cl2ml->insert(cl, paRefML);
-  nodeState.addFact(analysis, 0, new CPMemLocObjectNodeFact(paRefML));
+//   CPMemLocObjectPtr paRefML = boost::make_shared<CPMemLocObject>(core->getRegion(), offset, paRef, part->inEdgeFromAny(), analysis);
+//   if(constantPropagationAnalysisDebugLevel()>=1) dbg << "paRefML="<<(paRefML? paRefML->str(): "NULL")<<endl;
+//   //cl2ml->insert(cl, paRefML);
+//   nodeState.addFact(analysis, 0, new CPMemLocObjectNodeFact(paRefML));
 }
 
 void ConstantPropagationAnalysisTransfer::visit(SgBinaryOp *sgn) { 
@@ -3620,6 +3620,7 @@ SgExpression* getModExpr(SgExpression* expr) {
   case V_SgCastExp: {
     return getModExpr(isSgCastExp(expr)->get_operand());
   }
+  case V_SgPntrArrRefExp:
   case V_SgVarRefExp:
   case V_SgDotExp: {
       return expr;

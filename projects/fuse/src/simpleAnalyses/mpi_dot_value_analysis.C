@@ -11,7 +11,7 @@
 
 
 namespace fuse {
-  DEBUG_LEVEL(mpiDotValueAnalysisDebugLevel, 2);
+  DEBUG_LEVEL(mpiDotValueAnalysisDebugLevel, 0);
   
   boost::uuids::random_generator gen;
   /*********************

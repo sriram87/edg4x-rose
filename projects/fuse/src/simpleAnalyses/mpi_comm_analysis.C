@@ -15,7 +15,7 @@ using namespace sight;
 
 namespace fuse {
 
-  DEBUG_LEVEL(mpiCommAnalysisDebugLevel, 3);
+  DEBUG_LEVEL(mpiCommAnalysisDebugLevel, 2);
 
   /********************
    * MPICommValueKind *

@@ -566,6 +566,8 @@ namespace fuse {
     if(mpiDotValueAnalysisDebugLevel() >= 2) {    
       dbg << "bml=" << bml->str() << endl;
       dbg << "mdv=" << mdv->str() << endl;
+      // cout << "transferSend: bml=" << bml->str() << endl;
+      // cout << "transferSend: mdv=" << mdv->str() << endl;
     }
     return aMapState->insert(bml, boost::dynamic_pointer_cast<Lattice>(mdv));                            
   }
@@ -583,8 +585,10 @@ namespace fuse {
     if(mpiDotValueAnalysisDebugLevel() >= 2) {
       dbg << "Expr2Val(bexpr) = " << v->str() << endl;
       dbg << "mdv=" << mdv->str() << endl;
+      // cout << "transferRecv: bml = " << bml->str() << endl;
+      // cout << "transferRecv: mdv=" << mdv->str() << endl;
     }
-    // assert(!mdv->isFullLat());
+    //assert(!mdv->isFullLat());
     return aMapState->insert(bml, mdv);
   }
 
@@ -684,6 +688,9 @@ namespace fuse {
     if(mpiDotValueAnalysisDebugLevel() >= 2) {
       dbg << "ml=" << ml->str() << endl;
       dbg << "mdv=" << mdv->str() << endl;
+
+      // cout << "Expr2Val: ml=" << ml->str() << endl;
+      // cout << "Expr2Val: mdv=" << mdv->str() << endl;
     }
     if(mdv->isFullLat()) return composer->Expr2Val(sgn, pedge, this);
     else if(mdv->isEmptyLat()) assert(0);
@@ -735,6 +742,8 @@ namespace fuse {
     SgNode* bexpr = recvcs.getRecvBuffer();
     MemLocObjectPtr ml = analysis->getComposer()->Expr2MemLoc(bexpr, part->outEdgeToAny(), analysis);
     MPIDotValueObjectPtr mdv = boost::dynamic_pointer_cast<MPIDotValueObject>(aMapState->get(ml));
+    // cout << "getRecvMPIDotValue:ml=" << ml->str() << endl;
+    // cout << "getRecvMPIDotValue:mdv=" << mdv->str() << endl;
     assert(mdv && !mdv->isFullLat());
     return mdv->get_dot_value();    
   }
@@ -880,19 +889,33 @@ namespace fuse {
     }
     
     string buff = oss.str();
-    int buffsize = buff.length();
-    char* c_buff = new char[buffsize];
-    strcpy(c_buff, buff.c_str());
+    char * writable = new char[buff.size() + 1];
+    std::copy(buff.begin(), buff.end(), writable);
+    writable[buff.size()] = '\0'; // don't forget the terminating 0
+    unsigned int buffsize = strlen(writable) + 1;
 
-    MPI_File_set_view(file, rank * buffsize * sizeof(char),
-                      MPI_CHAR, MPI_CHAR, "native",
-                      MPI_INFO_NULL);
-    //MPI_File_set_atomicity(file, 1);
-
+    MPI_Offset offset, c_offset;
+    offset = (long long) rank * buffsize * sizeof(char);
+    MPI_File_seek(file, offset, MPI_SEEK_SET);
+    MPI_File_get_position(file, &c_offset);
     MPI_Status status;
-    int offset = rank * buffsize * sizeof(char);
-    MPI_File_write_at(file, offset, c_buff, buffsize, MPI_CHAR, MPI_STATUS_IGNORE);
+    MPI_File_write(file, writable, buffsize, MPI_CHAR, &status);
+    
+    // MPI_File_get_position(fh, &my_current_offset);
+  
+    // printf ("%3d: my current offset is %lld\n", my_rank, my_current_offset);
+
     MPI_File_close(&file);
-    //delete c_buff;    
+    
+    // MPI_File_set_view(file, rank * buffsize * sizeof(char),
+    //                    MPI_CHAR, MPI_CHAR, "native",
+    //                    MPI_INFO_NULL);
+    // MPI_File_set_atomicity(file, 1);
+
+    // MPI_Status status;
+    // int offset = rank * buffsize * sizeof(char);
+    // MPI_File_write_at(file, offset, writable, buffsize, MPI_CHAR, &status);
+    // MPI_File_close(&file);
+    delete[] writable;
   }
 }; // end namespace

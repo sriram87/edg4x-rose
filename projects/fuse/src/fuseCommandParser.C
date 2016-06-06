@@ -142,6 +142,7 @@ namespace fuse {
     mpidotvalue = icase("mdv");
     pointsto = icase("pt");
     array = icase("arr");
+    callcontext = icase("ccs");
     deadpath = icase("dp");
     seqcomp = icase("seq");
     tightcomp = icase("tight");
@@ -152,7 +153,8 @@ namespace fuse {
       | by_ref(mpidotvalue) 
       | by_ref(pointsto) 
       | by_ref(deadpath)
-      | by_ref(array);
+      | by_ref(array)
+      | by_ref(callcontext);
     
     composer = by_ref(seqcomp) | by_ref(tightcomp);
     atailseq = *_s >> as_xpr(',') >> *_s >> analysis >> *_s;
@@ -196,6 +198,9 @@ namespace fuse {
     }
     else if(regex_match(analysis_s, array)) {
       cc.push_back(new ArrayAnalysis());
+    }
+    else if(regex_match(analysis_s, callcontext)) {
+      cc.push_back(new CallContextSensitivityAnalysis(1, CallContextSensitivityAnalysis::callSite));
     }
     else {
       ostringstream oss;

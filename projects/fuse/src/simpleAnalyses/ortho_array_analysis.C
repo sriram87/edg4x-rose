@@ -6,7 +6,11 @@ using namespace sight;
 using namespace std;
 
 namespace fuse {
-  DEBUG_LEVEL(arrayAnalysisDebugLevel, 0);
+#define arrayAnalysisDebugLevel 0
+#if arrayAnalysisDebugLevel==0
+#define DISABLE_SIGHT
+#endif
+  //  DEBUG_LEVEL(arrayAnalysisDebugLevel, 0);
 
   /***************
    * EmptyMLType *
@@ -537,9 +541,9 @@ namespace fuse {
    * ArrayAnalysis *
    *****************/  
   MemLocObjectPtr  ArrayAnalysis::Expr2MemLoc(SgNode* n, PartEdgePtr pedge) {
-    scope s(sight::txt() 
-            << "ArrayAnalysis::Expr2MemLoc(n="<<SgNode2Str(n) 
-            << ", pedge="<<pedge->str()<<")", scope::medium, attrGE("arrayAnalysisDebugLevel", 2));
+    SIGHT_VERB_DECL(scope, (sight::txt() << "ArrayAnalysis::Expr2MemLoc(n="<<SgNode2Str(n) 
+                            << ", pedge="<<pedge->str()<<")", scope::medium), 
+                    2, arrayAnalysisDebugLevel)
     MemLocObjectPtr ml;
     // If this is a top level array reference for which we need to create ML
     if(isSgPntrArrRefExp(n) && 
@@ -551,13 +555,13 @@ namespace fuse {
       SgExpression* arrayNameExp=0;
       std::vector<SgExpression*>* subscripts = new std::vector<SgExpression*>();
       SageInterface::isArrayReference(isSgExpression(n), &arrayNameExp, &subscripts);
-      if(arrayAnalysisDebugLevel() >= 2) {
+      SIGHT_VERB_IF(2, arrayAnalysisDebugLevel)
         dbg << "arrayNameExpr=" << SgNode2Str(arrayNameExp) << endl;
         std::vector<SgExpression*>::iterator it = subscripts->begin();
         for(int i=0 ; it != subscripts->end(); ++it, ++i) {
           dbg << "[" << i << "]=>" << SgNode2Str(*it) << endl;
         }
-      }
+      SIGHT_VERB_FI()
 
       // arrayNameExp is the array symbol
       // subscripts is the index expressions
@@ -567,19 +571,15 @@ namespace fuse {
       std::vector<SgExpression*>::iterator it = subscripts->begin();
       for( ; it != subscripts->end(); ++it) {
         SgExpression* index = *it;
-        ValueObjectPtr v = getComposer()->OperandExpr2Val(n, index, pedge, this);
-        if(arrayAnalysisDebugLevel() >= 2) {
-          dbg << "index=" << SgNode2Str(index) << endl;
-          dbg << "indexV=" << v->str() << endl;
-        }
+        ValueObjectPtr v = getComposer()->OperandExpr2Val(n, index, pedge, this);        
+        SIGHT_VERB(dbg << "index=" << SgNode2Str(index) << endl, 2, arrayAnalysisDebugLevel)
+        SIGHT_VERB(dbg << "indexV=" << v->str() << endl, 2, arrayAnalysisDebugLevel)        
         subscriptsV.push_back(v->copyV());
       }
       ArrayIndexVectorPtr indices = boost::make_shared<ArrayIndexVector>(subscriptsV);
       ArrayMLTypePtr mltype = boost::make_shared<ArrayMLType>(n, region, indices, origML);
       MemLocObjectPtr arrayML = boost::make_shared<ArrayML>(mltype);
-      if(arrayAnalysisDebugLevel() >= 2) {
-        dbg << arrayML->str() << endl;
-      }
+      SIGHT_VERB(dbg << arrayML->str() << endl, 2, arrayAnalysisDebugLevel)
       return arrayML;
     }
     else {

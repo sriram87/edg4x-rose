@@ -6,7 +6,11 @@ using namespace sight;
 
 namespace fuse
 {
-  DEBUG_LEVEL(pointsToAnalysisDebugLevel, 0);
+  // DEBUG_LEVEL(pointsToAnalysisDebugLevel, 0);
+#define pointsToAnalysisDebugLevel 0
+#if pointsToAnalysisDebugLevel==0
+#define DISABLE_SIGHT
+#endif
 
   /****************************
    * PointsToAnalysisTransfer *
@@ -75,7 +79,7 @@ namespace fuse
   }
 
   void PointsToAnalysisTransfer::PointerExprTransfer::visit(SgExpression* sgn) {
-    dbg << "Unhandled expr=" << SgNode2Str(sgn) << "PointerExprTransfer\n";
+    SIGHT_VERB(dbg << "Unhandled expr=" << SgNode2Str(sgn) << "PointerExprTransfer\n", 2, pointsToAnalysisDebugLevel)
     assert(false);
   }
 
@@ -161,11 +165,9 @@ namespace fuse
         getArgParamMapping(sgn, sgnFuncEntry, argParamMappingList);
         ArgParamMappingList::iterator apmIt = argParamMappingList.begin();
         for( ; apmIt != argParamMappingList.end(); ++apmIt) {
-          ArgParamMapping& mapping = *apmIt;
-          if(pointsToAnalysisDebugLevel() >= 2) {
-            dbg << "arg=" << SgNode2Str(mapping.first) << endl;
-            dbg << "param=" << SgNode2Str(mapping.second) << endl;
-          }
+          ArgParamMapping& mapping = *apmIt;          
+          SIGHT_VERB(dbg << "arg=" << SgNode2Str(mapping.first) << endl, 2, pointsToAnalysisDebugLevel)
+          SIGHT_VERB(dbg << "param=" << SgNode2Str(mapping.second) << endl, 2, pointsToAnalysisDebugLevel)          
           assert(mapping.second->variantT() == V_SgInitializedName);
           MemLocObjectPtr keyML = composer->Expr2MemLoc(mapping.second, funcEntryPart->inEdgeFromAny(), analysis);
           boost::shared_ptr<AbstractObjectSet> latElem = boost::dynamic_pointer_cast<AbstractObjectSet>(latticeMapIn->get(keyML));
@@ -174,18 +176,16 @@ namespace fuse
           PointerExprTransfer* exprTransfer = new PointerExprTransfer(latElem, sgn, part->inEdgeFromAny(), latticeMapIn, *this);
           mapping.first->accept(*exprTransfer);
           if(exprTransfer->isLatElemModified()) {
-            if(pointsToAnalysisDebugLevel() >= 2) dbg << latElem->str();
+            SIGHT_VERB(dbg << latElem->str(), 2, pointsToAnalysisDebugLevel)
             PointsToRelation prel = make_pointsto(keyML, latElem);
             modified = updateLatticeMap(newL, prel);
           }
           delete exprTransfer;
         }
         // update the edge to lattice mapping
-        dfInfo[*peIt].push_back(newL);
-        if(pointsToAnalysisDebugLevel() >= 2) {
-          dbg << "PartEdge=" << (*peIt)->str();
-          dbg << "newL=" << newL->str() << endl;
-        }
+        dfInfo[*peIt].push_back(newL);        
+        SIGHT_VERB(dbg << "PartEdge=" << (*peIt)->str(), 2, pointsToAnalysisDebugLevel)
+        SIGHT_VERB(dbg << "newL=" << newL->str() << endl, 2, pointsToAnalysisDebugLevel)        
       }
     }
   }
@@ -285,16 +285,13 @@ namespace fuse
     return "PointsToAnalysis"; 
   }
 
-  MemLocObjectPtr PointsToAnalysis::Expr2MemLoc(SgNode* sgn, PartEdgePtr pedge)
-  {
-    scope reg(txt()<<"PointsToAnalysis::Expr2MemLoc(sgn=" << SgNode2Str(sgn) << ")", scope::medium, attrGE("pointsToAnalysisDebugLevel", 2));
-    if(pointsToAnalysisDebugLevel()>=2) {
-      dbg << "pedge=" << pedge->str() << endl;     
-    }
-
+  MemLocObjectPtr PointsToAnalysis::Expr2MemLoc(SgNode* sgn, PartEdgePtr pedge) {
+    SIGHT_VERB_DECL(scope, (txt()<<"PointsToAnalysis::Expr2MemLoc(sgn=" 
+                            << SgNode2Str(sgn) << ")", scope::medium), 
+                    2, pointsToAnalysisDebugLevel)
+    SIGHT_VERB(dbg << "pedge=" << pedge->str() << endl, 2, pointsToAnalysisDebugLevel)
     // ML object returned by Pointsto analysis
     boost::shared_ptr<PTMemLocObject> ptML_p = boost::make_shared<PTMemLocObject>(pedge, getComposer(), this);
-
     // Switch based on the type of the expression
     switch(sgn->variantT()) {
     // Handle all pointer dereference expressions by looking up analysis state
@@ -317,13 +314,9 @@ namespace fuse
 
       assert(lattice);
       AbstractObjectMap* aom_p = dynamic_cast<AbstractObjectMap*>(lattice);
-
-      if(pointsToAnalysisDebugLevel() >= 2) {
-        dbg << "PointsToMap=" << aom_p->str() << endl;
-      }
-
+      SIGHT_VERB(dbg << "PointsToMap=" << aom_p->str() << endl, 2, pointsToAnalysisDebugLevel)
       boost::shared_ptr<AbstractObjectSet> aos_p = boost::dynamic_pointer_cast<AbstractObjectSet>(aom_p->get(opML_p));
-      if(pointsToAnalysisDebugLevel() >= 2) dbg << "MLSet=" << aos_p->str() << endl;
+      SIGHT_VERB(dbg << "MLSet=" << aos_p->str() << endl, 2, pointsToAnalysisDebugLevel)
       assert(!aos_p->isEmptyLat());
       ptML_p->add(aos_p, pedge);
       break;

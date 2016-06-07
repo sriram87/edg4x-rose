@@ -13,7 +13,11 @@ using namespace sight;
 
 namespace fuse {
 
-DEBUG_LEVEL(AbstractObjectMapDebugLevel, 0);
+#define AbstractObjectMapDebugLevel 0
+#if AbstractObjectMapDebugLevel == 0
+  #define DISABLE_SIGHT
+#endif
+//DEBUG_LEVEL(AbstractObjectMapDebugLevel, 0);
 
 // Set this Lattice object to represent the set of all possible execution prefixes.
 // Return true if this causes the object to change and false otherwise.
@@ -38,15 +42,13 @@ bool AbstractObjectMap::setToEmpty()
 // Return true if this causes the object to change and false otherwise.
 bool AbstractObjectMap::setMLValueToFull(MemLocObjectPtr ml)
 {
-  scope s("AbstractObjectMap::setMLValueToFull()", scope::medium, attrGE("AbstractObjectMapDebugLevel", 2));
-  if(AbstractObjectMapDebugLevel() >= 2) {
-    dbg << "ml=" << ml->str() << endl;
-  }
+  SIGHT_VERB_DECL(scope, ("AbstractObjectMap::setMLValueToFull()", scope::medium),
+                  2, AbstractObjectMapDebugLevel)
+  SIGHT_VERB(dbg << "ml=" << ml->str() << endl, 2, AbstractObjectMapDebugLevel)
+
   bool modified = false;
   bool found = false;
-  if(AbstractObjectMapDebugLevel() >= 2) {
-    
-  }
+
   // Iterate through all the keys in the items list. If any key is mayEqual(ml) then its associated 
   // value is set to full. Note that this works even if the keys are not MemLobObjectPtrs since in 
   // that case mustEqual will return false.
@@ -65,9 +67,7 @@ bool AbstractObjectMap::setMLValueToFull(MemLocObjectPtr ml)
     LatticePtr fullLat(defaultLat->copy());
     fullLat->setToFull();
     items.push_front(MapElement(ml, fullLat));
-    if(AbstractObjectMapDebugLevel() >= 2) {
-      dbg << str() << endl;
-    }
+    SIGHT_VERB(dbg << str() << endl, 2, AbstractObjectMapDebugLevel)    
     modified = true;
   }
   return modified;
@@ -82,16 +82,17 @@ bool AbstractObjectMap::isFullLat()
 // Returns whether this lattice denotes the empty set.
 bool AbstractObjectMap::isEmptyLat()
 {
-  scope s("AbstractObjectMap::isEmpty()", scope::medium, attrGE("AbstractObjectMapDebugLevel", 2));
-  if(AbstractObjectMapDebugLevel()>=2) dbg << "this="<<str()<<endl;
+  SIGHT_VERB_DECL(scope, ("AbstractObjectMap::isEmpty()", scope::medium),
+                  2, AbstractObjectMapDebugLevel)
+  SIGHT_VERB(dbg << "this="<<str()<<endl, 2, AbstractObjectMapDebugLevel)
   
   // Check if all items are empty
   for(std::list<MapElement>::iterator i=items.begin(); i!=items.end();) {
-    if(AbstractObjectMapDebugLevel()>=2) {
+    SIGHT_VERB_IF(2, AbstractObjectMapDebugLevel)
       indent ind;
       dbg << "i->first="<<i->first->str()<<endl;
-      dbg << "i->second="<<i->second->str()<<endl;
-    }
+      dbg << "i->second="<<i->second->str()<<endl;    
+    SIGHT_VERB_FI()
     // If at least one is not empty, return false
     if(!(i->first)->isEmpty(getPartEdge(), comp, analysis) && 
        !(i->second)->isEmptyLat()) return false;
@@ -131,15 +132,18 @@ std::string AbstractObjectMap::strp(PartEdgePtr pedge, std::string indent) const
 // Return true if this causes the map to change and false otherwise.
 // It is assumed that the given Lattice is now owned by the AbstractObjectMap and can be modified and deleted by it.
 bool AbstractObjectMap::insert(AbstractObjectPtr o, LatticePtr lattice) {
-  scope reg("AbstractObjectMap::insert()", scope::medium, attrGE("AbstractObjectMapDebugLevel", 1));
-  if(AbstractObjectMapDebugLevel()>=1) {
+  SIGHT_VERB_DECL(scope, ("AbstractObjectMap::insert()", scope::medium),
+                  2, AbstractObjectMapDebugLevel)
+  SIGHT_VERB_IF(2, AbstractObjectMapDebugLevel)
     dbg << "&nbsp;&nbsp;&nbsp;&nbsp;o="<<o->strp(latPEdge, "")<<" lattice="<<lattice->str("&nbsp;&nbsp;&nbsp;&nbsp;")<<" mapIsFull="<<mapIsFull<<endl;
     dbg << "&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;"<<str("&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;")<<endl;
-  }
+  SIGHT_VERB_FI()
   
   // Do not insert mappings for dead keys
-  if(!o->isLive(latPEdge, comp, analysis)) { 
-    if(AbstractObjectMapDebugLevel()>=1) dbg << "<b>AbstractObjectMap::insert() WARNING: attempt to insert dead mapping "<<o->strp(latPEdge)<<" =&gt; "<<lattice->str()<<"<\b>"<<endl;
+  if(!o->isLive(latPEdge, comp, analysis)) {
+    SIGHT_VERB_IF(2, AbstractObjectMapDebugLevel)
+      dbg << "<b>AbstractObjectMap::insert() WARNING: attempt to insert dead mapping "<<o->strp(latPEdge)<<" =&gt; "<<lattice->str()<<"<\b>"<<endl;
+    SIGHT_VERB_FI()
     return false;
   }
   
@@ -159,7 +163,11 @@ bool AbstractObjectMap::insert(AbstractObjectPtr o, LatticePtr lattice) {
   int i=0;
   for(it = items.begin(); it != items.end(); i++) {
     AbstractObjectPtr keyElement = it->first;
-    if(AbstractObjectMapDebugLevel()>=2) dbg << "&nbsp;&nbsp;&nbsp;&nbsp;keyElement="<<keyElement->str("            ")<<" mustEqual(o, keyElement, latPEdge)="<<o->mustEqual(keyElement, latPEdge, comp, analysis)<<" insertDone="<<insertDone<<" mustEqualSeen="<<mustEqualSeen<<endl;
+    SIGHT_VERB_IF(2, AbstractObjectMapDebugLevel)
+      dbg << "&nbsp;&nbsp;&nbsp;&nbsp;keyElement="<<keyElement->str("            ")
+          <<" mustEqual(o, keyElement, latPEdge)="<<o->mustEqual(keyElement, latPEdge, comp, analysis)
+          <<" insertDone="<<insertDone<<" mustEqualSeen="<<mustEqualSeen<<endl;
+    SIGHT_VERB_FI()
     // If we're done inserting, don't do it again
     if(insertDone) {
       // If o is mustEqual to this element and it is not the first match, remove this element
@@ -182,18 +190,26 @@ bool AbstractObjectMap::insert(AbstractObjectPtr o, LatticePtr lattice) {
   
     // If the o-frontier contains an object that must-equal to 
     if(o->mustEqual(keyElement, latPEdge, comp, analysis)) {
-      if(AbstractObjectMapDebugLevel()==1) dbg << "&nbsp;&nbsp;&nbsp;&nbsp;keyElement="<<keyElement->str("            ")<<" mustEqual(o, keyElement, latPEdge)="<<o->mustEqual(keyElement, latPEdge, comp, analysis)<<" insertDone="<<insertDone<<" mustEqualSeen="<<mustEqualSeen<<endl;
-      if(AbstractObjectMapDebugLevel()>=1) {
+      SIGHT_VERB_IF(2, AbstractObjectMapDebugLevel)
+        dbg << "&nbsp;&nbsp;&nbsp;&nbsp;keyElement="<<keyElement->str("            ")
+            <<" mustEqual(o, keyElement, latPEdge)="<<o->mustEqual(keyElement, latPEdge, comp, analysis)
+            <<" insertDone="<<insertDone<<" mustEqualSeen="<<mustEqualSeen<<endl;
         dbg << "&nbsp;&nbsp;&nbsp;&nbsp;Must Equal"<<endl;
         dbg << "&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;lattice="<<lattice->str("&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;")<<endl;
         dbg << "&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;it="<<it->second->str("&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;")<<endl;
-      }
+      SIGHT_VERB_FI()
 
       // If the old and new mappings of o are different,  we remove the old mapping and add a new one 
       if(!it->second->equiv(lattice.get()))
       {
-        if(AbstractObjectMapDebugLevel()==1) dbg << "&nbsp;&nbsp;&nbsp;&nbsp;keyElement="<<keyElement->str("            ")<<" mustEqual(o, keyElement, latPEdge)="<<o->mustEqual(keyElement, latPEdge, comp, analysis)<<" insertDone="<<insertDone<<" mustEqualSeen="<<mustEqualSeen<<endl;
-        if(AbstractObjectMapDebugLevel()>=1) dbg << "&nbsp;&nbsp;&nbsp;&nbsp;Removing i="<<i<<", inserting "<<o->strp(latPEdge, "        ")<<"=&gt;"<<lattice->str("        ")<<endl;
+        SIGHT_VERB_IF(2, AbstractObjectMapDebugLevel)
+          dbg << "&nbsp;&nbsp;&nbsp;&nbsp;keyElement="<<keyElement->str("            ")
+              <<" mustEqual(o, keyElement, latPEdge)="<<o->mustEqual(keyElement, latPEdge, comp, analysis)
+              <<" insertDone="<<insertDone<<" mustEqualSeen="<<mustEqualSeen<<endl;
+          dbg << "&nbsp;&nbsp;&nbsp;&nbsp;Removing i="<<i<<", inserting "<<o->strp(latPEdge, "        ")
+              <<"=&gt;"<<lattice->str("        ")<<endl;
+        SIGHT_VERB_FI()
+
         items.erase(it++);
         items.push_front(MapElement(o, lattice));
         retVal = true;
@@ -240,11 +256,12 @@ bool AbstractObjectMap::insert(AbstractObjectPtr o, LatticePtr lattice) {
   // Step 2: if the map is larger than some fixed bound, merge some key->value mappings together
   // !!! TODO !!!
   
-  if(AbstractObjectMapDebugLevel()>=1) {
+  SIGHT_VERB_IF(2, AbstractObjectMapDebugLevel)
     indent ind();
     dbg << "retVal="<<retVal<<" insertDone="<<insertDone<<" mustEqualSeen="<<mustEqualSeen<<endl;
     dbg << str()<<endl;
-  }
+  SIGHT_VERB_FI()
+
   return retVal;
 };
 
@@ -264,15 +281,16 @@ bool AbstractObjectMap::remove(AbstractObjectPtr abstractObjectPtr) {
     }
   }
   return false;
-};
+}
 
 // Get all x-frontier for a given abstract memory object                                                            
 LatticePtr AbstractObjectMap::get(AbstractObjectPtr abstractObjectPtr) {
-  scope reg("AbstractObjectMap::get()", scope::medium, attrGE("AbstractObjectMapDebugLevel", 1));
-  if(AbstractObjectMapDebugLevel()>=1) {
+  SIGHT_VERB_DECL(scope, ("AbstractObjectMap::get()", scope::medium),
+                  2, AbstractObjectMapDebugLevel)
+  SIGHT_VERB_IF(2, AbstractObjectMapDebugLevel)
     dbg << "&nbsp;&nbsp;&nbsp;&nbsp;o="<<abstractObjectPtr->strp(latPEdge, "&nbsp;&nbsp;&nbsp;&nbsp;")<<endl;
     dbg << "&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;"<<str("&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;")<<endl;
-  }
+  SIGHT_VERB_FI()
   
   // If this map corresponds to all possible mappings, the only mapping that exists for any object is the full lattice
   if(mapIsFull) { 
@@ -286,7 +304,11 @@ LatticePtr AbstractObjectMap::get(AbstractObjectPtr abstractObjectPtr) {
        it != items.end(); it++) {
     AbstractObjectPtr keyElement = it->first;
     bool eq = abstractObjectPtr->mayEqual(keyElement, latPEdge, comp, analysis);
-    if(AbstractObjectMapDebugLevel()>=2 || (AbstractObjectMapDebugLevel()>=1 && eq)) dbg << "&nbsp;&nbsp;&nbsp;&nbsp;keyElement(equal="<<eq<<")="<<keyElement->str("&nbsp;&nbsp;&nbsp;&nbsp;")<<endl;
+
+    SIGHT_VERB_IF(2, AbstractObjectMapDebugLevel)
+      dbg << "&nbsp;&nbsp;&nbsp;&nbsp;keyElement(equal="<<eq<<")="<<keyElement->str("&nbsp;&nbsp;&nbsp;&nbsp;")<<endl;
+    SIGHT_VERB_FI()
+
     if(eq) {
       // If this is the first matching Lattice, copy this Lattice to ret
       if(!ret) ret = boost::shared_ptr<Lattice>(it->second->copy());
@@ -296,17 +318,21 @@ LatticePtr AbstractObjectMap::get(AbstractObjectPtr abstractObjectPtr) {
       // If the current key must-equals the given object, its assignment must have overwritten any prior assignment
       // to this object, meaning that prior assignments can be ignored
       if(abstractObjectPtr->mustEqual(keyElement, latPEdge, comp, analysis)) {
-        if(AbstractObjectMapDebugLevel()>=1) dbg << "&nbsp;&nbsp;&nbsp;&nbsp;Stopping search since mustEqual, ret="<<ret->str("&nbsp;&nbsp;&nbsp;&nbsp;")<<endl;
+        SIGHT_VERB_IF(2, AbstractObjectMapDebugLevel)
+          dbg << "&nbsp;&nbsp;&nbsp;&nbsp;Stopping search since mustEqual, ret="<<ret->str("&nbsp;&nbsp;&nbsp;&nbsp;")<<endl;
+        SIGHT_VERB_FI()
         break;
       }
       
-      if(AbstractObjectMapDebugLevel()>=1) dbg << "&nbsp;&nbsp;&nbsp;&nbsp;ret="<<ret->str("&nbsp;&nbsp;&nbsp;&nbsp;")<<endl;
+      SIGHT_VERB_IF(2, AbstractObjectMapDebugLevel)
+        dbg << "&nbsp;&nbsp;&nbsp;&nbsp;ret="<<ret->str("&nbsp;&nbsp;&nbsp;&nbsp;")<<endl;
+      SIGHT_VERB_FI()
     }
   }
   
-  if(AbstractObjectMapDebugLevel()>=1) {
+  SIGHT_VERB_IF(2, AbstractObjectMapDebugLevel)
     dbg << "ret="<<(ret ? ret->str("&nbsp;&nbsp;&nbsp;&nbsp;"): "NULL")<<endl;
-  }
+  SIGHT_VERB_FI()
   if(ret) return ret;
   // If there is no match for abstractObjectPtr, return a copy of the default lattice
   return LatticePtr(defaultLat->copy());
@@ -353,29 +379,33 @@ Lattice* AbstractObjectMap::remapML(const std::set<MLMapping>& ml2ml, PartEdgePt
   // Do nothing on empty maps or those where the keys are not MemLocObjects
   if(items.size()==0 || !(items.begin()->first->isMemLocObject())) { return copy(); }
   
-  scope reg("AbstractObjectMap::remapML", scope::medium, attrGE("AbstractObjectMapDebugLevel", 1));
+  SIGHT_VERB_DECL(scope, ("AbstractObjectMap::remapML", scope::medium),
+                  2, AbstractObjectMapDebugLevel)
   
-  if(AbstractObjectMapDebugLevel()>=1) {
+  SIGHT_VERB_IF(2, AbstractObjectMapDebugLevel)
     // If either the key or the value of this mapping is dead within its respective part, we skip it.
     // Print notices of this skipping once
     for(std::set<MLMapping>::const_iterator m=ml2ml.begin(); m!=ml2ml.end(); m++) {
       if(!m->from) continue;
       // If either the key or the value of this mapping is dead within its respective part, skip it
       if(!m->from->isLive(fromPEdge, comp, analysis) || (m->to && !m->to->isLive(latPEdge, comp, analysis)))
-        dbg << "<b>AbstractObjectMap::remapML() WARNING: Skipping dead ml2ml mapping "<<m->from->strp(fromPEdge)<<"(live="<<m->from->isLive(fromPEdge, comp, analysis)<<") =&gt; "<<(m->to ? m->to->strp(latPEdge) : "NULL")<<"(live="<<(m->to ? m->to->isLive(latPEdge, comp, analysis) : -1)<<")"<<endl
-                 << "&nbsp;&nbsp;&nbsp;&nbsp;fromPEdge=["<<fromPEdge->str()<<"]"<<endl
-                 << "&nbsp;&nbsp;&nbsp;&nbsp;latPEdge=["<<latPEdge->str()<<"]</b>"<<endl;
+        dbg << "<b>AbstractObjectMap::remapML() WARNING: Skipping dead ml2ml mapping "
+            <<m->from->strp(fromPEdge)<<"(live="<<m->from->isLive(fromPEdge, comp, analysis)
+            <<") =&gt; "<<(m->to ? m->to->strp(latPEdge) : "NULL")<<"(live="
+            <<(m->to ? m->to->isLive(latPEdge, comp, analysis) : -1)<<")"<<endl
+            << "&nbsp;&nbsp;&nbsp;&nbsp;fromPEdge=["<<fromPEdge->str()<<"]"<<endl
+            << "&nbsp;&nbsp;&nbsp;&nbsp;latPEdge=["<<latPEdge->str()<<"]</b>"<<endl;
     }
-  }
+  SIGHT_VERB_FI()
   
-  if(AbstractObjectMapDebugLevel()>=2) {
-    scope reg("ml2ml", scope::medium, attrGE("AbstractObjectMapDebugLevel", 2));
+  SIGHT_VERB_IF(2, AbstractObjectMapDebugLevel)
+    SIGHT_VERB_DECL(scope, ("ml2ml", scope::medium), 2, AbstractObjectMapDebugLevel)
     for(std::set<MLMapping>::const_iterator m=ml2ml.begin(); m!=ml2ml.end(); m++) {
       if(!m->from) continue;
       dbg << m->from.get()->str() << " =&gt; " << (m->to? m->to.get()->strp(latPEdge): "NULL") << endl;
     }
     //dbg << "this="<<str()<<endl;
-  }
+  SIGHT_VERB_FI()
   
   // Copy of this map where the keys in ml2ml have been remapped to their corresponding values
   AbstractObjectMap* newM = new AbstractObjectMap(*this);
@@ -383,27 +413,27 @@ Lattice* AbstractObjectMap::remapML(const std::set<MLMapping>& ml2ml, PartEdgePt
 
   std::set<MLMapping>::const_iterator m=ml2ml.begin();
   for( ; m != ml2ml.end(); ++m) {
-    if(AbstractObjectMapDebugLevel()>=2) {
-      scope reg("MLMapping", scope::medium, attrGE("AbstractObjectMapDebugLevel", 2)); 
+    SIGHT_VERB_IF(2, AbstractObjectMapDebugLevel)
+      SIGHT_VERB_DECL(scope, ("MLMapping", scope::medium), 2, AbstractObjectMapDebugLevel)
       dbg << "m-&gtfrom=" << (m->from? m->from->str(): "NULLMemLocObjectPtr") << endl;
       dbg << "m-&gtto=" << (m->to? m->to->str() : "NULLMemLocObjectPtr") << endl;
-    }
+    SIGHT_VERB_FI()
 
     // temporary variable mappings in callee do not have a valid m->to in caller
     if(m->to) {
       LatticePtr mFromLat = get(m->from);
       newM->insert(m->to, mFromLat);
-      if(AbstractObjectMapDebugLevel() >= 2) {
-        scope reg("newM::insert", scope::low, attrGE("AbstractObjectMapDebugLevel", 2));
+      SIGHT_VERB_IF(2, AbstractObjectMapDebugLevel)
+        SIGHT_VERB_DECL(scope, ("newM::insert", scope::low), 2, AbstractObjectMapDebugLevel)
         dbg << "m-&gtto=" << (m->to? m->to->str() : "NULLMemLocObjectPtr") << endl;
         dbg << "mFromLat=" << mFromLat->str() << endl;
-      }
-    }      
+      SIGHT_VERB_FI()
+    }
   }
 
-  if(AbstractObjectMapDebugLevel() >= 2) {
+  SIGHT_VERB_IF(2, AbstractObjectMapDebugLevel)
     dbg << "newM=" << newM->str() << endl;
-  }
+  SIGHT_VERB_FI()
   return newM;  
 }
 
@@ -430,9 +460,9 @@ bool AbstractObjectMap::replaceML(Lattice* newL)
 // Computes the meet of this and that and saves the result in this
 // returns true if this causes this to change and false otherwise
 // The part of this object is to be used for AbstractObject comparisons.
-bool AbstractObjectMap::meetUpdate(Lattice* thatL)
-{
-  scope reg("AbstractObjectMap::meetUpdate()", scope::medium, attrGE("AbstractObjectMapDebugLevel", 2));
+bool AbstractObjectMap::meetUpdate(Lattice* thatL) {
+  SIGHT_VERB_DECL(scope, ("AbstractObjectMap::meetUpdate()", scope::medium),
+                  2, AbstractObjectMapDebugLevel)
 
   // Both incorporateVars() and meetUpdate currently call merge. This is clearly not
   // right but we'll postpone fixing it until we have the right algorithm for merges
@@ -440,13 +470,17 @@ bool AbstractObjectMap::meetUpdate(Lattice* thatL)
   try {
     AbstractObjectMap * that = dynamic_cast <AbstractObjectMap*> (thatL);
     
-    if(AbstractObjectMapDebugLevel()>=2) {
+    SIGHT_VERB_IF(2, AbstractObjectMapDebugLevel)
       dbg << "latPEdge="<<latPEdge->str()<<endl;
-      { scope thisreg("this", scope::medium);
-      dbg << str()<<endl; }
-      { scope thatreg("that", scope::medium);
-      dbg << that->str()<<endl; }
-    }
+      { 
+        SIGHT_VERB_DECL(scope, ("this", scope::medium), 2, AbstractObjectMapDebugLevel)
+        dbg << str()<<endl; 
+      }
+      { 
+        SIGHT_VERB_DECL(scope, ("that", scope::medium), 2, AbstractObjectMapDebugLevel)
+          dbg << that->str()<<endl; 
+      }
+    SIGHT_VERB_FI()
     
     // This algorithm is based on the following insights:
     // Given two AbstractObjectMaps: 
@@ -496,26 +530,28 @@ bool AbstractObjectMap::meetUpdate(Lattice* thatL)
     for(list<MapElement>::iterator itThat=that->items.begin(); itThat!=that->items.end(); itThat++)
       thatMustEq.push_back(false);
 
-    if(AbstractObjectMapDebugLevel()>=2)  {
-      scope thisreg("that->items", scope::medium);
+    SIGHT_VERB_IF(2, AbstractObjectMapDebugLevel)
+      SIGHT_VERB_DECL(scope, ("that->items", scope::medium), 2, AbstractObjectMapDebugLevel)
       for(list<MapElement>::iterator itThat=that->items.begin(); itThat!=that->items.end(); itThat++)
       dbg << "that: "<<itThat->first->str()<<" ==&gt; "<<itThat->second->str()<<endl;
-    }
+    SIGHT_VERB_FI()
     
     // Determine which elements in this->items are mustEqual to elements in that->items
     // and for these pairs merge the lattices from that->items to this->items.
     for(list<MapElement>::iterator itThis=items.begin(); 
        itThis!=items.end(); itThis++) {
-      scope thisreg("itThis", scope::medium, attrGE("AbstractObjectMapDebugLevel", 2));
-      if(AbstractObjectMapDebugLevel()>=2) dbg << "this: "<<itThis->first->str()<<" ==&gt; "<<itThis->second->str()<<endl;
+      SIGHT_VERB_DECL(scope, ("itThis", scope::medium), 2, AbstractObjectMapDebugLevel)
+      SIGHT_VERB(dbg << "this: "<<itThis->first->str()<<" ==&gt; "<<itThis->second->str()<<endl,
+                 2, AbstractObjectMapDebugLevel)
       
       int i=0;
       list<bool>::iterator thatMEIt=thatMustEq.begin();
       for(list<MapElement>::iterator itThat=that->items.begin(); 
          itThat!=that->items.end(); itThat++, i++, thatMEIt++) {
       
-        scope thisreg("itThat", scope::medium, attrGE("AbstractObjectMapDebugLevel", 2));
-        if(AbstractObjectMapDebugLevel()>=2) dbg << "that: "<<itThat->first->str()<<" ==&gt; "<<itThat->second->str()<<endl;
+        SIGHT_VERB_DECL(scope, ("itThat", scope::medium), 2, AbstractObjectMapDebugLevel)
+        SIGHT_VERB(dbg << "that: "<<itThat->first->str()<<" ==&gt; "<<itThat->second->str()<<endl,
+                   2, AbstractObjectMapDebugLevel)
         
         // If we've found a pair of keys in this and that that are mustEqual or denote the same set
         //if(mustEqual(itThis->first, itThat->first, latPEdge, comp, analysis)) {
@@ -524,7 +560,7 @@ bool AbstractObjectMap::meetUpdate(Lattice* thatL)
           thisMustEq2thatMustEq.push_back(make_pair(itThis, make_pair(itThat, i)));
           *thatMEIt = true;
           
-          scope meetreg(txt()<<"Meeting", scope::medium, attrGE("AbstractObjectMapDebugLevel", 2));
+          SIGHT_VERB_DECL(scope, (txt()<<"Meeting", scope::medium), 2, AbstractObjectMapDebugLevel)
           
           // Update the lattice at *itThis to incorporate information at *itThat
           {
@@ -533,32 +569,41 @@ bool AbstractObjectMap::meetUpdate(Lattice* thatL)
             // As such, instead of updating lattices in-place (this would update the same lattice
             // in other maps) we first copy them and update into the copy.
             itThis->second = LatticePtr(itThis->second->copy());
-            scope meetreg(txt()<<"Meeting "<<itThis->first->str(), scope::medium, attrGE("AbstractObjectMapDebugLevel", 2));
-            if(AbstractObjectMapDebugLevel()>=2) { scope befreg("before", scope::low); dbg << itThis->second->str()<<endl; }
+
+            SIGHT_VERB_IF(2, AbstractObjectMapDebugLevel)
+              SIGHT_VERB_DECL(scope, ("before", scope::low), 2, AbstractObjectMapDebugLevel)
+              dbg << itThis->second->str()<<endl; 
+            SIGHT_VERB_FI()
+
             modified = itThis->second->meetUpdate(itThat->second.get()) || modified;
-            if(AbstractObjectMapDebugLevel()>=2) { scope aftreg("after", scope::low); dbg << itThis->second->str()<<endl; }
-            if(AbstractObjectMapDebugLevel()>=2) dbg << "modified="<<modified<<endl;
+            SIGHT_VERB_IF(2, AbstractObjectMapDebugLevel)
+              SIGHT_VERB_DECL(scope, ("after", scope::low), 2, AbstractObjectMapDebugLevel)
+              dbg << itThis->second->str()<<endl; 
+              dbg << "modified="<<modified<<endl; 
+            SIGHT_VERB_FI()
           }
         }
       }
     }
-    if(AbstractObjectMapDebugLevel()>=2) {
-      scope eqreg("thisMustEq2thatMustEq", scope::medium, attrGE("AbstractObjectMapDebugLevel", 2));
+
+    SIGHT_VERB_IF(2, AbstractObjectMapDebugLevel)
+      SIGHT_VERB_DECL(scope, ("thisMustEq2thatMustEq", scope::medium), 2, AbstractObjectMapDebugLevel)
       for(list<pair<list<MapElement>::iterator, pair<list<MapElement>::iterator, int> > >::iterator it=thisMustEq2thatMustEq.begin();
           it!=thisMustEq2thatMustEq.end(); it++) {
         dbg << (it->first)->first->str() << " =&gt; " << (it->second).first->second->str() << endl;
       }
-    }
+    SIGHT_VERB_FI()
 
-    if(AbstractObjectMapDebugLevel() >= 2) {
-      scope mustEqBool(txt() << "thatMustEq bool list", scope::medium, attrGE("AbstractObjectMapDebugLevel", 2));
+    SIGHT_VERB_IF(2, AbstractObjectMapDebugLevel)
+      SIGHT_VERB_DECL(scope, (txt() << "thatMustEq bool list", scope::medium), 2, AbstractObjectMapDebugLevel)
       list<bool>::iterator b = thatMustEq.begin();
       for(int i = 0; b != thatMustEq.end(); ++b, ++i) {
         dbg << "thatMustEq[" << i << "]=" << *b << endl;
       }
-    }
+    SIGHT_VERB_FI()
     
-    { scope insreg("inserting that->this", scope::medium, attrGE("AbstractObjectMapDebugLevel", 2));
+    { 
+      SIGHT_VERB_DECL(scope, ("inserting that->this", scope::medium), 2, AbstractObjectMapDebugLevel)
     
     // Copy over the mappings of all the elements in that->items that were not mustEqual
     // to any elements in this->items. Although any order will work for these elements,
@@ -568,43 +613,47 @@ bool AbstractObjectMap::meetUpdate(Lattice* thatL)
     list<bool>::iterator thatMEIt=thatMustEq.begin();
     for(list<pair<list<MapElement>::iterator, pair<list<MapElement>::iterator, int> > >::iterator meIt=thisMustEq2thatMustEq.begin();
        meIt!=thisMustEq2thatMustEq.end(); meIt++) {
-      scope mapreg(txt()<<"mustEqual mapping "<<meIt->second.second<<": "<<(meIt->first)->first->str(), scope::medium, attrGE("AbstractObjectMapDebugLevel", 2));
-      if(AbstractObjectMapDebugLevel()>=2) {
+      SIGHT_VERB_DECL(scope, (txt()<<"mustEqual mapping "<<meIt->second.second<<": "<<(meIt->first)->first->str(), scope::medium),
+                      2, AbstractObjectMapDebugLevel)
+      SIGHT_VERB_IF(2, AbstractObjectMapDebugLevel)
         dbg << "this: "<<meIt->first->first->str() << " =&gt; " << meIt->first->second->str() <<endl;
         dbg << "that: "<<(meIt->second).first->first->str() << " =&gt; " << (meIt->second).first->second->str() << endl;
         dbg << "thatIdx="<<thatIdx<<endl;
-      }
+      SIGHT_VERB_FI()
       
       // Copy over all the mappings from that->items from thatIt to meIt's partner in that->items
       // if they have not already been copied because elements that are mustEqual to each other were ordered
       // differently in this->items and that->items
-      if(AbstractObjectMapDebugLevel() >= 2) {
-        scope idxComp("thatThisIndexCompare", scope::low, attrGE("AbstractObjectMapDebugLevel", 2));
+      SIGHT_VERB_IF(2, AbstractObjectMapDebugLevel)
+        SIGHT_VERB_DECL(scope, ("thatThisIndexCompare", scope::low), 2, AbstractObjectMapDebugLevel)
         dbg << "meIt->second.second=" << meIt->second.second << ", thatIdx=" << thatIdx << endl;
-      }
+      SIGHT_VERB_FI()
       if(meIt->second.second >= thatIdx) {
-        if(AbstractObjectMapDebugLevel() >= 2) {
-          scope thatItComp("MapElementCompare", scope::low, attrGE("AbstractObjectMapDebugLevel", 2));
+        SIGHT_VERB_IF(2, AbstractObjectMapDebugLevel)
+          SIGHT_VERB_DECL(scope, ("MapElementCompare", scope::low), 2, AbstractObjectMapDebugLevel)
           dbg << "thatIt.ML=" << thatIt->first->str() << endl;
           dbg << "meIt->second.first.ML=" << meIt->second.first->first->str() << endl;
-        }
+        SIGHT_VERB_FI()
         
         for(; thatIt!=meIt->second.first; thatIt++, thatIdx++, thatMEIt++) {
           // Copy over the current element from that->items if it doesn't have a mustEqual 
           // partner in this->items (i.e. its already been handled)
-          if(AbstractObjectMapDebugLevel() >= 2) {
+          SIGHT_VERB_IF(2, AbstractObjectMapDebugLevel)
             dbg << "thatIdx=" << thatIdx << endl;
             dbg << "thatMEIt=" << *thatMEIt << endl;
-          }
+          SIGHT_VERB_FI()
           
           if(!(*thatMEIt)) {
-            if(AbstractObjectMapDebugLevel()>=2) dbg << "Inserting at meIt->first="<<(meIt->first)->first->str()<<" mapping "<<thatIt->first->str()<<" ==&gt; "<<thatIt->second->str()<<endl;
+            SIGHT_VERB(dbg << "Inserting at meIt->first="<<(meIt->first)->first->str()
+                       <<" mapping "<<thatIt->first->str()<<" ==&gt; "
+                       <<thatIt->second->str()<<endl,
+                       2, AbstractObjectMapDebugLevel)
             // NOTE: we do not currently update the part field in the lattice thatIt->second
             //       to refer to this->latPEdge. Perhaps we should make a copy of it and update it.
             items.insert(meIt->first, *thatIt);
             modified = true;
           } else 
-            if(AbstractObjectMapDebugLevel()>=2) dbg << "mustEqual partner exists in this"<<endl;
+            SIGHT_VERB(dbg << "mustEqual partner exists in this"<<endl, 2, AbstractObjectMapDebugLevel)
         }
         // Advance thatIt and thatIdx once more to account for the partner in that->items 
         // of the current entry in this->items
@@ -617,7 +666,9 @@ bool AbstractObjectMap::meetUpdate(Lattice* thatL)
     
     // Add all the elements from that->items that remain
     for(; thatIt!=that->items.end(); thatIt++) {
-      if(AbstractObjectMapDebugLevel()>=2) dbg << "Pushing end "<<thatIt->first->str()<<" ==&gt; "<<thatIt->second->str()<<endl;
+      SIGHT_VERB(dbg << "Pushing end "<<thatIt->first->str()<<" ==&gt; "
+                 <<thatIt->second->str()<<endl,
+                 2, AbstractObjectMapDebugLevel)
       // NOTE: we do not currently update the part field in the lattice thatIt->second
       //       to refer to this->latPEdge. Perhaps we should make a copy of it and update it.
       items.push_back(*thatIt);
@@ -645,7 +696,7 @@ bool AbstractObjectMap::meetUpdate(Lattice* thatL)
   } catch (bad_cast & bc) { 
     assert(false);
   }
-  if(AbstractObjectMapDebugLevel()>=2) dbg << "Final modified="<<modified<<endl;
+  SIGHT_VERB(dbg << "Final modified="<<modified<<endl,2 ,AbstractObjectMapDebugLevel)
   return modified;
 }
 
@@ -697,22 +748,22 @@ bool AbstractObjectMap::compressMustEq()
 // Return true if this causes the object to change and false otherwise.
 bool AbstractObjectMap::compressDead()
 {
-  scope reg("compressDead", scope::low, attrGE("AbstractObjectMapDebugLevel", 2));
+  SIGHT_VERB_DECL(scope, ("compressDead", scope::low), 2, AbstractObjectMapDebugLevel)
   if(mapIsFull) { return false; }
         
   bool modified = false;
   for(list<MapElement>::iterator i = items.begin(); i != items.end(); ) {
-    if(AbstractObjectMapDebugLevel()>=2)
-    dbg << "i: "<<i->first.get()->str()<<" ==&gt"<<endl<<
-              "          "<<i->second.get()->str()<<endl;
+    SIGHT_VERB_IF(2, AbstractObjectMapDebugLevel)
+      dbg << "i: "<<i->first.get()->str()<<" ==&gt"<<endl
+          <<"          "<<i->second.get()->str()<<endl;
+    SIGHT_VERB_FI()
     
     // Remove mappings with dead keys
     if(!(i->first->isLive(latPEdge, comp, analysis))) {
       list<MapElement>::iterator nextI = i;
       nextI++;
       
-      if(AbstractObjectMapDebugLevel()>=2)
-        dbg << "Erasing "<<i->first.get()->str()<<endl;
+      SIGHT_VERB(dbg << "Erasing "<<i->first.get()->str()<<endl, 2, AbstractObjectMapDebugLevel)
       items.erase(i);
       modified = true;
       

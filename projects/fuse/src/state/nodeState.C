@@ -8,7 +8,12 @@ using namespace std;
 
 namespace fuse {
 //int nodeStateDebugLevel=2;
-DEBUG_LEVEL(nodeStateDebugLevel, 0);
+#define nodeStateDebugLevel 0
+#if nodeStateDebugLevel==0
+  #define DISABLE_SIGHT
+#endif
+
+// DEBUG_LEVEL(nodeStateDebugLevel, 0);
 
 // Records that this analysis has initialized its state at this node
 void NodeState::initialized(Analysis* init)
@@ -104,16 +109,17 @@ Lattice* NodeState::meetLatticeMapInfo(const LatticeMap& dfMap,
                                        Analysis* analysis,
                                        int latticeName,
                                        bool isAbove) const {
-  scope reg("NodeState::meetLatticeMapInfo", scope::medium, attrGE("nodeStateDebugLevel", 2));
+  SIGHT_VERB_DECL(scope, ("NodeState::meetLatticeMapInfo", scope::medium), 2, nodeStateDebugLevel)
   LatticeMap::const_iterator a;
   a = dfMap.find(analysis);
   if(a == dfMap.end()) {
-    dbg << "dfMap.find("<<analysis<<")!=dfMap.end() = "
-        <<(dfMap.find((Analysis*)analysis) != dfMap.end())
-        <<" dfMap.size()="<<dfMap.size()<<endl;
-    for(LatticeMap::const_iterator i=dfMap.begin(); i!=dfMap.end(); i++)
-    { dbg << "i="<<i->first<<endl; }
-    assert(0);
+    SIGHT_VERB_IF(2, nodeStateDebugLevel)
+      dbg << "dfMap.find("<<analysis<<")!=dfMap.end() = "
+          <<(dfMap.find((Analysis*)analysis) != dfMap.end())
+          <<" dfMap.size()="<<dfMap.size()<<endl;
+      for(LatticeMap::const_iterator i=dfMap.begin(); i!=dfMap.end(); i++)
+        { dbg << "i="<<i->first<<endl; }
+    SIGHT_VERB_FI()
   }
 
   // map is found for the analysis
@@ -151,22 +157,22 @@ Lattice* NodeState::meetLatticeMapInfo(const LatticeMap& dfMap,
   // pedges should be concrete at this point
   assert(pedge && pedge->source() && pedge->target()); 
   retLattice = (eLM->second)[latticeName]->copy();
-  if(nodeStateDebugLevel() >= 2) {
+  SIGHT_VERB_IF(2, nodeStateDebugLevel)
     dbg << "pedge=" << pedge->str()
         << ", lat@pedge=" << (eLM->second)[latticeName]->str()
         << ", retLattice=" << retLattice->str() << endl;
-  }
+  SIGHT_VERB_FI()
   ++eLM;
   // meet with all other lattices
   for( ; eLM != edgeToLatticeMap.end(); ++eLM) {
     pedge = eLM->first;
     assert(pedge->source() && pedge->target());
     retLattice->meetUpdate((eLM->second)[latticeName]);
-    if(nodeStateDebugLevel() >= 2) {
+    SIGHT_VERB_IF(2, nodeStateDebugLevel)
       dbg << "pedge=" << pedge->str()
         << ", lat@pedge=" << (eLM->second)[latticeName]->str()
         << ", retLattice=" << retLattice->str() << endl;
-    }
+    SIGHT_VERB_FI()
   }
   return retLattice;
 }
@@ -193,12 +199,12 @@ Lattice* NodeState::meetLatticeMapInfo(const LatticeMap& dfMap,
 Lattice* NodeState::getLatticeAbove(Analysis* analysis, PartEdgePtr departEdge, int latticeName) const
 {
   Lattice* retLattice;
-  scope reg("NodeState::getLatticeAbove", scope::medium, attrGE("nodeStateDebugLevel", 2));
-  if(nodeStateDebugLevel() >= 2) {
+  SIGHT_VERB_DECL(scope, ("NodeState::getLatticeAbove", scope::medium), 2, nodeStateDebugLevel)
+  SIGHT_VERB_IF(2, nodeStateDebugLevel)
     dbg << "analysis=" << dynamic_cast<ComposedAnalysis*>(analysis)->str() 
         << ", PartEdge=" << (departEdge? departEdge->str() : "NULL")
         << ", latticeName=" << latticeName << endl;    
-  }
+  SIGHT_VERB_FI()
   // We must get either a concrete edge or inEdgeFromAny
   assert(departEdge && departEdge->target());
 
@@ -214,9 +220,7 @@ Lattice* NodeState::getLatticeAbove(Analysis* analysis, PartEdgePtr departEdge, 
   // If departEdge is inEdgeFromAny, and the info above is stored separately among concrete edges, we merge their lattices
   if(!retLattice) retLattice = meetLatticeMapInfo(dfInfoAbove, analysis, latticeName, true);
 
-  if(nodeStateDebugLevel() >= 2) {
-    dbg << "retLattice=" << (retLattice? retLattice->str() : "NULL") << endl;
-  }
+  SIGHT_VERB(dbg << "retLattice=" << (retLattice? retLattice->str() : "NULL") << endl, 2, nodeStateDebugLevel)
   return retLattice;
 }
 
@@ -224,12 +228,12 @@ Lattice* NodeState::getLatticeAbove(Analysis* analysis, PartEdgePtr departEdge, 
 Lattice* NodeState::getLatticeBelow(Analysis* analysis, PartEdgePtr departEdge, int latticeName) const
 {
   Lattice* retLattice;
-  scope reg("NodeState::getLatticeBelow", scope::medium, attrGE("nodeStateDebugLevel", 2));
-  if(nodeStateDebugLevel() >= 2) {
+  SIGHT_VERB_DECL(scope, ("NodeState::getLatticeBelow", scope::medium), 2, nodeStateDebugLevel)
+  SIGHT_VERB_IF(2, nodeStateDebugLevel)
     dbg << "analysis=" << dynamic_cast<ComposedAnalysis*>(analysis)->str() 
         << ", PartEdge=" << (departEdge? departEdge->str() : "NULL")
         << ", latticeName=" << latticeName << endl;
-  }
+  SIGHT_VERB_FI()
 
   // We must get a concrete edge or outEdgeToAny
   assert(departEdge && departEdge->source());
@@ -246,10 +250,8 @@ Lattice* NodeState::getLatticeBelow(Analysis* analysis, PartEdgePtr departEdge, 
   // If departEdge is outEdgeToAny, and the info above is stored separately among concrete edges, we merge their lattices
   if(!retLattice) retLattice = meetLatticeMapInfo(dfInfoBelow, analysis, latticeName, false);
 
-  if(nodeStateDebugLevel() >= 2) {
-    dbg << "retLattice=" << (retLattice? retLattice->str() : "NULL") << endl;
-  }
-
+  SIGHT_VERB(dbg << "retLattice=" << (retLattice? retLattice->str() : "NULL") << endl, 
+             2, nodeStateDebugLevel)  
   return retLattice;
 }
 
@@ -348,10 +350,15 @@ Lattice* NodeState::getLattice_ex(const LatticeMap& dfMap, Analysis* analysis,
   std::map<PartEdgePtr, std::vector<Lattice*> >::const_iterator w;
 
   if(dfMap.find((Analysis*)analysis) == dfMap.end()) {
-    scope reg("NodeState::getLattice_ex: Analysis not found!", scope::medium);
-    dbg << "dfMap.find("<<analysis<<")!=dfMap.end() = "<<(dfMap.find((Analysis*)analysis) != dfMap.end())<<" dfMap.size()="<<dfMap.size()<<endl;
-    for(LatticeMap::const_iterator i=dfMap.begin(); i!=dfMap.end(); i++)
-    { dbg << "i="<<i->first<<endl; }
+    SIGHT_VERB_DECL(scope, ("NodeState::getLattice_ex: Analysis not found!", scope::medium), 
+                    2, nodeStateDebugLevel)
+    SIGHT_VERB_IF(2, nodeStateDebugLevel)
+      dbg << "dfMap.find("<<analysis<<")!=dfMap.end() = "
+          <<(dfMap.find((Analysis*)analysis) != dfMap.end())
+          <<" dfMap.size()="<<dfMap.size()<<endl;
+      for(LatticeMap::const_iterator i=dfMap.begin(); i!=dfMap.end(); i++)
+        { dbg << "i="<<i->first<<endl; }
+    SIGHT_VERB_FI()
     assert(0);
   }
   /*if((a=dfMap.find((Analysis*)analysis)) != dfMap.end()) {
@@ -501,7 +508,7 @@ void NodeState::unionLattices(set<Analysis*>& unionSet, Analysis* master)
 bool NodeState::unionLatticeMaps(map<PartEdgePtr, vector<Lattice*> >& to, 
                                  const map<PartEdgePtr, vector<Lattice*> >& from)
 {
-  scope reg("NodeState::unionLatticeMaps()", scope::medium, attrGE("nodeStateDebugLevel", 2));
+  SIGHT_VERB_DECL(scope, ("NodeState::unionLatticeMaps()", scope::medium), 2, nodeStateDebugLevel)
   // All the analyses in unionSet must have the same number of edges
   assert(to.size() == from.size());
 
@@ -517,10 +524,11 @@ bool NodeState::unionLatticeMaps(map<PartEdgePtr, vector<Lattice*> >& to,
     vector<Lattice*>::iterator       lTo;
     vector<Lattice*>::const_iterator lFrom;
     for(lTo=eTo->second.begin(), lFrom=eFrom->second.begin(); lTo!=eTo->second.end(); lTo++, lFrom++) {
-      if(nodeStateDebugLevel()>=1) {
-        dbg << "lTo="<<(*lTo? (*lTo)->str() : "NULL")<<endl;
-        dbg << "lFrom="<<(*lFrom? (*lFrom)->str() : "NULL")<<endl;
-      }
+      SIGHT_VERB(dbg << "lTo="<<(*lTo? (*lTo)->str() : "NULL")<<endl,
+                 2, nodeStateDebugLevel)
+      SIGHT_VERB(dbg << "lFrom="<<(*lFrom? (*lFrom)->str() : "NULL")<<endl,
+                 2, nodeStateDebugLevel)
+      
       if((*lTo)->finiteLattice()) {
         modified = (*lTo)->meetUpdate(*lFrom) || modified;
       } else {

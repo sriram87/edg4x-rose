@@ -1,5 +1,6 @@
 #include "sage3basic.h"
 #include "call_context_sensitivity_analysis.h"
+#include "sight_control.h"
 
 using namespace std;
 using namespace sight;
@@ -7,7 +8,10 @@ using namespace sight;
 namespace fuse
 {
 
-DEBUG_LEVEL(callContextSensitivityDebugLevel, 0);
+#define callContextSensitivityDebugLevel 0
+#if callContextSensitivityDebugLevel==0
+  #define DISABLE_SIGHT
+#endif
 
 /* ###########################
    ##### CallPartContext #####
@@ -260,7 +264,7 @@ std::list<PartEdgePtr> CallCtxSensPart::outEdges()
   
   // The NodeState at the current part
   NodeState* outState = NodeState::getNodeState(analysis, getParent());
-  if(callContextSensitivityDebugLevel()>=2) dbg << "outState="<<outState->str(analysis)<<endl;
+  SIGHT_VERB(dbg << "outState="<<outState->str(analysis)<<endl, 2, callContextSensitivityDebugLevel)
   
   // Consider all the CallCtxSensPartEdges along all of this part's outgoing edges. Since this is a forward
   // analysis, they are maintained separately
@@ -269,14 +273,14 @@ std::list<PartEdgePtr> CallCtxSensPart::outEdges()
     CallCtxSensLattice* lat = dynamic_cast<CallCtxSensLattice*>(outState->getLatticeBelow(analysis, *be, 0));
     assert(lat);
 //    scope(txt()<<"be="<<be->str(), scope::medium, attrGE("callContextSensitivityDebugLevel", 2));
-    if(callContextSensitivityDebugLevel()>=2) dbg << "lat="<<lat->str()<<endl;
+    SIGHT_VERB(dbg << "lat="<<lat->str()<<endl, 2, callContextSensitivityDebugLevel)
   
     // Create CallCtxSensPartEdges for all the outgoing src->tgt CallCtxSensPart pairs in lat
     for(set<CallCtxSensPartPtr>::iterator i=lat->outgoing[get_shared_this()].begin(); i!=lat->outgoing[get_shared_this()].end(); i++)
       ccsEdges.push_back(makePtr<CallCtxSensPartEdge>(*be, get_shared_this(), *i, ccsa));
   }
   
-  if(callContextSensitivityDebugLevel()>2) dbg << "#ccsEdges="<<ccsEdges.size()<<endl;
+  SIGHT_VERB(dbg << "#ccsEdges="<<ccsEdges.size()<<endl, 2, callContextSensitivityDebugLevel)
   return ccsEdges;
 }
 
@@ -295,10 +299,10 @@ std::list<PartEdgePtr> CallCtxSensPart::inEdges() {
   for(list<PartEdgePtr>::iterator be=baseEdges.begin(); be!=baseEdges.end(); be++) {
     // The NodeState at the current predecessor
     NodeState* inState = NodeState::getNodeState(analysis, (*be)->source());
-    if(callContextSensitivityDebugLevel()>=2) {
+    SIGHT_VERB_IF(2, callContextSensitivityDebugLevel)
       dbg << "be="<<be->str()<<endl;
       dbg << "inState="<<inState->str(analysis)<<endl;
-    }
+    SIGHT_VERB_FI()
     
     CallCtxSensLattice* lat = dynamic_cast<CallCtxSensLattice*>(inState->getLatticeBelow(analysis, *be, 0));
     assert(lat);
@@ -430,34 +434,33 @@ PartPtr CallCtxSensPartEdge::target() const
 // A default implementation that walks the server analysis-provided graph backwards to find 
 //    matching PartEdges is provided.
 std::list<PartEdgePtr> CallCtxSensPartEdge::getOperandPartEdge(SgNode* anchor, SgNode* operand) {
-  scope reg("PartEdge::getOperandPartEdge()", scope::medium, attrGE("callContextSensitivityDebugLevel", 2));
-  if(callContextSensitivityDebugLevel()>=2) {
+  SIGHT_VERB_DECL(scope, ("PartEdge::getOperandPartEdge()", scope::medium),
+                  2, callContextSensitivityDebugLevel);
+  // scope reg("PartEdge::getOperandPartEdge()", scope::medium, attrGE("callContextSensitivityDebugLevel", 2));
+  SIGHT_VERB_IF(2, callContextSensitivityDebugLevel)
     dbg << "anchor="<<SgNode2Str(anchor)<<" operand="<<SgNode2Str(operand)<<endl;
     dbg << "this PartEdge="<<str()<<endl;
-  }
+  SIGHT_VERB_FI()
   
   std::list<PartEdgePtr> baseEdges = getParent()->getOperandPartEdge(anchor, operand);
-  if(callContextSensitivityDebugLevel()>=2) {
-    scope regBE("baseOperandEdges", scope::medium, attrGE("callContextSensitivityDebugLevel", 2));
-    if(callContextSensitivityDebugLevel()>=2)
-      for(list<PartEdgePtr>::iterator be=baseEdges.begin(); be!=baseEdges.end(); be++)
-        dbg << be->get()->str();
-  }
+  SIGHT_VERB_IF(2, callContextSensitivityDebugLevel)    
+    SIGHT_VERB_DECL(scope, ("baseOperandEdges", scope::medium),
+                    2, callContextSensitivityDebugLevel);
+    for(list<PartEdgePtr>::iterator be=baseEdges.begin(); be!=baseEdges.end(); be++)
+      dbg << be->get()->str();
+  SIGHT_VERB_FI()
   
   // Convert the list of edges into a set for easier/faster lookups
   list<PartEdgePtr> ccsEdges;
   for(list<PartEdgePtr>::iterator be=baseEdges.begin(); be!=baseEdges.end(); be++) {
     CallCtxSensPartPtr edgeSrc = makePtr<CallCtxSensPart>((*be)->source(), (src? src: tgt), analysis);
-    { scope reg("edgeSrc", scope::low, attrGE("callContextSensitivityDebugLevel", 2));
-    if(callContextSensitivityDebugLevel()>=2) dbg<<edgeSrc->str()<<endl; }
-    
+    SIGHT_VERB(dbg<<edgeSrc->str()<<endl, 2, callContextSensitivityDebugLevel)
+
     CallCtxSensPartPtr edgeTgt = makePtr<CallCtxSensPart>((*be)->target(), (src? src: tgt), analysis);
-    { scope reg("edgeTgt", scope::low, attrGE("callContextSensitivityDebugLevel", 2));
-    if(callContextSensitivityDebugLevel()>=2) dbg<<edgeTgt->str()<<endl; }
+    SIGHT_VERB(dbg<<edgeTgt->str()<<endl, 2, callContextSensitivityDebugLevel)
     
     CallCtxSensPartEdgePtr ccsEdge = makePtr<CallCtxSensPartEdge>(*be, edgeSrc, edgeTgt, analysis);
-    { scope reg("ccsEdge", scope::low, attrGE("callContextSensitivityDebugLevel", 2));
-    if(callContextSensitivityDebugLevel()>=2) dbg<<ccsEdge->str()<<endl; }
+    SIGHT_VERB(dbg<<ccsEdge->str()<<endl, 2, callContextSensitivityDebugLevel)
     
     ccsEdges.push_back(ccsEdge);
   }
@@ -762,12 +765,16 @@ bool CallCtxSensML::isLiveML(PartEdgePtr pedge_arg) {
   // Note: we use either the source or the target context, whichever is available since 
   //       MemLocs can't be generated at context switch points, meaning that the contexts
   //       at each edge's source and destination must be identical.
-  scope reg("CallCtxSensML::isLiveML()", scope::low);
-  dbg << "this="<<str()<<endl;
-  dbg << "context="<<context.str()<<endl;
+  SIGHT_VERB_DECL(scope, ("CallCtxSensML::isLiveML()", scope::low), 2, callContextSensitivityDebugLevel)
+    SIGHT_VERB(dbg << "this="<<str()<<endl, 2, callContextSensitivityDebugLevel)
+    SIGHT_VERB(dbg << "context="<<context.str()<<endl, 2, callContextSensitivityDebugLevel)
+
   if(pedge->src) dbg << "pedge->src->context="<<pedge->src->context.str()<<endl;
   else           dbg << "pedge->tgt->context="<<pedge->tgt->context.str()<<endl;
-  dbg << "overlap="<<context.setOverlap(pedge->src? pedge->src->context: pedge->tgt->context)<<endl;
+
+  SIGHT_VERB(dbg <<"overlap="<<context.setOverlap(pedge->src? pedge->src->context: pedge->tgt->context)<<endl,
+             2, callContextSensitivityDebugLevel)
+
   return context.setOverlap(pedge->src? pedge->src->context: pedge->tgt->context) &&
          baseML->isLive(pedge->getParent(), ccsa->getComposer(), ccsa);
 }
@@ -956,8 +963,8 @@ bool CallCtxSensLattice::meetUpdate(Lattice* that_arg)
   
   bool modified = false;
   
-  if(callContextSensitivityDebugLevel()>=1)
-    dbg << "CallCtxSensLattice::meetUpdate() #outgoing="<<outgoing.size()<<" #that->outgoing="<<that->outgoing.size()<<endl;
+  SIGHT_VERB(dbg<<"CallCtxSensLattice::meetUpdate() #outgoing="<<outgoing.size()<<" #that->outgoing="<<that->outgoing.size()<<endl,
+             2, callContextSensitivityDebugLevel)
   // Copy all the information from that->outgoing to this->outgoing, setting modified if we end up inserting
   // any new elements into this->outgoing.
   map<CallCtxSensPartPtr, set<CallCtxSensPartPtr> >::iterator iThis=outgoing.begin(),
@@ -1149,7 +1156,10 @@ bool CallContextSensitivityAnalysis::transfer(PartPtr part, CFGNode cn, NodeStat
         
         //if(callContextSensitivityDebugLevel()>=1) dbg << "src="<<src->get()->str()<<endl;
 //        scope reg(txt()<<"src="<<src->get()->str(), scope::medium, attrGE("callContextSensitivityDebugLevel", 1));
-        if(callContextSensitivityDebugLevel()>=1) dbg << "sensDepth="<<getSensDepth()<<", src->context(#"<<(*src)->context.getCtxtStackDepth()<<")="<<src->get()->context.str()<<endl;
+        SIGHT_VERB_IF(2, callContextSensitivityDebugLevel)
+          dbg << "sensDepth="<<getSensDepth()<<", src->context(#"
+              <<(*src)->context.getCtxtStackDepth()<<")="<<src->get()->context.str()<<endl;
+        SIGHT_VERB_FI()
         //indent ind(attrGE("callContextSensitivityDebugLevel", 1));
         assert((*e)->source() == (*src)->getParent());
 
@@ -1160,15 +1170,19 @@ bool CallContextSensitivityAnalysis::transfer(PartPtr part, CFGNode cn, NodeStat
         } else if(isFuncExitAmbiguous(*e, matchNodes)) {
           assert(isSgFunctionDefinition((matchNodes.begin())->getNode()));
           Function exitingFunc(isSgFunctionDefinition((matchNodes.begin())->getNode()));
-          scope outScp(txt()<<"CallContextSensitivityAnalysis::transfer() Function Exit "<<exitingFunc.get_name().getString(), scope::medium, attrGE("callContextSensitivityDebugLevel", 1));          
+
+          SIGHT_VERB_DECL(scope, (txt()<<"CallContextSensitivityAnalysis::transfer() Function Exit "
+                                  <<exitingFunc.get_name().getString(), scope::medium),
+                          2, callContextSensitivityDebugLevel)
+
           newTargets = createFuncExitEdge(*e, *src);
         } else {
-          if(callContextSensitivityDebugLevel()>=1) dbg << "<b>Internal Node</b>" << endl;
+          SIGHT_VERB(dbg << "<b>Internal Node</b>" << endl, 2, callContextSensitivityDebugLevel)
           newTargets.insert(makePtr<CallCtxSensPart>((*e)->target(), (*src)->context, (*src)->lastCtxtFunc, (*src)->recursive, this));
         }
         
         for(set<CallCtxSensPartPtr>::iterator t=newTargets.begin(); t!=newTargets.end(); t++) {
-          if(callContextSensitivityDebugLevel()>=1) dbg << "<b>newTarget</b>="<<t->get()->str()<<endl;
+          SIGHT_VERB(dbg << "<b>newTarget</b>="<<t->get()->str()<<endl, 2, callContextSensitivityDebugLevel)
           
           newCCSLat->outgoing[*src].insert(*t);
           newCCSLat->incoming[*t].insert(*src);
@@ -1186,8 +1200,10 @@ bool CallContextSensitivityAnalysis::transfer(PartPtr part, CFGNode cn, NodeStat
 // Returns true if the given part denotes an outgoing function call to a function that is targeted
 // by other calls.
 bool CallContextSensitivityAnalysis::isOutgoingCallAmbiguous(PartEdgePtr edge) {
-  scope s("isOutgoingCallAmbiguous(edge)", scope::medium, attrGE("callContextSensitivityDebugLevel", 1));
-  if(callContextSensitivityDebugLevel()>=1) dbg << "edge="<<edge->str()<<endl;
+
+  SIGHT_VERB_DECL(scope, ("isOutgoingCallAmbiguous(edge)", scope::medium),
+                  2, callContextSensitivityDebugLevel)
+  SIGHT_VERB(dbg << "edge="<<edge->str()<<endl, 2, callContextSensitivityDebugLevel)
   
   set<CFGNode> matchNodes;
   if(!edge->source()->mustOutgoingFuncCall(matchNodes)) return false;
@@ -1206,16 +1222,18 @@ bool CallContextSensitivityAnalysis::isOutgoingCallAmbiguous(PartEdgePtr edge, F
   if(!edge->source()->mustOutgoingFuncCall(matchNodes)) return false;
   if(matchNodes.size()!=1) return true;
   
-  scope s("isOutgoingCallAmbiguous(call->callee)", scope::medium, attrGE("callContextSensitivityDebugLevel", 1));
-  if(callContextSensitivityDebugLevel()>=1) {
-    dbg << "edge="<<edge->str()<<endl;
-    dbg << "callee="<<callee.get_name().getString()<<"()"<<endl;
-  }
+  SIGHT_VERB_DECL(scope, ("isOutgoingCallAmbiguous(call->callee)", scope::medium),
+                  2, callContextSensitivityDebugLevel)
+
+  SIGHT_VERB(dbg << "edge="<<edge->str()<<endl, 2, callContextSensitivityDebugLevel)
+  SIGHT_VERB(dbg << "callee="<<callee.get_name().getString()<<"()"<<endl, 2, callContextSensitivityDebugLevel)
+
 
   // If we already know whether this call is ambiguous, return immediately
   if(callAmbiguity.find(edge->source()) != callAmbiguity.end() && 
      callAmbiguity[edge->source()].find(callee) != callAmbiguity[edge->source()].end()) {
-    if(callContextSensitivityDebugLevel()>=1) dbg << "Recorded: "<<(callAmbiguity[edge->source()][callee]? "": "NOT")<<" Ambiguous"<<endl;
+    SIGHT_VERB(dbg << "Recorded: "<<(callAmbiguity[edge->source()][callee]? "": "NOT")<<" Ambiguous"<<endl,
+               2, callContextSensitivityDebugLevel)
     return callAmbiguity[edge->source()][callee];
   }
 
@@ -1242,16 +1260,18 @@ bool CallContextSensitivityAnalysis::isOutgoingCallAmbiguous(PartEdgePtr edge, F
       // inside its own context) and is not identical to part
       for(list<PartEdgePtr>::iterator i=tgtIn.begin(); i!=tgtIn.end(); i++) {
 //        scope s3(txt()<<"input"<<i->get()->str(), scope::medium, attrGE("callContextSensitivityDebugLevel", 1));
-        if(callContextSensitivityDebugLevel()>=1) {
-          dbg << "(*i)->source() == edge->source()="<<((*i)->source() == edge->source())<<endl;
-          dbg << "(*i)->source()->getContext() == (*e)->source()->getContext()="<<((*i)->source()->getContext() == edge->target()->getContext())<<endl;
-        }
+
+        SIGHT_VERB(dbg << "(*i)->source() == edge->source()="<<((*i)->source() == edge->source())<<endl,
+                   2, callContextSensitivityDebugLevel)
+        SIGHT_VERB(dbg << "(*i)->source()->getContext() == (*e)->source()->getContext()=" <<
+                   ((*i)->source()->getContext() == edge->target()->getContext())<<endl, 
+                   2, callContextSensitivityDebugLevel)
 
         if((*i)->source() != edge->source() && 
            (*i)->source()->getContext() != edge->target()->getContext())
         {
           //isAmbiguous = true;
-          if(callContextSensitivityDebugLevel()>=1) dbg << "Is Ambiguous"<<endl;
+          SIGHT_VERB(dbg << "Is Ambiguous"<<endl, 2, callContextSensitivityDebugLevel)
           //goto END_LOOP;
           callAmbiguity[edge->source()][callee] = true;
           return true;
@@ -1262,7 +1282,7 @@ bool CallContextSensitivityAnalysis::isOutgoingCallAmbiguous(PartEdgePtr edge, F
     // There is just one call AND this function may be called from outside this compilation unit
     set<PartPtr> startStates = getComposer()->GetStartAStates(this);
     if(startStates.find(edge->target())!=startStates.end()) {
-      if(callContextSensitivityDebugLevel()>=1) dbg << "Ambiguous since this is a Start state"<<endl;
+      SIGHT_VERB(dbg << "Ambiguous since this is a Start state"<<endl, 2, callContextSensitivityDebugLevel)
       callAmbiguity[edge->source()][callee] = true;
       return true;
     }
@@ -1295,11 +1315,12 @@ bool CallContextSensitivityAnalysis::isFuncExitAmbiguous(PartEdgePtr edge, set<C
   assert(isSgFunctionDefinition(matchNodes.begin()->getNode()));
   Function returningFunc(isSgFunctionDefinition(matchNodes.begin()->getNode()));
   
-  scope reg("isFuncExitAmbiguous()", scope::medium, attrGE("callContextSensitivityDebugLevel", 1));
-  if(callContextSensitivityDebugLevel()>=1) {
-    dbg << "edge="<<edge->str()<<endl;
-    dbg << "returningFunc="<<returningFunc.get_name().getString()<<endl;
-  }
+  SIGHT_VERB_DECL(scope, ("isFuncExitAmbiguous()", scope::medium),
+                  2, callContextSensitivityDebugLevel)
+
+  SIGHT_VERB(dbg << "edge="<<edge->str()<<endl, 2, callContextSensitivityDebugLevel)
+  SIGHT_VERB(dbg << "returningFunc="<<returningFunc.get_name().getString()<<endl, 2, callContextSensitivityDebugLevel)
+
   
   set<CFGNode> incomingMatchNodes;
   if(!edge->target()->mustIncomingFuncCall(incomingMatchNodes)) return false;
@@ -1318,8 +1339,9 @@ bool CallContextSensitivityAnalysis::isFuncExitAmbiguous(PartEdgePtr edge, set<C
       assert((*o)->target()->mustFuncEntry(callMatchNodes));
       if(callMatchNodes.size()==1) {
         Function callee = Function::getEnclosingFunction(callMatchNodes.begin()->getNode());
-        if(callContextSensitivityDebugLevel()>=1)
+        SIGHT_VERB_IF(2, callContextSensitivityDebugLevel)
           dbg << "callee="<<callee.get_name().getString()<<", (returningFunc == callee)="<<(returningFunc == callee)<<endl;
+        SIGHT_VERB_FI()
         // If this is a call to the same function as we're currently returning from, return true
         // only if it is ambiguous. Otherwise, look for other possible matches to this return
         if(returningFunc == callee && isOutgoingCallAmbiguous(*o, callee))
@@ -1437,7 +1459,7 @@ set<CallCtxSensPartPtr> CallContextSensitivityAnalysis::createCallOutEdge(PartEd
   
   // If the start->src edge has reached our sensitivity depth limit
   if(src->context.getCtxtStackDepth() == getSensDepth()) {
-    if(callContextSensitivityDebugLevel()>=1) dbg << "At stack depth limit."<<endl;
+    SIGHT_VERB(dbg << "At stack depth limit."<<endl, 2, callContextSensitivityDebugLevel)
     // For now we'll only consider Parts with a single CFGNode
     assert(src->CFGNodes().size()==1);
 
@@ -1445,18 +1467,21 @@ set<CallCtxSensPartPtr> CallContextSensitivityAnalysis::createCallOutEdge(PartEd
     // called recursively,
     // - The flag target->recursive is already set to true
     // - We observe this at the current call
-    if(callContextSensitivityDebugLevel()>=1) dbg << "src->lastCtxtFunc="<<src->lastCtxtFunc.get_name().getString()<<"(), calleeFunc="<<calleeFunc.get_name().getString()<<endl;
+    SIGHT_VERB_IF(2, callContextSensitivityDebugLevel)
+     dbg << "src->lastCtxtFunc="<<src->lastCtxtFunc.get_name().getString()<<"(), calleeFunc="<<calleeFunc.get_name().getString()<<endl;
+    SIGHT_VERB_FI()
+
     if(src->recursive || src->lastCtxtFunc==calleeFunc) {
-      if(callContextSensitivityDebugLevel()>=1) dbg << "Recursive call."<<endl;
+      SIGHT_VERB(dbg << "Recursive call"<<endl, 2, callContextSensitivityDebugLevel)
       ret.insert(makePtr<CallCtxSensPart>(baseEdge->target(), src->context, src->lastCtxtFunc, true, this));
     // Else, if there is no recursion at this point in the analysis
     } else {
-      if(callContextSensitivityDebugLevel()>=1) dbg << "Non-recursive call."<<endl;
+      SIGHT_VERB(dbg << "Non-recursive call"<<endl, 2, callContextSensitivityDebugLevel)
       ret.insert(makePtr<CallCtxSensPart>(baseEdge->target(), src->context, src->lastCtxtFunc, false, this));
     }
   // If we haven't yet reached the limits of our context 
   } else {
-    if(callContextSensitivityDebugLevel()>=1) dbg << "Stack depth limit not reached."<<endl;
+    SIGHT_VERB(dbg << "Stack depth limit not reached"<<endl, 2, callContextSensitivityDebugLevel)
     //CallPartContextPtr new_context = makePtr<CallPartContext>(src->context);
     CallPartContext new_context = src->context;
     new_context.push(baseEdge->source());
@@ -1486,10 +1511,10 @@ set<CallCtxSensPartPtr> CallContextSensitivityAnalysis::createFuncExitEdge(PartE
   
   // If we're currently at the limit of our context
   if(src->context.getCtxtStackDepth() == getSensDepth()) {
-    if(callContextSensitivityDebugLevel()>=1) dbg << "At context depth limit"<<endl;
+    SIGHT_VERB(dbg << "At context depth limit"<<endl, 2, callContextSensitivityDebugLevel)
     // If we're returning to the last function in our context
     if(src->lastCtxtFunc == callerFunc) {
-      if(callContextSensitivityDebugLevel()>=1) dbg << "Returning to last in context"<<endl;
+      SIGHT_VERB(dbg << "Returning to last in context"<<endl, 2, callContextSensitivityDebugLevel)
       assert(src->context.getCtxtStackDepth()>0);
           
       /*dbg << "context.back()="<<src->context.last()->str()<<endl;
@@ -1503,23 +1528,25 @@ set<CallCtxSensPartPtr> CallContextSensitivityAnalysis::createFuncExitEdge(PartE
         // Pop off the most recent element in context and use this reduced context in the outgoing edges
         CallPartContext new_context = src->context;
         new_context.pop();
-        if(callContextSensitivityDebugLevel()>=1) dbg << "Match. #new_context="<<new_context.getCtxtStackDepth()<<endl;
+
+        SIGHT_VERB_IF(2, callContextSensitivityDebugLevel)
+          dbg << "Match. #new_context="<<new_context.getCtxtStackDepth()<<endl;
+        SIGHT_VERB_FI()
         ret.insert(makePtr<CallCtxSensPart>(baseEdge->target(), new_context, Function(), false, this));
       } else {
-        if(callContextSensitivityDebugLevel()>=1) dbg << "No Match."<<endl;
+        SIGHT_VERB(dbg << "No Match."<<endl, 2, callContextSensitivityDebugLevel)
       
         // If we encounter any recursive calls to this function, then it is possible that there were more
         // calls to it within the current context than there were returns. As such, add an edge for the case
         // where we return from the function while in the same context.
         if(src->recursive) {
-          if(callContextSensitivityDebugLevel()>=1) dbg << "Recursive."<<endl;
-
+          SIGHT_VERB(dbg << "Recursive."<<endl, 2, callContextSensitivityDebugLevel)
           ret.insert(makePtr<CallCtxSensPart>(baseEdge->target(), src->context, src->lastCtxtFunc, true, this));
         }
       }
     // If we're returning to a function that is not the last one in our context
     } else {
-      if(callContextSensitivityDebugLevel()>=1) dbg << "Returning to non-last in context"<<endl;
+      SIGHT_VERB(dbg << "Returning to non-last in context"<<endl, 2, callContextSensitivityDebugLevel)
       // Create an edge with the same context information as src
       ret.insert(makePtr<CallCtxSensPart>(baseEdge->target(), src->context, src->lastCtxtFunc, src->recursive, this));
     }
@@ -1527,30 +1554,32 @@ set<CallCtxSensPartPtr> CallContextSensitivityAnalysis::createFuncExitEdge(PartE
   // If we're not currently at full context depth and we have a non-empty context (empty contexts correspond to 
   // exits from function calls that were invoked from outside the compilation unit)
   } else if(src->context.getCtxtStackDepth()>0) {
-    if(callContextSensitivityDebugLevel()>=1) {
+
+    SIGHT_VERB_IF(2, callContextSensitivityDebugLevel)
       dbg << "Not full depth"<<endl;
       dbg << "baseEdge->target()="<<baseEdge->target()->str()<<endl;
       dbg << "src->context="<<src->context.str()<<endl;
       dbg << "src->context.last()="<<src->context.last()->str()<<endl;
-    }
+    SIGHT_VERB_FI()
+
     // If we're currently returning to the Part that contains the most recent call on the context stack
     if(baseEdge->target()->mustMatchFuncCall(src->context.last())) {
       // Pop off the most recent element in context and use this reduced context in the outgoing edges
       CallPartContext new_context = src->context;
       new_context.pop();
-      if(callContextSensitivityDebugLevel()>=1) dbg << "Match. #new_context="<<new_context.getCtxtStackDepth()<<endl;
+      SIGHT_VERB(dbg << "Match. #new_context="<<new_context.getCtxtStackDepth()<<endl, 2, callContextSensitivityDebugLevel)
       ret.insert(makePtr<CallCtxSensPart>(baseEdge->target(), new_context, Function(), false, this));
     } else 
-      if(callContextSensitivityDebugLevel()>=1) dbg << "No Match."<<endl;
+      SIGHT_VERB(dbg << "No Match."<<endl, 2, callContextSensitivityDebugLevel)
   } else 
-    if(callContextSensitivityDebugLevel()>=1)
-      dbg << "Cannot exit from empty context."<<endl;
+      SIGHT_VERB(dbg << "Cannot exit from empty context."<<endl, 2, callContextSensitivityDebugLevel)
   
   return ret;
 }
 
 MemRegionObjectPtr CallContextSensitivityAnalysis::Expr2MemRegion(SgNode* n, PartEdgePtr pedge_arg) {
-  if(callContextSensitivityDebugLevel()>=1) dbg << "CallContextSensitivityAnalysis::Expr2MemRegion() pedge_arg="<<pedge_arg->str()<<endl;
+  SIGHT_VERB(dbg<<"CallContextSensitivityAnalysis::Expr2MemRegion() pedge_arg="<<pedge_arg->str()<<endl,
+             2, callContextSensitivityDebugLevel)
   CallCtxSensPartEdgePtr pedge = dynamicConstPtrCast<CallCtxSensPartEdge>(pedge_arg);
   assert(pedge);
   
@@ -1563,7 +1592,8 @@ MemRegionObjectPtr CallContextSensitivityAnalysis::Expr2MemRegion(SgNode* n, Par
 }
 
 MemLocObjectPtr CallContextSensitivityAnalysis::Expr2MemLoc(SgNode* n, PartEdgePtr pedge_arg) {
-  if(callContextSensitivityDebugLevel()>=1) dbg << "CallContextSensitivityAnalysis::Expr2MemLoc() pedge_arg="<<pedge_arg->str()<<endl;
+  SIGHT_VERB(dbg << "CallContextSensitivityAnalysis::Expr2MemLoc() pedge_arg="<<pedge_arg->str()<<endl,
+             2, callContextSensitivityDebugLevel)
   CallCtxSensPartEdgePtr pedge = dynamicConstPtrCast<CallCtxSensPartEdge>(pedge_arg);
   assert(pedge);
   
@@ -1576,8 +1606,7 @@ MemLocObjectPtr CallContextSensitivityAnalysis::Expr2MemLoc(SgNode* n, PartEdgeP
 }
 
 // Return the anchor Parts of the application
-set<PartPtr> CallContextSensitivityAnalysis::GetStartAStates_Spec()
-{
+set<PartPtr> CallContextSensitivityAnalysis::GetStartAStates_Spec() {
   set<PartPtr> startStates = getComposer()->GetStartAStates(this);
   set<PartPtr> startCCSStates;
   for(set<PartPtr>::iterator s=startStates.begin(); s!=startStates.end(); s++) {
@@ -1591,13 +1620,13 @@ set<PartPtr> CallContextSensitivityAnalysis::GetStartAStates_Spec()
   return startCCSStates;
 }
 
-set<PartPtr> CallContextSensitivityAnalysis::GetEndAStates_Spec()
-{
-  scope reg("CallContextSensitivityAnalysis::GetEndAStates_Spec()", scope::medium, attrGE("callContextSensitivityDebugLevel", 3));
+set<PartPtr> CallContextSensitivityAnalysis::GetEndAStates_Spec() {
+  SIGHT_VERB_DECL(scope, ("CallContextSensitivityAnalysis::GetEndAStates_Spec()", scope::medium),
+                  2, callContextSensitivityDebugLevel)
   
   set<PartPtr> endStates = getComposer()->GetEndAStates(this);
   set<PartPtr> endCCSStates;
-  if(callContextSensitivityDebugLevel()>=3) dbg << "#endStates="<<endStates.size()<<endl;
+  SIGHT_VERB(dbg << "#endStates="<<endStates.size()<<endl, 3, callContextSensitivityDebugLevel)
   for(set<PartPtr>::iterator e=endStates.begin(); e!=endStates.end(); e++) {
 //    scope reg(txt()<<"edge="<<e->get()->str(), scope::medium, attrGE("callContextSensitivityDebugLevel", 3));
     
@@ -1607,10 +1636,10 @@ set<PartPtr> CallContextSensitivityAnalysis::GetEndAStates_Spec()
     CallCtxSensLattice* lat = dynamic_cast<CallCtxSensLattice*>(endNodeState->getLatticeAbove(this, e->get()->inEdgeFromAny(), 0));
     assert(lat);
     
-    if(callContextSensitivityDebugLevel()>=3) {
+    SIGHT_VERB_IF(3, callContextSensitivityDebugLevel)
       dbg << "lat="<<lat->str()<<endl;
       dbg << "#lat->incoming="<<lat->incoming.size()<<endl;
-    }
+    SIGHT_VERB_FI()
     
     // Find the current ending State in all of its correct contexts
     for(map<CallCtxSensPartPtr, set<CallCtxSensPartPtr> >::iterator i=lat->incoming.begin(); i!=lat->incoming.end(); i++) {
@@ -1618,7 +1647,7 @@ set<PartPtr> CallContextSensitivityAnalysis::GetEndAStates_Spec()
       // correspond to instances of the functions that must have been called from inside the current compilation
       // unit and could not have been called from outside
       if(i->first->context.getCtxtStackDepth()==0) {
-        if(callContextSensitivityDebugLevel()>=3) dbg << "i="<<i->first.get()->str()<<endl;
+        SIGHT_VERB(dbg << "i="<<i->first.get()->str()<<endl, 2, callContextSensitivityDebugLevel)
         endCCSStates.insert(i->first);
       }
     }

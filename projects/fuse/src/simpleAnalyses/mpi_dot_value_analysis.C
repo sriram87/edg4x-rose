@@ -11,7 +11,11 @@
 
 
 namespace fuse {
-  DEBUG_LEVEL(mpiDotValueAnalysisDebugLevel, 0);
+  // DEBUG_LEVEL(mpiDotValueAnalysisDebugLevel, 0);
+  #define mpiDotValueAnalysisDebugLevel 0
+  #if mpiDotValueAnalysisDebugLevel==0
+  #define DISABLE_SIGHT
+  #endif
   
   boost::uuids::random_generator gen;
   /*********************
@@ -36,7 +40,7 @@ namespace fuse {
           boost::shared_ptr<SgValueExp> svalue_p = *vset.begin();
           SgStringVal* sgsval = boost::dynamic_pointer_cast<SgStringVal>(svalue_p).get(); assert(sgsval);
           dotvalue = sgsval->get_value();
-          dbg << "MPIDotValueObject::MPIDotValueObject(dotvalue=" << dotvalue << ")\n";
+          // dbg << "MPIDotValueObject::MPIDotValueObject(dotvalue=" << dotvalue << ")\n";
         }
         else dotvalue = "unknown";
       }
@@ -189,7 +193,9 @@ namespace fuse {
     case V_SgPntrArrRefExp:
       return expr;
     default:
-      dbg << "Unhandled buffer Expr in traverseATS(expr=" << SgNode2Str(expr) << ")\n";
+      SIGHT_VERB(dbg << "Unhandled buffer Expr in traverseATS(expr=" 
+                 << SgNode2Str(expr) << ")\n",
+                 2, mpiDotValueAnalysisDebugLevel)
       assert(0);
     }
   }
@@ -469,7 +475,8 @@ namespace fuse {
   }
   
   void MDVTransferVisitor::visit(SgBinaryOp* sgn) {
-    dbg << "Unhandled Binary Op = " << SgNode2Str(sgn) << endl;
+    SIGHT_VERB(dbg << "Unhandled Binary Op = " << SgNode2Str(sgn) << endl,
+               2, mpiDotValueAnalysisDebugLevel)
     assert(false);
   }
 
@@ -496,7 +503,8 @@ namespace fuse {
   void MDVTransferVisitor::visit(SgVarRefExp* sgn) { }
   
   void MDVTransferVisitor::visit(SgExpression* sgn) {
-    dbg << "Unhandled expr=" << SgNode2Str(sgn) << endl;
+    SIGHT_VERB(dbg << "Unhandled expr=" << SgNode2Str(sgn) << endl,
+               2, mpiDotValueAnalysisDebugLevel)
     assert(0);
   }
 
@@ -554,40 +562,36 @@ namespace fuse {
   }
 
   bool MDVTransferVisitor::transferSendOp(Function& mpif_, SgFunctionCallExp* sgn) {
-    scope reg(sight::txt() << "MDVTransferVisitor::transferSendOp",
-              scope::medium,
-              attrGE("mpiDotValueAnalysisDebugLevel", 2));
+    SIGHT_VERB_DECL(scope, (sight::txt() << "MDVTransferVisitor::transferSendOp", scope::medium),
+                    2, mpiDotValueAnalysisDebugLevel)
     assert(isMPISendOp(mpif_));
     MPISendOpCallSite sendcs(mpif_, sgn);
     SgNode* bexpr = sendcs.getSendBuffer();
     MemLocObjectPtr bml = analysis->getComposer()->Expr2MemLoc(bexpr, part->inEdgeFromAny(), analysis);
     string dotvalue = analysis->part2dotid(part);
     MPIDotValueObjectPtr mdv = boost::make_shared<MPIDotValueObject>(dotvalue, part->inEdgeFromAny());
-    if(mpiDotValueAnalysisDebugLevel() >= 2) {    
-      dbg << "bml=" << bml->str() << endl;
-      dbg << "mdv=" << mdv->str() << endl;
+
+    SIGHT_VERB(dbg << "bml=" << bml->str() << endl, 2, mpiDotValueAnalysisDebugLevel)
+    SIGHT_VERB(dbg << "mdv=" << mdv->str() << endl, 2, mpiDotValueAnalysisDebugLevel)
       // cout << "transferSend: bml=" << bml->str() << endl;
       // cout << "transferSend: mdv=" << mdv->str() << endl;
-    }
+
     return aMapState->insert(bml, boost::dynamic_pointer_cast<Lattice>(mdv));                            
   }
 
   bool MDVTransferVisitor::transferRecvOp(Function& mpif_, SgFunctionCallExp* sgn) {
-    scope reg(sight::txt() << "MDVTransferVisitor::transferRecvOp",
-              scope::medium,
-              attrGE("mpiDotValueAnalysisDebugLevel", 2));
+    SIGHT_VERB_DECL(scope, (sight::txt() << "MDVTransferVisitor::transferRecvOp", scope::medium),
+                    2, mpiDotValueAnalysisDebugLevel)
     assert(isMPIRecvOp(mpif_));
     MPIRecvOpCallSite recvcs(mpif_, sgn);
     SgNode* bexpr = recvcs.getRecvBuffer();
     MemLocObjectPtr bml = analysis->getComposer()->Expr2MemLoc(bexpr, part->inEdgeFromAny(), analysis);
     ValueObjectPtr v = analysis->getComposer()->Expr2Val(bexpr, part->inEdgeFromAny(), analysis);
     MPIDotValueObjectPtr mdv = boost::make_shared<MPIDotValueObject>(v, part->inEdgeFromAny());
-    if(mpiDotValueAnalysisDebugLevel() >= 2) {
-      dbg << "Expr2Val(bexpr) = " << v->str() << endl;
-      dbg << "mdv=" << mdv->str() << endl;
+    SIGHT_VERB(dbg << "Expr2Val(bexpr) = " << v->str() << endl, 2, mpiDotValueAnalysisDebugLevel)
+    SIGHT_VERB(dbg << "mdv=" << mdv->str() << endl, 2, mpiDotValueAnalysisDebugLevel)
       // cout << "transferRecv: bml = " << bml->str() << endl;
       // cout << "transferRecv: mdv=" << mdv->str() << endl;
-    }
     //assert(!mdv->isFullLat());
     return aMapState->insert(bml, mdv);
   }
@@ -661,9 +665,10 @@ namespace fuse {
   }
 
   ValueObjectPtr MPIDotValueAnalysis::Expr2Val(SgNode* sgn, PartEdgePtr pedge) {
-    scope reg(sight::txt() << "MPIDotValueAnalysis::Expr2Val(sgn=" << SgNode2Str(sgn) << ",pedge=" << pedge->str() << ")",
-              scope::medium,
-              attrGE("mpiDotValueAnalysisDebugLevel", 2));
+    SIGHT_VERB_DECL(scope, (sight::txt() << "MPIDotValueAnalysis::Expr2Val(sgn=" 
+                            << SgNode2Str(sgn) << ",pedge=" 
+                            << pedge->str() << ")", scope::medium),
+                    2, mpiDotValueAnalysisDebugLevel)
     Composer* composer = getComposer();
     assert(pedge->source() || pedge->target());
     NodeState* state;
@@ -685,13 +690,10 @@ namespace fuse {
 
     MemLocObjectPtr ml = composer->Expr2MemLoc(sgn, pedge, this);
     MPIDotValueObjectPtr mdv = boost::dynamic_pointer_cast<MPIDotValueObject>(aMapState->get(ml));
-    if(mpiDotValueAnalysisDebugLevel() >= 2) {
-      dbg << "ml=" << ml->str() << endl;
-      dbg << "mdv=" << mdv->str() << endl;
-
+    SIGHT_VERB(dbg << "ml=" << ml->str() << endl, 2, mpiDotValueAnalysisDebugLevel)
+    SIGHT_VERB(dbg << "mdv=" << mdv->str() << endl, 2, mpiDotValueAnalysisDebugLevel)
       // cout << "Expr2Val: ml=" << ml->str() << endl;
-      // cout << "Expr2Val: mdv=" << mdv->str() << endl;
-    }
+      // cout << "Expr2Val: mdv=" << mdv->str() << endl;    
     if(mdv->isFullLat()) return composer->Expr2Val(sgn, pedge, this);
     else if(mdv->isEmptyLat()) assert(0);
     return mdv;

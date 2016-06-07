@@ -12,7 +12,12 @@ using namespace sight;
 using namespace boost;
 
 namespace fuse {
-  DEBUG_LEVEL(mpiCommContextAnalysisDebugLevel, 0);
+
+#define mpiCommContextAnalysisDebugLevel 0
+#if  mpiCommContextAnalysisDebugLevel==0
+#define DISABLE_SIGHT
+#endif
+  // DEBUG_LEVEL(mpiCommContextAnalysisDebugLevel, 0);
 
   /*********
    * MPIOp *
@@ -243,7 +248,7 @@ namespace fuse {
   // For each base outEdge retrive the CommContextLattice on that edge
   // Iterate through outgoing map and create CommATSPartEdge for each pair of CommATSPart 
   list<PartEdgePtr> CommATSPart::outEdges() {
-    scope reg("CommATSPart::outEdges()", scope::low, attrGE("mpiCommContextAnalysisDebugLevel", 3)); 
+    SIGHT_VERB_DECL(scope, ("CommATSPart::outEdges()", scope::low), 3, mpiCommContextAnalysisDebugLevel)
     list<PartEdgePtr> caPartOutEdges;
 
     list<PartEdgePtr> oedges = base->outEdges();
@@ -254,10 +259,10 @@ namespace fuse {
       CommContextLattice* ccl_p = dynamic_cast<CommContextLattice*>(state->getLatticeBelow(mpicommanalysis_p, *oe, 0));
       ROSE_ASSERT(ccl_p);
 
-      if(mpiCommContextAnalysisDebugLevel() >= 3) {
-        dbg << "baseEdge=" << oe->str() << endl;
-        dbg << "ccl_p=" << ccl_p->str() << endl;
-      }
+
+      SIGHT_VERB(dbg << "baseEdge=" << oe->str() << endl, 3, mpiCommContextAnalysisDebugLevel)
+      SIGHT_VERB(dbg << "ccl_p=" << ccl_p->str() << endl, 3, mpiCommContextAnalysisDebugLevel)
+
 
       // Get the CommATSPartSet from outgoing map for this CommATSPart
       const CommATSPartSet& caPartSet = ccl_p->getOutGoingCommATSPartSet(get_shared_this());
@@ -269,9 +274,7 @@ namespace fuse {
       CommATSPartSet::const_iterator sit = caPartSet.begin();
       for( ; sit != caPartSet.end(); ++sit) {
         CommATSPartEdgePtr caPartEdge = makePtr<CommATSPartEdge>(*oe, mpicommanalysis_p, get_shared_this(), *sit);
-        if(mpiCommContextAnalysisDebugLevel() >= 3) {
-          dbg << "CommATSPartEdge=" << caPartEdge->str() << endl;
-        }
+        SIGHT_VERB(dbg << "CommATSPartEdge=" << caPartEdge->str() << endl, 3, mpiCommContextAnalysisDebugLevel)
         caPartOutEdges.push_back(caPartEdge);
       }      
     }
@@ -281,11 +284,9 @@ namespace fuse {
   list<PartEdgePtr> CommATSPart::inEdges() {
     // Look up predMap in MPICommContextAnalysis to find the predecessor of this CommATSPart
     // Create CommATSPartEdge between this part and all the successors
-    scope reg("CommATSPart::inEdges()", scope::low, attrGE("mpiCommContextAnalysisDebugLevel", 3));
-    if(mpiCommContextAnalysisDebugLevel() >= 3) {
-      dbg << "src=" << str() << endl;
-    }
-    
+    SIGHT_VERB_DECL(scope, ("CommATSPart::inEdges()", scope::low), 3, mpiCommContextAnalysisDebugLevel)
+    SIGHT_VERB(dbg << "src=" << str() << endl, 3, mpiCommContextAnalysisDebugLevel)
+       
     list<PartEdgePtr> caPartOutEdges;
     list<PartEdgePtr> baseEdges = base->inEdges();
     // For each base edge
@@ -305,9 +306,7 @@ namespace fuse {
       CommATSPartSet::iterator si = caPartPtrSet.begin();
       for( ; si != caPartPtrSet.end(); ++si) {
         CommATSPartEdgePtr caPartEdge = makePtr<CommATSPartEdge>(*be, mpicommanalysis_p, *si, get_shared_this());
-        if(mpiCommContextAnalysisDebugLevel() >= 3) {
-          dbg << "InCommATSPartEdge=" << caPartEdge->str() << endl;
-        }
+        SIGHT_VERB(dbg << "InCommATSPartEdge=" << caPartEdge->str() << endl, 3, mpiCommContextAnalysisDebugLevel)        
         caPartOutEdges.push_back(caPartEdge);        
       }
     }
@@ -406,8 +405,8 @@ namespace fuse {
   }
 
   list<CommATSPartEdgePtr> CommATSPartEdge::getOperandCommATSPartEdge(PartEdgePtr base) {
-    scope reg(txt() << "CommATSPartEdge::getOperandCommATSPartEdge(base=" << base->str() << ")", 
-              scope::low, attrGE("mpiCommContextAnalysisDebugLevel", 3));
+    SIGHT_VERB_DECL(scope, (txt() << "CommATSPartEdge::getOperandCommATSPartEdge(base=" << base->str() << ")", scope::low),
+                    3, mpiCommContextAnalysisDebugLevel)
     list<CommATSPartEdgePtr> commATSOpPartEdges;
     
     // bw_graphEdgeIterator<PartEdgePtr, PartPtr> ge;
@@ -424,16 +423,17 @@ namespace fuse {
   }
 
   list<PartEdgePtr> CommATSPartEdge::getOperandPartEdge(SgNode* anchor, SgNode* operand) {
-    scope reg(txt() << "CommATSPart::getOperandPartEdge(anchor=" << SgNode2Str(anchor) << ", operand=" << SgNode2Str(operand) << ")", 
-              scope::low, attrGE("mpiCommContextAnalysisDebugLevel", 3));
+    SIGHT_VERB_DECL(scope,(txt() << "CommATSPart::getOperandPartEdge(anchor=" 
+                           << SgNode2Str(anchor) << ", operand=" << SgNode2Str(operand) << ")", scope::low), 
+                    3, mpiCommContextAnalysisDebugLevel)
 
     list<PartEdgePtr> commATSOpPartEdges = PartEdge::getOperandPartEdge(anchor, operand);
-    if(mpiCommContextAnalysisDebugLevel() >= 3) {
+    SIGHT_VERB_IF(3, mpiCommContextAnalysisDebugLevel)
       list<PartEdgePtr>::iterator e = commATSOpPartEdges.begin();
       for(int i=0; e != commATSOpPartEdges.end(); ++e, ++i) {
         dbg << "opPartEdge" << i << "=" << e->str() << endl;
       }
-    }
+    SIGHT_VERB_FI()
     return commATSOpPartEdges;
   }
 
@@ -759,11 +759,11 @@ namespace fuse {
   // Generic insert method
   bool CommContextLattice::insert(CommATSPartPtr src, CommATSPartPtr tgt, CommATSPartMap& commATSMap) {    
     CommATSPartSet& capSet = commATSMap[src];
-    if(mpiCommContextAnalysisDebugLevel() >= 3 && capSet.size() > 0) {
-      scope reg("CommContextLattice::insert", scope::low, attrGE("mpiCommContextAnalysisDebugLevel", 3));
+    SIGHT_VERB_IF(3, mpiCommContextAnalysisDebugLevel)
+      SIGHT_VERB_DECL(scope, ("CommContextLattice::insert", scope::low), 3, mpiCommContextAnalysisDebugLevel)
       dbg << "<b> CommATSPartSet(" << capSet.size() << ") </b>";
       dbg << str(capSet) << "\n";
-    }
+    SIGHT_VERB_FI()
     pair<CommATSPartSet::iterator, bool> insertReturnVal = capSet.insert(tgt);
     return insertReturnVal.second;
   }
@@ -907,7 +907,7 @@ namespace fuse {
       ROSE_ASSERT(ccl);
       CommATSPartPtr dummyCommATSPart;
       ccl->outGoingInsert(dummyCommATSPart, srcCommATSPart);
-      if(mpiCommContextAnalysisDebugLevel() >= 3) dbg << state->str() << endl;
+      SIGHT_VERB(dbg << state->str() << endl, 3, mpiCommContextAnalysisDebugLevel)
     }
   }
 
@@ -921,15 +921,13 @@ namespace fuse {
   //! Populate the outgoing/incoming of the new CommContextLattice and insert it into dfInfo for each outgoing edge
   bool MPICommContextAnalysis::transfer(PartPtr part, CFGNode cn, NodeState& state, 
                                  std::map<PartEdgePtr, std::vector<Lattice*> >& dfInfo) {
-    scope reg("MPICommContextAnalysis::transfer", scope::low, attrGE("mpiCommContextAnalysisDebugLevel", 3));
+    SIGHT_VERB_DECL(scope, ("MPICommContextAnalysis::transfer", scope::low), 3, mpiCommContextAnalysisDebugLevel)
     bool modified=false;
 
     CommContextLattice* inCCL = dynamic_cast<CommContextLattice*>(dfInfo[part->inEdgeFromAny()][0]);
     assert(inCCL);
-    if(mpiCommContextAnalysisDebugLevel() >= 3) {
-      dbg << "inCCL=" << inCCL->str() << endl;
-    }
-
+    SIGHT_VERB(dbg << "inCCL=" << inCCL->str() << endl, 3, mpiCommContextAnalysisDebugLevel)
+    
     // If this part does not have any outEdge (example: termination part)
     // Leave the dfInfo intact and do nothing in the transfer function
     // Composer adds an edge beyond the termination part and stores the dfInfo on that edge
@@ -947,7 +945,7 @@ namespace fuse {
     if(caPartSet.size() == 0) {
       // Error
       // Output debug information before failing
-      scope reg("MPICommContextAnalysis::Error", scope::medium, attrGE("mpiCommContextAnalysisDebugLevel", 3));
+      SIGHT_VERB_DECL(scope, ("MPICommContextAnalysis::Error", scope::medium), 3, mpiCommContextAnalysisDebugLevel)
       dbg << "<b>";
       dbg << "No CommATSPart in inCCL->outgoing with match condition CommATSPart::getParent() ==  current_part\n";
       dbg << "inCCL=" << inCCL->str() << endl;
@@ -955,12 +953,11 @@ namespace fuse {
       dbg << "</b>";
       return false;
     }
-
     // We should have least one CommATSPart in the outgoing map whose getParent() == current_part
     ROSE_ASSERT(caPartSet.size() > 0);
     dfInfo.clear();
 
-    dbg << "<b> oedges.size() = " << oedges.size() << "</b>\n";
+    SIGHT_VERB(dbg << "<b> oedges.size() = " << oedges.size() << "</b>\n", 3, mpiCommContextAnalysisDebugLevel)
     list<PartEdgePtr>::iterator oe = oedges.begin();
     for( ; oe != oedges.end(); ++oe) {
       CommContextLattice* outCCL = new CommContextLattice(*oe);
@@ -969,35 +966,33 @@ namespace fuse {
       // For each CommATSPart for the current part create an equivalent target CommATSPart
       for( ; si != caPartSet.end(); ++si) {
         CommATSPartPtr currCommATSPartPtr = *si;
-        // if(mpiCommContextAnalysisDebugLevel() >= 3) {
-        //   dbg << "parent=" << part->str() << endl;
-        //   dbg << "commATSPart=" << currCommATSPartPtr->str() << endl;
-        // }
-        
         // Build the target part based on the current CommATSPart        
         set<CommATSPartPtr> tgtCommATSPartPtrs = buildTargetCommATSPart(tgt, currCommATSPartPtr);
         if(tgtCommATSPartPtrs.size() > 0) {
           set<CommATSPartPtr>::iterator tIt = tgtCommATSPartPtrs.begin();
           for( ; tIt != tgtCommATSPartPtrs.end(); ++tIt) {
             CommATSPartPtr tgtCommATSPartPtr = *tIt;
-            if(mpiCommContextAnalysisDebugLevel() >=2 ) {
+            SIGHT_VERB_IF(3, mpiCommContextAnalysisDebugLevel)
               dbg << "currCommATSPart=" << currCommATSPartPtr->str()
                   << ", target=" << tgtCommATSPartPtr->str() << endl;
-            }
+            SIGHT_VERB_FI()
             modified = outCCL->outGoingInsert(currCommATSPartPtr, tgtCommATSPartPtr) || modified;  
           }
         }
         else {
-          dbg << "No matching call found for currCommATSPart=" << currCommATSPartPtr->str() << "on this edge=" << oe->str() << endl;
+          SIGHT_VERB(dbg << "No matching call found for currCommATSPart=" 
+                     << currCommATSPartPtr->str() << "on this edge=" 
+                     << oe->str() << endl,
+                     3, mpiCommContextAnalysisDebugLevel)
         }
       }
       // Populate the incoming map based on outgoing map
       outCCL->createIncomingMapfromOutgoingMap();
 
-      if(mpiCommContextAnalysisDebugLevel() >= 3) {
+      SIGHT_VERB_IF(3, mpiCommContextAnalysisDebugLevel)
         dbg << "outEdge=" << (*oe)->str() << endl;
         dbg << "outCCL=" << outCCL->str() << endl;
-      }
+      SIGHT_VERB_FI()
       // Add the lattice to corresponding edge
       dfInfo[*oe].push_back(outCCL);
     } 

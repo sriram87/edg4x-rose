@@ -9,13 +9,18 @@
 #include <boost/archive/text_iarchive.hpp>
 #include <boost/archive/text_oarchive.hpp>
 #include "serialization_exports.h"
+#include "sight_control.h"
 
 using namespace std;
 using namespace sight;
 
 namespace fuse {
 
-  DEBUG_LEVEL(mpiCommAnalysisDebugLevel, 0);
+  // DEBUG_LEVEL(mpiCommAnalysisDebugLevel, 0);
+#define mpiCommAnalysisDebugLevel 0
+#if mpiCommAnalysisDebugLevel==0
+#define DISABLE_SIGHT
+#endif
 
   /********************
    * MPICommValueKind *
@@ -304,7 +309,7 @@ namespace fuse {
         return boost::make_shared<StringConcreteValue>(svalue->get_value());
       }      
     default:
-      dbg << "sgvalue=" << SgNode2Str(sgvalue.get()) << endl;
+      SIGHT_VERB(dbg << "sgvalue=" << SgNode2Str(sgvalue.get()) << endl, 2, mpiCommAnalysisDebugLevel)
       assert(false);
     }
   }
@@ -599,9 +604,9 @@ namespace fuse {
   }
    
   bool MPICommValueObject::meetUpdate(Lattice* thatL) {
-    scope reg(txt() << "MPICommValueObject::meetUpdate(thisL=" << str() << "thatL=" << thatL->str() << ")",
-              scope::medium,
-              attrGE("mpiCommAnalysisDebugLevel", 3));
+    SIGHT_VERB_DECL(scope, (txt() << "MPICommValueObject::meetUpdate(thisL=" 
+                            << str() << "thatL=" << thatL->str() << ")", scope::medium),
+                    2, mpiCommAnalysisDebugLevel)
     MPICommValueObject* thatV = dynamic_cast<MPICommValueObject*>(thatL); assert(thatV);
     MPICommValueKindPtr thatK = thatV->getKind(); assert(thatK);
     
@@ -613,9 +618,7 @@ namespace fuse {
     // if this is bottom copy thatK into this
     else if(kind->getKindType() == MPICommValueKind::bottom) {
       kind = thatK->copyK();
-      if(mpiCommAnalysisDebugLevel() >=3) {
-        dbg << "After join thisL=" << str() << endl;
-      }
+      SIGHT_VERB(dbg << "After join thisL=" << str() << endl, 2, mpiCommAnalysisDebugLevel)      
       return true;
     }
     // if that is unknown and this is not -> this is unknown now
@@ -634,7 +637,7 @@ namespace fuse {
         return true;
       }
       return thisCK->unionConcreteValues(thatCK);
-    }    
+    }
   }
 
   bool MPICommValueObject::operator==(Lattice* thatL) {
@@ -871,27 +874,23 @@ namespace fuse {
     : composer(composer), pedge(pedge), analysis(analysis) { }
 
   int MPICommAnalysisTransfer::ValueObject2Int::operator()(SgInitializedName* sgn) {
-    scope reg("MPICommAnalysisTransfer::ValueObject2Int", scope::low, 
-          attrGE("mpiCommAnalysisDebugLevel", 2));
-    if(mpiCommAnalysisDebugLevel() >= 2) {
-      dbg << "sgn=" << SgNode2Str(sgn) << endl;
-      dbg << "pedge=" << pedge->str() << endl;
-    }
+    SIGHT_VERB_DECL(scope, ("MPICommAnalysisTransfer::ValueObject2Int", scope::low),
+                    2, mpiCommAnalysisDebugLevel) 
+    SIGHT_VERB(dbg << "sgn=" << SgNode2Str(sgn) << endl, 2, mpiCommAnalysisDebugLevel)
+    SIGHT_VERB(dbg << "pedge=" << pedge->str() << endl, 2, mpiCommAnalysisDebugLevel)
 
     ValueObjectPtr vo = composer->Expr2Val(sgn, pedge, analysis);
+    SIGHT_VERB(dbg << vo->str() << endl, 2, mpiCommAnalysisDebugLevel)
 
-    if(mpiCommAnalysisDebugLevel() >= 2) {
-      dbg << vo->str() << endl;
-    }
     assert(vo->isConcrete());
 
     SgValueExpPtrSet cvalues = vo->getConcreteValue();
-    if(mpiCommAnalysisDebugLevel() >= 2) {
+    SIGHT_VERB_IF(2, mpiCommAnalysisDebugLevel)
       SgValueExpPtrSet::iterator it = cvalues.begin();
       for(int i = 0; it != cvalues.end(); ++it, ++i) {
         dbg << "cvalues[" << i << "]=" << SgNode2Str(it->get()) << endl;
       }
-    }
+    SIGHT_VERB_FI()
     assert(cvalues.size() == 1);
     SgValueExpPtr sgval = *cvalues.begin();
 
@@ -907,7 +906,7 @@ namespace fuse {
       }
       // TODO: Fill out cases for other int types
       default: {
-        dbg << "unhandled type=" << SgNode2Str(sgval.get()) << endl;
+        SIGHT_VERB(dbg << "unhandled type=" << SgNode2Str(sgval.get()) << endl, 2, mpiCommAnalysisDebugLevel)
         assert(0);      
       } // end default
     } // end switch case
@@ -958,17 +957,16 @@ namespace fuse {
   }
   
   void MPICommAnalysisTransfer::transferMPISendOp(SgPointerDerefExp* sgn, const MPICommOp& commop) {
-    scope reg("MPICommAnalysisTransfer::transferMPISendOp", scope::low, 
-          attrGE("mpiCommAnalysisDebugLevel", 2));
+    SIGHT_VERB_DECL(scope, ("MPICommAnalysisTransfer::transferMPISendOp", scope::low),
+                    2, mpiCommAnalysisDebugLevel)
     assert(commop.isMPICommSendOp());
 
     Composer* composer = analysis->getComposer();
     MemLocObjectPtr bml = composer->Expr2MemLoc(sgn, part->inEdgeFromAny(), analysis);
 
     ValueObjectPtr  bvo = composer->Expr2Val(sgn, part->inEdgeFromAny(), analysis);
-    if(mpiCommAnalysisDebugLevel() >= 2) {
-      dbg << "buffer value=" << bvo->str() << endl;      
-    }
+    SIGHT_VERB(dbg << "buffer value=" << bvo->str() << endl, 2, mpiCommAnalysisDebugLevel)
+
     // Build MPICommValueObject based on this ValueObject
     MPICommValueKindPtr kind = createMPICommValueKind(bvo, part->inEdgeFromAny());
     MPICommValueObjectPtr bmvo = boost::make_shared<MPICommValueObject>(kind, part->inEdgeFromAny());               
@@ -979,9 +977,8 @@ namespace fuse {
     ValueObject2Int vo2int(composer, part->inEdgeFromAny(), analysis);
 
     SgInitializedName* targetExpr = commop.getCommOpTarget();
-    if(mpiCommAnalysisDebugLevel() >= 2) {
-      dbg << "targetExpr=" << SgNode2Str(targetExpr) << endl;
-    }
+    SIGHT_VERB(dbg << "targetExpr=" << SgNode2Str(targetExpr) << endl, 2, mpiCommAnalysisDebugLevel)
+
     int target = vo2int(targetExpr);
 
     SgInitializedName* tag_sgn = commop.getCommOpTag();
@@ -992,9 +989,9 @@ namespace fuse {
     //TODO: verify we are communicating in MPI_COMM_WORLD
     assert(comm == MPI_COMM_WORLD);
 
-    if(mpiCommAnalysisDebugLevel() >= 2) {
+    SIGHT_VERB_IF(2, mpiCommAnalysisDebugLevel)
       dbg << "target=" << target << ", tag= " << tag << ", MPI_Comm= " << comm << endl;
-    }
+    SIGHT_VERB_FI()
 
     string sdata = serialize(bmvo);
     const char* sdata_p = sdata.c_str();
@@ -1004,8 +1001,8 @@ namespace fuse {
   }
 
    void MPICommAnalysisTransfer::transferMPIRecvOp(SgPointerDerefExp* sgn, const MPICommOp& commop) {
-    scope reg("MPICommAnalysisTransfer::transferMPIRecvOp", scope::medium, 
-          attrGE("mpiCommAnalysisDebugLevel", 2));
+     SIGHT_VERB_DECL(scope, ("MPICommAnalysisTransfer::transferMPIRecvOp", scope::medium),
+                     2, mpiCommAnalysisDebugLevel)
     assert(commop.isMPICommRecvOp());
 
     Composer* composer = analysis->getComposer();
@@ -1032,10 +1029,7 @@ namespace fuse {
     // deserialize
     string sdata(sdata_p);
     MPICommValueObjectPtr mvo = deserialize(sdata);
-
-    if(mpiCommAnalysisDebugLevel() >= 2) {
-      dbg << "Recv VO:" << mvo->str() << endl;
-    }
+    SIGHT_VERB(dbg << "Recv VO:" << mvo->str() << endl, 2, mpiCommAnalysisDebugLevel)
 
     // Find the outgoing edges of MPI call expression part
     list<PartEdgePtr> callExpEdges = outGoingEdgesMPICallExp(part, "MPI_Recv");
@@ -1048,10 +1042,7 @@ namespace fuse {
       analysis->insertRecvMLVal(*ce, buffML, mvo);
     }
 
-    if(mpiCommAnalysisDebugLevel() >= 3) {
-      dbg << analysis->stringifyRecvMLValMap() << endl;
-    }
-    
+    SIGHT_VERB(dbg << analysis->stringifyRecvMLValMap() << endl, 3, mpiCommAnalysisDebugLevel)    
     // modified = latticeMap->insert(buffML, mvo) || modified;
   }
 
@@ -1083,7 +1074,8 @@ namespace fuse {
   }
 
   list<PartEdgePtr> MPICommAnalysisTransfer::outGoingEdgesMPICallExp(PartPtr srcPart, string funcname) {
-    scope reg("MPICommAnalysisTransfer::outGoingEdgesMPICallExp", scope::medium, attrGE("mpiCommAnalysisDebugLevel", 3));
+    SIGHT_VERB_DECL(scope, ("MPICommAnalysisTransfer::outGoingEdgesMPICallExp", scope::medium),
+                    3, mpiCommAnalysisDebugLevel)
     list<PartEdgePtr> pedges;
     // Find the first edge outgoing from ATS part corresponding to MPI function call expression
     fw_dataflowGraphEdgeIterator<PartEdgePtr, PartPtr> fe;
@@ -1091,11 +1083,9 @@ namespace fuse {
     PartContextPtr context = srcPart->getPartContext();
     assert(context);
 
-    if(mpiCommAnalysisDebugLevel() >=3) {
-      dbg << "srcPart=" << srcPart->str() << endl;
-      dbg << "funcname=" << funcname << endl;
-      dbg << "context=" << context->str() << endl;
-    }
+    SIGHT_VERB(dbg << "srcPart=" << srcPart->str() << endl, 3, mpiCommAnalysisDebugLevel)
+    SIGHT_VERB(dbg << "funcname=" << funcname << endl, 3, mpiCommAnalysisDebugLevel)
+    SIGHT_VERB(dbg << "context=" << context->str() << endl, 3, mpiCommAnalysisDebugLevel)
 
     fe.pushAllDescendants();
     fe++;
@@ -1108,7 +1098,7 @@ namespace fuse {
       // if(source && source->mapCFGNodeALL<bool>(filter)) {        
       //   pedges.push_back(pe);
       // }
-      if(mpiCommAnalysisDebugLevel() >= 3) dbg << "Edge match: " << pe->str() << endl;
+      SIGHT_VERB(dbg << "Edge match: " << pe->str() << endl, 3, mpiCommAnalysisDebugLevel)
       pedges.push_back(pe);
 
       if(part->getPartContext() == context) {
@@ -1191,15 +1181,12 @@ namespace fuse {
    * If this is the first insertion insert the tuple into the map.
    */
   bool MPICommAnalysis::insertRecvMLVal(PartEdgePtr pedge, MemLocObjectPtr ml, MPICommValueObjectPtr mval) {
-    scope reg(txt() << "MPICommAnalysis::insertRecvMLVal",
-              scope::medium,
-              attrGE("mpiCommAnalysisDebugLevel", 2));
-    if(mpiCommAnalysisDebugLevel() >= 2) {
-      dbg << "pedge=" << pedge->str() << endl;
-      dbg << "ml=" << ml->str() << endl;
-      dbg << "mval=" << mval->str() << endl;
-    }
+    SIGHT_VERB_DECL(scope, (txt() << "MPICommAnalysis::insertRecvMLVal", scope::medium),
+                    2, mpiCommAnalysisDebugLevel)
 
+    SIGHT_VERB(dbg << "pedge=" << pedge->str() << endl, 2, mpiCommAnalysisDebugLevel)
+    SIGHT_VERB(dbg << "ml=" << ml->str() << endl, 2, mpiCommAnalysisDebugLevel)
+    SIGHT_VERB(dbg << "mval=" << mval->str() << endl, 2, mpiCommAnalysisDebugLevel)
     // First copy the ValueObject
     MPICommValueObjectPtr mvalc = boost::dynamic_pointer_cast<MPICommValueObject>(mval->copyV());
     
@@ -1214,13 +1201,13 @@ namespace fuse {
       RecvMLValPtr relem = melem->second;
       if(ml->mayEqualML(relem->getMemLocObject(), pedge)) {
         MPICommValueObjectPtr oval = relem->getValueObject();        
-        if(mpiCommAnalysisDebugLevel() >= 2) dbg << "OldVal=" << oval->str() << endl;
+        SIGHT_VERB(dbg << "OldVal=" << oval->str() << endl, 2, mpiCommAnalysisDebugLevel)
         // Join the current value into old value
         insertR = oval->meetUpdateV(mval, pedge);
-        if(mpiCommAnalysisDebugLevel() >= 2) {
-          dbg << "newV=" << oval->str() << endl;
-          dbg << "insertR=" << insertR << endl;
-        }
+
+        SIGHT_VERB(dbg << "newV=" << oval->str() << endl, 2, mpiCommAnalysisDebugLevel)
+        SIGHT_VERB(dbg << "insertR=" << insertR << endl, 2, mpiCommAnalysisDebugLevel)
+        
         // If the value changes remove the old mapping and insert the new mapping
         if(insertR) {
           RecvMLValPtr newelem = boost::make_shared<RecvMLVal>(ml, oval);
@@ -1237,11 +1224,9 @@ namespace fuse {
       else {
         // The conservative solution is to join the two ml and their values
         MemLocObjectPtr oml = relem->getMemLocObject();
-        MPICommValueObjectPtr oval = relem->getValueObject();
-        if(mpiCommAnalysisDebugLevel() >= 2) {
-          dbg << "oldML=" << oml->str() << endl;
-          dbg << "oldV=" << oval->str() << endl;
-        }
+        MPICommValueObjectPtr oval = relem->getValueObject();        
+        SIGHT_VERB(dbg << "oldML=" << oml->str() << endl, 2, mpiCommAnalysisDebugLevel)
+        SIGHT_VERB(dbg << "oldV=" << oval->str() << endl, 2, mpiCommAnalysisDebugLevel)        
         // First copy the ML
         MemLocObjectPtr omlc = oml->copyML();
         // Join the already mapped ML and the ml to be inserted
@@ -1254,10 +1239,8 @@ namespace fuse {
         recvMLValMap.erase(pedge);          
         recvMLValMap.insert(std::pair<PartEdgePtr, RecvMLValPtr>(pedge, newelem));
         insertR = true;
-        if(mpiCommAnalysisDebugLevel() >= 2) {
-          dbg << "newML=" << oml->str() << endl;
-          dbg << "newV=" << oval->str() << endl;
-        }
+        SIGHT_VERB(dbg << "newML=" << oml->str() << endl, 2, mpiCommAnalysisDebugLevel)
+        SIGHT_VERB(dbg << "newV=" << oval->str() << endl, 2, mpiCommAnalysisDebugLevel)
       }
     }
     // When this is the first time we insert into the map
@@ -1288,9 +1271,9 @@ namespace fuse {
 
   // Return all matching PartEdges corresponding to pedge
   list<PartEdgePtr> MPICommAnalysis::matchingPartEdges(PartEdgePtr pedge) const {
-    scope reg(txt() << "MPICommAnalysis::matchingPartEdges(pedge=" << pedge->str() << ")",
-              scope::medium,
-              attrGE("mpiCommAnalysisDebugLevel", 3));
+    SIGHT_VERB_DECL(scope, (txt() << "MPICommAnalysis::matchingPartEdges(pedge=" 
+                    << pedge->str() << ")", scope::medium),
+                    3, mpiCommAnalysisDebugLevel)
     list<PartEdgePtr> pedges;
     int count=0;
     map<PartEdgePtr, RecvMLValPtr>::const_iterator elem;
@@ -1298,10 +1281,8 @@ namespace fuse {
     if(pedge->source() && pedge->target()) {
       elem = recvMLValMap.find(pedge);
       if(elem != recvMLValMap.end()) {
-        pedges.push_back(elem->first);
-        if(mpiCommAnalysisDebugLevel() >= 3) {
-          dbg << "pedges[" << count++ << "]=" << elem->first->str() << endl;
-        }
+        pedges.push_back(elem->first);        
+        SIGHT_VERB(dbg << "pedges[" << count++ << "]=" << elem->first->str() << endl, 3 ,mpiCommAnalysisDebugLevel)        
       }
     }
     // wildcard edge of the form source -> *
@@ -1311,9 +1292,7 @@ namespace fuse {
         PartEdgePtr pe = it->first;
         if(pe->source() == pedge->source()) {
           pedges.push_back(pe);
-          if(mpiCommAnalysisDebugLevel() >= 3) {
-            dbg << "pedges[" << count++ << "]=" << pe->str() << endl;
-          }          
+          SIGHT_VERB(dbg << "pedges[" << count++ << "]=" << pe->str() << endl, 3, mpiCommAnalysisDebugLevel)          
         }
       }
     }
@@ -1324,9 +1303,7 @@ namespace fuse {
         PartEdgePtr pe = it->first;
         if(pe->target() == pedge->target()) {
           pedges.push_back(pe);
-          if(mpiCommAnalysisDebugLevel() >= 3) {
-            dbg << "pedges[" << count++ << "]=" << pe->str() << endl;
-          }          
+          SIGHT_VERB(dbg << "pedges[" << count++ << "]=" << pe->str() << endl, 3, mpiCommAnalysisDebugLevel)          
         }
       }
     }
@@ -1335,18 +1312,16 @@ namespace fuse {
       for( ; it != recvMLValMap.end(); ++it) {
         PartEdgePtr pe = it->first;
         pedges.push_back(pe);
-        if(mpiCommAnalysisDebugLevel() >= 3) {
-          dbg << "pedges[" << count++ << "]=" << pe->str() << endl;
-        }                  
+        SIGHT_VERB(dbg << "pedges[" << count++ << "]=" << pe->str() << endl, 3, mpiCommAnalysisDebugLevel)                  
       }
     }
     return pedges;
   }
 
   list<RecvMLValPtr> MPICommAnalysis::getRecvMLVal(PartEdgePtr pedge) const {
-    scope reg(txt() << "MPICommAnalysis::getRecvMLVal(pedge" << pedge->str() << ")",
-              scope::medium,
-              attrGE("mpiCommAnalysisDebugLevel", 3));
+    SIGHT_VERB_DECL(scope, (txt() << "MPICommAnalysis::getRecvMLVal(pedge" 
+                            << pedge->str() << ")", scope::medium),
+                    3, mpiCommAnalysisDebugLevel)
     list<RecvMLValPtr> rmlvals;
     list<PartEdgePtr> pedges = matchingPartEdges(pedge);
     int count = 0;
@@ -1357,18 +1332,16 @@ namespace fuse {
       elem = recvMLValMap.find(pe);
       assert(elem != recvMLValMap.end());
       rmlvals.push_back(elem->second);
-      if(mpiCommAnalysisDebugLevel() >= 3) {
-        dbg << "rmlvals[" << count++ << "]=" << elem->second->str() << endl;
-      }
+      SIGHT_VERB(dbg << "rmlvals[" << count++ << "]=" << elem->second->str() << endl, 3, mpiCommAnalysisDebugLevel)
     }
     return rmlvals;
   }
 
   MPICommValueObjectPtr MPICommAnalysis::mergeMayEqualMLVal(MemLocObjectPtr ml, PartEdgePtr pedge,
                                                             list<RecvMLValPtr>& rmlvals) {
-    scope reg(txt() << "MPICommAnalysis::getMayEqualMLVal(ml=" << ml->str() << ")",
-              scope::medium,
-              attrGE("mpiCommAnalysisDebugLevel", 3));
+    SIGHT_VERB_DECL(scope, (txt() << "MPICommAnalysis::getMayEqualMLVal(ml=" 
+                            << ml->str() << ")", scope::medium), 
+                    3, mpiCommAnalysisDebugLevel)
     MPICommValueObjectPtr retV = boost::make_shared<MPICommValueObject>(pedge);
     list<RecvMLValPtr>::const_iterator it = rmlvals.begin();
     for( ; it != rmlvals.end(); ++it) {
@@ -1376,38 +1349,32 @@ namespace fuse {
       if(ml->mayEqualML(that, pedge)) {
         MPICommValueObjectPtr thatV = (*it)->getValueObject();
         retV->meetUpdateV(thatV, pedge);
-        if(mpiCommAnalysisDebugLevel() >=3 ) {
-          dbg << "thatV=" << thatV->str() << endl;
-          dbg << "retV=" << retV->str() << endl;
-        }
+        SIGHT_VERB(dbg << "thatV=" << thatV->str() << endl, 3, mpiCommAnalysisDebugLevel)
+        SIGHT_VERB(dbg << "retV=" << retV->str() << endl, 3, mpiCommAnalysisDebugLevel)
       }
     }
     return retV;
   }
   
   ValueObjectPtr MPICommAnalysis::Expr2Val(SgNode* sgn, PartEdgePtr pedge) {
-    scope reg(sight::txt() << "MPICommAnalysis::Expr2Val(sgn=" << SgNode2Str(sgn) << ",pedge=" << pedge->str() << ")",
-          scope::medium,
-          attrGE("mpiCommAnalysisDebugLevel", 2));
+    SIGHT_VERB_DECL(scope, (sight::txt() << "MPICommAnalysis::Expr2Val(sgn=" 
+                            << SgNode2Str(sgn) << ",pedge=" << pedge->str() << ")", scope::medium),
+                    2, mpiCommAnalysisDebugLevel)
     
     list<RecvMLValPtr> rmlvals = getRecvMLVal(pedge);
     MPICommValueObjectPtr mvo;
-    dbg << "rmlvals.size()=" << rmlvals.size() << endl;
+    SIGHT_VERB(dbg << "rmlvals.size()=" << rmlvals.size() << endl, 2, mpiCommAnalysisDebugLevel)
     if(rmlvals.size() != 0) {
       MemLocObjectPtr ml = getComposer()->Expr2MemLoc(sgn, pedge, this);
       mvo = mergeMayEqualMLVal(ml, pedge, rmlvals);
     }
     else {
       ValueObjectPtr val = getComposer()->Expr2Val(sgn, pedge, this);
-      if(mpiCommAnalysisDebugLevel() >= 2) {
-        dbg << "Composer Val=" << val->str() << endl;
-      }
+      SIGHT_VERB(dbg << "Composer Val=" << val->str() << endl, 2, mpiCommAnalysisDebugLevel)
       mvo = boost::make_shared<MPICommValueObject>(val, pedge);
     }
     assert(mvo->getKind());
-    if(mpiCommAnalysisDebugLevel() >= 2) {
-      dbg << "Expr2Val(sgn)=" << mvo->str() << endl;
-    }
+    SIGHT_VERB(dbg << "Expr2Val(sgn)=" << mvo->str() << endl, 2, mpiCommAnalysisDebugLevel)
     return mvo;
     // Composer* composer = getComposer();
     // MemLocObjectPtr ml = composer->Expr2MemLoc(sgn, pedge, this);

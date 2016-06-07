@@ -8,7 +8,11 @@
 
 namespace fuse {
 
-  DEBUG_LEVEL(mpiValueAnalysisDebugLevel, 0);
+  //DEBUG_LEVEL(mpiValueAnalysisDebugLevel, 0);
+#define mpiValueAnalysisDebugLevel 0
+#if mpiValueAnalysisDebugLevel==0
+#define DISABLE_SIGHT
+#endif
 
   /******************
    * MPIValueObject *
@@ -474,11 +478,12 @@ namespace fuse {
   }
 
   ValueObjectPtr MPIValueAnalysis::Expr2Val(SgNode* n, PartEdgePtr pedge) {
-    scope s(sight::txt()<<"MPIValueAnalysis::Expr2Val(n="<<SgNode2Str(n)<<
-            ", pedge="<<pedge->str()<<")", scope::medium, attrGE("mpiValueAnalysisDebugLevel", 2));
+    SIGHT_VERB_DECL(scope, (sight::txt()<<"MPIValueAnalysis::Expr2Val(n="<<SgNode2Str(n)
+                            << ", pedge="<<pedge->str()<<")", scope::medium),
+                    1, mpiValueAnalysisDebugLevel)
 
     MemLocObjectPtr ml = getComposer()->Expr2MemLoc(n, pedge, this);
-    if(mpiValueAnalysisDebugLevel()>=1) dbg << "ml="<<(ml? ml->str(): "NULL")<<endl;
+    SIGHT_VERB(dbg << "ml="<<(ml? ml->str(): "NULL")<<endl, 1, mpiValueAnalysisDebugLevel)
 
     NodeState* state;
     Lattice* l;
@@ -502,11 +507,9 @@ namespace fuse {
     ROSE_ASSERT(mvMap);
 
     // print debug info
-    if(mpiValueAnalysisDebugLevel() >= 2) {
-      dbg << "mvMap Below=" << mvMap << "=" << mvMap->str() << endl;
-      dbg << "state=" << state->str() << endl;
-    }
-
+    SIGHT_VERB(dbg << "mvMap Below=" << mvMap << "=" << mvMap->str() << endl, 1, mpiValueAnalysisDebugLevel)
+    SIGHT_VERB(dbg << "state=" << state->str() << endl, 1, mpiValueAnalysisDebugLevel)
+    
     MPIValueObjectPtr mvo = boost::dynamic_pointer_cast<MPIValueObject>(mvMap->get(ml));
     ROSE_ASSERT(mvo);
     return mvo;    

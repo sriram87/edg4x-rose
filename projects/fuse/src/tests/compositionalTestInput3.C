@@ -37,7 +37,7 @@ int main()
   CompDebugAssert(y==20);
   CompDebugAssert(z==20);
   array[z] = min(w,z);
-        
+  
   // ConstProp: w=15, x=10, y=20, z=20, array[20]==15
   CompDebugAssert(w==15);
   CompDebugAssert(x==10);

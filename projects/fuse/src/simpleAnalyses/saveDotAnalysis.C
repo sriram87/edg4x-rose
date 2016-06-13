@@ -399,12 +399,29 @@ std::ostream & ats2dot(std::ostream &o, std::string graphName, set<PartPtr>& sta
   // Maps contexts to the set of parts in each context
   Ctxt2PartsMap ctxt2parts(false, boost::make_shared<Ctxt2PartsMap_Generator_Base>(),
                                   boost::make_shared<Ctxt2PartsMap_Leaf_Generator_Base>());
-  for(fw_partEdgeIterator state(startParts); state!=fw_partEdgeIterator::end(); state++) {
+  /*fw_partEdgeIterator state(startParts);
+  cout << "state=("<<&state<<")="<<state.str() << endl;
+  const fw_partEdgeIterator& end = fw_partEdgeIterator::end();
+  cout << "end=("<<&end<<")=" << endl;
+  cout << "end=("<<&end<<")="<< end.str() << endl;
+  
+  for(fw_partEdgeIterator state(startParts); state!=fw_partEdgeIterator::end(); state++) {*/
+  { scope s("startParts");
+  for(set<PartPtr>::const_iterator p=startParts.begin(); p!=startParts.end(); ++p)
+    dbg << (*p)->str()<<endl;
+  }
+
+  for(fw_partEdgeIterator state(startParts, /*incrementalGraph*/ false); !state.isEnd(); state++) {
     PartPtr part = state.getPart();
     scope reg2(txt()<<"ats2dot: part="<<getPartUID(partInfo, part)<<"="<<part->str(), scope::medium, attrGE("saveDotAnalysisDebugLevel", 1));
     if(saveDotAnalysisDebugLevel()>=1) {
       dbg << "context="<<part->getContext()->str()<<endl;
       dbg << "pedge="<<state.getPartEdge()->str()<<endl;
+
+      /*{ scope s("partInfo");
+      for(map<PartPtr, partDotInfoPtr>::iterator i=partInfo.begin(); i!=partInfo.end(); ++i) {
+        dbg << i->first->str()<<endl;
+      } }*/
     }
     
     list<list<PartContextPtr> > key = part->getContext()->getDetailedPartContexts();
@@ -498,8 +515,10 @@ std::ostream & ats2dot_bw(std::ostream &o, std::string graphName, set<PartPtr>& 
   Ctxt2PartsMap ctxt2parts(false, boost::make_shared<Ctxt2PartsMap_Generator_Base>(),
                                   boost::make_shared<Ctxt2PartsMap_Leaf_Generator_Base>());
   
-  for(bw_partEdgeIterator state(endParts); state!=bw_partEdgeIterator::end(); state++) {
+  //for(bw_partEdgeIterator state(endParts); state!=bw_partEdgeIterator::end(); state++) {
+  for(bw_partEdgeIterator state(endParts, /*incrementalGraph*/ false); !state.isEnd(); state++) {
     PartPtr part = state.getPart();
+//cout << "==== part="<<part->str()<<endl;
     scope reg(txt()<<"ats2dot: part="<<getPartUID(partInfo, part)<<"="<<part->str(), scope::medium, attrGE("saveDotAnalysisDebugLevel", 1));
     if(saveDotAnalysisDebugLevel()>=1) {
       dbg << "state="<<state.str()<<endl;

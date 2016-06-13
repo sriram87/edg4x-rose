@@ -35,6 +35,7 @@ public:
     const ClassDefSet& getSubclasses(SgClassDefinition *) const;
     const ClassDefSet& getDirectSubclasses(SgClassDefinition *) const;
     const ClassDefSet& getAncestorClasses(SgClassDefinition *) const;
+    const ClassDefSet& getDirectAncestorClasses(SgClassDefinition *) const;
 
 private:
 

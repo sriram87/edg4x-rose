@@ -8,6 +8,7 @@
 /* A simple pointer analysis computing PointsTo relation
  */
 #include "compose.h"
+#include "composed_analysis.h"
 #include "abstract_object_map.h"
 #include "abstract_object_set.h"
 
@@ -31,9 +32,9 @@ namespace fuse
     bool modified;
     friend class PointerExprTransfer;
   public:
-    PointsToAnalysisTransfer(PartPtr part, CFGNode cn, NodeState& state,
+    PointsToAnalysisTransfer(AnalysisParts& parts, CFGNode cn, NodeState& state,
                              std::map<PartEdgePtr, std::vector<Lattice*> >& dfInfo,
-                             Composer* composer, PointsToAnalysis* analysis);                             
+                             Composer* composer, PointsToAnalysis* analysis);
 
 
     //! Visitor pattern to process sub-expressions of expressions involving pointer assignment.
@@ -87,26 +88,26 @@ namespace fuse
   class PointsToAnalysis : public virtual FWDataflow
   {
   public:
-    PointsToAnalysis() { }
-    
-    // Returns a shared pointer to a freshly-allocated copy of this ComposedAnalysis object
-    ComposedAnalysisPtr copy() { return boost::make_shared<PointsToAnalysis>(); }
+    PointsToAnalysis(bool useSSA) : FWDataflow(/*trackBase2RefinedPartEdgeMapping*/ false, useSSA) { }
 
-    void genInitLattice(PartPtr part, PartEdgePtr pedge,
+    // Returns a shared pointer to a freshly-allocated copy of this ComposedAnalysis object
+    ComposedAnalysisPtr copy() { return boost::make_shared<PointsToAnalysis>(useSSA); }
+
+    void genInitLattice(const AnalysisParts& parts, const AnalysisPartEdges& pedges,
                         std::vector<Lattice*>& initLattices);
 
-    bool transfer(PartPtr part, CFGNode cn, NodeState& state, 
+    bool transfer(AnalysisParts& parts, CFGNode cn, NodeState& state,
                   std::map<PartEdgePtr, std::vector<Lattice*> >& dfInfo) { assert(false); return false; }
 
-    boost::shared_ptr<DFTransferVisitor> 
-    getTransferVisitor(PartPtr part, CFGNode cn, NodeState& state, 
+    boost::shared_ptr<DFTransferVisitor>
+    getTransferVisitor(AnalysisParts& parts, CFGNode cn, NodeState& state,
                        std::map<PartEdgePtr, std::vector<Lattice*> >& dfInfo);
-    
+
     // functions called by composer
     MemLocObjectPtr Expr2MemLoc(SgNode* sgn, PartEdgePtr pedge);
     bool implementsExpr2MemLoc   () { return true; }
     implTightness Expr2MemLocTightness()    { return loose; }
-    std::string str(std::string indent) const; 
+    std::string str(std::string indent) const;
 
     friend class PointsToAnalysisTransfer;
 
@@ -130,26 +131,42 @@ namespace fuse
   //! AbstractObjectSet is used to store the set of MemLocObjects denoted by an expression.
   class PTMemLocObject : public MemLocObject {
     boost::shared_ptr<AbstractObjectSet> aos_p;
+    PointsToAnalysis* ptanalysis;
   public:
     PTMemLocObject(PartEdgePtr pedge, Composer* composer, PointsToAnalysis* ptanalysis);
     PTMemLocObject(const PTMemLocObject& thatPTML);
 
-    void add(MemLocObjectPtr ml_p, PartEdgePtr pedge);
-    void add(boost::shared_ptr<AbstractObjectSet> thataos_p, PartEdgePtr pedge);
+    MemRegionObjectPtr getRegion() const;
+    ValueObjectPtr     getIndex() const;
+
+    // Allocates a copy of this object and returns a pointer to it
+    MemLocObjectPtr copyAOType() const;
+
+    void add(MemLocObjectPtr ml_p, PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis);
+    void add(boost::shared_ptr<AbstractObjectSet> thataos_p, PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis);
     const AbstractObjectSet& getMLSet() const;
     boost::shared_ptr<AbstractObjectSet> getMLSetPtr() const;
     Lattice* getMLSetLatticePtr() const;
-    virtual bool mayEqualML(MemLocObjectPtr ml_p, PartEdgePtr pedge);
-    virtual bool mustEqualML(MemLocObjectPtr ml_p, PartEdgePtr pedge);
-    virtual bool equalSetML(MemLocObjectPtr ml_p, PartEdgePtr pedge);
-    virtual bool subSetML(MemLocObjectPtr ml_p, PartEdgePtr pedge);
-    virtual bool isLiveML(PartEdgePtr pedge);
-    virtual bool meetUpdateML(MemLocObjectPtr ml_p, PartEdgePtr pedge);
-    virtual bool isFullML(PartEdgePtr pedge);
-    virtual bool isEmptyML(PartEdgePtr pedge);
+    virtual bool mayEqual(MemLocObjectPtr ml_p, PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis);
+    virtual bool mustEqual(MemLocObjectPtr ml_p, PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis);
+    virtual bool equalSet(MemLocObjectPtr ml_p, PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis);
+    virtual bool subSet(MemLocObjectPtr ml_p, PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis);
+    virtual bool isLive(PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis);
+    virtual bool meetUpdate(MemLocObjectPtr ml_p, PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis);
+    virtual bool isFull(PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis);
+    virtual bool isEmpty(PartEdgePtr pedge, Composer* comp, ComposedAnalysis* analysis);
     virtual MemLocObjectPtr copyML() const;
     virtual MemLocObject* copyMLPtr() const;
     virtual std::string str(std::string indent="") const;
+
+    // Returns whether all instances of this class form a hierarchy. Every instance of the same
+    // class created by the same analysis must return the same value from this method!
+    virtual bool isHierarchy() const { return false; }
+    // AbstractObjects that form a hierarchy must inherit from the AbstractionHierarchy class
+
+    // Returns a key that uniquely identifies this particular AbstractObject in the
+    // set hierarchy.
+    virtual const hierKeyPtr& getHierKey() const { assert(0); }
   };
 
   typedef boost::shared_ptr<PTMemLocObject> PTMemLocObjectPtr;
@@ -165,13 +182,13 @@ namespace fuse
   //   // returned by this class for a given SgNode*
   //   boost::shared_ptr<AbstractObjectSet> p_aos;
   // public:
-  //   Expr2MemLocTraversal(Composer* _composer, 
+  //   Expr2MemLocTraversal(Composer* _composer,
   //                        PointsToAnalysis* _analysis,
-  //                        PartEdgePtr _pedge, 
-  //                        AbstractObjectMap* _aom) : 
-  //   composer(_composer), 
-  //   analysis(_analysis), 
-  //   pedge(_pedge), aom(_aom), 
+  //                        PartEdgePtr _pedge,
+  //                        AbstractObjectMap* _aom) :
+  //   composer(_composer),
+  //   analysis(_analysis),
+  //   pedge(_pedge), aom(_aom),
   //   p_aos(boost::shared_ptr<AbstractObjectSet>()) { }
   //   void visit(SgPointerDerefExp* sgn);
   //   void visit(SgVarRefExp* sgn);

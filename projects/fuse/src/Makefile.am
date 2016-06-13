@@ -1,34 +1,37 @@
 include $(top_srcdir)/config/Makefile.for.ROSE.includes.and.libs
 include $(ROSE_WITH_SIGHT_INSTALL_PATH)/Makefile.extern
 
-bin_PROGRAMS = fuse fuseTight fuseMPI fuseLayout typeVisitor
+bin_PROGRAMS = fuse fuseLayout
 
 INCLUDES = \
 	$(ROSE_INCLUDES) \
 	-I$(srcdir)/analysis \
+	-I$(srcdir)/abstraction \
 	-I$(srcdir)/cfgUtils \
 	-I$(srcdir)/sight/widgets \
 	-I$(srcdir)/lattice \
 	-I$(srcdir)/simpleAnalyses \
-	-I$(srcdir)/state \
-        -I${srcdir}/sparse
+	-I$(srcdir)/state 
+#    -I${srcdir}/sparse
 
 include_HEADERS =\
-	analysis/abstract_object.h \
-	analysis/abstract_object_map.h \
-	analysis/abstract_object_set.h \
-	analysis/address_taken_analysis.h \
+        fuse.h \
+	abstraction/abstract_object.h \
+	abstraction/abstract_object_map.h \
+	abstraction/abstract_object_set.h \
+	abstraction/concrete_values.h \
 	analysis/analysis.h \
 	analysis/analysis_tester.h \
 	analysis/compose.h \
+	analysis/tight_composer.h \
 	analysis/composed_analysis.h \
 	analysis/comp_shared_ptr.h \
         analysis/data_structures.h \
 	analysis/factor_trans_system.h \
 	analysis/graphIterator.h \
 	analysis/partitions.h \
+	analysis/ssa.h \
 	analysis/stx_analysis.h \
-	analysis/tight_composer.h \
 	cfgUtils/CallGraphTraverse.h \
 	cfgUtils/cfgUtils.h \
 	cfgUtils/DataflowCFG.h \
@@ -40,34 +43,29 @@ include_HEADERS =\
 	simpleAnalyses/const_prop_analysis.h \
 	simpleAnalyses/dead_path_elim_analysis.h \
 	simpleAnalyses/live_dead_analysis.h \
-	simpleAnalyses/mpi_annotate_ast.h \
-	simpleAnalyses/mpi_value_analysis.h \
-	simpleAnalyses/mpi_comm_context_analysis.h \
-	simpleAnalyses/mpi_comm_analysis.h \
-	simpleAnalyses/mpi_dot_value_analysis.h \
-	simpleAnalyses/ortho_array_analysis.h \
 	simpleAnalyses/pointsToAnalysis.h \
 	simpleAnalyses/printAnalysisStates.h \
 	simpleAnalyses/saveDotAnalysis.h \
 	simpleAnalyses/taintAnalysis.h \
-	simpleAnalyses/VariableStateTransfer.h \
-	sparse/constantAnalysis.h \
-	sparse/heapDefsAndUsesTraversal.h \
-	sparse/heapReachingDef.h \
-	sparse/heapSSA.h \
-	sparse/LatticeArith.h \
-	sparse/LatticeArithInstance.h \
-	sparse/partitionGraph.h \
-	sparse/PGSSA.h \
-	sparse/pointerAnalysis.h \
-	sparse/SSAVariableStateTransfer.h \
-	sparse/valueNumbering.h \
-	state/nodeState.h \
-	fuseCommandParser.h
+	simpleAnalyses/virtualMethodAnalysis.h \
+	simpleAnalyses/dynamicMonitor.h \
+	simpleAnalyses/defsAnalysis.h \
+	simpleAnalyses/VariableStateTransfer.h
 
-##################
-# TEST VARIABLES #
-##################
+#	sparse/constantAnalysis.h \
+#	sparse/heapDefsAndUsesTraversal.h \
+#	sparse/heapReachingDef.h \
+#	sparse/heapSSA.h \
+#	sparse/LatticeArith.h \
+#	sparse/LatticeArithInstance.h \
+#	sparse/partitionGraph.h \
+#	sparse/PGSSA.h \
+#	sparse/pointerAnalysis.h \
+#	sparse/SSAVariableStateTransfer.h \
+#	sparse/valueNumbering.h \
+#	state/nodeState.h
+
+# TEST VARIABLES
 TESTS_DIR = $(top_srcdir)/projects/fuse/src/tests
 TEST_EXIT_STATUS = $(top_srcdir)/scripts/test_exit_status
 
@@ -78,15 +76,6 @@ fuseLayout_CXXFLAGS = $(SIGHT_CFLAGS)
 fuseLayout_LDFLAGS = $(ROSE_LIBS) $(LIBS_WITH_RPATH) $(SIGHT_LAYOUT_DYNAMIC_LINKFLAGS)
 fuseLayout_SOURCES = \
 	sight/widgets/ats_graph_layout.C
-
-###############
-# TypeVisitor #
-###############
-typeVisitor_CXXFLAGS = -DROSE_PREFIX="\"${top_builddir}\""
-typeVisitor_LDFLAGS = $(ROSE_LIBS) $(LIBS_WITH_RPATH)
-typeVisitor_LDADD = -lrose
-typeVisitor_SOURCES = typeVisitorTest.cpp
-
 ########
 # FUSE #
 ########
@@ -97,18 +86,22 @@ fuse_LDFLAGS = $(ROSE_LIBS) $(LIBS_WITH_RPATH) $(SIGHT_LINKFLAGS)
 fuse_DEPENDENCIES=fuseLayout
 
 fuse_SOURCES = \
-	analysis/abstract_object.C \
-	analysis/abstract_object_map.C \
-	analysis/abstract_object_set.C \
+        fuse.C \
+	abstraction/abstract_object.C \
+	abstraction/abstract_object_map.C \
+	abstraction/abstract_object_set.C \
+	abstraction/concrete_values.C \
 	analysis/analysis.C \
 	analysis/analysis_tester.C \
 	analysis/compose.C \
+	analysis/tight_composer.C \
 	analysis/composed_analysis.C \
 	analysis/factor_trans_system.C \
 	analysis/graphIterator.C \
 	analysis/partitions.C \
+	analysis/ssa_nosight.C \
+	analysis/ssa.C \
 	analysis/stx_analysis.C \
-	analysis/tight_composer.C \
 	cfgUtils/CallGraphTraverse.C \
 	cfgUtils/cfgUtils.C \
 	cfgUtils/DataflowCFG.C \
@@ -123,14 +116,18 @@ fuse_SOURCES = \
 	simpleAnalyses/printAnalysisStates.C \
 	simpleAnalyses/saveDotAnalysis.C \
 	simpleAnalyses/taintAnalysis.C \
-        sparse/constantAnalysis.C \
-	sparse/heapDefsAndUsesTraversal.C \
-	sparse/heapSSA.C \
-	sparse/hssaMemObject.C \
-	sparse/pointerAnalysis.C \
-	sparse/valueNumbering.C \
+	simpleAnalyses/virtualMethodAnalysis.C \
+	simpleAnalyses/dynamicMonitor.C \
+	simpleAnalyses/defsAnalysis.C \
 	state/nodeState.C \
 	compositionalTestAnalysis.C
+
+#	sparse/constantAnalysis.C \
+#	sparse/heapDefsAndUsesTraversal.C \
+#	sparse/heapSSA.C \
+#	sparse/hssaMemObject.C
+#	sparse/pointerAnalysis.C \
+#	sparse/valueNumbering.C
 
 # for .C files
 FUSE_C_TESTS = \
@@ -143,6 +140,7 @@ FUSE_C_TESTS = \
 	compositionalTestInput7.C \
 	compositionalTestInput8.C \
 	compositionalTestInput9.C \
+	compositionalTestInput10.C \
 	compositionalTestInput.jisheng.C \
 	cp_test1.C 
 
@@ -158,76 +156,6 @@ FUSE_CPP_TESTS = \
 	simplePtrTest.cpp \
 	sas13Fig1Example.cpp
 
-FUSE_C_CHECKS = $(addprefix fuse_C_, $(addsuffix .passed, $(FUSE_C_TESTS)))
-FUSE_C_EXPENSIVE_CHECKS = $(addprefix fuse_C_EXP_, $(addsuffix .passed, $(FUSE_C_EXPENSIVE_TESTS)))
-FUSE_CPP_CHECKS = $(addprefix fuse_cpp_, $(addsuffix .passed, $(FUSE_CPP_TESTS)))
-FUSE_FLAGS = 
-FUSE = ./fuse
-
-$(FUSE_C_CHECKS): fuse_C_%.passed: $(TESTS_DIR)/% $(TEST_EXIT_STATUS) $(FUSE)
-	@$(RTH_RUN) CMD="./fuse  -I$(TESTS_DIR) -c $<" $(TEST_EXIT_STATUS) $@
-
-$(FUSE_C_EXPENSIVE_CHECKS): fuse_C_EXP_%.passed: $(TESTS_DIR)/% $(TEST_EXIT_STATUS) $(FUSE)
-	@$(RTH_RUN) CMD="./fuse  -I$(TESTS_DIR) -c $<" $(TEST_EXIT_STATUS) $@
-
-$(FUSE_CPP_CHECKS): fuse_cpp_%.passed: $(TESTS_DIR)/% $(TEST_EXIT_STATUS) $(FUSE)
-	@$(RTH_RUN) CMD="./fuse  -I$(TESTS_DIR) -c $<" $(TEST_EXIT_STATUS) $@
-
-.PHONY: check-fuse check-fuse-expensive
-
-check-fuse: $(FUSE_C_CHECKS) $(FUSE_CPP_CHECKS)
-check-fuse-expensive: $(FUSE_C_EXPENSIVE_CHECKS)
-
-.PHONY: clean-fuse
-clean-fuse:
-	rm -rf fuse fuse-*.o
-
-#############
-# FUSETIGHT #
-#############
-fuseTight_SKIP_FLAGS =-DFUSE_SKIP_LIB_GLOBAL_DECLS -DFUSE_START_FROM_MAIN
-fuseTight_CXXFLAGS = $(SIGHT_CFLAGS) -DROSE_PREFIX="\"${top_builddir}\"" $(fuseTight_SKIP_FLAGS)
-fuseTight_LDADD = -lrose
-fuseTight_LDFLAGS = $(ROSE_LIBS) $(LIBS_WITH_RPATH) $(SIGHT_LINKFLAGS)
-
-fuseTight_DEPENDENCIES=fuseLayout
-
-fuseTight_SOURCES = \
-	analysis/abstract_object.C \
-	analysis/abstract_object_map.C \
-	analysis/abstract_object_set.C \
-	analysis/analysis.C \
-	analysis/analysis_tester.C \
-	analysis/compose.C \
-	analysis/composed_analysis.C \
-	analysis/factor_trans_system.C \
-	analysis/graphIterator.C \
-	analysis/partitions.C \
-	analysis/stx_analysis.C \
-	analysis/tight_composer.C \
-	cfgUtils/CallGraphTraverse.C \
-	cfgUtils/cfgUtils.C \
-	cfgUtils/DataflowCFG.C \
-	cfgUtils/VirtualCFGIterator.C \
-	sight/widgets/ats_graph_structure.C \
-	lattice/lattice.C \
-	simpleAnalyses/call_context_sensitivity_analysis.C \
-	simpleAnalyses/const_prop_analysis.C \
-	simpleAnalyses/dead_path_elim_analysis.C \
-	simpleAnalyses/live_dead_analysis.C \
-	simpleAnalyses/pointsToAnalysis.C \
-	simpleAnalyses/printAnalysisStates.C \
-	simpleAnalyses/saveDotAnalysis.C \
-	simpleAnalyses/taintAnalysis.C \
-	sparse/constantAnalysis.C \
-	sparse/heapDefsAndUsesTraversal.C \
-	sparse/heapSSA.C \
-	sparse/hssaMemObject.C \
-	sparse/pointerAnalysis.C \
-	sparse/valueNumbering.C \
-	state/nodeState.C \
-	tightCompositionTest.C
-
 #SA 8/15/2014
 # Adding checks for testing tight composition
 # Tests are simple pointer manipulations
@@ -240,77 +168,33 @@ FUSETIGHT_CP_PT_TESTS=\
 	simplePtrTestTight4.cpp \
 	simplePtrTestTight5.cpp
 
-FUSETIGHT_CP_ARR_TESTS = arrayPtrTestTight.cpp
-
-FUSETIGHT_TESTS = ${FUSETIGHT_CP_PT_TESTS}
-
+FUSE_C_CHECKS = $(addprefix fuse_C_, $(addsuffix .passed, $(FUSE_C_TESTS)))
+FUSE_C_EXPENSIVE_CHECKS = $(addprefix fuse_C_EXP_, $(addsuffix .passed, $(FUSE_C_EXPENSIVE_TESTS)))
+FUSE_CPP_CHECKS = $(addprefix fuse_cpp_, $(addsuffix .passed, $(FUSE_CPP_TESTS)))
 FUSETIGHT_CHECKS = $(addprefix fusetight_, $(addsuffix .passed, $(FUSETIGHT_TESTS)))
+FUSE_FLAGS = 
+FUSE = ./fuse
 
-FUSETIGHT = ./fuseTight
+$(FUSE_C_CHECKS): fuse_C_%.passed: $(TESTS_DIR)/% $(TEST_EXIT_STATUS) $(FUSE)
+	@$(RTH_RUN) CMD="./fuse  -I$(TESTS_DIR) -c $<" $(TEST_EXIT_STATUS) $@
 
-$(FUSETIGHT_CHECKS): fusetight_%.passed: $(TESTS_DIR)/% $(TEST_EXIT_STATUS) $(FUSETIGHT)
-	@$(RTH_RUN) CMD="./fuseTight  -I$(TESTS_DIR) -c $<" $(TEST_EXIT_STATUS) $@
+$(FUSE_C_EXPENSIVE_CHECKS): fuse_C_EXP_%.passed: $(TESTS_DIR)/% $(TEST_EXIT_STATUS) $(FUSE)
+	@$(RTH_RUN) CMD="./fuse  -I$(TESTS_DIR) -c $<" $(TEST_EXIT_STATUS) $@
 
+$(FUSE_CPP_CHECKS): fuse_cpp_%.passed: $(TESTS_DIR)/% $(TEST_EXIT_STATUS) $(FUSE)
+	@$(RTH_RUN) CMD="./fuse  -I$(TESTS_DIR) -c $<" $(TEST_EXIT_STATUS) $@
 
-.PHONY: check-fusetight
-check-fusetight: $(FUSETIGHT_CHECKS)
+$(FUSETIGHT_CHECKS): fusetight_%.passed: $(TESTS_DIR)/% $(TEST_EXIT_STATUS) $(FUSE)
+	@$(RTH_RUN) CMD="./fuse  -I$(TESTS_DIR) -c $<" $(TEST_EXIT_STATUS) $@
 
-.PHONY: clean-fusetight
-clean-fusetight:
-	rm -rf fuseTight fuseTight-*.o
+.PHONY: check-fuse check-fuse-expensive
 
-###########
-# FUSEMPI #
-###########
+check-fuse: $(FUSE_C_CHECKS) $(FUSE_CPP_CHECKS) $(FUSETIGHT_CHECKS)
+check-fuse-expensive: $(FUSE_C_EXPENSIVE_CHECKS)
 
-fuseMPI_SKIP_FLAGS = -DFUSE_SKIP_MPI_HEADERS -DFUSE_SKIP_LIB_GLOBAL_DECLS -DFUSE_START_FROM_MAIN
-fuseMPI_CXXFLAGS = $(SIGHT_CFLAGS) $(ROSE_WITH_MPI_CFLAGS) -DROSE_PREFIX="\"${top_builddir}\"" $(fuseMPI_SKIP_FLAGS)
-fuseMPI_LDADD = -lrose -lboost_serialization
-fuseMPI_LDFLAGS = $(ROSE_LIBS) $(LIBS_WITH_RPATH) $(SIGHT_LINKFLAGS) $(ROSE_WITH_MPI_CLDFLAGS)
-
-fuseMPI_DEPENDENCIES=fuseLayout
-
-fuseMPI_SOURCES = \
-	analysis/abstract_object.C \
-	analysis/abstract_object_map.C \
-	analysis/abstract_object_set.C \
-	analysis/address_taken_analysis.C \
-	analysis/analysis.C \
-	analysis/analysis_tester.C \
-	analysis/compose.C \
-	analysis/composed_analysis.C \
-	analysis/factor_trans_system.C \
-	analysis/graphIterator.C \
-	analysis/partitions.C \
-	analysis/stx_analysis.C \
-	analysis/tight_composer.C \
-	cfgUtils/CallGraphTraverse.C \
-	cfgUtils/cfgUtils.C \
-	cfgUtils/DataflowCFG.C \
-	cfgUtils/VirtualCFGIterator.C \
-	sight/widgets/ats_graph_structure.C \
-	lattice/lattice.C \
-	simpleAnalyses/call_context_sensitivity_analysis.C \
-	simpleAnalyses/const_prop_analysis.C \
-	simpleAnalyses/dead_path_elim_analysis.C \
-	simpleAnalyses/live_dead_analysis.C \
-	simpleAnalyses/mpi_annotate_ast.C \
-	simpleAnalyses/mpi_comm_context_analysis.C \
-	simpleAnalyses/mpi_comm_analysis.C \
-	simpleAnalyses/mpi_dot_value_analysis.C \
-	simpleAnalyses/mpi_value_analysis.C \
-	simpleAnalyses/ortho_array_analysis.C \
-	simpleAnalyses/pointsToAnalysis.C \
-	simpleAnalyses/printAnalysisStates.C \
-	simpleAnalyses/saveDotAnalysis.C \
-	simpleAnalyses/taintAnalysis.C \
-	state/nodeState.C \
-	fuseCommandParser.C \
-	fuseTestMPIAnalysis.C
-
-.PHONY: clean-fusempi
-clean-fusempi:
-	rm -rf fuseMPI fuseMPI-*.o
+.PHONY: clean-fuse
+clean-fuse:
+	rm -rf fuse fuse-*.o
 
 #############
 # EXTRADIST #
@@ -560,9 +444,9 @@ check-local: check-fuse check-fusetight check-cxx
 # CLEAN RULES #
 ###############
 clean-debug:
-	rm -rf *.dot *.png dbg*/
+	rm -rf *.dot *.png dbg/
 
 clean-check:
 	rm -f *.passed *.failed *.out *.err
 
-clean-local: clean-fuse clean-fusetight clean-fusempi clean-check clean-debug
+clean-local: clean-fuse clean-check clean-debug

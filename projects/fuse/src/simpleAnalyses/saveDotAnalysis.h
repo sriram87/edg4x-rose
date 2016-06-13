@@ -59,7 +59,7 @@ class partDotInfo {
 };
 typedef boost::shared_ptr<partDotInfo> partDotInfoPtr;
 
-class Ctxt2PartsMap : public sight::printable {
+class Ctxt2PartsMap {
   protected:
   std::map<PartContextPtr, Ctxt2PartsMap* > m;
   Ctxt2PartsMap_Leaf* l;
@@ -100,7 +100,7 @@ class Ctxt2PartsMap : public sight::printable {
   virtual std::string str(std::string indent="") const;
 };
 
-class Ctxt2PartsMap_Leaf : public sight::printable {
+class Ctxt2PartsMap_Leaf {
   protected:
   std::map<PartContextPtr, std::set<PartPtr> > m;
   public:

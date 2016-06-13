@@ -1,128 +1,62 @@
 #include "sage3basic.h"
 #include "compose.h"
+#include "tight_composer.h"
 #include "const_prop_analysis.h"
 #include "live_dead_analysis.h"
-#include "ortho_array_analysis.h"
 #include "call_context_sensitivity_analysis.h"
 #include "dead_path_elim_analysis.h"
 #include "printAnalysisStates.h"
 #include "pointsToAnalysis.h"
+#include "virtualMethodAnalysis.h"
+#include "dynamicMonitor.h"
+//#include "constantAnalysis.h"
+//#include "valueNumbering.h"
+#include "defsAnalysis.h"
 #include "analysis_tester.h"
 #include <vector>
 #include <ctype.h>
 #include <boost/xpressive/xpressive.hpp>
 #include <boost/xpressive/regex_actions.hpp>
+#include "sageBuilder.h"
+#include "sageInterface.h"
 #include "sight.h"
+using namespace sight;
 #include <sys/time.h>
+#include "fuse.h"
+
+#include "staticCFG.h"
+#include "interproceduralCFG.h"
 
 using namespace std;
 using namespace fuse;
 using namespace boost::xpressive;
+using namespace SageBuilder;
+using namespace SageInterface;
+using namespace fuse;
 
+// Prints out the Fuse CFG, including the string representations of nodes and edges
+void printFuseCFG(SgProject* project, Fuse& f);
 
-// Regex expressions for the composition command, defined globally so that they can be used inside main 
-// (where they're initialized) as well as inside output_nested_results()
-sregex composer, lcComposer, lpComposer, analysis, cpAnalysis, ldAnalysis, oaAnalysis, ccsAnalysis, dpAnalysis, ptAnalysis, analysisList, compSpec;
-
-// Displays nested results to std::cout with indenting
-struct output_nested_results
-{
-  typedef enum {looseSeq, loosePar, tight, unknown} composerType;
-  
-  int tabs_;
-  composerType parentComposerType;
-  list<ComposedAnalysis*>& parentSubAnalyses;
-  Composer** parentComposer; 
-  checkDataflowInfoPass* cdip;
-      
-  output_nested_results(int tabs, composerType& parentComposerType, list<ComposedAnalysis*>& parentSubAnalyses, Composer** parentComposer, checkDataflowInfoPass* cdip)
-      : tabs_( tabs ), parentComposerType(parentComposerType), parentSubAnalyses(parentSubAnalyses), parentComposer(parentComposer), cdip(cdip)
-  {
-  }
-
-  template< typename BidiIterT >
-  void operator ()( match_results< BidiIterT > const &what ) 
-  {
-    // first, do some indenting
-    typedef typename std::iterator_traits< BidiIterT >::value_type char_type;
-    //char_type space_ch = char_type(' ');
-
-    string match = what[0];
-    
-    // If this term is an analysis rather than a composer
-    smatch subWhat;
-    if(regex_match(match, subWhat, analysis)) {
-//      cout << "analysis match="<<match<<", smatch="<<subWhat<<endl;
-      // Create the selected analysis and add it to the parent's sub-analysis list
-           if(regex_match(match, subWhat, cpAnalysis))  { parentSubAnalyses.push_back(new ConstantPropagationAnalysis()); }
-      else if(regex_match(match, subWhat, ldAnalysis))  { parentSubAnalyses.push_back(new LiveDeadMemAnalysis()); }
-//      else if(regex_match(match, subWhat, oaAnalysis))  { parentSubAnalyses.push_back(new OrthogonalArrayAnalysis()); }//ComposedAnalysis* ca = new OrthogonalArrayAnalysis(); cout << "OrthogonalArrayAnalysis="<<ca->str()<<endl; parentSubAnalyses.push_back(ca); }
-      else if(regex_match(match, subWhat, dpAnalysis))  { parentSubAnalyses.push_back(new DeadPathElimAnalysis()); }
-      else if(regex_match(match, subWhat, ccsAnalysis)) { 
-        parentSubAnalyses.push_back(new CallContextSensitivityAnalysis(1, CallContextSensitivityAnalysis::callSite));
-        
-/*        list<ComposedAnalysis*> mySubAnalyses;
-        composerType myComposerType = unknown;
-        output_nested_results ons(tabs_ + 1, myComposerType, mySubAnalyses, NULL, NULL);
-        std::for_each(
-            subWhat.nested_results().begin(),
-            subWhat.nested_results().end(),
-            ons);*/
-      }
-      else if(regex_match(match, subWhat, ptAnalysis))  { parentSubAnalyses.push_back(new PointsToAnalysis()); }
-    // Otherwise, if this is a composer, create the analyses in its sub-analysis list and then create the composer
-    } else if(regex_match(match, subWhat, lcComposer)) {
-      //std::fill_n( std::ostream_iterator<char_type>( std::cout ), tabs_ * 4, space_ch ); cout << "LOOSE SEQUENTIAL\n"<<endl;
-      parentComposerType = looseSeq;
-    } else if(regex_match(match, subWhat, lpComposer)) {
-      //std::fill_n( std::ostream_iterator<char_type>( std::cout ), tabs_ * 4, space_ch ); cout << "LOOSE PARALLEL\n"<<endl;
-      parentComposerType = loosePar;
-    // Finally, if this is a list of analyses for a given parent composer
-    } else {
-      //cout << "other match="<<match<<endl;
-      
-      assert(parentComposerType != unknown);
-      list<ComposedAnalysis*> mySubAnalyses;
-      composerType myComposerType = unknown;
-      
-      // Output any nested matches
-      output_nested_results ons(tabs_ + 1, myComposerType, mySubAnalyses, NULL, NULL);
-      std::for_each(
-          what.nested_results().begin(),
-          what.nested_results().end(),
-          ons);
-      // std::fill_n( std::ostream_iterator<char_type>( std::cout ), tabs_ * 4, space_ch );
-      /*cout << "#mySubAnalyses="<<mySubAnalyses.size()<<endl;
-      for(list<ComposedAnalysis*>::iterator i=mySubAnalyses.begin(); i!=mySubAnalyses.end(); i++)
-      { // std::fill_n( std::ostream_iterator<char_type>( std::cout ), tabs_ * 4, space_ch );
-        cout << "    "<<(*i)->str()<<endl; }*/
-      
-      if(parentComposerType == looseSeq) {
-        ChainComposer* cc = new ChainComposer(mySubAnalyses, cdip, true);
-        // Until ChainComposer is made to be a ComposedAnalysis, we cannot add it to the parentSubAnalyses list. This means that 
-        // LooseComposer can only be user at the outer-most level of composition
-        // !!!parentSubAnalyses.push_back(cc);
-        *parentComposer = cc;
-      } else if(parentComposerType == loosePar) {
-        LooseParallelComposer* lp = new LooseParallelComposer(mySubAnalyses);
-        parentSubAnalyses.push_back(lp);
-        *parentComposer = lp;
-      }
-    }
-  }
-};
+void FuseSSA2DOT(SgProject* project, Fuse& f, const std::string& fname);
+void FuseSSA2DOT(SgProject* project, Fuse& f, ostream& dot);
 
 int main(int argc, char** argv)
 {
-  FuseInit(argc, argv);
-  
   printf("========== S T A R T ==========\n");
-  
+
   Rose_STL_Container<string> args = CommandlineProcessing::generateArgListFromArgcArgv(argc, argv);
   // Strip the dataflow analysis options
-  
+
   // Run the front end
+  struct timeval start, end;
+  gettimeofday(&start, NULL);
+
   SgProject* project = frontend(argc, argv);
+
+  gettimeofday(&end, NULL);
+  cout << "  Front End Elapsed="<<((end.tv_sec*1000000+end.tv_usec) -
+                                               (start.tv_sec*1000000+start.tv_usec))/1000000.0<<"s"<<endl;
+
   //generatePDF(*project);
 
 #if 0
@@ -134,8 +68,8 @@ int main(int argc, char** argv)
      generateAstGraph(project,MAX_NUMBER_OF_IR_NODES_TO_GRAPH_FOR_WHOLE_GRAPH,"");
 #endif
 
-  printf("Frontend done\n");fflush(stdout);
-  
+  //printf("Frontend done\n");fflush(stdout);
+
   string fuseCmd = "";
   Rose_STL_Container<string> dataflowoptions = CommandlineProcessing::generateOptionList(args, "-fuse:");
   //std::vector<std::string>  dataflowoptions = project->get_originalCommandLineArgumentList();
@@ -161,22 +95,6 @@ int main(int argc, char** argv)
     }
   }
 
-  lcComposer = as_xpr(icase("loosechain")) | icase("lc");
-  lpComposer = as_xpr(icase("loosepar"))   | icase("lp");
-  composer = by_ref(lcComposer) | by_ref(lpComposer);
-  //composer = as_xpr(icase("loosechain")) | icase("lc") | icase("loosepar") | icase("lp");
-  
-  cpAnalysis  = as_xpr(icase("constantpropagationanalysis")) | icase("constantpropagation") | icase("cp");
-  ldAnalysis  = as_xpr(icase("livedeadmemanalysis"))         | icase("livedead")            | icase("ld");
-  oaAnalysis  = as_xpr(icase("livedeadmemanalysis"))         | icase("orthoarray")          | icase("oa");
-  ccsAnalysis = as_xpr(icase("callctxsensanalysis"))         | icase("callctxsens")         | icase("ccs");
-  dpAnalysis  = as_xpr(icase("deadpathelimanalysis"))        | icase("deadpath")            | icase("dp");
-  ptAnalysis  = as_xpr(icase("pointstoanalysis"))            | icase("pointsto")            | icase("pt");
-  analysis = by_ref(cpAnalysis) | by_ref(ldAnalysis) | by_ref(oaAnalysis) | by_ref(ccsAnalysis) | by_ref(dpAnalysis) | by_ref(ptAnalysis);
-  analysisList = '(' >> *_s >> (by_ref(analysis) | by_ref(compSpec)) >> *_s >> (!('(' >> *_s >>  +_w   >> *_s >> ')') ) >>
-        *(*_s >> "," >> *_s >> (by_ref(analysis) | by_ref(compSpec)) >> *_s >> (!('(' >> *_s >>  +_w   >> *_s >> ')') ) ) >> *_s >> ')';
-  compSpec = *_s >> by_ref(composer) >> *_s >> analysisList >> *_s;
-
 /*
   // Remove leading spaces
   unsigned int startNonSpace=0;
@@ -189,43 +107,201 @@ int main(int argc, char** argv)
   if(endNonSpace<fuseCmd.length()-1) fuseCmd.erase(endNonSpace+1);*/
 
   cout << "fuseCmd = \""<<fuseCmd<<"\"\n";
-  
+
   // If this is a command for the compositional framework
   if(fuseCmd.size()>0) {
-    smatch what;
-    if(regex_match(fuseCmd, what, compSpec)) {
-      //cout << "MATCH composer\n";
-      list<ComposedAnalysis*>  mySubAnalyses;
-      Composer* rootComposer = NULL;
-      output_nested_results::composerType rootComposerType = output_nested_results::unknown;
-      
-      checkDataflowInfoPass* cdip = new checkDataflowInfoPass();
-      
-      output_nested_results ons(0, rootComposerType, mySubAnalyses, &rootComposer, cdip);
-      std::for_each(what.nested_results().begin(),
-                    what.nested_results().end(),
-                    ons);
-      assert(rootComposer!=NULL);
-      
-      struct timeval start, end;
-      gettimeofday(&start, NULL);
-      
-      ((ChainComposer*)rootComposer)->runAnalysis();
-      
-      gettimeofday(&end, NULL);
-      cout << "Elapsed="<<((end.tv_sec*1000000+end.tv_usec) - 
-                           (start.tv_sec*1000000+start.tv_usec))/1000000.0<<"s"<<endl;
-      
-      //cout << "rootComposer="<<rootComposer<<" cdip->getNumErrors()="<<cdip->getNumErrors()<<endl;
-      if(cdip->getNumErrors() > 0) cout << cdip->getNumErrors() << " Errors Reported!"<<endl;
-      else                         cout << "PASS"<<endl;
+    Fuse f(argc, argv);
+    f.run(project, fuseCmd);
+    //f.cfgToDot("cfg.dot");
+    //printFuseCFG(project, f);
+    //FuseSSA2DOT(project, f, "ssa.dot");
+    f.placeConstantPropagationAnnotations(/*verbose*/ true);
+    f.placeUseDefAnnotations(/*verbose*/ true);
 
-    } else
-      cout << "FAIL composer\n";
-  }
-  
-  printf("==========  E  N  D  ==========\n");
-  
-  return 0;
+  } else
+    cout << "ERROR: no Fuse command specified either on the command line or as a pragma inside the target files!"<<endl;
+
+  cout << "==========  E  N  D  ==========\n";
+
+  return backend (project);
+  //return 0;
 }
 
+class FuseCFGMap {
+  public:
+  virtual void mapNode(FuseCFGNodePtr node) {}
+  virtual void mapEdge(FuseCFGEdgePtr edge) {}
+  
+  void iterateOnceOverFuseCFG(std::set<FuseCFGNodePtr> startStates) {
+    std::set<FuseCFGNodePtr> worklist = startStates;
+    std::set<FuseCFGNodePtr> visited;
+    while(worklist.size()>0) {
+      FuseCFGNodePtr cur = *worklist.begin();
+      worklist.erase(worklist.begin());
+      visited.insert(cur);
+  
+      mapNode(cur);
+  
+      vector<FuseCFGEdgePtr> out=cur->outEdges();
+      for(vector<FuseCFGEdgePtr>::iterator e=out.begin(); e!=out.end(); ++e) {
+        if(visited.find((*e)->target()) == visited.end()) {
+          mapEdge(*e);
+  
+          worklist.insert((*e)->target());
+        }
+      }
+    }
+  }
+};
+
+
+// Prints out the Fuse CFG, including the string representations of nodes and edges
+void printFuseCFG(SgProject* project, Fuse& f) {
+  StaticCFG::CFG icfg(project, /*is_filtered*/ false);
+  std::set<CFGNode> worklist;
+  CFGNode entry = icfg.toCFGNode(icfg.getEntry());
+  //cout << "entry = "<<CFGNode2Str(entry)<<endl;
+  worklist.insert(entry);
+  std::set<CFGNode> visited;
+  while(worklist.size()>0) {
+    CFGNode cur = *worklist.begin();
+    worklist.erase(worklist.begin());
+    visited.insert(cur);
+
+    cout << "node: "<<CFGNode2Str(cur)<<endl;
+    std::set<FuseCFGNodePtr> FuseNodes = f.GetATSNodes(cur);
+    for(std::set<FuseCFGNodePtr>::iterator n=FuseNodes.begin(); n!=FuseNodes.end(); ++n)
+      cout << "    "<<(*n)->toString()<<endl;
+
+    vector<CFGEdge> out=cur.outEdges();
+    for(vector<CFGEdge>::iterator e=out.begin(); e!=out.end(); ++e) {
+      if(visited.find(e->target()) == visited.end()) {
+        cout << "edge: "<<CFGEdge2Str(*e)<<endl;
+        std::set<FuseCFGEdgePtr> FuseEdges = f.GetATSEdges(*e);
+        for(std::set<FuseCFGEdgePtr>::iterator fe=FuseEdges.begin(); fe!=FuseEdges.end(); ++fe)
+          cout << "    "<<(*fe)->toStringFuse()<<endl;
+
+        worklist.insert(e->target());
+      }
+    }
+  }
+}
+
+// Relaces all instances of string search in subject with replace
+// From http://stackoverflow.com/questions/5343190/how-do-i-replace-all-instances-of-of-a-string-with-another-string
+void ReplaceStringInPlace(std::string& subject, const std::string& search,
+                          const std::string& replace) {
+    size_t pos = 0;
+    while ((pos = subject.find(search, pos)) != std::string::npos) {
+         subject.replace(pos, search.length(), replace);
+         pos += replace.length();
+    }
+}
+
+
+void FuseSSA2DOT(SgProject* project, Fuse& f, const std::string& fname) {
+  ofstream ofile (fname.c_str(), ios::out);
+  FuseSSA2DOT(project, f, ofile);
+}
+
+void FuseSSA2DOT(SgProject* project, Fuse& f, ostream& dot) {
+  dot << "digraph SSA {"<<endl;
+
+  std::set<FuseCFGNodePtr> startStates = f.GetStartATSNodes();
+
+  // First, assign unique nodeIDs to all parts in the ATS and emit node descriptions for all parts
+  class PartIDMap: public FuseCFGMap {
+    public:
+    std::map<FuseCFGNodePtr, int> partID;
+    ostream& dot;
+    PartIDMap(ostream& dot): dot(dot) {}
+    void mapNode(FuseCFGNodePtr node) {
+      int ID=partID.size();
+      string mlLabel = node->toString();
+      // Replace all the line breaks in mlLabel with explicit text "\n";
+      ReplaceStringInPlace(mlLabel, "\n", "\\n");
+      dot << "node"<<ID<<" [label=\""<<mlLabel<<"\"";
+      if(node->isPhiNode())
+        dot << " color=red"<<endl;
+      dot << "];"<<endl;
+      partID[node] = ID;
+
+    }
+  };
+  PartIDMap pidM(dot);
+  pidM.iterateOnceOverFuseCFG(startStates);
+
+  // Next, add transition system edges
+  /*for(fw_graphEdgeIterator<FuseCFGEdgePtr, FuseCFGNodePtr> state(startStates, / *incrementalGraph* / false); !state.isEnd(); state++) {
+    PartPtr src = state.getPartEdge()->source();
+    PartPtr tgt = state.getPartEdge()->target();
+    dot << "node"<<partID[src]<<" -> node"<<partID[tgt]<<";"<<endl;
+  }*/
+  class TransEdgesMap: public FuseCFGMap {
+    public:
+    ostream& dot;
+    std::map<FuseCFGNodePtr, int> partID;
+    TransEdgesMap(ostream& dot, std::map<FuseCFGNodePtr, int>& partID): dot(dot), partID(partID) {}
+    void mapNode(FuseCFGNodePtr node) {
+      vector<FuseCFGEdgePtr> out = node->outEdges();
+      for(vector<FuseCFGEdgePtr>::iterator e=out.begin(); e!=out.end(); e++) {
+        dot << "node"<<partID[node]<<" -> node"<<partID[(*e)->target()]<<";"<<endl;
+      }
+    }
+  };
+  TransEdgesMap teM(dot,pidM.partID);
+  teM.iterateOnceOverFuseCFG(startStates);
+
+  // Add edges for def-use relations
+  //dot << "DefUseMap"<<endl;
+  class DefUseMap: public FuseCFGMap {
+    public:
+    ostream& dot;
+    std::map<FuseCFGNodePtr, int> partID;
+    Fuse& f;
+    DefUseMap(ostream& dot, std::map<FuseCFGNodePtr, int>& partID, Fuse& f): dot(dot), partID(partID), f(f) {}
+    void mapNode(FuseCFGNodePtr node) {
+      std::set<SSAMemLocObjectPtr> uses = node->getUses();
+      //dot << "part="<<node->getPart()->str()<<" #uses="<<uses.size()<<endl;
+      for(std::set<SSAMemLocObjectPtr>::iterator u=uses.begin(); u!=uses.end(); ++u) {
+        const std::set<SSAMemLocObjectPtr>& defs = f.getDirectDefs(*u);
+        for(std::set<SSAMemLocObjectPtr>::const_iterator d=defs.begin(); d!=defs.end(); ++d) {
+          string mlLabel = (*d)->str();
+          // Replace all the line breaks in mlLabel with explicit text "\n";
+          ReplaceStringInPlace(mlLabel, "\n", "\\n");
+          dot << "node"<<partID[(*d)->getFuseCFGNodeLoc(&f)]<<" -> node"<<partID[(*u)->getFuseCFGNodeLoc(&f)]<<" [label=\""<<mlLabel<<"\" color=blue];"<<endl;
+        }
+      }
+    }
+  };
+  DefUseMap duM(dot,pidM.partID, f);
+  duM.iterateOnceOverFuseCFG(startStates);
+  
+  // Add edges for def-phiDef relations
+  //dot << "DefPhiDefMap"<<endl;
+  class DefPhiDefMap: public FuseCFGMap {
+    public:
+    ostream& dot;
+    std::map<FuseCFGNodePtr, int> partID;
+    Fuse& f;
+    DefPhiDefMap(ostream& dot, std::map<FuseCFGNodePtr, int>& partID, Fuse& f): dot(dot), partID(partID), f(f) {}
+    void mapNode(FuseCFGNodePtr node) {
+      if(node->isPhiNode()) {
+        const map<SSAMemLocObjectPtr, std::set<SSAMemLocObjectPtr> >& phiDU = node->getDefsUsesAtPhiNode();
+        //dot << "#phiDU="<<phiDU.size()<<endl;
+        for(map<SSAMemLocObjectPtr, std::set<SSAMemLocObjectPtr> >::const_iterator phiD=phiDU.begin(); phiD!=phiDU.end(); ++phiD) {
+          for(std::set<SSAMemLocObjectPtr>::const_iterator def=phiD->second.begin(); def!=phiD->second.end(); ++def) {
+            string mlLabel = phiD->first->str();
+            // Replace all the line breaks in mlLabel with explicit text "\n";
+            ReplaceStringInPlace(mlLabel, "\n", "\\n");
+            dot << "node"<<partID[(*def)->getFuseCFGNodeLoc(&f)]<<" -> node"<<partID[phiD->first->getFuseCFGNodeLoc(&f)]<<" [label=\""<<mlLabel<<"\" color=green];"<<endl;
+          }
+        }
+      }
+    }
+  };
+  DefPhiDefMap dpdM(dot,pidM.partID, f);
+  dpdM.iterateOnceOverFuseCFG(startStates);
+
+  dot << "}"<<endl;
+}

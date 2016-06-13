@@ -17,6 +17,7 @@ AstAnnotator::AstAnnotator(Labeler* labeler, VariableIdMapping* variableIdMappin
   ROSE_ASSERT(_variableIdMapping);
 }
 
+
 void AstAnnotator::annotateAstAttributesAsCommentsBeforeStatements(SgNode* node, string attributeName) {
   string analysisInfoTypeDescription="in ";
   annotateAstAttributesAsComments(node,attributeName,PreprocessingInfo::before,analysisInfoTypeDescription);

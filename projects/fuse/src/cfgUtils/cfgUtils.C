@@ -6,11 +6,12 @@
 #include <time.h>
 #include <list>
 #include <set>
-#include <string> 
+#include <string>
 #include <utility>
 #include <iostream>
 #include <boost/make_shared.hpp>
 
+#include "sight.h"
 using namespace std;
 using namespace sight;
 
@@ -65,7 +66,7 @@ SgValueExp* getSGValueExp(SgExpression* e) {
     }
     return val;
   }
-  
+
   return NULL;
 }
 
@@ -83,7 +84,7 @@ CFGNode getFuncStartCFG(SgFunctionDefinition* func)
   }
   // We should never get here
   assert(0);
-  
+
   /*ROSE_STL_Container<SgNode*> funcParamL = NodeQuery::querySubTree(SageInterface::getSageInterface::getProject()(), V_SgFunctionParameterList);
   assert(funcParamL.size()==1);
   return CFGNode(*funcParamL.begin(), 0);*/
@@ -114,7 +115,7 @@ string genUniqueName()
     {
       char num[2];
       num[0] = '0'+rand()%10;
-      num[1] = 0;                       
+      num[1] = 0;
       name = name + num;
     }
   }
@@ -135,6 +136,17 @@ string genUniqueName()
     }
   }
   return name;
+}
+
+// Returns the type of the given node or NULL if none is defined for this node type
+SgType* getType(SgNode* n) {
+  if(SgExpression* expr = isSgExpression(n))
+    return expr->get_type();
+  else if(SgInitializedName* iname = isSgInitializedName(n))
+    return iname->get_type();
+
+  // This SgNode doesn't have a get_type field
+  return NULL;
 }
 
 // returns the SgFunctionDeclaration for the function with the given name
@@ -193,7 +205,7 @@ std::string SgNode2Str(SgNode* sgn)
     for(SgInitializedNamePtrList::iterator a=args.begin(); a!=args.end(); a++) {
       if(a!=args.begin()) oss << ", ";
       oss << common::escape((*a)->unparseToString());
-    }       
+    }
     oss << ") | " << sgn->class_name() << "]";
   } else if(isSgVariableSymbol(sgn)) {
     oss << "[" << common::escape(isSgVariableSymbol(sgn)->get_name().getString()) << " | " << sgn->class_name() << "]";
@@ -205,59 +217,37 @@ std::string SgNode2Str(SgNode* sgn)
 }
 
 // Returns a string representation of this CFG node's key information
-std::string CFGNode2Str(CFGNode n)
+std::string CFGNode2Str(const CFGNode& n)
 {
   ostringstream oss;
-  if(isSgClassType(n.getNode())) {
-    string nodeStr;
-    nodeStr = isSgClassType(n.getNode())->unparseToString();
-    if(nodeStr.length() > 40) {
-      nodeStr.resize(40); 
-      nodeStr += "...";
-    }
-    oss << "[" << nodeStr
-        << " | " << isSgClassType(n.getNode())->class_name()
-        << " | decl="<<SgNode2Str(isSgClassDeclaration(isSgClassType(n.getNode())->get_declaration())->get_definition())<<"]";
-  }
-  else if(isSgNullStatement(n.getNode())) {
+  if(n.getNode()==NULL)
+    oss << "[NULL]";
+  else if(isSgClassType(n.getNode()))
+    oss << "[" << isSgClassType(n.getNode())->unparseToString() << " | " << isSgClassType(n.getNode())->class_name() << " | decl="<<SgNode2Str(isSgClassDeclaration(isSgClassType(n.getNode())->get_declaration())->get_definition())<<"]";
+  else if(isSgNullStatement(n.getNode()))
     oss << "[" << n.getNode()->class_name() << " | " << n.getIndex() << "]";
-  }
-  else if(isSgStringVal(n.getNode())) {
+  else if(isSgStringVal(n.getNode()))
     oss << "[" << isSgStringVal(n.getNode())->get_value()<<" | "<<n.getNode()->class_name() << " | " << n.getIndex() << "]";
-  }
   else if(isSgFunctionParameterList(n.getNode())) {
-    string nodeStr;
     Function func = Function::getEnclosingFunction(n.getNode());
-    oss << "[";
-    nodeStr = func.get_name().getString() + "(";
+    oss << "["<<func.get_name().getString()<<"(";
     SgInitializedNamePtrList args = isSgFunctionParameterList(n.getNode())->get_args();
     for(SgInitializedNamePtrList::iterator a=args.begin(); a!=args.end(); a++) {
-      if(a!=args.begin()) nodeStr += ", ";
-      nodeStr += common::escape((*a)->unparseToString());
+      if(a!=args.begin()) oss << ", ";
+      oss << common::escape((*a)->unparseToString());
     }
-    nodeStr += ")";
-    if(nodeStr.length() > 40) {
-      nodeStr.resize(40); 
-      nodeStr += "...";
-    }
-    oss << nodeStr << " | " << n.getNode()->class_name() << " | " << n.getIndex() << "]";
+    oss << ") | " << n.getNode()->class_name() << " | " << n.getIndex() << "]";
   } else if(isSgVariableSymbol(n.getNode())) {
     oss << "[" << common::escape(isSgVariableSymbol(n.getNode())->get_name().getString()) << " | " << n.getNode()->class_name() << " | " << n.getIndex() << "]";
   } else if(isSgInitializedName(n.getNode())) {
     oss << "[" << common::escape(isSgInitializedName(n.getNode())->get_name().getString()) << " | " << n.getNode()->class_name() << " | " << n.getIndex() << "]";
-  } else {
-    string nodeStr = common::escape(n.getNode()->unparseToString());
-    if(nodeStr.length() > 40) {
-      nodeStr.resize(40); 
-      nodeStr += "...";
-    }
-    oss << "[" << nodeStr << " | " << n.getNode()->class_name() << " | " << n.getIndex() << "]";
-  }
+  } else
+    oss << "[" << common::escape(n.getNode()->unparseToString()) << " | " << n.getNode()->class_name() << " | " << n.getIndex() << "]";
   return oss.str();
 }
 
 // Returns a string representation of this CFG edge's key information
-std::string CFGEdge2Str(CFGEdge e)
+std::string CFGEdge2Str(const CFGEdge& e)
 {
   ostringstream oss;
   oss << "[" << CFGNode2Str(e.source()) << " ==&gt; " << CFGNode2Str(e.target())<<"]";
@@ -265,7 +255,7 @@ std::string CFGEdge2Str(CFGEdge e)
 }
 
 // Returns a string representation of this CFG paths's key information
-std::string CFGPath2Str(CFGPath p)
+std::string CFGPath2Str(const CFGPath& p)
 {
   ostringstream oss;
   const std::vector<CFGEdge>& edges = p.getEdges();
@@ -279,5 +269,119 @@ std::string CFGPath2Str(CFGPath p)
   return oss.str();
 }
 
-} /* namespace fuse */
+/**********************
+ ***** comparable *****
+ **********************/
+bool comparable::operator==(const comparable& that) const {
+  /*scope s("operator==(comparable)");
+  dbg << "this="<<str()<<endl;
+  dbg << "that="<<that.str()<<endl;*/
 
+  // First try applying the equal method of this
+  try{
+    return equal(that);
+  } catch (std::bad_cast bc) {
+    // The types of this and that are not compatible and this::equal cannot deal with
+    // this. Try calling the equal method of that.
+    try{
+      return that.equal(*this);
+    } catch (std::bad_cast bc) {
+      // Neither method could deal with the type incompatibility
+      cerr << "ERROR in comparable::operator==: types of comparable objects are not compatible!"<<endl;
+      cerr << "this="<<str()<<endl;
+      cerr << "that="<<that.str()<<endl;
+      ROSE_ASSERT(0);
+    }
+  }
+}
+
+bool comparable::operator<(const comparable& that) const {
+  /*scope s("operator<(comparable)");
+  dbg << "this="<<str()<<endl;
+  dbg << "that="<<that.str()<<endl;*/
+
+  // First try applying the less method of this
+  try{
+    return less(that);
+  } catch (std::bad_cast bc) {
+    // The types of this and that are not compatible and this::less cannot deal with
+    // this. Try calling the less method of that. Since we know that this!=that because
+    // they're not type compatible we can just negate the return of that.less(this)
+    try{
+      return !that.less(*this);
+    } catch (std::bad_cast bc) {
+      // Neither method could deal with the type incompatibility
+      cerr << "ERROR in comparable::operator<: types of comparable objects are not compatible!"<<endl;
+      cerr << "this="<<str()<<endl;
+      cerr << "that="<<that.str()<<endl;
+      ROSE_ASSERT(0);
+    }
+  }
+}
+
+// Comparison operations on lists of comparable objects
+bool operator==(const std::list<comparablePtr>& leftKey, const std::list<comparablePtr>& rightKey) {
+  std::list<comparablePtr>::const_iterator left=leftKey.begin(), right=rightKey.begin();
+  for(; left!=leftKey.end() && right!=rightKey.end(); left++, right++) {
+    if(*left != *right) return false;
+  }
+  return true;
+}
+
+bool operator<(const std::list<comparablePtr>& leftKey, const std::list<comparablePtr>& rightKey) {
+  /*scope s("operator<(list<comparable>)");
+  dbg << "leftKey: "<<leftKey<<endl;
+  dbg << "rightKey: "<<rightKey<<endl;*/
+
+  std::list<comparablePtr>::const_iterator left=leftKey.begin(), right=rightKey.begin();
+  for(; left!=leftKey.end() && right!=rightKey.end(); left++, right++) {
+    // Less-than
+    // Greater-than (rephrased since the > implementation calls < redundantly)
+    if(*left != *right) return false;
+  }
+  // leftKey == rightKey
+  return false;
+}
+
+// Stringification of comparable lists
+std::ostream& operator<<(std::ostream& s, const std::list<comparablePtr>& l) {
+  /*for(list<comparablePtr>::const_iterator k=l.begin(); k!=l.end(); k++) {
+    if(k!=l.begin()) s << ", ";
+    s << (*k)->str();
+  }*/
+  s << "<table border=1><tr><td>";
+  for(list<comparablePtr>::const_iterator k=l.begin(); k!=l.end(); k++) {
+    if(k!=l.begin()) s << "</td><td>";
+    s << (*k)->str();
+  }
+  s << "</td></tr></table>";
+  return s;
+}
+
+/****************************
+ ***** comparableSgNode *****
+ ****************************/
+
+comparableSgNode::comparableSgNode(SgNode* n): n(n) {}
+// This == That
+bool comparableSgNode::equal(const comparable& that_arg) const {
+  //try{
+    const comparableSgNode& that = dynamic_cast<const comparableSgNode&>(that_arg);
+    return n == that.n;
+  /*} catch (std::bad_cast bc) {
+    ROSE_ASSERT(0);
+  }*/
+}
+
+// This < That
+bool comparableSgNode::less(const comparable& that_arg) const {
+  //try{
+    const comparableSgNode& that = dynamic_cast<const comparableSgNode&>(that_arg);
+    return n < that.n;
+  /*} catch (std::bad_cast bc) {
+    ROSE_ASSERT(0);
+  }*/
+}
+std::string comparableSgNode::str(std::string indent) const { return SgNode2Str(n); }
+
+} /* namespace fuse */

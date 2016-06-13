@@ -109,7 +109,7 @@ void graphEdgeIterator<GraphEdgePtr, GraphNodePtr>::init(const set<GraphNodePtr>
   worklist->initGivenStart(startEdges);
 
   for(typename set<GraphNodePtr>::const_iterator s=start.begin(); s!=start.end(); s++) {
-    cout << "s="<<(*s)->str()<<endl;
+    //cout << "s="<<(*s)->str()<<endl;
     add(Part2PartEdge(*s));
   }
 }

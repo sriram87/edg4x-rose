@@ -21,7 +21,7 @@ using namespace sight;
 
 namespace fuse
 {
-#define composedAnalysisDebugLevel 1
+#define composedAnalysisDebugLevel 0
 #define moduleProfile false
 #if (composedAnalysisDebugLevel==0) && (moduleProfile==false)
   #define DISABLE_SIGHT
@@ -1040,13 +1040,35 @@ bool ComposedAnalysis::transferCFGNodeDense(
         }
       }
     }
-  // If the key has been changed
-  } else {
-    // Verify that it has been changed correctly and otherwise leave it alone
-    assert(descIndexEdges.size() == dfInfo.size());
-    for(list<PartEdgePtr>::const_iterator eIndex=descIndexEdges.begin(); eIndex!=descIndexEdges.end(); ++eIndex)
-      assert(dfInfo.find(*eIndex) != dfInfo.end());
-  }
+    // If the key has been changed
+    } else {
+//GB2015-11-09 : Commenting out since in the case of Tight Composition with analyses that implement the
+//               ATS this accesses the outgoing edges before they've been computed.
+//GB2015-11-09      AnalysisPartEdgeLists outEdges = parts.outEdgesAll(*this);
+//GB2015-11-09
+//GB2015-11-09      if(outEdges.size() != dfInfo.size()) {
+//GB2015-11-09        scope s("ERROR: mismatched outEdges and dfInfo");
+//GB2015-11-09        {
+//GB2015-11-09          scope s("outEdges");
+//GB2015-11-09          dbg << outEdges.str()<<endl;
+//GB2015-11-09          /*for(list<PartEdgePtr>::const_iterator e=descIndexEdges.begin(); e!=descIndexEdges.end(); ++e)
+//GB2015-11-09            dbg << (*e)->str()<<endl;*/
+//GB2015-11-09        }
+//GB2015-11-09        {
+//GB2015-11-09          scope s("dfInfo edges");
+//GB2015-11-09          for(map<PartEdgePtr, vector<Lattice*> >::const_iterator e=dfInfo.begin(); e!=dfInfo.end(); ++e)
+//GB2015-11-09            dbg << e->first->str()<<endl;
+//GB2015-11-09        }
+//GB2015-11-09      }
+//GB2015-11-09
+//GB2015-11-09      // Verify that it has been changed correctly and otherwise leave it alone
+//GB2015-11-09      //assert(descIndexEdges.size() == dfInfo.size());
+//GB2015-11-09      assert(outEdges.size() == dfInfo.size());
+//GB2015-11-09      //for(list<PartEdgePtr>::const_iterator eIndex=descIndexEdges.begin(); eIndex!=descIndexEdges.end(); ++eIndex)
+//GB2015-11-09      //assert(dfInfo.find(*eIndex) != dfInfo.end());
+//GB2015-11-09      for(AnalysisPartEdgeLists::iterator e=outEdges.begin(); e!=outEdges.end(); ++e)
+//GB2015-11-09        assert(dfInfo.find(e->index()) != dfInfo.end());
+    }
   }
   //gettimeofday(&tfEnd, NULL); double tfElapsed = ((tfEnd.tv_sec*1000000 + tfEnd.tv_usec) - (tfStart.tv_sec*1000000 + tfStart.tv_usec)) / 1000000.0;
   //cout << "transferCFGNodeDense\t"<<tfElapsed<<"\t"<<CFGNode2Str(cn)<<"\t"<<analysis->str()<<endl;

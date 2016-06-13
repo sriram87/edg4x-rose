@@ -14,7 +14,7 @@ using namespace std;
 using namespace boost;
 using namespace sight;
 
-#define tightComposerDebugLevel 1
+#define tightComposerDebugLevel 0
 #if tightComposerDebugDevel==0
   #define DISABLE_SIGHT
 #endif

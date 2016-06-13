@@ -15,7 +15,7 @@ using namespace sight;
 using namespace boost;
 namespace fuse
 {
-#define composerDebugLevel 1
+#define composerDebugLevel 0
 #if composerDebugDevel==0
   #define DISABLE_SIGHT
 #endif

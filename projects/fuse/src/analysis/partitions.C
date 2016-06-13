@@ -14,7 +14,7 @@ using namespace boost;
 
 namespace fuse {
 
-#define partitionsDebugLevel 1
+#define partitionsDebugLevel 0
 
 /* #########################
    ##### Remap Functor #####
@@ -1544,7 +1544,7 @@ std::list<PartEdgePtr> IntersectionPart::outEdges()
   assert(initialized);
 
   scope s("IntersectionPart::outEdges()");
-  /*scope reg("IntersectionPart::outEdges", scope::high);*/
+  dbg << "getInputPart()="<<getInputPart()->str()<<endl;
   // For each part in parts, maps the parent part of each outgoing part to the set of parts that share this parent
   map<PartEdgePtr, map<ComposedAnalysis*, set<PartEdgePtr> > > parent2Out;
   for(map<ComposedAnalysis*, PartPtr>::iterator part=parts.begin(); part!=parts.end(); part++) {

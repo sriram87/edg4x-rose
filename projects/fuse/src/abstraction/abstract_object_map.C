@@ -13,7 +13,7 @@ using namespace boost;
 using namespace sight;
 
 namespace fuse {
-#define AOMDebugLevel 1
+#define AOMDebugLevel 0
 
 
 AbstractObjectMapKindPtr NULLAbstractObjectMapKind;

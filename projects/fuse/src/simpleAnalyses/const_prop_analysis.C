@@ -14,7 +14,7 @@ using namespace SageInterface;
 
 #include <cwchar>
 
-#define CPDebugLevel 2
+#define CPDebugLevel 0
 #if CPDebugDevel==0
   #define DISABLE_SIGHT
 #endif

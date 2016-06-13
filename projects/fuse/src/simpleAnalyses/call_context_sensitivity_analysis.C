@@ -7,7 +7,7 @@ using namespace sight;
 namespace fuse
 {
 
-#define callContextSensitivityDebugLevel 2
+#define callContextSensitivityDebugLevel 0
 
 /* ###########################
    ##### CallPartContext #####
@@ -1242,10 +1242,10 @@ bool CallContextSensitivityAnalysis::transfer(AnalysisParts& parts, CFGNode cn, 
   SIGHT_VERB_DECL(scope, ("CallContextSensitivityAnalysis::transfer()", scope::medium), 1, callContextSensitivityDebugLevel)
   CallCtxSensLattice* oldCCSLat = dynamic_cast<CallCtxSensLattice*>(dfInfo[parts.index()->inEdgeFromAny()][0]);
   assert(oldCCSLat);
-  dbg << "oldCCSLat="<<oldCCSLat->str()<<endl;
+  //dbg << "oldCCSLat="<<oldCCSLat->str()<<endl;
 
   AnalysisPartEdgeLists outEdges = parts.outEdgesAll(*this);
-  dbg << "outEdges="<<outEdges.str()<<endl;
+  SIGHT_VERB(dbg << "outEdges="<<outEdges.str()<<endl, 1, callContextSensitivityDebugLevel)
   // If this abstract state has no outgoing edges, return without modifying dfInfo. This is because
   // the composer may wish to do something with the resulting Lattice (e.g. copy it on a wildcard outgoing edge)
   // even if its information content has not changed.
@@ -1283,8 +1283,9 @@ bool CallContextSensitivityAnalysis::transfer(AnalysisParts& parts, CFGNode cn, 
 
         // Focus on the CallCtxSensPartEdges that derive from the current baseEdge
         //if((*src? (*src)->getInputPart(): NULLPart) != (*e)->source()) continue;
-        dbg << "edge->input()->source()="<<edge->input()->source()->str()<<endl;
-        if((*src)->getInput() != edge->input()->source()) continue;
+        //dbg << "(*src)->getInput()="<<(*src)->getInputPart()->str()<<endl;
+        //dbg << "edge->input()->source()="<<edge->input()->source()->str()<<endl;
+        if((*src)->getInputPart() != edge->input()->source()) continue;
 
         //SIGHT_VERB(dbg << "src="<<src->get()->str()<<endl, 1, callContextSensitivityDebugLevel)
 //        SIGHT_VERB_DECL(scope, (txt()<<"src="<<src->get()->str(), scope::medium), 1, callContextSensitivityDebugLevel)
@@ -1434,8 +1435,8 @@ bool CallContextSensitivityAnalysis::isFuncExitAmbiguous(PartEdgePtr edge, set<C
   assert(isSgFunctionDefinition(matchNodes.begin()->getNode()));
   Function returningFunc(isSgFunctionDefinition(matchNodes.begin()->getNode()));
 
+  SIGHT_VERB_DECL(scope, ("isFuncExitAmbiguous()", scope::medium), 1, callContextSensitivityDebugLevel)
   SIGHT_VERB_IF(1, callContextSensitivityDebugLevel)
-    scope reg("isFuncExitAmbiguous()", scope::medium);
     dbg << "edge="<<edge->str()<<endl;
     dbg << "returningFunc="<<returningFunc.get_name().getString()<<endl;
   SIGHT_VERB_FI()

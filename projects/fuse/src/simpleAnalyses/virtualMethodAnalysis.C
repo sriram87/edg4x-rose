@@ -8,7 +8,7 @@ using namespace sight;
 using namespace SageInterface;
 
 namespace fuse {
-#define VirtualMethodAnalysisDebugLevel 2
+#define VirtualMethodAnalysisDebugLevel 0
 
 /********************************
  ***** ClassInheritanceTree *****

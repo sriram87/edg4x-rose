@@ -6,7 +6,7 @@ using namespace sight;
 
 namespace fuse {
 
-#define DPEAnalDebugLevel 2
+#define DPEAnalDebugLevel 0
 #if DPEAnalDebugDevel==0
   #define DISABLE_SIGHT
 #endif

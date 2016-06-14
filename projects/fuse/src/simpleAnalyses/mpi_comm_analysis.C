@@ -17,7 +17,7 @@ using namespace sight;
 namespace fuse {
 
   // DEBUG_LEVEL(mpiCommAnalysisDebugLevel, 0);
-#define mpiCommAnalysisDebugLevel 0
+#define mpiCommAnalysisDebugLevel 2
 #if mpiCommAnalysisDebugLevel==0
 #define DISABLE_SIGHT
 #endif
@@ -903,6 +903,11 @@ namespace fuse {
       }
       case V_SgLongLongIntVal: {
         return isSgLongLongIntVal(sgval.get())->get_value();
+      }
+      // Dont't know how MPI arguments are promoted to this type
+      // but a concrete evidence was seen in heat_mpi.c 
+      case V_SgDoubleVal: {
+        return (int)isSgDoubleVal(sgval.get())->get_value();
       }
       // TODO: Fill out cases for other int types
       default: {

@@ -109,6 +109,8 @@ namespace fuse {
     bool transferSendOp(Function& mpif_, SgFunctionCallExp* sgn);
     bool transferRecvOp(Function& mpif_, SgFunctionCallExp* sgn);
 
+    void visit(SgNullExpression* sgn);
+
     // Unary Op
     void visit(SgAddressOfOp* sgn);
     void visit(SgBitComplementOp* sgn);

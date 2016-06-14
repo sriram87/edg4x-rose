@@ -12,7 +12,7 @@
 
 namespace fuse {
   // DEBUG_LEVEL(mpiDotValueAnalysisDebugLevel, 0);
-  #define mpiDotValueAnalysisDebugLevel 0
+  #define mpiDotValueAnalysisDebugLevel 2
   #if mpiDotValueAnalysisDebugLevel==0
   #define DISABLE_SIGHT
   #endif
@@ -267,6 +267,9 @@ namespace fuse {
     return false;
   }
 
+  // SgNullExpression for empty return statements
+  void MDVTransferVisitor::visit(SgNullExpression* sgn) { }
+
   void MDVTransferVisitor::visit(SgAddressOfOp* sgn) { }
   
   void MDVTransferVisitor::visit(SgBitComplementOp* sgn) {
@@ -504,7 +507,7 @@ namespace fuse {
   
   void MDVTransferVisitor::visit(SgExpression* sgn) {
     SIGHT_VERB(dbg << "Unhandled expr=" << SgNode2Str(sgn) << endl,
-               2, mpiDotValueAnalysisDebugLevel)
+               2, mpiDotValueAnalysisDebugLevel)    
     assert(0);
   }
 

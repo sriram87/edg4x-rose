@@ -1115,7 +1115,7 @@ bool CallContextSensitivityAnalysis::transfer(PartPtr part, CFGNode cn, NodeStat
 {
   //#SA: Incoming dfInfo is associated with inEdgeFromAny
   assert(dfInfo[part->inEdgeFromAny()].size()==1);
-  scope reg("CallContextSensitivityAnalysis::transfer()", scope::medium, attrGE("callContextSensitivityDebugLevel", 1));
+  SIGHT_VERB_DECL(scope, ("CallContextSensitivityAnalysis::transfer()", scope::medium), 1, callContextSensitivityDebugLevel)
   CallCtxSensLattice* oldCCSLat = dynamic_cast<CallCtxSensLattice*>(dfInfo[part->inEdgeFromAny()][0]);
   assert(oldCCSLat);
   
@@ -1165,7 +1165,7 @@ bool CallContextSensitivityAnalysis::transfer(PartPtr part, CFGNode cn, NodeStat
 
         set<CallCtxSensPartPtr> newTargets;
         if(isOutgoingCallAmbiguous(*e)) {
-          scope outScp("CallContextSensitivityAnalysis::transfer() OutgoingFuncCall", scope::medium, attrGE("callContextSensitivityDebugLevel", 1));
+          SIGHT_VERB_DECL(scope, ("CallContextSensitivityAnalysis::transfer() OutgoingFuncCall", scope::medium), 1, callContextSensitivityDebugLevel)
           newTargets = createCallOutEdge(*e, *src);
         } else if(isFuncExitAmbiguous(*e, matchNodes)) {
           assert(isSgFunctionDefinition((matchNodes.begin())->getNode()));

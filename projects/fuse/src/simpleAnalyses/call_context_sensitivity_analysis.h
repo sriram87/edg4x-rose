@@ -532,10 +532,10 @@ class CallContextSensitivityAnalysis : public FWDataflow
   std::set<CallCtxSensPartPtr> createFuncExitEdge(PartEdgePtr baseEdge, CallCtxSensPartPtr src);
   
   MemRegionObjectPtr Expr2MemRegion(SgNode* n, PartEdgePtr pedge);
-  bool implementsExpr2MemRegion () { return true; }
+  bool implementsExpr2MemRegion () { return false; }
   
   MemLocObjectPtr Expr2MemLoc(SgNode* n, PartEdgePtr pedge);
-  bool implementsExpr2MemLoc () { return true; }
+  bool implementsExpr2MemLoc () { return false; }
   
   // Return the anchor Parts of the application
   std::set<PartPtr> GetStartAStates_Spec();

@@ -1299,9 +1299,14 @@ namespace fuse {
                             << SgNode2Str(sgn) << ",pedge=" << pedge->str() << ")", scope::medium),
                     2, mpiCommAnalysisDebugLevel)
     
+    // Use the edge and find all the matching edges
+    // GetRecvMLVal returns a list of RecvMLValPtr at all matching edges
     list<RecvMLValPtr> rmlvals = getRecvMLVal(pedge);
     MPICommValueObjectPtr mvo;
     MemLocObjectPtr ml = getComposer()->Expr2MemLoc(sgn, pedge, this);
+    // If the object is present in the mapping
+    // Find all mayEquals ML and merge the received value using mergeMayEqualMLVal
+    // Else forward the query to a prior analysis
     if(findML(ml, pedge, rmlvals)) {
       SIGHT_VERB(dbg << "rmlvals.size()=" << rmlvals.size() << endl, 2, mpiCommAnalysisDebugLevel)
       mvo = mergeMayEqualMLVal(ml, pedge, rmlvals);

@@ -1264,6 +1264,7 @@ namespace fuse {
     return rmlvals;
   }
 
+
   MPICommValueObjectPtr MPICommAnalysis::mergeMayEqualMLVal(MemLocObjectPtr ml, PartEdgePtr pedge,
                                                             list<RecvMLValPtr>& rmlvals) {
     SIGHT_VERB_DECL(scope, (txt() << "MPICommAnalysis::getMayEqualMLVal(ml=" 
@@ -1282,6 +1283,16 @@ namespace fuse {
     }
     return retV;
   }
+
+  bool MPICommAnalysis::findML(MemLocObjectPtr ml, PartEdgePtr pedge, list<RecvMLValPtr>& rmlvals) {
+    if(rmlvals.size() == 0) return false;
+    list<RecvMLValPtr>::const_iterator c = rmlvals.begin();
+    for( ; c != rmlvals.end(); ++c) {
+      MemLocObjectPtr cml = (*c)->getMemLocObject();
+      if(ml->mayEqualML(cml, pedge)) return true;
+    }
+    return false;
+  }
   
   ValueObjectPtr MPICommAnalysis::Expr2Val(SgNode* sgn, PartEdgePtr pedge) {
     SIGHT_VERB_DECL(scope, (sight::txt() << "MPICommAnalysis::Expr2Val(sgn=" 
@@ -1290,9 +1301,9 @@ namespace fuse {
     
     list<RecvMLValPtr> rmlvals = getRecvMLVal(pedge);
     MPICommValueObjectPtr mvo;
-    SIGHT_VERB(dbg << "rmlvals.size()=" << rmlvals.size() << endl, 2, mpiCommAnalysisDebugLevel)
-    if(rmlvals.size() != 0) {
-      MemLocObjectPtr ml = getComposer()->Expr2MemLoc(sgn, pedge, this);
+    MemLocObjectPtr ml = getComposer()->Expr2MemLoc(sgn, pedge, this);
+    if(findML(ml, pedge, rmlvals)) {
+      SIGHT_VERB(dbg << "rmlvals.size()=" << rmlvals.size() << endl, 2, mpiCommAnalysisDebugLevel)
       mvo = mergeMayEqualMLVal(ml, pedge, rmlvals);
     }
     else {
@@ -1302,35 +1313,7 @@ namespace fuse {
     }
     assert(mvo->getKind());
     SIGHT_VERB(dbg << "Expr2Val(sgn)=" << mvo->str() << endl, 2, mpiCommAnalysisDebugLevel)
-    return mvo;
-    // Composer* composer = getComposer();
-    // MemLocObjectPtr ml = composer->Expr2MemLoc(sgn, pedge, this);
-
-    // AbstractObjectMap* latticeMap;
-    // if(pedge->target()) {
-    //   PartPtr part = pedge->target();
-    //   NodeState* state = NodeState::getNodeState(this, part);
-    //   assert(state);
-    //   latticeMap = dynamic_cast<AbstractObjectMap*>(state->getLatticeAbove(this, pedge, 0));
-    // }
-    // else if(pedge->source()) {
-    //   PartPtr part = pedge->source();     
-    //   NodeState* state = NodeState::getNodeState(this, part);
-    //   assert(state);
-    //   latticeMap = dynamic_cast<AbstractObjectMap*>(state->getLatticeBelow(this, pedge, 0));
-    // }
-    // else assert(0);
-
-    // assert(latticeMap);
-    // dbg << "latticeMap=" << latticeMap->str() << endl;
-    // LatticePtr latVal = latticeMap->get(ml);
-    // assert(latVal);
-
-    // MPICommValueObjectPtr mvo = boost::dynamic_pointer_cast<MPICommValueObject>(latVal); assert(mvo);
-    // if(mvo->isFullV(pedge)) {
-    //   ValueObjectPtr vo = composer->Expr2Val(sgn, pedge, this);
-    //   mvo = boost::make_shared<MPICommValueObject>(vo, pedge);
-    // }
+    return mvo;    
   }
 
 

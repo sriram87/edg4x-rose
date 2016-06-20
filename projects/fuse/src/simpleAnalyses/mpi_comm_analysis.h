@@ -437,12 +437,14 @@ namespace fuse {
     bool implementsExpr2Val() { return true; }
 
     ValueObjectPtr Expr2Val(SgNode* sgn, PartEdgePtr pedge);
-
-    std::list<PartEdgePtr> matchingPartEdges(PartEdgePtr pedge) const;
     bool insertRecvMLVal(PartEdgePtr pedge, MemLocObjectPtr ml, MPICommValueObjectPtr mvalue);
+
+  private:
+    bool findML(MemLocObjectPtr ml, PartEdgePtr pedge, std::list<RecvMLValPtr>& rmlvals);
+    std::list<PartEdgePtr> matchingPartEdges(PartEdgePtr pedge) const;
     std::list<RecvMLValPtr> getRecvMLVal(PartEdgePtr pedge) const;
     MPICommValueObjectPtr mergeMayEqualMLVal(MemLocObjectPtr ml, PartEdgePtr pedge, std::list<RecvMLValPtr>& rmlvals);
-    
+  public:    
     std::string stringifyRecvMLValMap() const;
        
     bool implementsATSGraph() { return false; }

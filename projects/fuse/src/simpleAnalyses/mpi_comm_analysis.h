@@ -301,26 +301,6 @@ namespace fuse {
   typedef boost::shared_ptr<MPICommValueObject> MPICommValueObjectPtr;
 
   /**************************
-   * MPICommOpCallParamList *
-   **************************/
-  //! Class to process arguments of MPICommOp SgFunctionParameterList
-  class MPICommOp {
-    enum OpType { SEND,
-                  RECV };
-    Function mpifunc;
-    MPICommOp::OpType optype;
-  public:
-    MPICommOp(const Function& func);;
-    MPICommOp(const MPICommOp& that);
-    SgPointerDerefExp* getCommOpBufferDerefExpr() const;
-    SgInitializedName* getCommOpTarget() const;
-    SgInitializedName* getCommOpTag() const;
-    SgInitializedName* getCommOpComm() const;
-    bool isMPICommSendOp() const;
-    bool isMPICommRecvOp() const;
-  };
-
-  /**************************
    * MPICommAnalysisTranfer *
    **************************/
 
@@ -341,20 +321,10 @@ namespace fuse {
     Function getFunction(SgFunctionParameterList* sgn);
     Function getFunction(SgFunctionCallExp* sgn);
     Function getFunction(SgNode* sgn);
+
     //! Check if this function is a MPI call 
-    bool isMPIFuncCall(const Function& func) const;
     bool isMPISendOp(const Function& func) const;
     bool isMPIRecvOp(const Function& func) const;
-    bool isMPICommOpFuncCall(const Function& func) const;
-
-    class ValueObject2Int {
-      Composer* composer;
-      PartEdgePtr pedge;
-      ComposedAnalysis* analysis;
-    public:
-      ValueObject2Int(Composer* composer, PartEdgePtr pedge, ComposedAnalysis* analysis);
-      int operator()(SgInitializedName* sgn);
-    };
 
     std::string serialize(MPICommValueObjectPtr mvo);
     MPICommValueObjectPtr deserialize(std::string data);
@@ -364,16 +334,18 @@ namespace fuse {
      * The sender sends the dataflow state by querying for ValueObject,
      * serializing the ValueObject and sending it through MPI runtime.
      */
-    void transferMPISendOp(SgPointerDerefExp* sgn, const MPICommOp& commop);
+    void transferMPISendOp(SgPointerDerefExp* sgn, Function mpif_);
     /*!
      * Each analysis is also constantly probing the incoming channel.
      * When a message is present on the channel, it receives the message,
      * deserialize the value object and updates the MemLoc->ValueObject mapping
      * at the corresponding call site of the receiver.
      */
-    void transferMPIRecvOp(SgPointerDerefExp* sgn, const MPICommOp& commop);
+    void transferMPIRecvOp(SgPointerDerefExp* sgn, Function mpif_);
 
     void transferMPIBarrier();
+
+    void transferMPIBcastOp(SgPointerDerefExp* sgn, Function mpif_);
     
     list<PartEdgePtr> outGoingEdgesMPICallExp(PartPtr part, string funcname);
 

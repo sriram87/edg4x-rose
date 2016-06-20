@@ -10,6 +10,7 @@
 #include <boost/archive/text_oarchive.hpp>
 #include "serialization_exports.h"
 #include "sight_control.h"
+#include "mpi_utils.h"
 
 using namespace std;
 using namespace sight;
@@ -544,6 +545,7 @@ namespace fuse {
     else if(vo->isFullV(pedge)) {
       return boost::make_shared<MPICommValueUnknownKind>();
     }
+    else assert(false);
   }
 
   /**********************
@@ -737,80 +739,6 @@ namespace fuse {
     return oss.str();
   }
 
-  /*************
-   * MPICommOp *
-   *************/
-  MPICommOp::MPICommOp(const Function& func) 
-    : mpifunc(func) {
-    string name = mpifunc.get_name().getString();
-    if(name.compare("MPI_Send") == 0) optype = MPICommOp::SEND;
-    else if(name.compare("MPI_Recv") == 0) optype = MPICommOp::RECV;
-    else assert(0);    
-  }
-
-  MPICommOp::MPICommOp(const MPICommOp& that)
-    : mpifunc(that.mpifunc), optype(that.optype) {
-  }
-
-  SgPointerDerefExp* MPICommOp::getCommOpBufferDerefExpr() const {
-    SgPointerDerefExp* buffDerefExpr;
-    if(isMPICommSendOp() || isMPICommRecvOp()) {
-      SgInitializedNamePtrList* arglist_p = mpifunc.get_args();
-      SgInitializedNamePtrList& arglist = *arglist_p;
-      SgVariableSymbol* buffSymbol = isSgVariableSymbol(arglist[0]->search_for_symbol_from_symbol_table());
-      assert(buffSymbol);
-      SgVarRefExp* buffVarRefExpr = SageBuilder::buildVarRefExp(buffSymbol);
-      buffDerefExpr = SageBuilder::buildUnaryExpression<SgPointerDerefExp>(buffVarRefExpr);
-      assert(buffDerefExpr);
-    }
-    else assert(false);
-    return buffDerefExpr;
-  }
-
-  SgInitializedName* MPICommOp::getCommOpTarget() const {
-    SgInitializedName* target;
-    if(isMPICommSendOp() || isMPICommRecvOp()) {
-      SgInitializedNamePtrList* arglist_p = mpifunc.get_args();
-      SgInitializedNamePtrList& arglist = *arglist_p;
-      target = arglist[3];
-    }
-    else assert(false);
-    assert(target);
-    return target;
-  }
-
-  SgInitializedName* MPICommOp::getCommOpTag() const {
-    SgInitializedName* tag;
-    if(isMPICommSendOp() || isMPICommRecvOp()) {
-      SgInitializedNamePtrList* arglist_p = mpifunc.get_args();
-      SgInitializedNamePtrList& arglist = *arglist_p;
-      tag = arglist[4];
-    }
-    else assert(false);
-    assert(tag);
-    return tag;
-  }
-
-  SgInitializedName* MPICommOp::getCommOpComm() const {
-    SgInitializedName* comm;
-    if(isMPICommSendOp() || isMPICommRecvOp()) {
-      SgInitializedNamePtrList* arglist_p = mpifunc.get_args();
-      SgInitializedNamePtrList& arglist = *arglist_p;
-      comm = arglist[5];
-    }
-    else assert(false);
-    assert(comm);
-    return comm;
-  }
-
-  bool MPICommOp::isMPICommSendOp() const {
-    return optype == MPICommOp::SEND;
-  }
-
-  bool MPICommOp::isMPICommRecvOp() const {
-    return optype == MPICommOp::RECV;
-  }
-
   /**************************
    * MPICommAnalysisTranfer *
    **************************/
@@ -849,72 +777,14 @@ namespace fuse {
     return func;
   }
 
-  bool MPICommAnalysisTransfer::isMPIFuncCall(const Function& func) const {
-    if(func.get_name().getString().find("MPI_") != string::npos) return true;
-    return false;
-  }
-
   bool MPICommAnalysisTransfer::isMPISendOp(const Function& func) const {
-    string name = func.get_name().getString();
-    if(name.compare("MPI_Send") == 0) return true;
-    return false;
+    MPICommOp op(func);
+    return op.isMPISendOp();
   }
 
   bool MPICommAnalysisTransfer::isMPIRecvOp(const Function& func) const {
-     string name = func.get_name().getString();
-     if(name.compare("MPI_Recv") == 0) return true;
-     return false;
-  }
- 
-  bool MPICommAnalysisTransfer::isMPICommOpFuncCall(const Function& func) const {
-    return isMPISendOp(func) || isMPIRecvOp(func);    
-  }
-
-  MPICommAnalysisTransfer::ValueObject2Int::ValueObject2Int(Composer* composer, PartEdgePtr pedge, ComposedAnalysis* analysis)
-    : composer(composer), pedge(pedge), analysis(analysis) { }
-
-  int MPICommAnalysisTransfer::ValueObject2Int::operator()(SgInitializedName* sgn) {
-    SIGHT_VERB_DECL(scope, ("MPICommAnalysisTransfer::ValueObject2Int", scope::low),
-                    2, mpiCommAnalysisDebugLevel) 
-    SIGHT_VERB(dbg << "sgn=" << SgNode2Str(sgn) << endl, 2, mpiCommAnalysisDebugLevel)
-    SIGHT_VERB(dbg << "pedge=" << pedge->str() << endl, 2, mpiCommAnalysisDebugLevel)
-
-    ValueObjectPtr vo = composer->Expr2Val(sgn, pedge, analysis);
-    SIGHT_VERB(dbg << vo->str() << endl, 2, mpiCommAnalysisDebugLevel)
-
-    assert(vo->isConcrete());
-
-    SgValueExpPtrSet cvalues = vo->getConcreteValue();
-    SIGHT_VERB_IF(2, mpiCommAnalysisDebugLevel)
-      SgValueExpPtrSet::iterator it = cvalues.begin();
-      for(int i = 0; it != cvalues.end(); ++it, ++i) {
-        dbg << "cvalues[" << i << "]=" << SgNode2Str(it->get()) << endl;
-      }
-    SIGHT_VERB_FI()
-    assert(cvalues.size() == 1);
-    SgValueExpPtr sgval = *cvalues.begin();
-
-    switch(sgval.get()->variantT()) {      
-      case V_SgIntVal: {
-        return isSgIntVal(sgval.get())->get_value();
-      }
-      case V_SgLongIntVal: {
-        return isSgLongIntVal(sgval.get())->get_value();
-      }
-      case V_SgLongLongIntVal: {
-        return isSgLongLongIntVal(sgval.get())->get_value();
-      }
-      // Dont't know how MPI arguments are promoted to this type
-      // but a concrete evidence was seen in heat_mpi.c 
-      case V_SgDoubleVal: {
-        return (int)isSgDoubleVal(sgval.get())->get_value();
-      }
-      // TODO: Fill out cases for other int types
-      default: {
-        SIGHT_VERB(dbg << "unhandled type=" << SgNode2Str(sgval.get()) << endl, 2, mpiCommAnalysisDebugLevel)
-        assert(0);      
-      } // end default
-    } // end switch case
+    MPICommOp op(func);
+    return op.isMPIRecvOp();
   }
 
   string MPICommAnalysisTransfer::serialize(MPICommValueObjectPtr mvo) {
@@ -950,21 +820,18 @@ namespace fuse {
   
   void MPICommAnalysisTransfer::visit(SgFunctionParameterList* sgn) {
     Function call = getFunction(sgn);
-    string name = call.get_name().getString();
-
-    if(name.compare("MPI_Barrier") == 0) {
-      transferMPIBarrier();
-    }
+    MPICommOp op(call);
+    if(op.isMPIBarrierOp()) transferMPIBarrier();
   }
 
   void MPICommAnalysisTransfer::transferMPIBarrier() {
     MPI_Barrier(MPI_COMM_WORLD);
   }
   
-  void MPICommAnalysisTransfer::transferMPISendOp(SgPointerDerefExp* sgn, const MPICommOp& commop) {
+  void MPICommAnalysisTransfer::transferMPISendOp(SgPointerDerefExp* sgn, Function mpif_) {
     SIGHT_VERB_DECL(scope, ("MPICommAnalysisTransfer::transferMPISendOp", scope::low),
                     2, mpiCommAnalysisDebugLevel)
-    assert(commop.isMPICommSendOp());
+      // assert(commop.isMPICommSendOp());
 
     Composer* composer = analysis->getComposer();
     MemLocObjectPtr bml = composer->Expr2MemLoc(sgn, part->inEdgeFromAny(), analysis);
@@ -979,17 +846,17 @@ namespace fuse {
 
     // Generic functor to get value object given an sage expression
     // Forwards the query to the compoer
-    ValueObject2Int vo2int(composer, part->inEdgeFromAny(), analysis);
+    ValueObject2Int vo2int(composer, part->inEdgeFromAny(), analysis, mpiCommAnalysisDebugLevel);
 
-    SgInitializedName* targetExpr = commop.getCommOpTarget();
+    SgInitializedName* targetExpr = getSendOpTarget(mpif_);
     SIGHT_VERB(dbg << "targetExpr=" << SgNode2Str(targetExpr) << endl, 2, mpiCommAnalysisDebugLevel)
 
     int target = vo2int(targetExpr);
 
-    SgInitializedName* tag_sgn = commop.getCommOpTag();
+    SgInitializedName* tag_sgn = getSendOpTag(mpif_);
     int tag = vo2int(tag_sgn);
 
-    SgInitializedName* comm_sgn = commop.getCommOpComm();
+    SgInitializedName* comm_sgn = getSendOpComm(mpif_);
     MPI_Comm comm = (MPI_Comm) vo2int(comm_sgn);
     //TODO: verify we are communicating in MPI_COMM_WORLD
     assert(comm == MPI_COMM_WORLD);
@@ -1005,35 +872,88 @@ namespace fuse {
     MPI_Send(sdata_p, sdata.size(), MPI_CHAR, target, tag, comm);    
   }
 
-   void MPICommAnalysisTransfer::transferMPIRecvOp(SgPointerDerefExp* sgn, const MPICommOp& commop) {
+   void MPICommAnalysisTransfer::transferMPIRecvOp(SgPointerDerefExp* sgn, Function mpif_) {
      SIGHT_VERB_DECL(scope, ("MPICommAnalysisTransfer::transferMPIRecvOp", scope::medium),
                      2, mpiCommAnalysisDebugLevel)
-    assert(commop.isMPICommRecvOp());
+
+     Composer* composer = analysis->getComposer();
+     ValueObject2Int vo2int(composer, part->inEdgeFromAny(), analysis, mpiCommAnalysisDebugLevel);
+
+     SgInitializedName* source_sgn = getRecvOpSource(mpif_);
+     int source = vo2int(source_sgn);
+
+     SgInitializedName* tag_sgn = getRecvOpTag(mpif_);
+     int tag = vo2int(tag_sgn);
+
+     SgInitializedName* comm_sgn = getRecvOpComm(mpif_);
+     MPI_Comm comm = (MPI_Comm) vo2int(comm_sgn);
+
+     //TODO: verify we are communicating in MPI_COMM_WORLD
+     assert(comm == MPI_COMM_WORLD);
+    
+     // space of 1000 char to receive dataflow info
+     char* sdata_p = new char[1000];
+
+     // Issue the MPI_Recv operation to runtime from analysis
+     MPI_Status status;
+     MPI_Recv(sdata_p, 1000, MPI_CHAR, source, tag, comm, &status);
+
+     // deserialize
+     string sdata(sdata_p);
+     MPICommValueObjectPtr mvo = deserialize(sdata);
+     SIGHT_VERB(dbg << "Recv VO:" << mvo->str() << endl, 2, mpiCommAnalysisDebugLevel)
+
+       // Find the outgoing edges of MPI call expression part
+       list<PartEdgePtr> callExpEdges = outGoingEdgesMPICallExp(part, "MPI_Recv");
+    
+     // Update the RecvValueObjectMap corresponding to each edge in callExpEdges list
+     MemLocObjectPtr buffML = composer->Expr2MemLoc(sgn, part->inEdgeFromAny(), analysis);
+     list<PartEdgePtr>::iterator ce = callExpEdges.begin();
+    
+     for( ; ce != callExpEdges.end(); ++ce) {
+       analysis->insertRecvMLVal(*ce, buffML, mvo);
+     }
+     // SIGHT_VERB(dbg << analysis->stringifyRecvMLValMap() << endl, 3, mpiCommAnalysisDebugLevel)    
+       // modified = latticeMap->insert(buffML, mvo) || modified;
+   }
+
+  void MPICommAnalysisTransfer::transferMPIBcastOp(SgPointerDerefExp* sgn, Function mpif_) {
+    SIGHT_VERB_DECL(scope, ("MPICommAnalysisTransfer::transferMPIBcastOp", scope::medium),
+                    2, mpiCommAnalysisDebugLevel)
 
     Composer* composer = analysis->getComposer();
-    ValueObject2Int vo2int(composer, part->inEdgeFromAny(), analysis);
+    ValueObject2Int vo2int(composer, part->inEdgeFromAny(), analysis, mpiCommAnalysisDebugLevel);
 
-    SgInitializedName* source_sgn = commop.getCommOpTarget();
-    int source = vo2int(source_sgn);
+    SgInitializedName* root_sgn = getBcastOpRoot(mpif_);
+    int root = vo2int(root_sgn);
 
-    SgInitializedName* tag_sgn = commop.getCommOpTag();
-    int tag = vo2int(tag_sgn);
-
-    SgInitializedName* comm_sgn = commop.getCommOpComm();
+    SgInitializedName* comm_sgn = getBcastOpComm(mpif_);
     MPI_Comm comm = (MPI_Comm) vo2int(comm_sgn);
-    //TODO: verify we are communicating in MPI_COMM_WORLD
     assert(comm == MPI_COMM_WORLD);
-    
-    // space of 1000 char to receive dataflow info
-    char* sdata_p = new char[1000];
 
-    // Issue the MPI_Recv operation to runtime from analysis
-    MPI_Status status;
-    MPI_Recv(sdata_p, 1000, MPI_CHAR, source, tag, comm, &status);
+    int rank;
+    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
 
-    // deserialize
-    string sdata(sdata_p);
-    MPICommValueObjectPtr mvo = deserialize(sdata);
+    char* sdata_p;
+    // prepare the data to bcast
+    if(root == rank) {
+      ValueObjectPtr  bvo = composer->Expr2Val(sgn, part->inEdgeFromAny(), analysis);
+      SIGHT_VERB(dbg << "buffer value=" << bvo->str() << endl, 2, mpiCommAnalysisDebugLevel)
+      
+      MPICommValueKindPtr kind = createMPICommValueKind(bvo, part->inEdgeFromAny());
+      MPICommValueObjectPtr bmvo = boost::make_shared<MPICommValueObject>(kind, part->inEdgeFromAny());
+
+      string sdata = serialize(bmvo);
+      sdata_p = strdup(sdata.c_str());
+    }
+    else {
+      sdata_p = new char[1000];
+    }
+    MPI_Bcast(sdata_p, 1000, MPI_CHAR, root, MPI_COMM_WORLD);
+    // sdata_p holds the serialized data
+    // deserialize it and insert the value object at the respective edges
+    string rdata(sdata_p);
+    MPICommValueObjectPtr mvo = deserialize(rdata);
     SIGHT_VERB(dbg << "Recv VO:" << mvo->str() << endl, 2, mpiCommAnalysisDebugLevel)
 
     // Find the outgoing edges of MPI call expression part
@@ -1047,19 +967,21 @@ namespace fuse {
       analysis->insertRecvMLVal(*ce, buffML, mvo);
     }
 
-    SIGHT_VERB(dbg << analysis->stringifyRecvMLValMap() << endl, 3, mpiCommAnalysisDebugLevel)    
-    // modified = latticeMap->insert(buffML, mvo) || modified;
+    SIGHT_VERB(dbg << analysis->stringifyRecvMLValMap() << endl, 3, mpiCommAnalysisDebugLevel)
   }
 
   void MPICommAnalysisTransfer::visit(SgPointerDerefExp* sgn) {
     Function func = getFunction(sgn);
-    if(isMPISendOp(func)) {
-      MPICommOp sendop(func);
-      transferMPISendOp(sgn, sendop);
-    }
-    else if(isMPIRecvOp(func)) {
-      MPICommOp recvop(func);
-      transferMPIRecvOp(sgn, recvop);
+    MPICommOp op(func);
+    if(func.get_name().getString().find("MPI_", 0) == 0) {
+      if(op.isMPISendOp()) transferMPISendOp(sgn, func);
+      else if(op.isMPIRecvOp()) transferMPIRecvOp(sgn, func);
+      else if(op.isMPIBcastOp()) transferMPIBcastOp(sgn, func);
+      else if(op.isMPIUnknownOp()) {
+        cerr << "Unsupported MPI Operation: "<< func.get_name().getString()  
+             <<  " at file:" << __FILE__ << ", line: " <<  __LINE__ << endl; 
+        exit(EXIT_FAILURE);
+      }
     }
     modified = dynamic_cast<BoolAndLattice*>(dfInfo[part->inEdgeFromAny()][0])->set(true);
   }

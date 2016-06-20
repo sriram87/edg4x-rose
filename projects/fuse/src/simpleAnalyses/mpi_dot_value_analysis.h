@@ -62,31 +62,6 @@ namespace fuse {
     std::string str(std::string indent="") const;
   };
 
-  /*********************
-   * MPISendOpCallSite *
-   *********************/
-  class MPISendOpCallSite {
-    const Function mpif_;
-    SgFunctionCallExp* sgn;
-  public:
-    MPISendOpCallSite(const Function& mpif_, SgFunctionCallExp* sgn);
-    //! Return syntactic expression corresponding to send buffer
-    SgNode* getSendBuffer();
-    bool isSendOp();
-  };
-
-  /*********************
-   * MPIRecvOpCallSite *
-   *********************/
-  class MPIRecvOpCallSite {
-    const Function mpif_;
-    SgFunctionCallExp* sgn;
-  public:
-    MPIRecvOpCallSite(const Function& mpif_, SgFunctionCallExp* sgn);
-    SgNode* getRecvBuffer();
-    bool isRecvOp();
-  };
-
   class MPIDotValueAnalysis;
   /**********************
    * MDVTransferVisitor *
@@ -108,6 +83,8 @@ namespace fuse {
     void havocUnknownValues(SgFunctionCallExp* sgn);
     bool transferSendOp(Function& mpif_, SgFunctionCallExp* sgn);
     bool transferRecvOp(Function& mpif_, SgFunctionCallExp* sgn);
+    bool transferOutBcastOp(Function&, SgFunctionCallExp*);
+    bool transferInBcastOp(Function&, SgFunctionCallExp*);
 
     void visit(SgNullExpression* sgn);
 
@@ -220,9 +197,15 @@ namespace fuse {
     std::string partedge2dot(PartEdgePtr pedge);
     std::string commedge2dot(string sdotvalue, PartPtr target);
 
-    string getRecvMPIDotValue(PartPtr part);
+    std::string getRecvMPIDotValue(PartPtr part);
+    std::string getBcastMPIDotValue(PartPtr part);
+
+    std::string recvcommedge2dot(PartPtr part);
+    std::string bcastcommedge2dot(PartPtr part);
     bool isRecvOpATSNode(PartPtr part);
     bool isMPIOpATSNode(PartPtr part);
+    bool isMPICommOpATSNode(PartPtr part);
+    bool isBcastOpATSNode(PartPtr part);
     void generateDot();
     void generateDotFile();
   };

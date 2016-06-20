@@ -8,7 +8,7 @@
 #include <boost/uuid/uuid_generators.hpp>
 #include <boost/uuid/uuid_io.hpp>
 #include <algorithm>
-
+#include "mpi_utils.h"
 
 namespace fuse {
   // DEBUG_LEVEL(mpiDotValueAnalysisDebugLevel, 0);
@@ -172,63 +172,6 @@ namespace fuse {
     ostringstream oss;
     oss << "[MPIDotValue: " << dotvalue << "]";
     return oss.str();
-  }
-
-  /*********************
-   * MPISendOpCallSite *
-   *********************/
-  MPISendOpCallSite::MPISendOpCallSite(const Function& mpif_,
-                                       SgFunctionCallExp* sgn)
-    : mpif_(mpif_), sgn(sgn) { }
-
-  // Traverse the expression tree to find the buffer expr for the MPI operations
-  SgExpression* traverseAST(SgExpression* expr) {
-    switch(expr->variantT()) {
-    case V_SgVarRefExp:
-      return expr;
-    case V_SgAddressOfOp:
-      return traverseAST(isSgUnaryOp(expr)->get_operand());
-    case V_SgCastExp:
-      return traverseAST(isSgUnaryOp(expr)->get_operand());
-    case V_SgPntrArrRefExp:
-      return expr;
-    default:
-      SIGHT_VERB(dbg << "Unhandled buffer Expr in traverseATS(expr=" 
-                 << SgNode2Str(expr) << ")\n",
-                 2, mpiDotValueAnalysisDebugLevel)
-      assert(0);
-    }
-  }
-
-  SgNode* MPISendOpCallSite::getSendBuffer() {
-    SgExpressionPtrList& args = sgn->get_args()->get_expressions();
-    SgExpression* bexpr = traverseAST(args[0]); assert(bexpr);
-    return bexpr;
-  }
-
-  bool MPISendOpCallSite::isSendOp() {
-    string name = mpif_.get_name().getString();
-    return (name.compare("MPI_Send") == 0 ||
-            name.compare("MPI_Isend") == 0);
-  }
-  
-  /*********************
-   * MPIRecvOpCallSite *
-   *********************/
-  MPIRecvOpCallSite::MPIRecvOpCallSite(const Function& mpif_,
-                                       SgFunctionCallExp* sgn)
-    : mpif_(mpif_), sgn(sgn) { }
-
-  SgNode* MPIRecvOpCallSite::getRecvBuffer() {
-    SgExpressionPtrList& args = sgn->get_args()->get_expressions();
-    SgExpression* bexpr = traverseAST(args[0]); assert(bexpr);
-    return bexpr;
-  }
-
-  bool MPIRecvOpCallSite::isRecvOp() {
-    string name = mpif_.get_name().getString();
-    return (name.compare("MPI_Recv") == 0 ||
-            name.compare("MPI_Irecv") == 0);
   }
   
   /**********************
@@ -552,14 +495,36 @@ namespace fuse {
   void MDVTransferVisitor::visit(SgFunctionCallExp* sgn) {
     Function mpif_(sgn);
     if(Part::isOutgoingFuncCall(cn)) {
-      havocUnknownValues(sgn);      
-      if(isMPISendOp(mpif_)) {
-        modified = transferSendOp(mpif_, sgn);
+      havocUnknownValues(sgn);
+      // If this is a MPI function
+      if(mpif_.get_name().getString().find("MPI_", 0) == 0) {
+        MPICommOp op(mpif_);
+        if(op.isMPISendOp()) {  
+          modified = transferSendOp(mpif_, sgn);
+        }
+        else if(op.isMPIBcastOp()) {
+          modified = transferOutBcastOp(mpif_, sgn);
+        }
+        else if(op.isMPIUnknownOp()) {
+          cerr << "Unhandled MPI Function " << mpif_.get_name().getString() 
+               << ", file:" << __FILE__ << ", line: " << __LINE__ << endl;
+          exit(EXIT_FAILURE);
+        }
       }
     }
-    else if(Part::isIncomingFuncCall(cn)) {
-      if(isMPIRecvOp(mpif_)) {
+    else if(Part::isIncomingFuncCall(cn) &&
+            mpif_.get_name().getString().find("MPI_", 0) == 0) {
+      MPICommOp op(mpif_);
+      if(op.isMPIRecvOp()) {
         modified = transferRecvOp(mpif_, sgn);
+      }
+      else if(op.isMPIBcastOp()) {
+        modified = transferInBcastOp(mpif_, sgn);
+      }
+      else if(op.isMPIUnknownOp()) {
+        cerr << "Unhandled MPI Function " << mpif_.get_name().getString() 
+             << ", file:" << __FILE__ << ", line: " << __LINE__ << endl;
+        exit(EXIT_FAILURE);
       }
     }
   }
@@ -595,6 +560,46 @@ namespace fuse {
     SIGHT_VERB(dbg << "mdv=" << mdv->str() << endl, 2, mpiDotValueAnalysisDebugLevel)
       // cout << "transferRecv: bml = " << bml->str() << endl;
       // cout << "transferRecv: mdv=" << mdv->str() << endl;
+    //assert(!mdv->isFullLat());
+    return aMapState->insert(bml, mdv);
+  }
+
+  bool MDVTransferVisitor::transferOutBcastOp(Function& mpif_, SgFunctionCallExp* sgn) {
+    SIGHT_VERB_DECL(scope, (sight::txt() << "MDVTransferVisitor::transferOutBcastOp", scope::medium),
+                    2, mpiDotValueAnalysisDebugLevel)
+    MPIBcastOpCallSite bcastcs(mpif_, sgn);
+    SgNode* rexpr = bcastcs.getBcastRootExpr();
+    ValueObject2Int vo2int(analysis->getComposer(), part->inEdgeFromAny(), 
+                           analysis, mpiDotValueAnalysisDebugLevel);
+    int root = vo2int(rexpr);
+
+    int rank;
+    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+
+    // If my rank is same as the root
+    // Set the value of the buffer
+    if(root == rank) {
+      SgNode* bexpr = bcastcs.getBcastBuffer();
+      MemLocObjectPtr bml = analysis->getComposer()->Expr2MemLoc(bexpr, part->inEdgeFromAny(), analysis);
+      string dotvalue = analysis->part2dotid(part);
+      MPIDotValueObjectPtr mdv = boost::make_shared<MPIDotValueObject>(dotvalue, part->inEdgeFromAny());
+      SIGHT_VERB(dbg << "bml=" << bml->str() << endl, 2, mpiDotValueAnalysisDebugLevel)
+      SIGHT_VERB(dbg << "mdv=" << mdv->str() << endl, 2, mpiDotValueAnalysisDebugLevel)
+      return aMapState->insert(bml, mdv);
+    }
+    else return false;
+  }
+
+  bool MDVTransferVisitor::transferInBcastOp(Function& mpif_, SgFunctionCallExp* sgn) {
+    SIGHT_VERB_DECL(scope, (sight::txt() << "MDVTransferVisitor::transferInBcastOp", scope::medium),
+                    2, mpiDotValueAnalysisDebugLevel)
+    MPIBcastOpCallSite bcastcs(mpif_, sgn);
+    SgNode* bexpr = bcastcs.getBcastBuffer();
+    MemLocObjectPtr bml = analysis->getComposer()->Expr2MemLoc(bexpr, part->inEdgeFromAny(), analysis);
+    ValueObjectPtr v = analysis->getComposer()->Expr2Val(bexpr, part->inEdgeFromAny(), analysis);
+    MPIDotValueObjectPtr mdv = boost::make_shared<MPIDotValueObject>(v, part->inEdgeFromAny());
+    SIGHT_VERB(dbg << "Expr2Val(bexpr) = " << v->str() << endl, 2, mpiDotValueAnalysisDebugLevel)
+    SIGHT_VERB(dbg << "mdv=" << mdv->str() << endl, 2, mpiDotValueAnalysisDebugLevel)
     //assert(!mdv->isFullLat());
     return aMapState->insert(bml, mdv);
   }
@@ -727,6 +732,22 @@ namespace fuse {
     return false;
   }
 
+  //! Determine if we need to add a communication edge at this MPI function call
+  //! MPI_Recv
+  //! MPI_Bcast
+  //! MPI_Reduce
+  bool MPIDotGraphGenerator::isMPICommOpATSNode(PartPtr part) {
+    SgFunctionCallExp* callexp = part->mustSgNodeAll<SgFunctionCallExp>();
+    if(callexp) {
+      Function mpif_(callexp);
+      MPICommOp op(mpif_);
+      if(op.isMPIRecvOp()) return true;
+      else if(op.isMPIBcastOp()) return true;
+      else return false;
+    }
+    return false;
+  }
+
   bool MPIDotGraphGenerator::isRecvOpATSNode(PartPtr part) {
     SgFunctionCallExp* callexp = part->mustSgNodeAll<SgFunctionCallExp>();
     if(callexp) {
@@ -735,6 +756,32 @@ namespace fuse {
       if(recvcs.isRecvOp()) return true;
     }
     return false;
+  }
+
+  bool MPIDotGraphGenerator::isBcastOpATSNode(PartPtr part) {
+    SgFunctionCallExp* callexp = part->mustSgNodeAll<SgFunctionCallExp>();
+    if(callexp) {
+      Function mpif_(callexp);
+      MPICommOp op(mpif_);
+      return op.isMPIBcastOp();
+    }
+    return false;
+  }
+
+  string MPIDotGraphGenerator::getBcastMPIDotValue(PartPtr part) {
+    SgFunctionCallExp* callexp = part->mustSgNodeAll<SgFunctionCallExp>(); assert(callexp);
+    Function mpif_(callexp);
+    MPIBcastOpCallSite bcastcs(mpif_, callexp);
+    NodeState* state = NodeState::getNodeState(analysis, part); assert(state);
+    Lattice* l = state->getLatticeBelow(analysis, part->outEdgeToAny(), 0); assert(l);
+    AbstractObjectMap* aMapState = dynamic_cast<AbstractObjectMap*>(l); assert(aMapState);
+    SgNode* bexpr = bcastcs.getBcastBuffer();
+    MemLocObjectPtr ml = analysis->getComposer()->Expr2MemLoc(bexpr, part->outEdgeToAny(), analysis);
+    MPIDotValueObjectPtr mdv = boost::dynamic_pointer_cast<MPIDotValueObject>(aMapState->get(ml));
+    // cout << "getRecvMPIDotValue:ml=" << ml->str() << endl;
+    // cout << "getRecvMPIDotValue:mdv=" << mdv->str() << endl;
+    assert(mdv && !mdv->isFullLat());
+    return mdv->get_dot_value();
   }
 
   string MPIDotGraphGenerator::getRecvMPIDotValue(PartPtr part) {
@@ -817,6 +864,52 @@ namespace fuse {
     oss << sdotvalue << " -> " << tdotvalue << " [color=\"firebrick1\", constraint=false, weight=20];" << endl;
     return oss.str();
   }
+
+  string MPIDotGraphGenerator::recvcommedge2dot(PartPtr part) {
+    string rdotvalue = getRecvMPIDotValue(part);
+    return commedge2dot(rdotvalue, part);
+  }
+
+  string MPIDotGraphGenerator::bcastcommedge2dot(PartPtr part) {
+    SgFunctionCallExp* callexp = part->mustSgNodeAll<SgFunctionCallExp>(); assert(callexp);
+    Function mpif_(callexp);
+    MPIBcastOpCallSite bcastcs(mpif_, callexp);
+    SgNode* rexpr = bcastcs.getBcastRootExpr();
+    
+    int root;
+    // The incoming CallExp has a data state at MPICommAnalysis
+    // which only maintains the state of MPI buffer
+    // When we try to query for expr other than MPI buffer MPICommAnalysis must
+    // forward the query to prior analysis
+    // Unfortunately there is no way to tell if we are querying about mpi buffer expression
+    // workaround is perform the query at the outgoing call site
+    // Here no information is maintained is MPICommAnalysis and it is forwarded to a prior analysis
+    // This seems hacky : need to revisit in future
+    set<PartPtr> matchParts = part->matchingCallParts();
+    set<PartPtr>::iterator mi = matchParts.begin();
+    assert(matchParts.size() == 1);
+    for( ; mi != matchParts.end(); ++mi) {
+      PartPtr mpart = *mi;
+      ValueObject2Int vo2int(analysis->getComposer(), mpart->outEdgeToAny(), 
+                             analysis, mpiDotValueAnalysisDebugLevel);
+      root = vo2int(rexpr);
+      // int mroot = vo2int(rexpr);
+      // at first iteration, set the value of root
+      // if(root == -1) root = mroot;
+      // if(mroot != root) {
+      //   cerr << "Multiple root values due to imprecision in bcastcommedge()"
+      //        << ", file=" << __FILE__
+      //        << ", line=" << __LINE__ << endl;
+      //   exit(EXIT_FAILURE);
+      // }
+    }
+    int rank; MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+    if(root != rank) {
+      string rdotvalue = getBcastMPIDotValue(part);
+      return commedge2dot(rdotvalue, part);
+    }
+    return "";
+  }
   
   void MPIDotGraphGenerator::generateDot() {
     Composer* composer = analysis->getComposer();
@@ -855,9 +948,13 @@ namespace fuse {
       // Write comm edges if any
       set<CFGNode> cfgnodes;
       // Check if we have a commuication edge on this SgFunctionCallExp for MPI_Recv
-      if(isRecvOpATSNode(part) && part->mustIncomingFuncCall(cfgnodes)) {
-        string rdotvalue = getRecvMPIDotValue(part);
-        edgess << indent << commedge2dot(rdotvalue, part);               
+      if(isMPIOpATSNode(part) && part->mustIncomingFuncCall(cfgnodes)) {
+        if(isRecvOpATSNode(part)) edgess << indent << recvcommedge2dot(part);
+        else if(isBcastOpATSNode(part)) {
+          string bcastcommedge = bcastcommedge2dot(part);
+          // When the process is root this string might be empty
+          if(bcastcommedge.size() > 0) edgess << indent << bcastcommedge;
+        }
       }
       ei.pushAllDescendants();      
       ei++;

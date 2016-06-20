@@ -84,6 +84,20 @@ namespace fuse {
     int operator()(SgNode* sgn);
   };
 
+  /*********************
+   * OpValueObject2Int *
+   *********************/
+  class OpValueObject2Int {
+    Composer* composer;
+    PartEdgePtr pedge;
+    ComposedAnalysis* analysis;
+    int debugLevel;
+  public:
+    OpValueObject2Int(Composer* composer, PartEdgePtr pedge, 
+                    ComposedAnalysis* analysis, int debugLevel);
+    int operator()(SgNode* anchor, SgNode* op);
+  };
+
   //! Traverse the expression tree to find the buffer expr for the MPI operations
   SgExpression* traverseAST(SgExpression* expr);
   SgInitializedName* getSendOpTarget(Function function);

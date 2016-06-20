@@ -181,6 +181,61 @@ namespace fuse {
     } // end switch case
   }
 
+  /*********************
+   * OpValueObject2Int *
+   *********************/
+  OpValueObject2Int::OpValueObject2Int(Composer* composer, PartEdgePtr pedge, 
+                                   ComposedAnalysis* analysis, int debugLevel)
+  : composer(composer), 
+    pedge(pedge), 
+    analysis(analysis),
+    debugLevel(debugLevel) { }
+
+  int OpValueObject2Int::operator()(SgNode* anchor, SgNode* op) {
+    SIGHT_VERB_DECL(scope, ("OpValueObject2Int", scope::low),
+                    3, debugLevel) 
+    SIGHT_VERB(dbg << "anchor=" << SgNode2Str(anchor) << endl, 3, debugLevel)
+    SIGHT_VERB(dbg << "op=" << SgNode2Str(op) << endl, 3, debugLevel)
+    SIGHT_VERB(dbg << "pedge=" << pedge->str() << endl, 3, debugLevel)
+
+    ValueObjectPtr vo = composer->OperandExpr2Val(anchor, op, pedge, analysis);
+    SIGHT_VERB(dbg << vo->str() << endl, 3, debugLevel)
+
+    assert(vo->isConcrete());
+
+    SgValueExpPtrSet cvalues = vo->getConcreteValue();
+    SIGHT_VERB_IF(2, debugLevel)
+      SgValueExpPtrSet::iterator it = cvalues.begin();
+    for(int i = 0; it != cvalues.end(); ++it, ++i) {
+      dbg << "cvalues[" << i << "]=" << SgNode2Str(it->get()) << endl;
+    }
+    SIGHT_VERB_FI()
+      assert(cvalues.size() == 1);
+    SgValueExpPtr sgval = *cvalues.begin();
+
+    switch(sgval.get()->variantT()) {      
+    case V_SgIntVal: {
+      return isSgIntVal(sgval.get())->get_value();
+    }
+    case V_SgLongIntVal: {
+      return isSgLongIntVal(sgval.get())->get_value();
+    }
+    case V_SgLongLongIntVal: {
+      return isSgLongLongIntVal(sgval.get())->get_value();
+    }
+      // Dont't know how MPI arguments are promoted to this type
+      // but a concrete evidence was seen in heat_mpi.c 
+    case V_SgDoubleVal: {
+      return (int)isSgDoubleVal(sgval.get())->get_value();
+    }
+      // TODO: Fill out cases for other int types
+    default: {
+      SIGHT_VERB(dbg << "unhandled type=" << SgNode2Str(sgval.get()) << endl, 3, debugLevel)
+        assert(0);      
+    } // end default
+    } // end switch case
+  }
+
 
   /*********************
    * Utility Functions *

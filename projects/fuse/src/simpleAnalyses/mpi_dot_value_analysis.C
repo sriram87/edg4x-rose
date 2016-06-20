@@ -877,32 +877,9 @@ namespace fuse {
     SgNode* rexpr = bcastcs.getBcastRootExpr();
     
     int root;
-    // The incoming CallExp has a data state at MPICommAnalysis
-    // which only maintains the state of MPI buffer
-    // When we try to query for expr other than MPI buffer MPICommAnalysis must
-    // forward the query to prior analysis
-    // Unfortunately there is no way to tell if we are querying about mpi buffer expression
-    // workaround is perform the query at the outgoing call site
-    // Here no information is maintained is MPICommAnalysis and it is forwarded to a prior analysis
-    // This seems hacky : need to revisit in future
-    set<PartPtr> matchParts = part->matchingCallParts();
-    set<PartPtr>::iterator mi = matchParts.begin();
-    assert(matchParts.size() == 1);
-    for( ; mi != matchParts.end(); ++mi) {
-      PartPtr mpart = *mi;
-      ValueObject2Int vo2int(analysis->getComposer(), mpart->outEdgeToAny(), 
-                             analysis, mpiDotValueAnalysisDebugLevel);
-      root = vo2int(rexpr);
-      // int mroot = vo2int(rexpr);
-      // at first iteration, set the value of root
-      // if(root == -1) root = mroot;
-      // if(mroot != root) {
-      //   cerr << "Multiple root values due to imprecision in bcastcommedge()"
-      //        << ", file=" << __FILE__
-      //        << ", line=" << __LINE__ << endl;
-      //   exit(EXIT_FAILURE);
-      // }
-    }
+    OpValueObject2Int opvo2int(analysis->getComposer(), part->outEdgeToAny(), 
+                               analysis, mpiDotValueAnalysisDebugLevel);
+    root = opvo2int(callexp, rexpr);
     int rank; MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     if(root != rank) {
       string rdotvalue = getBcastMPIDotValue(part);

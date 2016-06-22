@@ -18,119 +18,396 @@ namespace fuse {
   #endif
   
   boost::uuids::random_generator gen;
+
+  using namespace std;
+
+  /*******************
+   * MPIDotValueKind *
+   *******************/
+  MPIDotValueKind::MPIDotValueKind(MPIDotValueKind::KType ktype) : ktype_(ktype) { }
+  MPIDotValueKind::MPIDotValueKind(const MPIDotValueKind& that) : ktype_(that.ktype_) { }
+  MPIDotValueKind::KType MPIDotValueKind::getType() const { 
+    return ktype_; 
+  }
+
+  /**************************
+   * MPIDotValueDefaultKind *
+   **************************/
+  MPIDotValueDefaultKind::MPIDotValueDefaultKind() 
+    : MPIDotValueKind(MPIDotValueKind::empty) { }
+
+  MPIDotValueDefaultKind::MPIDotValueDefaultKind(const MPIDotValueDefaultKind& that) 
+    : MPIDotValueKind(that) { }
+  
+  // Two default kinds are may equal
+  // 1. if thatK is unknown
+  // 2. if thisK and thatK are both default
+  bool MPIDotValueDefaultKind::mayEqualK(MPIDotValueKindPtr thatK) { 
+    if(thatK->getType() == MPIDotValueKind::unknown) return true;
+    else if(thatK->getType() == MPIDotValueKind::empty) return true;
+    return false;
+  }
+  
+  // Two default kind are mustEqual if this and thatK are default
+  bool MPIDotValueDefaultKind::mustEqualK(MPIDotValueKindPtr thatK) { 
+    return thatK->getType() == MPIDotValueKind::empty;
+  }
+  
+  bool MPIDotValueDefaultKind::equalSetK(MPIDotValueKindPtr thatK) { 
+    return thatK->getType() == MPIDotValueKind::empty;
+  }
+  
+  bool MPIDotValueDefaultKind::subSetK(MPIDotValueKindPtr thatK) { 
+    return true;
+  }
+  
+  bool MPIDotValueDefaultKind::isEmptyK() { 
+    return true;
+  }
+  
+  bool MPIDotValueDefaultKind::isFullK() { 
+    return false;
+  }
+  
+  MPIDotValueKindPtr MPIDotValueDefaultKind::copyK() { 
+    return boost::make_shared<MPIDotValueDefaultKind>(*this);
+  }
+  
+  std::string MPIDotValueDefaultKind::str(std::string indent) { 
+    return "empty";
+  }
+
+  /**************************
+   * MPIDotValueUnknownKind *
+   **************************/
+  MPIDotValueUnknownKind::MPIDotValueUnknownKind() 
+    : MPIDotValueKind(MPIDotValueKind::unknown) { }
+
+  MPIDotValueUnknownKind::MPIDotValueUnknownKind(const MPIDotValueUnknownKind& that) 
+    : MPIDotValueKind(that) { }
+
+  bool MPIDotValueUnknownKind::mayEqualK(MPIDotValueKindPtr thatK) {
+    return true;
+  }
+  bool MPIDotValueUnknownKind::mustEqualK(MPIDotValueKindPtr thatK) { 
+    return false;
+  }
+
+  bool MPIDotValueUnknownKind::equalSetK(MPIDotValueKindPtr thatK) { 
+    return thatK->getType() == MPIDotValueKind::unknown;
+  }
+
+  bool MPIDotValueUnknownKind::subSetK(MPIDotValueKindPtr thatK) { 
+    return thatK->getType() == MPIDotValueKind::unknown;
+  }
+
+  bool MPIDotValueUnknownKind::isEmptyK() { 
+    return false;
+  }
+
+  bool MPIDotValueUnknownKind::isFullK() {
+    return true;
+  }
+
+  MPIDotValueKindPtr MPIDotValueUnknownKind::copyK() { 
+    return boost::make_shared<MPIDotValueUnknownKind>(*this);
+  }
+
+  std::string MPIDotValueUnknownKind::str(std::string indent) { 
+    return "unknown";
+  }
+
+  /*************************
+   * MPIDotValueStringKind *
+   *************************/
+  MPIDotValueStringKind::MPIDotValueStringKind(set<string> dotvalues)
+    : MPIDotValueKind(MPIDotValueKind::stringT),
+      dotvalues(dotvalues) {
+  }
+
+  MPIDotValueStringKind::MPIDotValueStringKind(std::string dotvalue) 
+    : MPIDotValueKind(MPIDotValueKind::stringT) {
+    dotvalues.insert(dotvalue);
+  }
+  
+  MPIDotValueStringKind::MPIDotValueStringKind(const MPIDotValueStringKind& that) 
+    : MPIDotValueKind(that), dotvalues(that.dotvalues) {
+  }
+
+  set<string> MPIDotValueStringKind::get_dot_values() const { 
+    return dotvalues;
+  }
+
+  // If we find one element in common they are mayEquals
+  bool MPIDotValueStringKind::compareMayK(MPIDotValueStringKindPtr thatK) {
+    const set<string>& thatDotValues = thatK->get_dot_values();
+    set<string>::const_iterator thisD = dotvalues.begin(), thatD = thatDotValues.begin();
+    for( ; thisD != dotvalues.end() && thatD != thatDotValues.end(); 
+         ++thisD, ++thatD) {
+      if(*thisD == *thatD) return true;
+    }
+    return false;
+  }
+
+  // All elements
+  bool MPIDotValueStringKind::compareEqualK(MPIDotValueStringKindPtr thatK) {
+    const set<string>& thatDotValues = thatK->get_dot_values();
+    set<string>::const_iterator thisD = dotvalues.begin(), thatD = thatDotValues.begin();
+    for( ; thisD != dotvalues.end(); ++thisD, ++thatD) {
+      if(*thisD != *thatD) return false;
+    }
+    if(thatD != thatDotValues.end()) return false;
+    else return true;
+  }
+
+  bool MPIDotValueStringKind::compareSubK(MPIDotValueStringKindPtr thatK) {
+    const set<string>& thatDotValues = thatK->get_dot_values();
+    set<string>::const_iterator thisD = dotvalues.begin(), thatD = thatDotValues.begin();
+    for( ; thisD != dotvalues.end(); ++thisD, ++thatD) {
+      if(*thisD != *thatD) return false;
+    }
+    // It doesn't matter we have any elements to iterate in thatDotValues or not
+    return true;
+  }
+
+  bool MPIDotValueStringKind::mayEqualK(MPIDotValueKindPtr thatK) { 
+    if(thatK->getType() == MPIDotValueKind::unknown) return true;
+    else if(thatK->getType() == MPIDotValueKind::stringT) 
+      return compareMayK(boost::dynamic_pointer_cast<MPIDotValueStringKind>(thatK));
+    else return false;
+  }
+
+  bool MPIDotValueStringKind::mustEqualK(MPIDotValueKindPtr thatK) { 
+    return false;
+  }
+
+  bool MPIDotValueStringKind::equalSetK(MPIDotValueKindPtr thatK) { 
+    if(thatK->getType() == MPIDotValueKind::stringT) 
+      return compareEqualK(boost::dynamic_pointer_cast<MPIDotValueStringKind>(thatK));
+    else return false;
+  }
+
+  bool MPIDotValueStringKind::subSetK(MPIDotValueKindPtr thatK) { 
+    if(thatK->getType() == MPIDotValueKind::stringT) 
+      return compareSubK(boost::dynamic_pointer_cast<MPIDotValueStringKind>(thatK));
+    else return false;
+  }
+
+  bool MPIDotValueStringKind::mergeStringKind(MPIDotValueStringKindPtr thatK) {
+    // Not doing a in place merge
+    const set<string>& thatDotValues = thatK->get_dot_values();
+    set<string>::const_iterator thatD = thatDotValues.begin();
+    bool insert = false;
+    typedef pair<set<string>::iterator, bool> InsertRV;
+    InsertRV irv;
+    for( ; thatD != thatDotValues.end(); ++thatD) {
+      irv = dotvalues.insert(*thatD);
+      insert = insert || irv.second;
+    }
+    return insert;
+  }
+
+  bool MPIDotValueStringKind::isEmptyK() { 
+    return false;
+  }
+
+  bool MPIDotValueStringKind::isFullK() { 
+    return false;
+  }
+
+  MPIDotValueKindPtr MPIDotValueStringKind::copyK() { 
+    return boost::make_shared<MPIDotValueStringKind>(*this);
+  }
+
+  string MPIDotValueStringKind::str(string indent) { 
+    ostringstream oss;
+    oss << "[";
+    set<string>::iterator d = dotvalues.begin();
+    for( ; d != dotvalues.end(); ) {
+      oss << *d;
+      ++d;
+      if(d != dotvalues.end()) oss << ", ";
+    }
+    oss << "]";
+    return oss.str();
+  }
+
+  typedef boost::shared_ptr<SgValueExp> SgValueExpPtr;
+  typedef set<boost::shared_ptr<SgValueExp> > SgValueExpPtrSet;
+  string SgStringVal2String(SgStringVal* val) {
+    return val->get_value();
+  }
+
+  string SgValueExpPtr2String(SgValueExpPtr sgval) {
+   SgStringVal* sgsval = boost::dynamic_pointer_cast<SgStringVal>(sgval).get(); 
+   if(!sgsval) {
+     cerr << "Error: Building string from non-string SgValueExp"
+          << " line:" << __LINE__
+          << " file:" << __FILE__ << endl;
+     exit(EXIT_FAILURE);
+   }
+   return sgsval->get_value();
+  }
+
+  set<string> SgValueExpPtrSet2String(SgValueExpPtrSet& sgValSet) {
+    set<string> dotvalues;
+    SgValueExpPtrSet::iterator i = sgValSet.begin();
+    for( ; i != sgValSet.end(); ++i) {
+      string dotvalue = SgValueExpPtr2String(*i);
+      dotvalues.insert(dotvalue);
+    }
+    return dotvalues;
+  }
+
+  SgValueExpPtr String2SgValueExpPtr(string s) {
+    SgValueExpPtr sgVal = boost::shared_ptr<SgStringVal>(SageBuilder::buildStringVal(s));
+    return sgVal;
+  }
+
+  SgValueExpPtrSet String2SgValueExpPtrSet(set<string> svalues) {
+    SgValueExpPtrSet sgValSet;
+    set<string>::iterator s = svalues.begin();
+    for( ; s != svalues.end(); ++s) {
+      sgValSet.insert(String2SgValueExpPtr(*s));
+    }
+    return sgValSet;
+  }
+
   /*********************
    * MPIDotValueObject *
    *********************/
   MPIDotValueObject::MPIDotValueObject(PartEdgePtr pedge)
      : Lattice(pedge), FiniteLattice(pedge), ValueObject(0) {
-    dotvalue="";
+    kind = boost::make_shared<MPIDotValueDefaultKind>();
   }
   
   MPIDotValueObject::MPIDotValueObject(string dotvalue, PartEdgePtr pedge)
-    : Lattice(pedge), FiniteLattice(pedge), ValueObject(0), dotvalue(dotvalue) {    
+    : Lattice(pedge), FiniteLattice(pedge), ValueObject(0) {    
+    kind = boost::make_shared<MPIDotValueStringKind>(dotvalue);
   }
 
-  MPIDotValueObject::MPIDotValueObject(ValueObjectPtr v, PartEdgePtr pedge)
+  MPIDotValueObject::MPIDotValueObject(ValueObjectPtr vo, PartEdgePtr pedge)
     : Lattice(pedge), FiniteLattice(pedge), ValueObject(0) {
-    if(v->isConcrete()) {
-      SgType* vtype = v->getConcreteType();
+    SIGHT_VERB_DECL(scope, (sight::txt() << "MPIDotValueObject::MPIDotValueObject()", scope::medium),
+                    2, mpiDotValueAnalysisDebugLevel)
+    SIGHT_VERB(dbg << "vo=" << vo->str() << endl, 2, mpiDotValueAnalysisDebugLevel)
+    if(vo->isEmptyV(pedge)) kind = boost::make_shared<MPIDotValueDefaultKind>();
+    else if(vo->isFullV(pedge)) {
+      SIGHT_VERB(dbg << "isFull=" << vo->isFullV(pedge) << endl, 2, mpiDotValueAnalysisDebugLevel)
+      kind = boost::make_shared<MPIDotValueUnknownKind>();
+    }
+    else if(vo->isConcrete()) {
+      SgType* vtype = vo->getConcreteType();
       if(isSgTypeString(vtype)) {
-        set<boost::shared_ptr<SgValueExp> > vset = v->getConcreteValue();
-        if(vset.size() == 1) {
-          boost::shared_ptr<SgValueExp> svalue_p = *vset.begin();
-          SgStringVal* sgsval = boost::dynamic_pointer_cast<SgStringVal>(svalue_p).get(); assert(sgsval);
-          dotvalue = sgsval->get_value();
-          // dbg << "MPIDotValueObject::MPIDotValueObject(dotvalue=" << dotvalue << ")\n";
-        }
-        else dotvalue = "unknown";
+        SgValueExpPtrSet vset = vo->getConcreteValue();
+        // We will assume all elements are of same type
+        // The set can have values from multiple analyses
+        // under which the assumption above may not hold anymore
+        // We will use a special type of SgType* to denote such set of values
+        // Until then we will assume all values of a given value object have identical SgType
+        set<string> dotvalues = SgValueExpPtrSet2String(vset);
+        kind = boost::make_shared<MPIDotValueStringKind>(dotvalues);
       }
-      else dotvalue="unknown";
+      else {
+        cerr << "Warning: Non-string concrete type for MPIDotValue " << SgNode2Str(vtype)
+             << " line:" << __LINE__
+             << " file:" << __FILE__ << endl;
+        // We will create an object of unknown type
+        kind = boost::make_shared<MPIDotValueUnknownKind>();
+      }  
     }
-    else {
-      dotvalue="unknown";
-    }
+    // there is not really another possibility here
+    // if we reach here we should create MPIDotValueUnknownKind
+    else kind = boost::make_shared<MPIDotValueUnknownKind>();
+    SIGHT_VERB(dbg << "kind=" << kind->str() << endl, 2, mpiDotValueAnalysisDebugLevel)
   }
   
   MPIDotValueObject::MPIDotValueObject(const MPIDotValueObject& that)
     : Lattice(that), FiniteLattice(that), ValueObject(that) {
-    dotvalue = that.dotvalue;
+    kind = that.getKind()->copyK();
   }
 
   ValueObjectPtr MPIDotValueObject::copyV () const {
     return boost::make_shared<MPIDotValueObject>(*this);
   }
 
-  string MPIDotValueObject::get_dot_value() const {
-    return dotvalue;
+  MPIDotValueKindPtr MPIDotValueObject::getKind() const {
+    return kind;
   }
 
   void MPIDotValueObject::initialize() {
-    dotvalue="";
+    assert(false);
   }
   
   Lattice* MPIDotValueObject::copy() const {
     return new MPIDotValueObject(*this);
   }
+
+  bool MPIDotValueObject::operator==(Lattice* that) {
+    MPIDotValueObject* thatV = dynamic_cast<MPIDotValueObject*>(that); assert(thatV);
+    MPIDotValueKindPtr thatK = thatV->getKind();
+    return kind->equalSetK(thatK);
+  }
   
   bool MPIDotValueObject::meetUpdate(Lattice* that) {
-    MPIDotValueObject* thatL = dynamic_cast<MPIDotValueObject*>(that);
-    assert(thatL);
-    string thatDotV = thatL->get_dot_value();
-    if(dotvalue.compare(thatDotV) == 0) return false;
-    dotvalue = "unknown";
-    return true;
-  }
-  
-  bool MPIDotValueObject::meetUpdateV (ValueObjectPtr that, PartEdgePtr pedge) {
-    MPIDotValueObjectPtr thatV = boost::dynamic_pointer_cast<MPIDotValueObject>(that);
-    // if that object is not a MPIDotValueObject then conservatively set to top
-    if(!thatV) {
-      dotvalue = "unknown";
-      return true;
+    MPIDotValueObject* thatV = dynamic_cast<MPIDotValueObject*>(that); assert(thatV);
+    MPIDotValueKindPtr thatK = thatV->getKind();
+    // If this is full nothing to join
+    // of that is empty
+    if(kind->isFullK() || thatK->isEmptyK()) return false;
+    // this->kind is not full
+    // thatK is not empty
+    // If thatK is full set this to full
+    else if(thatK->isFullK()) return setToFull();
+    // If this->kind is empty
+    // this->kind = thatK
+    else if(kind->isEmptyK()) kind = thatK->copyK();
+    // Both this->kind and thatK are not full or empty
+    // Merge the dot values of the MPIDotValueStringKind
+    else if(kind->getType() == MPIDotValueKind::stringT &&
+            thatK->getType() == MPIDotValueKind::stringT) {
+      MPIDotValueStringKindPtr skindThis = boost::dynamic_pointer_cast<MPIDotValueStringKind>(kind);
+      MPIDotValueStringKindPtr skindThat = boost::dynamic_pointer_cast<MPIDotValueStringKind>(thatK);
+      return skindThis->mergeStringKind(skindThat);
     }
-    // If that is also a MPIDotValueObject check if the strings are equal
-    if(dotvalue.compare(thatV->get_dot_value())==0) return false;
-    // Else set to unknown and return true
-    dotvalue = "unknown";
-    return true;
-  }
-
-  // Each Dot Value is unique
-  bool MPIDotValueObject::operator==(Lattice* that) {
-    MPIDotValueObject* thatMDV = dynamic_cast<MPIDotValueObject*>(that);
-    return dotvalue.compare(thatMDV->get_dot_value()) == 0;
+    else {
+      cerr << "Error: Unhandled case in meet of MPIDotValue"
+           << "line: " << __LINE__
+           << " file: " << __FILE__ << endl;
+      exit(EXIT_FAILURE);
+    }
   }
   
-  bool MPIDotValueObject::equalSetV (ValueObjectPtr o, PartEdgePtr pedge) {
-    MPIDotValueObjectPtr thatMDV = boost::dynamic_pointer_cast<MPIDotValueObject>(o);
-    if(!thatMDV) return false;
-    return dotvalue.compare(thatMDV->get_dot_value()) == 0;
+  bool MPIDotValueObject::meetUpdateV (ValueObjectPtr o, PartEdgePtr pedge) {
+    MPIDotValueObjectPtr thatV = boost::dynamic_pointer_cast<MPIDotValueObject>(o); assert(thatV);
+    Lattice* thatL = dynamic_cast<Lattice*>(thatV.get()); assert(thatL);
+    return meetUpdate(thatL);
   }
   
   bool MPIDotValueObject::setToFull() {
-    dotvalue = "unknown";
+    kind = boost::make_shared<MPIDotValueUnknownKind>();
     return true;
   }
   
   bool MPIDotValueObject::setToEmpty() {
-    dotvalue = "";
+    kind = boost::make_shared<MPIDotValueDefaultKind>();
     return true;
   }
   
   bool MPIDotValueObject::isFullLat() {
-    return dotvalue.compare("unknown")==0;
+    return kind->isFullK();
   }
 
   bool MPIDotValueObject::isFullV(PartEdgePtr pedge) {
-    return isFullLat();
+    return kind->isFullK();
   }
   
   bool MPIDotValueObject::isEmptyLat() {
-    return dotvalue.compare("")==0;
+    return kind->isEmptyK();
   }
 
   bool MPIDotValueObject::isEmptyV(PartEdgePtr pedge) {
-    return isEmptyLat();
+    return kind->isEmptyK();
   }
   
   bool MPIDotValueObject::setMLValueToFull (MemLocObjectPtr ml) {
@@ -140,37 +417,68 @@ namespace fuse {
   bool MPIDotValueObject::mayEqualV (ValueObjectPtr o, PartEdgePtr pedge) {
     // It does not matter if the value object is MPIDotValueObject or not
     // We don't know their actual values and they could all be overlapping
-    return true;
+    MPIDotValueObjectPtr that = boost::dynamic_pointer_cast<MPIDotValueObject>(o); assert(that);
+    MPIDotValueKindPtr thatK = that->getKind();
+    return kind->mayEqualK(thatK);
   }
   
   bool MPIDotValueObject::mustEqualV (ValueObjectPtr o, PartEdgePtr pedge) {
-    return false;
+    MPIDotValueObjectPtr that = boost::dynamic_pointer_cast<MPIDotValueObject>(o); assert(that);
+    MPIDotValueKindPtr thatK = that->getKind();
+    return kind->mustEqualK(thatK);
   }
   
   bool MPIDotValueObject::subSetV (ValueObjectPtr o, PartEdgePtr pedge) {
-    return false;
+    MPIDotValueObjectPtr that = boost::dynamic_pointer_cast<MPIDotValueObject>(o); assert(that);
+    MPIDotValueKindPtr thatK = that->getKind();
+    return kind->subSetK(thatK);
   }
 
+  bool MPIDotValueObject::equalSetV (ValueObjectPtr o, PartEdgePtr pedge) {
+    MPIDotValueObjectPtr thatV = boost::dynamic_pointer_cast<MPIDotValueObject>(o); assert(thatV);
+    MPIDotValueKindPtr thatK = thatV->getKind();
+    return kind->equalSetK(thatK);
+  } 
+
   bool MPIDotValueObject::isConcrete() {
-    return true;
+    if(kind->getType() == MPIDotValueKind::stringT) return true;
+    else if(kind->getType() == MPIDotValueKind::empty ||
+            kind->getType() == MPIDotValueKind::unknown) return false;
+    else {
+      cerr << "Error: Unhandled concrete type " << kind->str()
+           << " line: " << __LINE__
+           << " file: " << __FILE__ << endl;
+      exit(EXIT_FAILURE);
+    }    
   }
   
   SgType* MPIDotValueObject::getConcreteType() {
-    SgStringVal* sval = SageBuilder::buildStringVal(dotvalue);
-    return sval->get_type();
+    if(kind->getType() == MPIDotValueKind::stringT) return SageBuilder::buildStringType();
+    else {
+      cerr << "Error: Unhandled concrete type " << kind->str()
+           << " line: " << __LINE__
+           << " file: " << __FILE__ << endl;
+      exit(EXIT_FAILURE);
+    }    
   }
   
   set<boost::shared_ptr< SgValueExp> > MPIDotValueObject::getConcreteValue() {
-    set<boost::shared_ptr<SgValueExp> > vset;
-    boost::shared_ptr<SgValueExp> sval_sp =
-      boost::shared_ptr<SgStringVal>(SageBuilder::buildStringVal(dotvalue));
-    vset.insert(sval_sp);
-    return vset;
+    if(kind->getType() == MPIDotValueKind::stringT) {
+      MPIDotValueStringKindPtr skind = boost::dynamic_pointer_cast<MPIDotValueStringKind>(kind);
+      set<string> dotvalues = skind->get_dot_values();
+      return String2SgValueExpPtrSet(dotvalues);
+    }
+    else {
+      cerr << "Error: Unhandled concrete type " << kind->str()
+           << " line: " << __LINE__
+           << " file: " << __FILE__ << endl;
+      exit(EXIT_FAILURE);
+    }    
   }
   
   string MPIDotValueObject::str(std::string indent) const {
     ostringstream oss;
-    oss << "[MPIDotValue: " << dotvalue << "]";
+    oss << "[MPIDotValue: " << kind->str() << "]";
     return oss.str();
   }
   
@@ -558,9 +866,8 @@ namespace fuse {
     MPIDotValueObjectPtr mdv = boost::make_shared<MPIDotValueObject>(v, part->inEdgeFromAny());
     SIGHT_VERB(dbg << "Expr2Val(bexpr) = " << v->str() << endl, 2, mpiDotValueAnalysisDebugLevel)
     SIGHT_VERB(dbg << "mdv=" << mdv->str() << endl, 2, mpiDotValueAnalysisDebugLevel)
-      // cout << "transferRecv: bml = " << bml->str() << endl;
-      // cout << "transferRecv: mdv=" << mdv->str() << endl;
-    //assert(!mdv->isFullLat());
+    // cout << "transferRecv: bml = " << bml->str() << endl;
+    // cout << "transferRecv: mdv=" << mdv->str() << endl;
     return aMapState->insert(bml, mdv);
   }
 
@@ -768,7 +1075,7 @@ namespace fuse {
     return false;
   }
 
-  string MPIDotGraphGenerator::getBcastMPIDotValue(PartPtr part) {
+  set<string> MPIDotGraphGenerator::getBcastMPIDotValue(PartPtr part) {
     SgFunctionCallExp* callexp = part->mustSgNodeAll<SgFunctionCallExp>(); assert(callexp);
     Function mpif_(callexp);
     MPIBcastOpCallSite bcastcs(mpif_, callexp);
@@ -781,10 +1088,12 @@ namespace fuse {
     // cout << "getRecvMPIDotValue:ml=" << ml->str() << endl;
     // cout << "getRecvMPIDotValue:mdv=" << mdv->str() << endl;
     assert(mdv && !mdv->isFullLat());
-    return mdv->get_dot_value();
+    MPIDotValueKindPtr kind = mdv->getKind();
+    MPIDotValueStringKindPtr skind = boost::dynamic_pointer_cast<MPIDotValueStringKind>(kind); assert(skind);
+    return skind->get_dot_values();   
   }
 
-  string MPIDotGraphGenerator::getRecvMPIDotValue(PartPtr part) {
+  set<string> MPIDotGraphGenerator::getRecvMPIDotValue(PartPtr part) {
     SgFunctionCallExp* callexp = part->mustSgNodeAll<SgFunctionCallExp>(); assert(callexp);
     Function mpif_(callexp);
     MPIRecvOpCallSite recvcs(mpif_, callexp);
@@ -797,7 +1106,9 @@ namespace fuse {
     // cout << "getRecvMPIDotValue:ml=" << ml->str() << endl;
     // cout << "getRecvMPIDotValue:mdv=" << mdv->str() << endl;
     assert(mdv && !mdv->isFullLat());
-    return mdv->get_dot_value();    
+    MPIDotValueKindPtr kind = mdv->getKind();
+    MPIDotValueStringKindPtr skind = boost::dynamic_pointer_cast<MPIDotValueStringKind>(kind); assert(skind);
+    return skind->get_dot_values();   
   }
 
   string MPIDotGraphGenerator::cfgn2label(CFGNode cfgn) {
@@ -865,9 +1176,19 @@ namespace fuse {
     return oss.str();
   }
 
+  string MPIDotGraphGenerator::commedges2dot(set<string> sdotvalues, PartPtr target) {
+    ostringstream oss;
+    string tdotvalue = analysis->part2dotid(target);
+    set<string>::iterator s = sdotvalues.begin();
+    for( ; s != sdotvalues.end(); ++s) {
+      oss << *s << " -> " << tdotvalue << " [color=\"firebrick1\", constraint=false, weight=20];" << endl;
+    }
+    return oss.str();
+  }
+
   string MPIDotGraphGenerator::recvcommedge2dot(PartPtr part) {
-    string rdotvalue = getRecvMPIDotValue(part);
-    return commedge2dot(rdotvalue, part);
+    set<string> rdotvalues = getRecvMPIDotValue(part);
+    return commedges2dot(rdotvalues, part);
   }
 
   string MPIDotGraphGenerator::bcastcommedge2dot(PartPtr part) {
@@ -882,8 +1203,8 @@ namespace fuse {
     root = opvo2int(callexp, rexpr);
     int rank; MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     if(root != rank) {
-      string rdotvalue = getBcastMPIDotValue(part);
-      return commedge2dot(rdotvalue, part);
+      set<string> rdotvalues = getBcastMPIDotValue(part);
+      return commedges2dot(rdotvalues, part);
     }
     return "";
   }

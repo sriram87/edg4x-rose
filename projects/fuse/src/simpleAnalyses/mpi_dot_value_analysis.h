@@ -9,56 +9,147 @@
 #include "abstract_object_map.h"
 #include "mpi.h"
 
-namespace fuse {  
-  class MPIDotValueObject;
-  typedef boost::shared_ptr<MPIDotValueObject> MPIDotValueObjectPtr;
+namespace fuse {
+
+  /*******************
+   * MPIDotValueKind *
+   *******************/
+  class MPIDotValueKind;
+  typedef boost::shared_ptr<MPIDotValueKind> MPIDotValueKindPtr;
+  //! Basic lattice type
+  class MPIDotValueKind {
+    // enum for avoiding downcasting
+    // empty -> bottom, string -> set of strings, unknown -> top
+  public:
+    typedef enum ktype {empty, stringT, unknown} KType;
+  private:
+    KType ktype_;
+  public:    
+    MPIDotValueKind(KType ktype_);
+    MPIDotValueKind(const MPIDotValueKind& that);
+    KType getType() const;
+    virtual bool mayEqualK(MPIDotValueKindPtr thatK)=0;
+    virtual bool mustEqualK(MPIDotValueKindPtr thatK)=0;
+    virtual bool equalSetK(MPIDotValueKindPtr thatK)=0;
+    virtual bool subSetK(MPIDotValueKindPtr thatK)=0;
+    virtual bool isEmptyK()=0;
+    virtual bool isFullK()=0;
+    virtual MPIDotValueKindPtr copyK()=0;
+    virtual std::string str(std::string indent="")=0;
+  };
+
+  /**************************
+   * MPIDotValueDefaultKind *
+   **************************/
+  class MPIDotValueDefaultKind : public MPIDotValueKind {
+  public:
+    MPIDotValueDefaultKind();
+    MPIDotValueDefaultKind(const MPIDotValueDefaultKind& that);
+    bool mayEqualK(MPIDotValueKindPtr thatK);
+    bool mustEqualK(MPIDotValueKindPtr thatK);
+    bool equalSetK(MPIDotValueKindPtr thatK);
+    bool subSetK(MPIDotValueKindPtr thatK);
+    bool isEmptyK();
+    bool isFullK();
+    MPIDotValueKindPtr copyK();
+    std::string str(std::string indent="");
+  };
+
+  /**************************
+   * MPIDotValueUnknownKind *
+   **************************/
+  class MPIDotValueUnknownKind : public MPIDotValueKind {
+  public:
+    MPIDotValueUnknownKind();
+    MPIDotValueUnknownKind(const MPIDotValueUnknownKind& that);
+    bool mayEqualK(MPIDotValueKindPtr thatK);
+    bool mustEqualK(MPIDotValueKindPtr thatK);
+    bool equalSetK(MPIDotValueKindPtr thatK);
+    bool subSetK(MPIDotValueKindPtr thatK);
+    bool isEmptyK();
+    bool isFullK();
+    MPIDotValueKindPtr copyK();
+    std::string str(std::string indent="");
+  };
+
+  /*************************
+   * MPIDotValueStringKind *
+   *************************/
+  class MPIDotValueStringKind;
+  typedef boost::shared_ptr<MPIDotValueStringKind> MPIDotValueStringKindPtr;
+  class MPIDotValueStringKind : public MPIDotValueKind {
+    std::set<std::string> dotvalues;
+  public:
+    MPIDotValueStringKind(std::set<std::string> dotvalues);
+    MPIDotValueStringKind(std::string dotvalue);
+    MPIDotValueStringKind(const MPIDotValueStringKind& that);
+    std::set<std::string> get_dot_values() const;
+    bool compareK(MPIDotValueKindPtr thatK);
+    bool mayEqualK(MPIDotValueKindPtr thatK);
+    bool mustEqualK(MPIDotValueKindPtr thatK);
+    bool equalSetK(MPIDotValueKindPtr thatK);
+    bool subSetK(MPIDotValueKindPtr thatK);
+    bool isEmptyK();
+    bool isFullK();
+    bool mergeStringKind(MPIDotValueStringKindPtr thatK);
+    MPIDotValueKindPtr copyK();
+    std::string str(std::string indent="");
+
+    bool compareMayK(MPIDotValueStringKindPtr thatK);
+    bool compareEqualK(MPIDotValueStringKindPtr thatK);
+    bool compareSubK(MPIDotValueStringKindPtr thatK);
+  };
+
+  /*********************
+   * MPIDotValueObject *
+   *********************/
   /*!
    *! MPIDotValueObject represents an interpretation of MPI buffers by MPIDotValueAnalysis
    *! This interpretation assigns a special value to buffers of MPI Comm operations
-   *! The interpretation is a string value used to generate a dot graph
+   *! The interpretation is a set of string values used to generate a dot graph
    *! The value assigned by this object may equals every other value as we dont know the actual set
    *! We only distinguish the set of values based on the callsite
    *! String is used to denote such sets
-   *! Empty string is empty value and the string "unknown" denotes Top
    *! Two values v1 \join v2 is unknown
    *! We will use unknown to denote values for which this analysis has no idea about.
    *! For instance, this analysis has no idea about ranks or size.
    *! Such values are assigned unknown
    *! When implementing Expr2Val, if the value mapped is unknown the query is forwarded to a prior analysis.
    */
+  class MPIDotValueObject;
+  typedef boost::shared_ptr<MPIDotValueObject> MPIDotValueObjectPtr;
   class MPIDotValueObject : public FiniteLattice, public ValueObject {
-    std::string dotvalue;
+    MPIDotValueKindPtr kind;
   public:
     MPIDotValueObject(PartEdgePtr pedge);
     MPIDotValueObject(std::string dotvalue, PartEdgePtr pedge);
-    MPIDotValueObject(ValueObjectPtr v, PartEdgePtr pedge);
+    MPIDotValueObject(ValueObjectPtr vo, PartEdgePtr pedge);
     MPIDotValueObject(const MPIDotValueObject& that);
 
-    std::string get_dot_value() const;
-
-    virtual void initialize();
-    virtual Lattice* copy() const;
-    virtual bool meetUpdate(Lattice* that);
-    virtual bool operator==(Lattice* that);
-    virtual bool setToFull();
-    virtual bool setToEmpty();
-    virtual bool isFullLat();
-    virtual bool isEmptyLat();
-    virtual bool setMLValueToFull (MemLocObjectPtr ml);
+    MPIDotValueKindPtr getKind() const;
+    void initialize();
+    Lattice* copy() const;
+    bool operator==(Lattice* that);
+    bool meetUpdate(Lattice* that);
+    bool setToFull();
+    bool setToEmpty();
+    bool isFullLat();
+    bool isEmptyLat();
+    bool setMLValueToFull (MemLocObjectPtr ml);
 
     // Value Object Methods
-    virtual bool mayEqualV (ValueObjectPtr o, PartEdgePtr pedge); 
-    virtual bool mustEqualV (ValueObjectPtr o, PartEdgePtr pedge);
-    virtual bool equalSetV (ValueObjectPtr o, PartEdgePtr pedge); 
-    virtual bool subSetV (ValueObjectPtr o, PartEdgePtr pedge);
-    virtual bool meetUpdateV (ValueObjectPtr that, PartEdgePtr pedge);
-    virtual bool isFullV(PartEdgePtr pedge);
-    virtual bool isEmptyV(PartEdgePtr pedge);
+    bool mayEqualV(ValueObjectPtr o, PartEdgePtr pedge); 
+    bool mustEqualV(ValueObjectPtr o, PartEdgePtr pedge);
+    bool equalSetV(ValueObjectPtr o, PartEdgePtr pedge); 
+    bool subSetV(ValueObjectPtr o, PartEdgePtr pedge);
+    bool meetUpdateV(ValueObjectPtr that, PartEdgePtr pedge);
+    bool isFullV(PartEdgePtr pedge);
+    bool isEmptyV(PartEdgePtr pedge);
     
-    virtual bool isConcrete();
-    virtual SgType* getConcreteType();
-    virtual std::set<boost::shared_ptr< SgValueExp> > getConcreteValue();
-    virtual ValueObjectPtr copyV () const;
+    bool isConcrete();
+    SgType* getConcreteType();
+    std::set<boost::shared_ptr< SgValueExp> > getConcreteValue();
+    ValueObjectPtr copyV () const;
     std::string str(std::string indent="") const;
   };
 
@@ -196,9 +287,9 @@ namespace fuse {
     std::string part2dot(PartPtr part);
     std::string partedge2dot(PartEdgePtr pedge);
     std::string commedge2dot(string sdotvalue, PartPtr target);
-
-    std::string getRecvMPIDotValue(PartPtr part);
-    std::string getBcastMPIDotValue(PartPtr part);
+    std::string commedges2dot(std::set<std::string> sdotvalues, PartPtr target);
+    std::set<std::string> getRecvMPIDotValue(PartPtr part);
+    std::set<std::string> getBcastMPIDotValue(PartPtr part);
 
     std::string recvcommedge2dot(PartPtr part);
     std::string bcastcommedge2dot(PartPtr part);

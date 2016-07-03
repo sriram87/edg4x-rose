@@ -67,7 +67,8 @@ namespace fuse {
           annotateExprValueUnknown(argsList[0]);
         }        
         else if(name.compare("MPI_Reduce") == 0){
-          assert(0);
+          sgn->setAttribute("fuse:UnknowSideEffectsAttribute", new UnknownSideEffectsAttribute());
+          annotateExprValueUnknown(argsList[1]);
         }
         else if(name.compare("MPI_Gather") == 0){
           assert(0);

@@ -176,6 +176,8 @@ namespace fuse {
     bool transferRecvOp(Function& mpif_, SgFunctionCallExp* sgn);
     bool transferOutBcastOp(Function&, SgFunctionCallExp*);
     bool transferInBcastOp(Function&, SgFunctionCallExp*);
+    bool transferOutReduceOp(Function&, SgFunctionCallExp*);
+    bool transferInReduceOp(Function&, SgFunctionCallExp*);
 
     void visit(SgNullExpression* sgn);
 
@@ -290,11 +292,14 @@ namespace fuse {
     std::string commedges2dot(std::set<std::string> sdotvalues, PartPtr target);
     std::set<std::string> getRecvMPIDotValue(PartPtr part);
     std::set<std::string> getBcastMPIDotValue(PartPtr part);
+    std::set<std::string> getReduceMPIDotValue(PartPtr part);
 
     std::string recvcommedge2dot(PartPtr part);
     std::string bcastcommedge2dot(PartPtr part);
+    std::string reducecommedge2dot(PartPtr part);
     bool isRecvOpATSNode(PartPtr part);
     bool isMPIOpATSNode(PartPtr part);
+    bool isReduceOpATSNode(PartPtr part);
     bool isMPICommOpATSNode(PartPtr part);
     bool isBcastOpATSNode(PartPtr part);
     void generateDot();

@@ -299,6 +299,10 @@ namespace fuse {
   };
 
   typedef boost::shared_ptr<MPICommValueObject> MPICommValueObjectPtr;
+  /*********************
+   * MPIDotValueReduce *
+   *********************/
+  void MPIDotValueReduceOp(char* in, char* inout, int* len, MPI_Datatype* datatype);
 
   /**************************
    * MPICommAnalysisTranfer *
@@ -329,6 +333,7 @@ namespace fuse {
     std::string serialize(MPICommValueObjectPtr mvo);
     MPICommValueObjectPtr deserialize(std::string data);
 
+    void visit(SgCommaOpExp* sgn);
     void visit(SgPointerDerefExp* sgn);
     /*!
      * The sender sends the dataflow state by querying for ValueObject,
@@ -346,6 +351,8 @@ namespace fuse {
     void transferMPIBarrier();
 
     void transferMPIBcastOp(SgPointerDerefExp* sgn, Function mpif_);
+
+    void transferMPIReduceOp(SgCommaOpExp* sgn, Function mpif_);
     
     list<PartEdgePtr> outGoingEdgesMPICallExp(PartPtr part, string funcname);
 

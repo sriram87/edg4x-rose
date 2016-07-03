@@ -18,6 +18,7 @@ namespace fuse {
       RECV,
       BARRIER,
       BCAST,
+      REDUCE,
       INIT,
       FINALIZE,
       UNKNOWN
@@ -30,6 +31,7 @@ namespace fuse {
     bool isMPIRecvOp() const;
     bool isMPIBarrierOp() const;
     bool isMPIBcastOp() const;
+    bool isMPIReduceOp() const;
     bool isMPIUnknownOp() const;
   };
 
@@ -68,6 +70,19 @@ namespace fuse {
     MPIBcastOpCallSite(const Function& mpif_, SgFunctionCallExp* sgn);
     SgNode* getBcastBuffer();
     SgNode* getBcastRootExpr();
+  };
+
+  /***********************
+   * MPIReduceOpCallSite *
+   ***********************/
+  class MPIReduceOpCallSite {
+    const Function mpif_;
+    SgFunctionCallExp* sgn;
+  public:
+    MPIReduceOpCallSite(const Function& mpif_, SgFunctionCallExp* sgn);
+    SgNode* getReduceSBuffer();
+    SgNode* getReduceRBuffer();
+    SgNode* getReduceRootExpr();
   };
 
   /*******************
@@ -112,6 +127,19 @@ namespace fuse {
 
   SgInitializedName* getBcastOpRoot(Function function);
   SgInitializedName* getBcastOpComm(Function function);
+
+  SgInitializedName* getReduceOpSbuff(Function function);
+  SgInitializedName* getReduceOpRbuff(Function function);
+  SgInitializedName* getReduceOpRoot(Function mpifunc);
+  SgInitializedName* getReduceOpComm(Function mpifunc);
+
+  bool isReduceOpSbuffDerefExp(Function mpifunc, SgPointerDerefExp* sgn);
+  bool isReduceOpSbuffDerefExp(Function mpifunc, SgPointerDerefExp* sgn, 
+                               Composer* composer, PartEdgePtr pedge, ComposedAnalysis* analysis,
+                               int debugLevel);
+  bool isReduceOpRbuffDerefExp(Function mpifunc, SgPointerDerefExp* sgn, 
+                               Composer* composer, PartEdgePtr pedge, ComposedAnalysis* analysis,
+                               int debugLevel);
 };
 
 #endif

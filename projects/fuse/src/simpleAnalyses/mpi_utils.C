@@ -16,8 +16,9 @@ namespace fuse {
     else if(name.compare("MPI_Recv") == 0) optype = MPICommOp::RECV;
     else if(name.compare("MPI_Barrier") == 0) optype = MPICommOp::BARRIER;
     else if(name.compare("MPI_Comm_rank") == 0) optype = MPICommOp::COMMRANK;
-    else if(name.compare("MPI_Comm_rank") == 0) optype = MPICommOp::COMMSIZE;
+    else if(name.compare("MPI_Comm_size") == 0) optype = MPICommOp::COMMSIZE;
     else if(name.compare("MPI_Bcast") == 0) optype = MPICommOp::BCAST;
+    else if(name.compare("MPI_Reduce") == 0) optype = MPICommOp::REDUCE;
     else if(name.compare("MPI_Init") == 0) optype = MPICommOp::INIT;
     else if(name.compare("MPI_Finalize") == 0) optype = MPICommOp::FINALIZE;
     else optype = MPICommOp::UNKNOWN;
@@ -40,6 +41,10 @@ namespace fuse {
 
   bool MPICommOp::isMPIBcastOp() const {
     return optype == MPICommOp::BCAST;
+  }
+
+  bool MPICommOp::isMPIReduceOp() const {
+    return optype == MPICommOp::REDUCE;
   }
 
   bool MPICommOp::isMPIUnknownOp() const {
@@ -123,6 +128,32 @@ namespace fuse {
     SgExpression* rexpr = traverseAST(args[3]); assert(rexpr);
     return rexpr;
   }
+
+  /***********************
+   * MPIReduceOpCallSite *
+   ***********************/
+  MPIReduceOpCallSite::MPIReduceOpCallSite(const Function& mpif_,
+                                           SgFunctionCallExp* sgn)
+    : mpif_(mpif_), sgn(sgn) { }
+
+  SgNode* MPIReduceOpCallSite::getReduceSBuffer() {
+    SgExpressionPtrList& args = sgn->get_args()->get_expressions();
+    SgExpression* bexpr = traverseAST(args[0]); assert(bexpr);
+    return bexpr;
+  }
+
+  SgNode* MPIReduceOpCallSite::getReduceRBuffer() {
+    SgExpressionPtrList& args = sgn->get_args()->get_expressions();
+    SgExpression* bexpr = traverseAST(args[1]); assert(bexpr);
+    return bexpr;
+  }
+
+  SgNode* MPIReduceOpCallSite::getReduceRootExpr() {
+    SgExpressionPtrList& args = sgn->get_args()->get_expressions();
+    SgExpression* rexpr = traverseAST(args[5]); assert(rexpr);
+    return rexpr;
+  }
+
 
   /*******************
    * ValueObject2Int *
@@ -353,6 +384,95 @@ namespace fuse {
     SgInitializedNamePtrList& arglist = *arglist_p;
     SgInitializedName* comm = arglist[4]; assert(comm);
     return comm;
+  }
+
+  SgInitializedName* getReduceOpSBuff(Function mpifunc) {
+    MPICommOp op(mpifunc);
+    if(op.isMPIUnknownOp()) unsupportedMPICommOpExit(__LINE__);
+    if(!op.isMPIReduceOp()) usageErrorExit(__LINE__);
+    
+    SgInitializedNamePtrList* arglist_p = mpifunc.get_args();
+    SgInitializedNamePtrList& arglist = *arglist_p;
+    SgInitializedName* sbuff = arglist[0]; assert(sbuff);
+    return sbuff;
+  }
+
+  SgInitializedName* getReduceOpRBuff(Function mpifunc) {
+    MPICommOp op(mpifunc);
+    if(op.isMPIUnknownOp()) unsupportedMPICommOpExit(__LINE__);
+    if(!op.isMPIReduceOp()) usageErrorExit(__LINE__);
+    
+    SgInitializedNamePtrList* arglist_p = mpifunc.get_args();
+    SgInitializedNamePtrList& arglist = *arglist_p;
+    SgInitializedName* rbuff = arglist[1]; assert(rbuff);
+    return rbuff;
+  }
+
+  SgInitializedName* getReduceOpRoot(Function mpifunc) {
+    MPICommOp op(mpifunc);
+    if(op.isMPIUnknownOp()) unsupportedMPICommOpExit(__LINE__);
+    if(!op.isMPIReduceOp()) usageErrorExit(__LINE__);
+    
+    SgInitializedNamePtrList* arglist_p = mpifunc.get_args();
+    SgInitializedNamePtrList& arglist = *arglist_p;
+    SgInitializedName* root = arglist[5]; assert(root);
+    return root;
+  }
+
+  SgInitializedName* getReduceOpComm(Function mpifunc) {
+    MPICommOp op(mpifunc);
+    if(op.isMPIUnknownOp()) unsupportedMPICommOpExit(__LINE__);
+    if(!op.isMPIReduceOp()) usageErrorExit(__LINE__);
+    
+    SgInitializedNamePtrList* arglist_p = mpifunc.get_args();
+    SgInitializedNamePtrList& arglist = *arglist_p;
+    SgInitializedName* comm = arglist[6]; assert(comm);
+    return comm;
+  }
+
+
+  bool isReduceOpSbuffDerefExp(Function mpifunc, SgPointerDerefExp* sgn) {
+    SgInitializedName* sbuff = getReduceOpSBuff(mpifunc);
+    SgVarRefExp* sbuffVarRef = isSgVarRefExp(sgn->get_operand());
+    if(sbuff && sbuffVarRef) {
+      SgSymbol* sbuffSymbol = sbuff->search_for_symbol_from_symbol_table();
+      SgVariableSymbol* sbuffVarRefSymbol = sbuffVarRef->get_symbol();
+      if(!sbuffSymbol || !sbuffVarRefSymbol) return false;
+      else return sbuffSymbol == sbuffVarRefSymbol;
+    }
+    return false;
+  }
+
+  bool isReduceOpSbuffDerefExp(Function mpifunc, SgPointerDerefExp* sgn, 
+                               Composer* composer, PartEdgePtr pedge, ComposedAnalysis* analysis,
+                               int debugLevel) {
+    SIGHT_VERB_DECL(scope, ("isReduceOpSbuffDerefExp", scope::low),
+                    3, debugLevel)
+    SgInitializedName* sbuff = getReduceOpSBuff(mpifunc);
+    SgVarRefExp* sbuffVarRef = isSgVarRefExp(sgn->get_operand());
+    SIGHT_VERB(dbg << "sbuff=" << SgNode2Str(sbuff) << endl, 3, debugLevel)
+    SIGHT_VERB(dbg << "sbuffVarRef=" << SgNode2Str(sbuffVarRef) << endl, 3, debugLevel)
+    MemLocObjectPtr sbuffML = composer->Expr2MemLoc(sbuff, pedge, analysis);
+    MemLocObjectPtr sbuffVarRefML = composer->OperandExpr2MemLoc(sgn, sbuffVarRef, pedge, analysis);
+    SIGHT_VERB(dbg << "sbuffML=" << sbuffML->str() << endl, 3, debugLevel)
+    SIGHT_VERB(dbg << "sbuffVarRefML=" << sbuffVarRefML->str() << endl, 3, debugLevel)
+    return sbuffML->mustEqualML(sbuffVarRefML, pedge);
+  }
+
+  bool isReduceOpRbuffDerefExp(Function mpifunc, SgPointerDerefExp* sgn, 
+                               Composer* composer, PartEdgePtr pedge, ComposedAnalysis* analysis,
+                               int debugLevel) {
+    SIGHT_VERB_DECL(scope, ("isReduceOpSbuffDerefExp", scope::low),
+                    3, debugLevel)
+    SgInitializedName* rbuff = getReduceOpRBuff(mpifunc);
+    SgVarRefExp* rbuffVarRef = isSgVarRefExp(sgn->get_operand());
+    SIGHT_VERB(dbg << "rbuff=" << SgNode2Str(rbuff) << endl, 3, debugLevel)
+    SIGHT_VERB(dbg << "rbuffVarRef=" << SgNode2Str(rbuffVarRef) << endl, 3, debugLevel)
+    MemLocObjectPtr rbuffML = composer->Expr2MemLoc(rbuff, pedge, analysis);
+    MemLocObjectPtr rbuffVarRefML = composer->OperandExpr2MemLoc(sgn, rbuffVarRef, pedge, analysis);
+    SIGHT_VERB(dbg << "rbuffML=" << rbuffML->str() << endl, 3, debugLevel)
+    SIGHT_VERB(dbg << "rbuffVarRefML=" << rbuffVarRefML->str() << endl, 3, debugLevel)
+    return rbuffML->mustEqualML(rbuffVarRefML, pedge);
   }
 
   // SgPointerDerefExp* MPICommOp::getCommOpBufferDerefExpr() const {

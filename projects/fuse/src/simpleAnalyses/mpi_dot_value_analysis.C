@@ -12,7 +12,7 @@
 
 namespace fuse {
   // DEBUG_LEVEL(mpiDotValueAnalysisDebugLevel, 0);
-  #define mpiDotValueAnalysisDebugLevel 2
+  #define mpiDotValueAnalysisDebugLevel 0
   #if mpiDotValueAnalysisDebugLevel==0
   #define DISABLE_SIGHT
   #endif
@@ -627,7 +627,9 @@ namespace fuse {
     modified = aMapState->insert(ml, mdv);
   }
   
-  void MDVTransferVisitor::visit(SgCommaOpExp* sgn) { assert(0); }
+  void MDVTransferVisitor::visit(SgCommaOpExp* sgn) {  
+    // identity transfer
+  }
 
   void MDVTransferVisitor::visit(SgCompoundAssignOp* sgn) {
     MemLocObjectPtr ml = analysis->getComposer()->Expr2MemLoc(sgn, part->inEdgeFromAny(), analysis);
@@ -813,6 +815,9 @@ namespace fuse {
         else if(op.isMPIBcastOp()) {
           modified = transferOutBcastOp(mpif_, sgn);
         }
+        else if(op.isMPIReduceOp()) {
+          modified = transferOutReduceOp(mpif_, sgn);
+        }
         else if(op.isMPIUnknownOp()) {
           cerr << "Unhandled MPI Function " << mpif_.get_name().getString() 
                << ", file:" << __FILE__ << ", line: " << __LINE__ << endl;
@@ -828,6 +833,9 @@ namespace fuse {
       }
       else if(op.isMPIBcastOp()) {
         modified = transferInBcastOp(mpif_, sgn);
+      }
+      else if(op.isMPIReduceOp()) {
+        modified = transferInReduceOp(mpif_, sgn);
       }
       else if(op.isMPIUnknownOp()) {
         cerr << "Unhandled MPI Function " << mpif_.get_name().getString() 
@@ -910,6 +918,48 @@ namespace fuse {
     //assert(!mdv->isFullLat());
     return aMapState->insert(bml, mdv);
   }
+
+  bool MDVTransferVisitor::transferOutReduceOp(Function& mpif_, SgFunctionCallExp* sgn) {
+    SIGHT_VERB_DECL(scope, (sight::txt() << "MDVTransferVisitor::transferOutReduceOp", scope::medium),
+                    2, mpiDotValueAnalysisDebugLevel)
+    MPIReduceOpCallSite reduceCS(mpif_, sgn);
+
+    SgNode* sexpr = reduceCS.getReduceSBuffer();
+    MemLocObjectPtr bml = analysis->getComposer()->Expr2MemLoc(sexpr, part->inEdgeFromAny(), analysis);
+    string dotvalue = analysis->part2dotid(part);
+    MPIDotValueObjectPtr mdv = boost::make_shared<MPIDotValueObject>(dotvalue, part->inEdgeFromAny());
+    SIGHT_VERB(dbg << "bml=" << bml->str() << endl, 2, mpiDotValueAnalysisDebugLevel)
+    SIGHT_VERB(dbg << "mdv=" << mdv->str() << endl, 2, mpiDotValueAnalysisDebugLevel)
+    return aMapState->insert(bml, mdv);    
+  }
+
+  bool MDVTransferVisitor::transferInReduceOp(Function& mpif_, SgFunctionCallExp* sgn) {
+    SIGHT_VERB_DECL(scope, (sight::txt() << "MDVTransferVisitor::transferInReduceOp", scope::medium),
+                    2, mpiDotValueAnalysisDebugLevel)
+    MPIReduceOpCallSite reduceCS(mpif_, sgn);
+    SgNode* rexpr = reduceCS.getReduceRootExpr();
+    OpValueObject2Int opvo2int(analysis->getComposer(), part->inEdgeFromAny(), 
+                               analysis, mpiDotValueAnalysisDebugLevel);
+    int root = opvo2int(sgn, rexpr);
+
+    int rank;
+    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+
+    // If my rank is same as the root
+    // Get the reduced value from MPICommAnalysis
+    if(root == rank) {
+      SgNode* bexpr = reduceCS.getReduceRBuffer();
+      MemLocObjectPtr bml = analysis->getComposer()->Expr2MemLoc(bexpr, part->inEdgeFromAny(), analysis);
+      ValueObjectPtr v = analysis->getComposer()->Expr2Val(bexpr, part->inEdgeFromAny(), analysis);
+      MPIDotValueObjectPtr mdv = boost::make_shared<MPIDotValueObject>(v, part->inEdgeFromAny());
+      SIGHT_VERB(dbg << "Expr2Val(bexpr) = " << v->str() << endl, 2, mpiDotValueAnalysisDebugLevel)
+      SIGHT_VERB(dbg << "mdv=" << mdv->str() << endl, 2, mpiDotValueAnalysisDebugLevel)
+        //assert(!mdv->isFullLat());
+      return aMapState->insert(bml, mdv);
+    }
+    else return false;
+  }
+
 
   bool MDVTransferVisitor::finish() {
     return modified;
@@ -1075,6 +1125,16 @@ namespace fuse {
     return false;
   }
 
+  bool MPIDotGraphGenerator::isReduceOpATSNode(PartPtr part) {
+    SgFunctionCallExp* callexp = part->mustSgNodeAll<SgFunctionCallExp>();
+    if(callexp) {
+      Function mpif_(callexp);
+      MPICommOp op(mpif_);
+      return op.isMPIReduceOp();
+    }
+    return false;
+  }
+
   set<string> MPIDotGraphGenerator::getBcastMPIDotValue(PartPtr part) {
     SgFunctionCallExp* callexp = part->mustSgNodeAll<SgFunctionCallExp>(); assert(callexp);
     Function mpif_(callexp);
@@ -1106,6 +1166,22 @@ namespace fuse {
     // cout << "getRecvMPIDotValue:ml=" << ml->str() << endl;
     // cout << "getRecvMPIDotValue:mdv=" << mdv->str() << endl;
     assert(mdv && !mdv->isFullLat());
+    MPIDotValueKindPtr kind = mdv->getKind();
+    MPIDotValueStringKindPtr skind = boost::dynamic_pointer_cast<MPIDotValueStringKind>(kind); assert(skind);
+    return skind->get_dot_values();   
+  }
+
+  set<string> MPIDotGraphGenerator::getReduceMPIDotValue(PartPtr part) {
+    SgFunctionCallExp* callexp = part->mustSgNodeAll<SgFunctionCallExp>(); assert(callexp);
+    Function mpif_(callexp);
+    MPIReduceOpCallSite reducecs(mpif_, callexp);
+    NodeState* state = NodeState::getNodeState(analysis, part); assert(state);
+    Lattice* l = state->getLatticeBelow(analysis, part->outEdgeToAny(), 0); assert(l);
+    AbstractObjectMap* aMapState = dynamic_cast<AbstractObjectMap*>(l); assert(aMapState);
+    SgNode* bexpr = reducecs.getReduceRBuffer();
+    MemLocObjectPtr ml = analysis->getComposer()->Expr2MemLoc(bexpr, part->outEdgeToAny(), analysis);
+    MPIDotValueObjectPtr mdv = boost::dynamic_pointer_cast<MPIDotValueObject>(aMapState->get(ml));    
+    assert(mdv && !mdv->isFullLat());    
     MPIDotValueKindPtr kind = mdv->getKind();
     MPIDotValueStringKindPtr skind = boost::dynamic_pointer_cast<MPIDotValueStringKind>(kind); assert(skind);
     return skind->get_dot_values();   
@@ -1208,6 +1284,25 @@ namespace fuse {
     }
     return "";
   }
+
+  string MPIDotGraphGenerator::reducecommedge2dot(PartPtr part) {
+    SgFunctionCallExp* callexp = part->mustSgNodeAll<SgFunctionCallExp>(); assert(callexp);
+    Function mpif_(callexp);
+    MPIReduceOpCallSite reducecs(mpif_, callexp);
+    SgNode* rexpr = reducecs.getReduceRootExpr();
+
+    int root;
+    OpValueObject2Int opvo2int(analysis->getComposer(), part->outEdgeToAny(), 
+                               analysis, mpiDotValueAnalysisDebugLevel);
+    root = opvo2int(callexp, rexpr);
+    int rank; MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+
+    if(root == rank) {
+      set<string> dotvalues = getReduceMPIDotValue(part);
+      return commedges2dot(dotvalues, part);
+    }
+    return "";
+  }
   
   void MPIDotGraphGenerator::generateDot() {
     Composer* composer = analysis->getComposer();
@@ -1252,6 +1347,9 @@ namespace fuse {
           string bcastcommedge = bcastcommedge2dot(part);
           // When the process is root this string might be empty
           if(bcastcommedge.size() > 0) edgess << indent << bcastcommedge;
+        }
+        else if(isReduceOpATSNode(part)) {
+          edgess << indent << reducecommedge2dot(part);
         }
       }
       ei.pushAllDescendants();      

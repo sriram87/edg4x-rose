@@ -7,6 +7,7 @@
 #include "stx_analysis.h"
 #include "sight.h"
 #include <set>
+#include "mpi.h"
 
 using namespace std;
 using namespace sight;
@@ -1272,8 +1273,18 @@ void ChainComposer::runAnalysis()
     currentAnalysis->runAnalysis();
     
     gettimeofday(&end, NULL);
-    cout << "  "<<(*a)->str("")<<" Elapsed="<<((end.tv_sec*1000000+end.tv_usec) - 
+    int flag;
+    MPI_Initialized(&flag);
+    if(flag) {
+      int rank;
+      MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+      cout << rank << ", " << (*a)->str("") << ", " << ((end.tv_sec*1000000+end.tv_usec) -
+							(start.tv_sec*1000000+start.tv_usec))/1000000.0<<endl;
+    }
+    else {
+      cout << "  "<<(*a)->str("")<<" Elapsed="<<((end.tv_sec*1000000+end.tv_usec) - 
                                                (start.tv_sec*1000000+start.tv_usec))/1000000.0<<"s"<<endl;
+    }
     
     /*if(composerDebugLevel() >= 3) {
       scope reg("Final State", scope::medium, attrGE("composerDebugLevel", 3));

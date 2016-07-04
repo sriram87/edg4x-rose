@@ -91,9 +91,9 @@ typeVisitor_SOURCES = typeVisitorTest.cpp
 ########
 # FUSE #
 ########
-fuse_CXXFLAGS = $(SIGHT_CFLAGS) -DROSE_PREFIX="\"${top_builddir}\""
+fuse_CXXFLAGS = $(SIGHT_CFLAGS) $(ROSE_WITH_MPI_CFLAGS) -DROSE_PREFIX="\"${top_builddir}\""
 fuse_LDADD = -lrose
-fuse_LDFLAGS = $(ROSE_LIBS) $(LIBS_WITH_RPATH) $(SIGHT_LINKFLAGS)
+fuse_LDFLAGS = $(ROSE_LIBS) $(LIBS_WITH_RPATH) $(SIGHT_LINKFLAGS) $(ROSE_WITH_MPI_CLDFLAGS)
 
 fuse_DEPENDENCIES=fuseLayout
 
@@ -187,9 +187,9 @@ clean-fuse:
 # FUSETIGHT #
 #############
 fuseTight_SKIP_FLAGS =-DFUSE_SKIP_LIB_GLOBAL_DECLS -DFUSE_START_FROM_MAIN
-fuseTight_CXXFLAGS = $(SIGHT_CFLAGS) -DROSE_PREFIX="\"${top_builddir}\"" $(fuseTight_SKIP_FLAGS)
+fuseTight_CXXFLAGS = $(SIGHT_CFLAGS) $(ROSE_WITH_MPI_CFLAGS) -DROSE_PREFIX="\"${top_builddir}\"" $(fuseTight_SKIP_FLAGS)
 fuseTight_LDADD = -lrose
-fuseTight_LDFLAGS = $(ROSE_LIBS) $(LIBS_WITH_RPATH) $(SIGHT_LINKFLAGS)
+fuseTight_LDFLAGS = $(ROSE_LIBS) $(LIBS_WITH_RPATH) $(SIGHT_LINKFLAGS) $(ROSE_WITH_MPI_CLDFLAGS)
 
 fuseTight_DEPENDENCIES=fuseLayout
 

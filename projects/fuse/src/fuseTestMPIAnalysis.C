@@ -31,7 +31,7 @@ void FuseMPIInit(int argc, char** argv) {
   // When compiling fuse ROSE_PREFIX is defined as -DROSE_PREFIX="\"${top_builddir}\"" which
   // is top of the build tree
   // If fuse fails to find fuseLayout set up this environment variable appropriately. 
-  setenv("SIGHT_LAYOUT_EXEC", (txt()<<ROSE_PREFIX<<"/projects/fuse/src/fuseLayout").c_str(), 1);
+  // setenv("SIGHT_LAYOUT_EXEC", (txt()<<ROSE_PREFIX<<"/projects/fuse/src/fuseLayout").c_str(), 1);
 
   int flag = false;
   MPI_Initialized(&flag); assert(flag);

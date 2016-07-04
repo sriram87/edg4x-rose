@@ -15,7 +15,11 @@ using namespace sight;
 using namespace boost;
 namespace fuse
 {
-DEBUG_LEVEL(composerDebugLevel, 0);
+#define composerDebugLevel 0
+#if composerDebugLevel == 0
+  #define DISABLE_SIGHT
+#endif
+
 
 //--------------------
 //----- Composer -----
@@ -223,8 +227,8 @@ bool Composer::HavocNodeState(ComposedAnalysis* client, PartEdgePtr pedge) {
 //! the MemLocObjectPtr
 //!
 bool Composer::HavocMLValue(MemLocObjectPtr ml, std::map<PartEdgePtr, std::vector<Lattice*> >& dfInfo) {
-  scope reg(txt() << "Composer::HavocMLValue(" << ml->str() << ")", scope::medium,
-            attrGE("composerDebugLevel", 2));  
+  SIGHT_VERB_DECL(scope, (txt() << "Composer::HavocMLValue(" << ml->str() << ")", scope::medium),
+                  2, composerDebugLevel)
   map<PartEdgePtr, vector<Lattice*> >::iterator mIt = dfInfo.begin();
   for( ; mIt != dfInfo.end(); ++mIt) {
     vector<Lattice*>& lats = mIt->second;
@@ -235,9 +239,7 @@ bool Composer::HavocMLValue(MemLocObjectPtr ml, std::map<PartEdgePtr, std::vecto
     }
   }
 
-  if(composerDebugLevel() >= 2) {
-    dbg << "dfInfo After:" << NodeState::str(dfInfo) << endl;
-  }
+  SIGHT_VERB(dbg << "dfInfo After:" << NodeState::str(dfInfo) << endl, 2, composerDebugLevel)
 }
 
 MemLocObjectPtr PointerExpr2MemLoc(SgExpression* expr, ComposedAnalysis* client, PartEdgePtr pedge, Composer* composer) {
@@ -492,7 +494,8 @@ RetType ChainComposer::callServerAnalysisFunc(
          // Flag that indicates whether the operation's invocation should be logged in detail
          bool verbose) {
   ostringstream label; if(verbose) label<<"ChainComposer::callServerAnalysisFunc() "<<opName<<" #doneAnalyses="<<doneAnalyses.size()<<" client="<<(client? client->str(): "NULL");
-  scope reg(label.str(), scope::medium, attrGE("composerDebugLevel", (verbose? 1: composerDebugLevel()+1)));
+  SIGHT_VERB_DECL(scope, (label.str(), scope::medium), 
+                  (verbose? 1: composerDebugLevel+1), composerDebugLevel)
 //          attrGE("composerDebugLevel", 1));
   assert(doneAnalyses.size()>0);
   //assert(serverCache.find(client) != serverCache.end());
@@ -640,7 +643,7 @@ RetType ChainComposer::callServerAnalysisFunc(
 template<class RetPtrType, class UnionRetType>
 boost::shared_ptr<UnionRetType> unionAbstractObjects(std::list<RetPtrType> objects) {
   boost::shared_ptr<UnionRetType> ret = boost::make_shared<UnionRetType>(objects);
-  if(composerDebugLevel()>=1) dbg << ret->str()<<endl;
+  SIGHT_VERB(dbg << ret->str()<<endl, 1, composerDebugLevel)
   return ret;
 }
 
@@ -661,18 +664,18 @@ UnionRetPtrType ChainComposer::OperandExpr2Any
                       // Returns a string representation of the result of the operation
                       function<string (RetPtrType, string)> ret2Str)
 {
-  scope reg(txt()<<"ChainComposer::Operand"<<OpName, scope::medium, attrGE("composerDebugLevel", 2));
-  if(composerDebugLevel()>=2) dbg << "n="<<SgNode2Str(n)<<endl << "operand("<<operand<<")="<<SgNode2Str(operand)<<endl << "pedge="<<pedge->str()<<endl;
+  SIGHT_VERB_DECL(scope, (txt()<<"ChainComposer::Operand"<<OpName, scope::medium), 
+                  2, composerDebugLevel)
+    SIGHT_VERB(dbg << "n="<<SgNode2Str(n)<<endl << "operand("<<operand<<")="<<SgNode2Str(operand)<<endl << "pedge="<<pedge->str()<<endl, 2, composerDebugLevel)
   
   // Get the parts of the execution prefixes that terminate at the operand before continuing directly 
   // to SgNode n in the given part
   list<PartEdgePtr> opPartEdges = pedge->getOperandPartEdge(n, operand);
-  if(composerDebugLevel()>=2) {
+  SIGHT_VERB_IF(2, composerDebugLevel)
     dbg << "opPartEdges(#"<<opPartEdges.size()<<")="<<endl;
     for(list<PartEdgePtr>::iterator opE=opPartEdges.begin(); opE!=opPartEdges.end(); opE++) {
-      indent ind;
-      dbg << (*opE)->str()<<endl;
-    }
+      SIGHT_VERB(dbg << (*opE)->str()<<endl, 2, composerDebugLevel)
+  SIGHT_VERB_FI()
   }
   
   // The MemRegionObjects that represent the operand within different Parts in opParts
@@ -681,14 +684,12 @@ UnionRetPtrType ChainComposer::OperandExpr2Any
   // Iterate over all the part edges to get the expression and memory MemRegionObjects for operand within those parts
   for(list<PartEdgePtr>::iterator opE=opPartEdges.begin(); opE!=opPartEdges.end(); opE++) {
     RetPtrType p = callOp(*opE, client);
-    if(composerDebugLevel()>=2) {
-      dbg << "opE="<<opE->get()->str()<<endl;
-      dbg << "p="<<ret2Str(p, "")<<endl;
-    }
+    SIGHT_VERB(dbg << "opE="<<opE->get()->str()<<endl, 2, composerDebugLevel)
+    SIGHT_VERB(dbg << "p="<<ret2Str(p, "")<<endl, 2, composerDebugLevel)    
     partObjects.push_back(p);
   }
 
-  scope reg2("Returning", scope::low, attrGE("composerDebugLevel", 1));
+  SIGHT_VERB_DECL(scope, ("Returning", scope::low), 1, composerDebugLevel)
   if(opPartEdges.size()>0) {
     // Return the union of all the objects
     return unionOp(partObjects);
@@ -1249,8 +1250,10 @@ void ChainComposer::runAnalysis()
     //trace opTimesT("OpTimes", contextAttrs, trace::showEnd, trace::boxplot);
     
     currentAnalysis = *a;
-    ostringstream label; if(composerDebugLevel()>=1) label << "ChainComposer Running Analysis "<<i<<": "<<(*a)<<" : "<<(*a)->str("");
-    scope reg(label.str(), scope::high, attrGE("composerDebugLevel", 1));
+    ostringstream label; 
+    SIGHT_VERB(label << "ChainComposer Running Analysis "<<i<<": "<<(*a)<<" : "<<(*a)->str(""), 1, composerDebugLevel)
+      SIGHT_VERB_DECL(scope, (label.str(), scope::high),
+                      1, composerDebugLevel)
     //scope s(txt()<<"Analysis "<<i<<": "<<currentAnalysis<<" : "<<currentAnalysis->str(""), scope::medium);
     //cout << "ChainComposer Analysis "<<i<<": "<<currentAnalysis<<" : "<<currentAnalysis->str("") << endl;
     
@@ -1259,12 +1262,13 @@ void ChainComposer::runAnalysis()
     if(doneAnalyses.size()==1) queryInfo[currentAnalysis] = CCQueryServers(doneAnalyses.back());
     else                       queryInfo[currentAnalysis] = CCQueryServers(queryInfo[doneAnalyses.back()], doneAnalyses.back());
     
-    if(doneAnalyses.size()>0 && composerDebugLevel()>=1) {
+    if(doneAnalyses.size()>0) {
       set<PartPtr> startStates = GetStartAStates(currentAnalysis);
       set<PartPtr> endStates   = GetEndAStates(currentAnalysis);
-      ostringstream fName; fName << "ats." << i << "." << doneAnalyses.back()->str();
-      ats2dot(fName.str(), "ATS", startStates, endStates);
-      ats2dot_bw(fName.str()+".BW", "ATS", startStates, endStates);
+
+        ostringstream fName; fName << "ats." << i << "." << doneAnalyses.back()->str();
+        SIGHT_VERB(ats2dot(fName.str(), "ATS", startStates, endStates), 1, composerDebugLevel)
+        SIGHT_VERB(ats2dot_bw(fName.str()+".BW", "ATS", startStates, endStates), 1, composerDebugLevel)
     }
     
     struct timeval start, end;
@@ -1307,20 +1311,20 @@ void ChainComposer::runAnalysis()
     if(doneAnalyses.size()==1) queryInfo[testAnalysis] = CCQueryServers(doneAnalyses.back());
     else                       queryInfo[testAnalysis] = CCQueryServers(queryInfo[doneAnalyses.back()], doneAnalyses.back());
 
-    if(doneAnalyses.size()>1 && composerDebugLevel()>=1) {
+    if(doneAnalyses.size()>1) {
       set<PartPtr> startStates = GetStartAStates(doneAnalyses.back());
-      dbg << "ChainComposer::runAnalysis() #startStates="<<startStates.size()<<endl;
+      SIGHT_VERB(dbg << "ChainComposer::runAnalysis() #startStates="<<startStates.size()<<endl, 1, composerDebugLevel)
       set<PartPtr> endStates   = GetEndAStates(*(allAnalyses.begin()));
       ostringstream fName; fName << "ats." << i << "." << doneAnalyses.back()->str();
-      ats2dot(fName.str(), "ATS", startStates, endStates);
-      ats2dot_bw(fName.str()+".BW", "ATS", startStates, endStates);
+      SIGHT_VERB(ats2dot(fName.str(), "ATS", startStates, endStates), 1, composerDebugLevel)
+      SIGHT_VERB(ats2dot_bw(fName.str()+".BW", "ATS", startStates, endStates), 1, composerDebugLevel)
     }
     
     /*list<string> contextAttrs;
     contextAttrs.push_back("ReqType");
     trace opTimesT("OpTimes", contextAttrs, trace::showEnd, trace::boxplot);*/
     
-    scope s("---", scope::high, attrGE("composerDebugLevel", 1));
+    SIGHT_VERB_DECL(scope, ("---", scope::high), 1, composerDebugLevel)
     //UnstructuredPassInterDataflow inter_up(testAnalysis);
     /*ContextInsensitiveInterProceduralDataflow inter_up(testAnalysis, getCallGraph());
     inter_up.runAnalysis();*/
@@ -1672,11 +1676,12 @@ void LooseParallelComposer::runAnalysis()
   // Run all the analyses without any interactions between them
   int i=1;
   for(list<ComposedAnalysis*>::iterator a=allAnalyses.begin(); a!=allAnalyses.end(); a++, i++) {
-    scope reg(txt()<< "LooseParallelComposer Running Analysis "<<i<<": "<<(*a)->str(""), scope::high, attrGE("composerDebugLevel", 1));
+    SIGHT_VERB_DECL(scope, (txt()<< "LooseParallelComposer Running Analysis "<<i<<": "<<(*a)->str(""), scope::high), 
+                    1, composerDebugLevel)
     
     (*a)->runAnalysis();
     
-    dbg << "<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< Analysis finished" << endl;
+    SIGHT_VERB(dbg << "<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< Analysis finished" << endl, 1, composerDebugLevel)
     
     /*if(composerDebugLevel() >= 3) {
       scope reg(Final State", scope::medium, attrGE("composerDebugLevel", 3));
@@ -1707,14 +1712,15 @@ ValueObjectPtr   LooseParallelComposer::Expr2Val(SgNode* n, PartEdgePtr pedge)
   list<ValueObjectPtr> vals;
   
   for(list<ComposedAnalysis*>::iterator a=allAnalyses.begin(); a!=allAnalyses.end(); a++) {
-    scope reg(txt()<<"Expr2Val  : " << (*a)->str(""), scope::medium, attrGE("composerDebugLevel", 1));
+    SIGHT_VERB_DECL(scope, (txt()<<"Expr2Val  : " << (*a)->str(""), scope::medium),
+                    1, composerDebugLevel)
     
     try {
       ValueObjectPtr val = (*a)->Expr2Val(n, getEdgeForAnalysis(pedge, *a));
-      dbg << "Returning "<<val->str("")<<endl;
+      SIGHT_VERB(dbg << "Returning "<<val->str("")<<endl, 1, composerDebugLevel)
       vals.push_back(val);
     } catch (NotImplementedException exc) {
-      if(composerDebugLevel()>=1) dbg << "&nbsp;&nbsp;&nbsp;&nbsp;Expr2Val() Not Implemented."<<endl;
+      SIGHT_VERB(dbg << "&nbsp;&nbsp;&nbsp;&nbsp;Expr2Val() Not Implemented."<<endl, 1, composerDebugLevel)
       // If control reaches here then the current analysis must not implement 
       // this method so we ask the remaining analyses
       continue;
@@ -1734,14 +1740,15 @@ CodeLocObjectPtr LooseParallelComposer::Expr2CodeLoc(SgNode* n, PartEdgePtr pedg
   list<CodeLocObjectPtr> cls;
   
   for(list<ComposedAnalysis*>::iterator a=allAnalyses.begin(); a!=allAnalyses.end(); a++) {
-    scope reg(txt()<<"Expr2CodeLoc  : " << (*a)->str(""), scope::medium, attrGE("composerDebugLevel", 1));
+    SIGHT_VERB_DECL(scope, (txt()<<"Expr2CodeLoc  : " << (*a)->str(""), scope::medium),
+                    1, composerDebugLevel)
 
     try {
       CodeLocObjectPtr cl = (*a)->Expr2CodeLoc(n, getEdgeForAnalysis(pedge, *a));
-      if(composerDebugLevel() >= 1) dbg << "Returning "<<cl->str("")<<endl;
+      SIGHT_VERB(dbg << "Returning "<<cl->str("")<<endl, 1, composerDebugLevel)
       cls.push_back(cl);
     } catch (NotImplementedException exc) {
-      if(composerDebugLevel()>=1) dbg << "&nbsp;&nbsp;&nbsp;&nbsp;Expr2CodeLoc() Not Implemented."<<endl;
+      SIGHT_VERB(dbg << "&nbsp;&nbsp;&nbsp;&nbsp;Expr2CodeLoc() Not Implemented."<<endl, 1, composerDebugLevel)
       // If control reaches here then the current analysis must not implement 
       // this method so we ask the remaining analyses
       continue;
@@ -1762,14 +1769,15 @@ MemRegionObjectPtr  LooseParallelComposer::Expr2MemRegion(SgNode* n, PartEdgePtr
   list<MemRegionObjectPtr> mrs;
   
   for(list<ComposedAnalysis*>::iterator a=allAnalyses.begin(); a!=allAnalyses.end(); a++) {
-    scope reg(txt()<<"Expr2MemRegion  : " << (*a)->str(""), scope::medium, attrGE("composerDebugLevel", 1));
+    SIGHT_VERB_DECL(scope, (txt()<<"Expr2MemRegion  : " << (*a)->str(""), scope::medium),
+                    1, composerDebugLevel)
     
     try {
       MemRegionObjectPtr mr = (*a)->Expr2MemRegion(n, getEdgeForAnalysis(pedge, *a));
-      if(composerDebugLevel() >= 1) { dbg << "Returning "<<mr->str("")<<endl; }
+      SIGHT_VERB(dbg << "Returning "<<mr->str("")<<endl, 1, composerDebugLevel)
       mrs.push_back(mr);
     } catch (NotImplementedException exc) {
-      if(composerDebugLevel()>=1) dbg << "&nbsp;&nbsp;&nbsp;&nbsp;Expr2MemRegion() Not Implemented."<<endl;
+      SIGHT_VERB(dbg << "&nbsp;&nbsp;&nbsp;&nbsp;Expr2MemRegion() Not Implemented."<<endl, 1, composerDebugLevel)
       // If control reaches here then the current analysis must not implement 
       // this method so we ask the remaining analyses
       continue;
@@ -1787,14 +1795,15 @@ MemLocObjectPtr  LooseParallelComposer::Expr2MemLoc(SgNode* n, PartEdgePtr pedge
   list<MemLocObjectPtr> mls;
   
   for(list<ComposedAnalysis*>::iterator a=allAnalyses.begin(); a!=allAnalyses.end(); a++) {
-    scope reg(txt()<<"Expr2MemLoc  : " << (*a)->str(""), scope::medium, attrGE("composerDebugLevel", 1));
+    SIGHT_VERB_DECL(scope, (txt()<<"Expr2MemLoc  : " << (*a)->str(""), scope::medium),
+                    1, composerDebugLevel)
     
     try {
       MemLocObjectPtr ml = (*a)->Expr2MemLoc(n, getEdgeForAnalysis(pedge, *a));
-      if(composerDebugLevel() >= 1) { dbg << "Returning "<<ml->str("")<<endl; }
+      SIGHT_VERB(dbg << "Returning "<<ml->str("")<<endl, 1, composerDebugLevel)
       mls.push_back(ml);
     } catch (NotImplementedException exc) {
-      if(composerDebugLevel()>=1) dbg << "&nbsp;&nbsp;&nbsp;&nbsp;Expr2MemLoc() Not Implemented."<<endl;
+      SIGHT_VERB(dbg << "&nbsp;&nbsp;&nbsp;&nbsp;Expr2MemLoc() Not Implemented."<<endl, 1, composerDebugLevel)
       // If control reaches here then the current analysis must not implement 
       // this method so we ask the remaining analyses
       continue;
@@ -1978,7 +1987,7 @@ set<PartPtr> LooseParallelComposer::GetStartOrEndAStates_Spec(callStartOrEndASta
   // that at least one implements or if we don't yet know if any do
   if(subAnalysesImplementPartitions==True || subAnalysesImplementPartitions==Unknown) {
     for(list<ComposedAnalysis*>::iterator a=allAnalyses.begin(); a!=allAnalyses.end(); a++) {
-      scope reg(txt()<<funcName<<"  : " << (*a)->str(""), scope::medium, attrGE("composerDebugLevel", 1));
+      SIGHT_VERB_DECL(scope, (txt()<<funcName<<"  : " << (*a)->str(""), scope::medium), 1, composerDebugLevel)
 
       try {
         //set<PartPtr> curParts = (*a)->GetEndAStates();
@@ -2023,7 +2032,7 @@ set<PartPtr> LooseParallelComposer::GetStartOrEndAStates_Spec(callStartOrEndASta
           // Parts in curParts will not be included in the intersection and we don't need to do anything to ensure this.
         }
       } catch (NotImplementedException exc) {
-        if(composerDebugLevel()>=1) dbg << "&nbsp;&nbsp;&nbsp;&nbsp;"<<funcName<<"() Not Implemented."<<endl;
+        SIGHT_VERB(dbg << "&nbsp;&nbsp;&nbsp;&nbsp;"<<funcName<<"() Not Implemented."<<endl, 1, composerDebugLevel)
         // If control reaches here then the current analysis must not implement 
         // this method so we ask the remaining analyses
         continue;
@@ -2043,17 +2052,15 @@ set<PartPtr> LooseParallelComposer::GetStartOrEndAStates_Spec(callStartOrEndASta
   } else {
     assert(intersection.size()>0);
     
-    if(composerDebugLevel() >= 1) {
-      dbg << "Returning ";
+    SIGHT_VERB_IF(1, composerDebugLevel)
+      SIGHT_VERB(dbg << "Returning ", 1, composerDebugLevel)
       for(map<PartPtr, map<ComposedAnalysis*, PartPtr> >::iterator i=intersection.begin(); i!=intersection.end(); i++) {
-        indent ind();
-        dbg << "Parent: "<<i->first.get()->str()<<endl;
+        SIGHT_VERB(dbg << "Parent: "<<i->first.get()->str()<<endl, 1, composerDebugLevel)
         for(map<ComposedAnalysis*, PartPtr>::iterator j=i->second.begin(); j!=i->second.end(); j++) {
-          indent ind();
-          dbg << j->first->str() << " =&gt; " << j->second->str() << endl;
+          SIGHT_VERB(dbg << j->first->str() << " =&gt; " << j->second->str() << endl, 1, composerDebugLevel)
         }
       }
-    }
+    SIGHT_VERB_FI()
     
     // Convert all the Parts in parts into IntersectionParts to match the result of 
     set<PartPtr> interParts;

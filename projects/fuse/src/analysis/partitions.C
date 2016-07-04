@@ -7,7 +7,10 @@ using namespace sight;
 
 namespace fuse {
 
-DEBUG_LEVEL(partitionsDebugLevel, 0);
+#define partitionsDebugLevel 0
+#if partitionsDebugLevel==0
+#define DISABLE_SIGHT
+#endif
 
 /* #########################
    ##### Remap Functor #####
@@ -100,7 +103,7 @@ void MLRemapper::init(const PartEdgePtr pedge, ComposedAnalysis* client)
       }
     }
   }
-  if(partitionsDebugLevel()>=2) dbg << "MLRemapper::init"<<endl<<str() <<endl;
+  SIGHT_VERB(dbg << "MLRemapper::init"<<endl<<str() <<endl, 2, partitionsDebugLevel)
 }
 
 // Given a lattice returns a freshly-allocated Lattice object that points to Lattice remapped in the forward direction
@@ -241,13 +244,12 @@ void setArgParamMap(PartEdgePtr callEdge, SgFunctionCallExp* call,
                     Composer* composer, ComposedAnalysis* client,
                     bool fw)
 {
-  scope reg("setArgParamMap", scope::medium, attrGE("partitionsDebugLevel", 1));
+  SIGHT_VERB_DECL(scope, ("setArgParamMap", scope::medium), 1, partitionsDebugLevel)
   Function func(call);
-  if(partitionsDebugLevel()>=1) {
-    dbg << "call="<<SgNode2Str(call)<<endl;
-    dbg << "callEdge="<<callEdge->str()<<endl;
-  }
-  
+
+  SIGHT_VERB(dbg << "call="<<SgNode2Str(call)<<endl, 1, partitionsDebugLevel)
+  SIGHT_VERB(dbg << "callEdge="<<callEdge->str()<<endl, 1, partitionsDebugLevel)
+    
   PartPtr callPart = callEdge->source();
   PartPtr funcStartPart = callEdge->target();
   
@@ -304,11 +306,11 @@ void setArgParamMap(PartEdgePtr callEdge, SgFunctionCallExp* call,
       itA!=args.end() && itP!=params.end(); 
       itA++, itP++)
   {
-    scope iter("iter", scope::low, attrGE("partitionsDebugLevel", 1));
-    if(partitionsDebugLevel()>=1) {
-      dbg << "itA="<<SgNode2Str(*itA)<<endl;
-      dbg << "itP="<<SgNode2Str(*itP)<<endl;
-    }
+    SIGHT_VERB_DECL(scope, ("iter", scope::low), 1, partitionsDebugLevel)
+
+    SIGHT_VERB(dbg << "itA="<<SgNode2Str(*itA)<<endl, 1, partitionsDebugLevel)
+    SIGHT_VERB(dbg << "itP="<<SgNode2Str(*itP)<<endl, 1, partitionsDebugLevel)
+
     SgType* typeParam = (*itP)->get_type();
     
     // Skip "..." types, which are used to specify VarArgs.
@@ -343,7 +345,8 @@ void setArgByRef2ParamMap(PartEdgePtr callEdge, SgFunctionCallExp* call,
                           std::set<MLMapping>& paramArgByRef2ParamMap,
                           Composer* composer, ComposedAnalysis* client)
 {
-  scope reg("setArgByRef2ParamMap", scope::medium, attrGE("partitionsDebugLevel", 1));
+  SIGHT_VERB_DECL(scope, ("setArgByRef2ParamMap", scope::medium),
+                  1, partitionsDebugLevel)
   std::set<CFGNode> exitNodes;
   assert(callEdge->source()->mustFuncExit(exitNodes));
   // For now we can only handle 1 CFGNode per Part
@@ -353,7 +356,7 @@ void setArgByRef2ParamMap(PartEdgePtr callEdge, SgFunctionCallExp* call,
   
   PartPtr callPart = callEdge->source();
   PartPtr funcStartPart = callEdge->target();
-  if(partitionsDebugLevel()>=1) dbg << "callEdge="<<callEdge->str()<<endl;
+  SIGHT_VERB(dbg << "callEdge="<<callEdge->str()<<endl, 1, partitionsDebugLevel)
   
   // Part that corresponds to the function, which for now is set to be the start of its definition
   //PartPtr funcStartPart = client->getComposer()->GetFunctionStartPart(func, client);
@@ -373,11 +376,12 @@ void setArgByRef2ParamMap(PartEdgePtr callEdge, SgFunctionCallExp* call,
       itParams!=params->end() && itArgs!=args.end(); 
       itParams++, itArgs++)
   {
-    scope iter("iter", scope::low, attrGE("partitionsDebugLevel", 1));
-    if(partitionsDebugLevel()>=1) {
-      dbg << "itArgs="<<SgNode2Str(*itArgs)<<endl;
-      dbg << "itParams="<<SgNode2Str(*itParams)<<endl;
-    }
+    SIGHT_VERB_DECL(scope, ("iter", scope::low),
+                    1, partitionsDebugLevel)
+
+    SIGHT_VERB(dbg << "itArgs="<<SgNode2Str(*itArgs)<<endl, 1, partitionsDebugLevel)
+    SIGHT_VERB(dbg << "itParams="<<SgNode2Str(*itParams)<<endl, 1, partitionsDebugLevel)
+
     SgType* typeParam = (*itParams)->get_type();
     
     // Skip "..." types, which are used to specify VarArgs.
@@ -864,11 +868,12 @@ std::list<PartEdgePtr> PartEdge::getOperandPartEdge(SgNode* anchor, SgNode* oper
   // The target of this edge identifies the termination point of all the execution prefixes
   // denoted by this edge. We thus use it to query for the parts of the operands and only both
   // if this part is itself live.
-  scope reg("PartEdge::getOperandPartEdge()", scope::medium, attrGE("partitionsDebugLevel", 2));
-  if(partitionsDebugLevel()>=2) {
-    dbg << "anchor="<<SgNode2Str(anchor)<<" operand="<<SgNode2Str(operand)<<endl;
-    dbg << "this PartEdge="<<str()<<endl;
-  }
+  SIGHT_VERB_DECL(scope, ("PartEdge::getOperandPartEdge()", scope::medium),
+                  2, partitionsDebugLevel)
+
+  SIGHT_VERB(dbg << "anchor="<<SgNode2Str(anchor)<<" operand="<<SgNode2Str(operand)<<endl, 2, partitionsDebugLevel)
+  SIGHT_VERB(dbg << "this PartEdge="<<str()<<endl, 2, partitionsDebugLevel)
+  
   
   std::list<PartEdgePtr> baseEdges = getParent()->getOperandPartEdge(anchor, operand);
   // Convert the list of edges into a set for easier/faster lookups
@@ -876,11 +881,12 @@ std::list<PartEdgePtr> PartEdge::getOperandPartEdge(SgNode* anchor, SgNode* oper
   for(list<PartEdgePtr>::iterator be=baseEdges.begin(); be!=baseEdges.end(); be++)
     baseEdgesSet.insert(*be);
   
-  if(partitionsDebugLevel()>=2) {
-    scope regBE("baseOperandEdges", scope::medium, attrGE("partitionsDebugLevel", 2));
+  SIGHT_VERB_IF(2, partitionsDebugLevel)
+    SIGHT_VERB_DECL(scope, ("baseOperandEdges", scope::medium),
+                    2, partitionsDebugLevel)
     for(list<PartEdgePtr>::iterator be=baseEdges.begin(); be!=baseEdges.end(); be++)
-      dbg << be->get()->str();
-  }
+      SIGHT_VERB(dbg << be->get()->str(), 2, partitionsDebugLevel)
+  SIGHT_VERB_FI()
     
   std::list<PartEdgePtr> ccsOperandEdges;
   bw_dataflowPartEdgeIterator it;
@@ -896,18 +902,18 @@ std::list<PartEdgePtr> PartEdge::getOperandPartEdge(SgNode* anchor, SgNode* oper
   for(std::list<PartEdgePtr>::iterator o=out.begin(); o!=out.end(); o++)
     it.add(*o);*/
   
-  if(partitionsDebugLevel()>=2) dbg << "it="<<it.str()<<endl;
-  scope regBE("Backward search", scope::medium, attrGE("partitionsDebugLevel", 2));
+  SIGHT_VERB(dbg << "it="<<it.str()<<endl, 2, partitionsDebugLevel)
+  SIGHT_VERB_DECL(scope, ("Backward search", scope::medium), 2, partitionsDebugLevel)
   
   // Walk backwards through the CCS edges, looking for the most recent CCS edge the parent of which is in list baseEdges
   while(it!=bw_dataflowPartEdgeIterator::end()) {
-    scope reg("Predecessor", scope::low, attrGE("partitionsDebugLevel", 2));
-    if(partitionsDebugLevel()>=2) {
+    SIGHT_VERB_DECL(scope, ("Predecessor", scope::low), 2, partitionsDebugLevel)
+    SIGHT_VERB_IF(2, partitionsDebugLevel)
         dbg << it.getPartEdge().get()->str()<<endl;
         dbg << "pred-parent "<<it.getPartEdge()->getParent()->str()<<", "<<
                "source is "<<(it.getPartEdge()->getParent()->source()==NULLPart? "wildcard": "concrete")<<", "<<
                "target is "<<(it.getPartEdge()->getParent()->target()==NULLPart? "wildcard": "concrete")<<", "<<endl;
-    }
+    SIGHT_VERB_FI()
     
     // If the parent of the current edge is one of the base edges
     bool isOperandEdge = false;
@@ -918,15 +924,16 @@ std::list<PartEdgePtr> PartEdge::getOperandPartEdge(SgNode* anchor, SgNode* oper
       // Look it up in baseEdges using a linear lookup that is sensitive to wildcards (this case should be 
       // rare enough that we don't optimize for it).
       for(list<PartEdgePtr>::iterator be=baseEdges.begin(); be!=baseEdges.end(); be++) {
-        if(partitionsDebugLevel()>=3) {
-          scope sbe(txt()<<"baseEdge="<<be->get()->str(), scope::low, attrGE("partitionsDebugLevel", 3));
+        SIGHT_VERB_IF(3, partitionsDebugLevel)
+          SIGHT_VERB_DECL(scope, (txt()<<"baseEdge="<<be->get()->str(), scope::low),
+                          3, partitionsDebugLevel)
           dbg << "it.getPartEdge()->getParent()->source()==NULLPart="<<(it.getPartEdge()->getParent()->source()==NULLPart)<<", "<<
                  "it.getPartEdge()->getParent()->target()==(*be)->target()="<<(it.getPartEdge()->getParent()->target()==(*be)->target())<<", "<<
                  "it.getPartEdge()->getParent()->target()==NULLPart="<<(it.getPartEdge()->getParent()->target()==NULLPart)<<", "<<
                  "it.getPartEdge()->getParent()->source()==(*be)->source()="<<(it.getPartEdge()->getParent()->source()==(*be)->source())<<endl;
           dbg << "it.getPartEdge()->getParent()->source()="<<it.getPartEdge()->getParent()->source()->str()<<endl;
           dbg << "(*be)->source()="<<(*be)->source()->str()<<endl;
-        }
+        SIGHT_VERB_FI()
         
         if((it.getPartEdge()->getParent()->source()==NULLPart &&
             it.getPartEdge()->getParent()->target()==(*be)->target()) ||
@@ -941,12 +948,12 @@ std::list<PartEdgePtr> PartEdge::getOperandPartEdge(SgNode* anchor, SgNode* oper
       isOperandEdge = (baseEdgesSet.find(it.getPartEdge()->getParent()) != baseEdgesSet.end());
     
     if(isOperandEdge) {
-      if(partitionsDebugLevel()>=2) dbg << "    Predecessor is an Operand edge."<<endl;
+      SIGHT_VERB(dbg << "    Predecessor is an Operand edge."<<endl, 2, partitionsDebugLevel)
       // Add it to the operand edges
       ccsOperandEdges.push_back(it.getPartEdge());
     // Otherwise, keep searching backward
     } else {
-      if(partitionsDebugLevel()>=2) dbg << "    Not an Operand edge. Moving on..."<<endl;
+      SIGHT_VERB(dbg << "    Not an Operand edge. Moving on..."<<endl, 2, partitionsDebugLevel)
       it.pushAllDescendants();
     }
     it++;

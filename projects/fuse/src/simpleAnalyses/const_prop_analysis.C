@@ -403,6 +403,10 @@ struct plain_return_type_2<arithmetic_action<Act>, long double, wchar_t> {
 }
 
 namespace fuse {
+#define cpDebugLevel 0
+#if (cpDebugLevel==0)
+#define DISABLE_SIGHT
+#endif
 DEBUG_LEVEL(constantPropagationAnalysisDebugLevel, 0);
 
 // ************************
@@ -629,17 +633,20 @@ CPValueObject::strp(PartEdgePtr pedge, string indent) const
 //    - if the two objects could not be merged and therefore that must be placed after 
 //       this in the parent CPValueObject's list, return that.
 CPValueObjectPtr CPValueObject::op(SgUnaryOp* op) {
-  scope s(txt()<<"CPValueObject::op(SgUnaryOp "<<SgNode2Str(op)<<")", scope::medium, attrGE("constantPropagationAnalysisDebugLevel", 1));
-  if(constantPropagationAnalysisDebugLevel()>=1) dbg << "this="<<str()<<endl;
+  ostringstream label;
+  label << "CPValueObject::op(SgUnaryOp "<<SgNode2Str(op)<<")";
+  SIGHT_VERB_DECL(scope, (label.str(), scope::medium), 1, cpDebugLevel)
+  SIGHT_VERB(dbg << "this="<<str()<<endl, 1, cpDebugLevel)
   return boost::make_shared<CPValueObject>(kind->op(op), getPartEdge());
 }
 
 CPValueObjectPtr CPValueObject::op(SgBinaryOp* op, CPValueObjectPtr that) {
-  scope s(txt()<<"CPValueObject::op(SgBinaryOp "<<SgNode2Str(op)<<")", scope::medium, attrGE("constantPropagationAnalysisDebugLevel", 1));
-  if(constantPropagationAnalysisDebugLevel()>=1) {
-    dbg << "this="<<str()<<endl;
-    dbg << "that="<<(that? that->str(): "NULL")<<endl;
-  }
+  ostringstream label;
+  label << "CPValueObject::op(SgBinaryOp "<<SgNode2Str(op)<<")";
+  SIGHT_VERB_DECL(scope, (label.str(), scope::medium), 1, cpDebugLevel)
+  SIGHT_VERB(dbg << "this="<<str()<<endl, 1, cpDebugLevel)
+  SIGHT_VERB(dbg << "that="<<(that? that->str(): "NULL")<<endl, 1, cpDebugLevel)
+
   if(that) return boost::make_shared<CPValueObject>(kind->op(op, that->kind), getPartEdge());
   else     return boost::make_shared<CPValueObject>(kind->op(op, NULLCPValueKind), getPartEdge());
 }
@@ -2558,7 +2565,8 @@ CPValueKindPtr CPOffsetListKind::op(SgBinaryOp* op, CPValueKindPtr that) {
       // ----- Memory References -----
       case V_SgDotExp:
       {
-        scope s("V_SgDotExp", scope::medium, attrGE("constantPropagationAnalysisDebugLevel", 1));
+        SIGHT_VERB_DECL(scope, ("V_SgDotExp", scope::medium),
+                        1, cpDebugLevel)
         // Find the index of the DotExp's RHS within the class of its LHS
         SgClassType *type = isSgClassType(isSgDotExp(op)->get_lhs_operand()->get_type());
         assert(type);
@@ -2615,7 +2623,8 @@ CPValueKindPtr CPOffsetListKind::op(SgBinaryOp* op, CPValueKindPtr that) {
     
       case V_SgPntrArrRefExp:
       {
-        scope s("V_SgPntrArrRefExp", scope::medium, attrGE("constantPropagationAnalysisDebugLevel", 1));
+        SIGHT_VERB_DECL(scope, ("V_SgPntrArrRefExp", scope::medium),
+                        1, cpDebugLevel)
         assert(thatConcrete);
         
         SgPntrArrRefExp* ref = isSgPntrArrRefExp(op);
@@ -3318,7 +3327,8 @@ std::string CPMemLocObject::str(std::string indent) const { // pretty print for 
 // }
 
 CPValueObjectPtr ConstantPropagationAnalysisTransfer::getLattice(SgExpression *sgn) {
-  scope s("ConstantPropagationAnalysisTransfer::getLattice()", scope::medium, attrGE("constantPropagationAnalysisDebugLevel", 2));
+  SIGHT_VERB_DECL(scope, ("ConstantPropagationAnalysisTransfer::getLattice()", scope::medium),
+                  2, cpDebugLevel)
   MemLocObjectPtr p = composer->Expr2MemLoc(sgn, part->inEdgeFromAny(), analysis);
   // First look up in the constant propagation lattice map
   CPValueObjectPtr cpv_p = boost::dynamic_pointer_cast<CPValueObject>
@@ -3334,40 +3344,40 @@ CPValueObjectPtr ConstantPropagationAnalysisTransfer::getLattice(SgExpression *s
       cpv_p = boost::make_shared<CPValueObject>(vo_p, part->inEdgeFromAny());
     }
   }
-  if(constantPropagationAnalysisDebugLevel() >= 2) 
+  SIGHT_VERB_IF(2, cpDebugLevel)
     dbg << "ML(" << SgNode2Str(sgn) << ")=" << p->str() << ", CPValue=" << cpv_p->str() << endl;
+  SIGHT_VERB_FI()
   return cpv_p;
 }
 
 // Returns a Lattice object that corresponds to the memory location denoted by the given operand of sgn 
 // in the current part
 CPValueObjectPtr ConstantPropagationAnalysisTransfer::getLatticeOperand(SgNode *sgn, SgExpression* operand) {
-  scope s("ConstantPropagationAnalysisTransfer::getLatticeOperand()", 
-          scope::medium, attrGE("constantPropagationAnalysisDebugLevel", 2));    
+  SIGHT_VERB_DECL(scope, ("ConstantPropagationAnalysisTransfer::getLatticeOperand()", scope::medium),
+                  2, cpDebugLevel)
   MemLocObjectPtr p = composer->OperandExpr2MemLoc(sgn, operand, part->inEdgeFromAny(), analysis);
   CPValueObjectPtr cpv_p = boost::dynamic_pointer_cast<CPValueObject>
     (VariableStateTransfer<CPValueObject, ConstantPropagationAnalysis>::getLattice(p));
   assert(cpv_p);
 
-  if(constantPropagationAnalysisDebugLevel() >= 2) {
-    dbg << "cpMap's cpv_p=" << cpv_p->str() << endl;
-  }
+  SIGHT_VERB(dbg << "cpMap's cpv_p=" << cpv_p->str() << endl, 2, cpDebugLevel)
+  
 
   if(!cpv_p->isConcrete()) {
     // If the lattice is uninitialized or unknown,
     // query the composer to check if its concrete
     ValueObjectPtr vo_p = composer->OperandExpr2Val(sgn, operand, part->inEdgeFromAny(), analysis);
-    if(constantPropagationAnalysisDebugLevel() >= 2) {
-      dbg << "Composer's vo_p=" << vo_p->str() << endl;
-    }
-
+    
+    SIGHT_VERB(dbg << "Composer's vo_p=" << vo_p->str() << endl, 2, cpDebugLevel)
+    
     if(vo_p->isConcrete()) {
       // Create a CPValueObject from the generic ValueObject
       cpv_p = boost::make_shared<CPValueObject>(vo_p, part->inEdgeFromAny());
     }
   }
-  if(constantPropagationAnalysisDebugLevel() >= 2) 
+  SIGHT_VERB_IF(2, cpDebugLevel)
     dbg << "ML(" << SgNode2Str(operand) << ")=" << p->str() << ", CPValue=" << cpv_p->str() << endl;
+  SIGHT_VERB_FI()
   return cpv_p;
 }
 
@@ -3376,7 +3386,8 @@ void ConstantPropagationAnalysisTransfer::visit(SgVarRefExp *vref) {
 }
 
 void ConstantPropagationAnalysisTransfer::visit(SgDotExp *dot) {
-  scope s("ConstantPropagationAnalysisTransfer::visit(SgDotExp *dot)", scope::medium, attrGE("constantPropagationAnalysisDebugLevel", 1));
+  SIGHT_VERB_DECL(scope, ("ConstantPropagationAnalysisTransfer::visit(SgDotExp *dot)", scope::medium),
+                  1, cpDebugLevel)
   
   /*assert(dfInfo[NULLPartEdge].size()==2);
   
@@ -3438,7 +3449,7 @@ void ConstantPropagationAnalysisTransfer::visit(SgDotExp *dot) {
   
   // Compute the offset into the region of the core MemLoc that results from the dot expression
   CPValueObjectPtr offset = core->getCPIndex()->op(dot, NULLCPValueObject);
-  if(constantPropagationAnalysisDebugLevel()>=1) dbg << "offset="<<(offset? offset->str(): "NULL")<<endl;
+  SIGHT_VERB(dbg << "offset="<<(offset? offset->str(): "NULL")<<endl, 1, cpDebugLevel)
   
   // Update this node's MemLoc to use the same region as core but with the new offset
   
@@ -3446,13 +3457,14 @@ void ConstantPropagationAnalysisTransfer::visit(SgDotExp *dot) {
   dfInfo[NULLPartEdge][1] = new CPMemLocObject(core->getRegion(), offset, dot, part->inEdgeFromAny(), analysis);
   dbg << "dfInfo[1]="<<dfInfo[NULLPartEdge][1]->str()<<endl;*/
   CPMemLocObjectPtr dotML = boost::make_shared<CPMemLocObject>(core->getRegion(), offset, dot, part->inEdgeFromAny(), analysis);
-  if(constantPropagationAnalysisDebugLevel()>=1) dbg << "dotML="<<(dotML? dotML->str(): "NULL")<<endl;
+  SIGHT_VERB(dbg << "dotML="<<(dotML? dotML->str(): "NULL")<<endl, 1, cpDebugLevel)
   //cl2ml->insert(cl, dotML);
   nodeState.addFact(analysis, 0, new CPMemLocObjectNodeFact(dotML));
 }
 
 void ConstantPropagationAnalysisTransfer::visit(SgPntrArrRefExp *paRef) { 
-  scope s("ConstantPropagationAnalysisTransfer::visit(SgPntrArrRefExp *paRef)", scope::medium, attrGE("constantPropagationAnalysisDebugLevel", 1));
+  SIGHT_VERB_DECL(scope, ("ConstantPropagationAnalysisTransfer::visit(SgPntrArrRefExp *paRef)", scope::medium),
+                  1, cpDebugLevel)
   
   /*assert(dfInfo[NULLPartEdge].size()==2);
   
@@ -3513,7 +3525,8 @@ void ConstantPropagationAnalysisTransfer::visit(SgPntrArrRefExp *paRef) {
 }
 
 void ConstantPropagationAnalysisTransfer::visit(SgBinaryOp *sgn) { 
-  scope s("ConstantPropagationAnalysisTransfer::visit(SgBinaryOp)", scope::medium, attrGE("constantPropagationAnalysisDebugLevel", 1));
+  SIGHT_VERB_DECL(scope, ("ConstantPropagationAnalysisTransfer::visit(SgBinaryOp)", scope::medium),
+                  1, cpDebugLevel)
   
   // Only bother to consider operators with short-circuiting a the end of the operator so that
   // all of its operands precede the operator
@@ -3532,7 +3545,8 @@ void ConstantPropagationAnalysisTransfer::visit(SgBinaryOp *sgn) {
 
 // Unary ops that update the operand
 void ConstantPropagationAnalysisTransfer::visit(SgMinusMinusOp *sgn) { 
-  scope s("ConstantPropagationAnalysisTransfer::visit(SgMinusMinusOp)", scope::medium, attrGE("constantPropagationAnalysisDebugLevel", 1));
+  SIGHT_VERB_DECL(scope, ("ConstantPropagationAnalysisTransfer::visit(SgMinusMinusOp)", scope::medium),
+                  1, cpDebugLevel)
   
   CPValueObjectPtr arg1Lat;//, arg2Lat;//, resLat_tmp;
   getLattices(sgn, arg1Lat);//, arg2Lat);//, resLat_tmp);
@@ -3543,7 +3557,8 @@ void ConstantPropagationAnalysisTransfer::visit(SgMinusMinusOp *sgn) {
 }
 
 void ConstantPropagationAnalysisTransfer::visit(SgPlusPlusOp *sgn) { 
-  scope s("ConstantPropagationAnalysisTransfer::visit(SgPlusPlusOp)", scope::medium, attrGE("constantPropagationAnalysisDebugLevel", 1));
+  SIGHT_VERB_DECL(scope, ("ConstantPropagationAnalysisTransfer::visit(SgPlusPlusOp)", scope::medium),
+                  1, cpDebugLevel)
   
   CPValueObjectPtr arg1Lat;//, arg2Lat;//, resLat_tmp;
   getLattices(sgn, arg1Lat);//, arg2Lat);//, resLat_tmp);
@@ -3566,21 +3581,23 @@ void ConstantPropagationAnalysisTransfer::visit(SgPlusPlusOp *sgn) {
 
 // Unary ops that do not update the operand
 void ConstantPropagationAnalysisTransfer::visit(SgCastExp *sgn) { 
-  scope s("ConstantPropagationAnalysisTransfer::visit(SgCastExp)", scope::medium, attrGE("constantPropagationAnalysisDebugLevel", 1));
+  SIGHT_VERB_DECL(scope, ("ConstantPropagationAnalysisTransfer::visit(SgCastExp)", scope::medium),
+                  1, cpDebugLevel)
   
   CPValueObjectPtr arg1Lat;//, arg2Lat;//, resLat_tmp;
   getLattices(sgn, arg1Lat);//, arg2Lat);//, resLat_tmp);
   CPValueObjectPtr resLat = arg1Lat->op(sgn);
-  if(constantPropagationAnalysisDebugLevel() >= 2) {
+  SIGHT_VERB_IF(2, cpDebugLevel)
     dbg << "type=" << SgNode2Str(sgn->get_type()) << endl;
     dbg << "resLat=" << resLat->str() << endl;
-  }
+  SIGHT_VERB_FI()
   setLattice(sgn, resLat);
 }
 
 // Unary ops that do not update the operand
 void ConstantPropagationAnalysisTransfer::visit(SgMinusOp *sgn) { 
-  scope s("ConstantPropagationAnalysisTransfer::visit(SgMinusOp)", scope::medium, attrGE("constantPropagationAnalysisDebugLevel", 1));
+  SIGHT_VERB_DECL(scope, ("ConstantPropagationAnalysisTransfer::visit(SgMinusOp)", scope::medium),
+                  1, cpDebugLevel)
   
   CPValueObjectPtr arg1Lat;//, arg2Lat;//, resLat_tmp;
   getLattices(sgn, arg1Lat);//, arg2Lat);//, resLat_tmp);
@@ -3591,7 +3608,8 @@ void ConstantPropagationAnalysisTransfer::visit(SgMinusOp *sgn) {
 
 // Unary ops that do not update the operand
 void ConstantPropagationAnalysisTransfer::visit(SgNotOp *sgn) { 
-  scope s("ConstantPropagationAnalysisTransfer::visit(SgNotOp)", scope::medium, attrGE("constantPropagationAnalysisDebugLevel", 1));
+  SIGHT_VERB_DECL(scope, ("ConstantPropagationAnalysisTransfer::visit(SgNotOp)", scope::medium),
+                  1, cpDebugLevel)
   
   CPValueObjectPtr arg1Lat;//, arg2Lat;//, resLat_tmp;
   getLattices(sgn, arg1Lat);//, arg2Lat);//, resLat_tmp);
@@ -3601,7 +3619,8 @@ void ConstantPropagationAnalysisTransfer::visit(SgNotOp *sgn) {
 }
 
 void ConstantPropagationAnalysisTransfer::visit(SgValueExp *val) {
-  scope reg("ConstantPropagationAnalysisTransfer::visit(SgValExp)", scope::low, attrGE("constantPropagationAnalysisDebugLevel", 1));
+  SIGHT_VERB_DECL(scope, ("ConstantPropagationAnalysisTransfer::visit(SgValExp)", scope::low),
+                  1, cpDebugLevel)
   assert(val);
   
 //prodLat->setToEmpty();
@@ -3630,9 +3649,9 @@ SgExpression* getModExpr(SgExpression* expr) {
 }
 
 void ConstantPropagationAnalysisTransfer::visit(SgFunctionCallExp* sgn) {
-  scope reg(txt() << "visit(SgFunctionCallExp sgn=" << SgNode2Str(sgn) << ")",
-            scope::medium,
-            attrGE("constantPropagationAnalysisDebugLevel", 2));
+  ostringstream label;
+  label << "visit(SgFunctionCallExp sgn=" << SgNode2Str(sgn) << ")";
+  SIGHT_VERB_DECL(scope, (label.str(), scope::medium), 2, cpDebugLevel)
 
   if(Part::isOutgoingFuncCall(cn)) {
     // Check if it has side-effects attribute
@@ -3670,10 +3689,10 @@ void ConstantPropagationAnalysisTransfer::visit(SgFunctionCallExp* sgn) {
           // It could be hiding under cast expr: (int) x
           SgExpression* mexpr = getModExpr(uexpr);           
           ValueObjectPtr val = composer->Expr2Val(mexpr, part->inEdgeFromAny(), analysis);
-          if(constantPropagationAnalysisDebugLevel() >= 2) {
+          SIGHT_VERB_IF(2, cpDebugLevel)
             dbg << "mexpr = " << SgNode2Str(mexpr) << endl;
             dbg << "ValueObject=" << val->str() << endl;
-          }
+          SIGHT_VERB_FI()
           // If the value is concrete add it to the map
           if(val->isConcrete()) {
             CPValueObjectPtr cpval = boost::make_shared<CPValueObject>(val, part->inEdgeFromAny());
@@ -3747,7 +3766,8 @@ CPMemLocObjectPtr ConstantPropagationAnalysis::createBasicCPML(SgNode* n, PartEd
 void ConstantPropagationAnalysis::genInitLattice(PartPtr part, PartEdgePtr pedge, 
                                                  vector<Lattice*>& initLattices)
 {
-  scope sEdge("genInitLattice", scope::medium, attrGE("constantPropagationAnalysisDebugLevel", 2));
+  SIGHT_VERB_DECL(scope, ("genInitLattice", scope::medium),
+                  2, cpDebugLevel)
   
   AbstractObjectMap* ml2val = new AbstractObjectMap(boost::make_shared<CPValueObject>(pedge),
                                                     pedge,
@@ -3813,14 +3833,16 @@ ConstantPropagationAnalysis::getTransferVisitor(PartPtr part, CFGNode cn, NodeSt
 }
 
 ValueObjectPtr ConstantPropagationAnalysis::Expr2Val(SgNode* n, PartEdgePtr pedge) {
-  scope s(txt()<<"ConstantPropagationAnalysis::Expr2Val(n="<<SgNode2Str(n)
-          <<", pedge="<<pedge->str()<<")", 
-          scope::medium, attrGE("constantPropagationAnalysisDebugLevel", 1));
+  ostringstream label;
+  label << "ConstantPropagationAnalysis::Expr2Val(n="<<SgNode2Str(n)
+        <<", pedge="<<pedge->str()<<")";
+  SIGHT_VERB_DECL(scope, (label.str(), scope::medium),
+                  1, cpDebugLevel)
 
   MemLocObjectPtr ml = getComposer()->Expr2MemLoc(n, pedge, this);
-  if(constantPropagationAnalysisDebugLevel() >= 1) {
-    dbg << "ml=" << (ml? ml->str(): NULL) << endl;
-  }
+
+  SIGHT_VERB(dbg << "ml=" << (ml? ml->str(): NULL) << endl, 1, cpDebugLevel)
+
 
   NodeState* state;
   Lattice* latticeMap;
@@ -3839,9 +3861,9 @@ ValueObjectPtr ConstantPropagationAnalysis::Expr2Val(SgNode* n, PartEdgePtr pedg
   else if(pedge->source()) {
     state = NodeState::getNodeState(this, pedge->source());
     assert(state);
-    if(constantPropagationAnalysisDebugLevel() >= 2) {
-      dbg << "state=" << state->str() << endl;
-    }
+
+    SIGHT_VERB(dbg << "state=" << state->str() << endl, 2, cpDebugLevel)
+
     // for backward flow has dataflow info is below this node
     latticeMap = state->getLatticeBelow(this, pedge, 0);
   }
@@ -3853,9 +3875,9 @@ ValueObjectPtr ConstantPropagationAnalysis::Expr2Val(SgNode* n, PartEdgePtr pedg
 
   CPValueObjectPtr cpVal = boost::dynamic_pointer_cast<CPValueObject>(cpMap->get(ml));
   assert(cpVal);
-  if(constantPropagationAnalysisDebugLevel()>=1) {
-    dbg << "cpMap's cpVal=" << cpVal->str() << endl;
-  }
+
+  SIGHT_VERB(dbg << "cpMap's cpVal=" << cpVal->str() << endl, 1, cpDebugLevel)
+
 
   if(cpVal->isFullV(pedge)) {
     ValueObjectPtr val = composer->Expr2Val(n, pedge, this);
@@ -3863,9 +3885,9 @@ ValueObjectPtr ConstantPropagationAnalysis::Expr2Val(SgNode* n, PartEdgePtr pedg
       cpVal = boost::make_shared<CPValueObject>(val, pedge);
     }
 
-    if(constantPropagationAnalysisDebugLevel() >= 1) {
-      dbg << "Composer's cpVal=" << cpVal->str() << endl;
-    }
+
+    SIGHT_VERB(dbg << "Composer's cpVal=" << cpVal->str() << endl, 1, cpDebugLevel)
+
   }
   return cpVal->copyV();
 }
@@ -3976,7 +3998,10 @@ ValueObjectPtr ConstantPropagationAnalysis::Expr2Val(SgNode* n, PartEdgePtr pedg
 // }
 
 MemLocObjectPtr ConstantPropagationAnalysis::Expr2MemLoc(SgNode* n, PartEdgePtr pedge) {
-  scope s(txt()<<"ConstantPropagationAnalysis::Expr2MemLoc(n="<<SgNode2Str(n)<<", pedge="<<pedge->str()<<")", scope::medium, attrGE("constantPropagationAnalysisDebugLevel", 1));
+  ostringstream label;
+  label << "ConstantPropagationAnalysis::Expr2MemLoc(n="<<SgNode2Str(n)<<", pedge="<<pedge->str()<<")";
+  SIGHT_VERB_DECL(scope, (label.str(), scope::medium),
+                  1, cpDebugLevel)
  
   // SgInitializedNames denote entities that are lexically known and thus do not require
   // any special handling by ConstantPropagation Analysis
@@ -4003,25 +4028,29 @@ MemLocObjectPtr ConstantPropagationAnalysis::Expr2MemLoc(SgNode* n, PartEdgePtr 
   }
   
   if(pedge->source()) {
-    scope s(txt()<<"Source: "<<pedge->source()->str(), scope::medium, attrGE("constantPropagationAnalysisDebugLevel", 1));
+    ostringstream label;
+    label << "Source: "<<pedge->source()->str();
+    SIGHT_VERB_DECL(scope, (label.str(), scope::medium),
+                    1, cpDebugLevel)
     NodeState* state = NodeState::getNodeState(this, pedge->source());
-    if(constantPropagationAnalysisDebugLevel()>=1) dbg << "state="<<state->str()<<endl;
+    SIGHT_VERB(dbg << "state="<<state->str()<<endl, 1, cpDebugLevel)
   }
   
   if(pedge->target()) {
-    scope s(txt()<<"target: "<<pedge->target()->str(), scope::medium, attrGE("constantPropagationAnalysisDebugLevel", 1));
+    SIGHT_VERB_DECL(scope, (txt()<<"target: "<<pedge->target()->str(), scope::medium),
+                    1, cpDebugLevel)
     NodeState* state = NodeState::getNodeState(this, pedge->target());
-    if(constantPropagationAnalysisDebugLevel()>=1) dbg << "state="<<state->str()<<endl;
+    SIGHT_VERB(dbg << "state="<<state->str()<<endl, 1, cpDebugLevel)
   }
   
   // If pedge doesn't have wildcards
   if(pedge->source() && pedge->target()) {
     CodeLocObjectPtr cl = boost::make_shared<CodeLocObject>(pedge->source(), cn);
-    if(constantPropagationAnalysisDebugLevel()>=1) dbg << "cl="<<cl->str()<<endl;
+    SIGHT_VERB(dbg << "cl="<<cl->str()<<endl, 1, cpDebugLevel)
     
     // Get the NodeState at the source of this edge
     NodeState* state = NodeState::getNodeState(this, pedge->source());
-    if(constantPropagationAnalysisDebugLevel()>=3) dbg << "state="<<state->str()<<endl;
+    SIGHT_VERB(dbg << "state="<<state->str()<<endl, 3, cpDebugLevel)
     
     /* // Get the memory locaiton at the current edge
     AbstractObjectMap* cl2ml = dynamic_cast<AbstractObjectMap*>(state->getLatticeBelow(this, pedge, 1));
@@ -4034,26 +4063,29 @@ MemLocObjectPtr ConstantPropagationAnalysis::Expr2MemLoc(SgNode* n, PartEdgePtr 
     assert(cpmlFact);
     CPMemLocObjectPtr ml = cpmlFact->ml;
     assert(ml);
-    if(constantPropagationAnalysisDebugLevel()>=1) dbg << "ml="<<ml->str()<<endl;
+    SIGHT_VERB(dbg << "ml="<<ml->str()<<endl, 1, cpDebugLevel)
     
     return ml->copyML();
   // If the target of this edge is a wildcard
   } else if(pedge->source()) {
     // Get the NodeState at the source of this edge
     NodeState* state = NodeState::getNodeState(this, pedge->source());
-    if(constantPropagationAnalysisDebugLevel()>=2) dbg << "state="<<state->str()<<endl;
+    SIGHT_VERB(dbg << "state="<<state->str()<<endl, 2, cpDebugLevel)
     
     map<PartEdgePtr, vector<Lattice*> >& e2lats = state->getLatticeBelowAllMod(this);
     assert(e2lats.size()>=1);
     CPMemLocObjectPtr mergedML;
     for(map<PartEdgePtr, vector<Lattice*> >::iterator lats=e2lats.begin(); lats!=e2lats.end(); lats++) {
-      scope sEdge(txt()<<"edge "<<lats->first.get()->str(), scope::medium, attrGE("constantPropagationAnalysisDebugLevel", 1));
+      ostringstream label;
+      label << "edge "<<lats->first.get()->str();
+      SIGHT_VERB_DECL(scope, (label.str(), scope::medium),
+                      1, cpDebugLevel)
       PartEdgePtr edge = lats->first;
       assert(edge.get()->source() == pedge.get()->source());
       
       // NOTE: for now we're assuming that the CFGNode index is 0 but this will need to be corrected
       CodeLocObjectPtr cl = boost::make_shared<CodeLocObject>(pedge->source(), cn);
-      if(constantPropagationAnalysisDebugLevel()>=1) dbg << "cl="<<cl->str();
+      SIGHT_VERB(dbg << "cl="<<cl->str(), 1, cpDebugLevel)
       
       // Get the memory locaiton at the current edge
       /*AbstractObjectMap* cl2ml = dynamic_cast<AbstractObjectMap*>(state->getLatticeBelow(this, edge, 1));
@@ -4066,25 +4098,25 @@ MemLocObjectPtr ConstantPropagationAnalysis::Expr2MemLoc(SgNode* n, PartEdgePtr 
       assert(cpmlFact);
       CPMemLocObjectPtr ml = cpmlFact->ml;
       assert(ml);
-      if(constantPropagationAnalysisDebugLevel()>=1) dbg << "ml="<<ml->str()<<endl;
+      SIGHT_VERB(dbg << "ml="<<ml->str()<<endl, 1, cpDebugLevel)
       
       if(lats==e2lats.begin())
         mergedML = boost::dynamic_pointer_cast<CPMemLocObject>(ml->copyML());
       else
         mergedML->meetUpdate(ml.get(), edge, getComposer(), this);
       
-      if(constantPropagationAnalysisDebugLevel()>=1) dbg << "mergedML="<<mergedML->str()<<endl;
+      SIGHT_VERB(dbg << "mergedML="<<mergedML->str()<<endl, 1, cpDebugLevel)
     }
     return mergedML;
   // If the source of this edge is a wildcard
   } else if(pedge->target()) {
     // Get the NodeState at the target of this edge
     NodeState* state = NodeState::getNodeState(this, pedge->target());
-    if(constantPropagationAnalysisDebugLevel()>=3) dbg << "state="<<state->str()<<endl;
+    SIGHT_VERB(dbg << "state="<<state->str()<<endl, 3, cpDebugLevel)
     
     // NOTE: for now we're assuming that the CFGNode index is 0 but this will need to be corrected
     CodeLocObjectPtr cl = boost::make_shared<CodeLocObject>(pedge->target(), cn);
-    if(constantPropagationAnalysisDebugLevel()>=1) dbg << "cl="<<cl->str();
+    SIGHT_VERB(dbg << "cl="<<cl->str(), 1, cpDebugLevel)
     
     // Get the memory locaiton at the current edge
     /*AbstractObjectMap* cl2ml = dynamic_cast<AbstractObjectMap*>(state->getLatticeAbove(this, NULLPartEdge, 1));
@@ -4097,7 +4129,7 @@ MemLocObjectPtr ConstantPropagationAnalysis::Expr2MemLoc(SgNode* n, PartEdgePtr 
     assert(cpmlFact);
     CPMemLocObjectPtr ml = cpmlFact->ml;
     assert(ml);
-    if(constantPropagationAnalysisDebugLevel()>=1) dbg << "ml="<<ml->str()<<endl;
+    SIGHT_VERB(dbg << "ml="<<ml->str()<<endl, 1, cpDebugLevel)
     
     return ml->copyML();
   }

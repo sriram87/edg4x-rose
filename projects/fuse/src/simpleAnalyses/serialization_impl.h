@@ -8,26 +8,21 @@
 
 namespace fuse {
 
-#define serializationDebugLevel 0
-#if serializationDebugLevel==0
-#define DISABLE_SIGHT
-#endif
+  DEBUG_LEVEL(serializationDebugLevel, 1);
 
   /**********************
    * MPICommValueObject *
    **********************/
   template<class Archive>
   void save_construct_data(Archive& ar, const MPICommValueObject* mvo_p, const unsigned int version) {
-    SIGHT_VERB_DECL(scope, ("save_construct_data(MPICommValueObject*)", scope::medium),
-                    3, serializationDebugLevel)
+    scope reg("save_construct_data(MPICommValueObject*)", scope::medium, attrGE("serializationDebugLevel", 3));
     MPICommValueKindPtr kind = mvo_p->getKind();
     ar & kind;
   }
 
   template<class Archive>
   void load_construct_data(Archive& ar, MPICommValueObject* mvo_p, const unsigned int version) {
-    SIGHT_VERB_DECL(scope, ("load_construct_data(MPICommValueObject*)", scope::medium),
-                    3, serializationDebugLevel)
+    scope reg("load_construct_data(MPICommValueObject*)", scope::medium, attrGE("serializationDebugLevel", 3));
     MPICommValueKindPtr kind;
     ar & kind;
     ::new(mvo_p) MPICommValueObject(kind, NULLPartEdge);
@@ -35,12 +30,11 @@ namespace fuse {
 
   template<class Archive>
   void MPICommValueObject::serialize(Archive& ar, const unsigned int version) {
-    SIGHT_VERB_DECL(scope, ("MPICommValueObject::serialize()", scope::medium),
-                    3, serializationDebugLevel)
+    scope reg("MPICommValueObject::serialize()", scope::medium, attrGE("serializationDebugLevel", 3));
     ar & kind;
-
-    SIGHT_VERB(dbg << "kind=" << kind->str() << ", addr=" << kind.get() << ", use_count=" << kind.use_count() << endl,
-               3, serializationDebugLevel)
+    if(serializationDebugLevel() >= 3) {
+      dbg << "kind=" << kind->str() << ", addr=" << kind.get() << ", use_count=" << kind.use_count() << endl;
+    }
   }
 
   /********************
@@ -48,8 +42,7 @@ namespace fuse {
    ********************/
   template<class Archive>
   void MPICommValueKind::serialize(Archive& ar, const unsigned int version) {
-    SIGHT_VERB_DECL(scope, ("MPICommValueKind::serialize()", scope::medium),
-                    3, serializationDebugLevel)
+    scope reg("MPICommValueKind::serialize()", scope::medium, attrGE("serializationDebugLevel", 3));
     ar & kind;
   }
 
@@ -58,8 +51,7 @@ namespace fuse {
    ***************************/
   template<class Archive>
   void MPICommValueDefaultKind::serialize(Archive& ar, const unsigned int version) {
-    SIGHT_VERB_DECL(scope, ("MPICommValueDefaultKind::serialize()", scope::medium),
-                    3, serializationDebugLevel)
+    scope reg("MPICommValueDefaultKind::serialize()", scope::medium, attrGE("serializationDebugLevel", 3));
     ar & boost::serialization::base_object<MPICommValueKind>(*this);
   }
 
@@ -68,16 +60,14 @@ namespace fuse {
    ****************************/
   template<class Archive>
   void save_construct_data(Archive& ar, const MPICommValueConcreteKind* mck_p, const unsigned int version) {
-    SIGHT_VERB_DECL(scope, ("save_construct_data(MPICommValueConcreteKind*)", scope::medium),
-                    3, serializationDebugLevel)
+    scope reg("save_construct_data(MPICommValueConcreteKind*)", scope::medium, attrGE("serializationDebugLevel", 3));
     set<ConcreteValuePtr> cvals = mck_p->getConcreteValuePtrSet();
     ar & cvals;
   }
 
   template<class Archive>
   void load_construct_data(Archive& ar, MPICommValueConcreteKind* mck_p, const unsigned int version) {
-    SIGHT_VERB_DECL(scope, ("load_construct_data(MPICommValueConcreteKind*)", scope::medium),
-                    3, serializationDebugLevel)
+    scope reg("load_construct_data(MPICommValueConcreteKind*)", scope::medium, attrGE("serializationDebugLevel", 3));
     set<ConcreteValuePtr> cvals;
     ar & cvals;
     ::new(mck_p) MPICommValueConcreteKind(cvals);
@@ -85,8 +75,7 @@ namespace fuse {
   
   template<class Archive>
   void MPICommValueConcreteKind::serialize(Archive& ar, const unsigned int version) {
-    SIGHT_VERB_DECL(scope, ("MPICommValueConcreteKind::serialize()", scope::medium),
-                    3, serializationDebugLevel)
+    scope reg("MPICommValueConcreteKind::serialize()", scope::medium, attrGE("serializationDebugLevel", 3));
     ar & boost::serialization::base_object<MPICommValueKind>(*this);
     ar & concreteValues;
   }
@@ -96,8 +85,7 @@ namespace fuse {
    ***************************/
   template<class Archive>
   void MPICommValueUnknownKind::serialize(Archive& ar, const unsigned int version) {
-    SIGHT_VERB_DECL(scope, ("MPICommValueUnknownKind::serialize()", scope::medium),
-                    3, serializationDebugLevel)
+    scope reg("MPICommValueUnknownKind::serialize()", scope::medium, attrGE("serializationDebugLevel", 3));
     ar & boost::serialization::base_object<MPICommValueKind>(*this);
   }
 
@@ -106,8 +94,7 @@ namespace fuse {
    *****************/
   template<class Archive>
   void ConcreteValue::serialize(Archive& ar, const unsigned int version) {
-    SIGHT_VERB_DECL(scope, ("ConcreteValue::serialize()", scope::medium),
-                    3, serializationDebugLevel)
+    scope reg("ConcreteValue::serialize()", scope::medium, attrGE("serializationDebugLevel", 3));
   }
 
   /************************
@@ -115,16 +102,14 @@ namespace fuse {
    ************************/
   template<class Archive>
   void save_construct_data(Archive& ar, const IntegerConcreteValue* icv_p, const unsigned int version) {
-    SIGHT_VERB_DECL(scope, ("save_construct_data(IntegerConcreteValue*)", scope::medium),
-                    3, serializationDebugLevel)
+    scope reg("save_construct_data(IntegerConcreteValue*)", scope::medium, attrGE("serializationDebugLevel", 3));
     int value = icv_p->get_value();
     ar & value;
   }
 
   template<class Archive>
   void load_construct_data(Archive& ar, IntegerConcreteValue* icv_p, const unsigned int version) {
-    SIGHT_VERB_DECL(scope, ("load_construct_data(IntegerConcreteValue*)", scope::medium),
-                    3, serializationDebugLevel)
+    scope reg("load_construct_data(IntegerConcreteValue*)", scope::medium, attrGE("serializationDebugLevel", 3));
     int value;
     ar & value;
     ::new(icv_p) IntegerConcreteValue(value);
@@ -132,8 +117,7 @@ namespace fuse {
 
   template<class Archive>
   void IntegerConcreteValue::serialize(Archive& ar, const unsigned int version) {
-    SIGHT_VERB_DECL(scope, ("IntegerConcreteValue::serialize()", scope::medium),
-                    3, serializationDebugLevel)
+    scope reg("IntegerConcreteValue::serialize()", scope::medium, attrGE("serializationDebugLevel", 3));
     ar & boost::serialization::base_object<ConcreteValue>(*this);
     int value = get_value();
     ar & value;
@@ -144,16 +128,14 @@ namespace fuse {
    ************************/
   template<class Archive>
   void save_construct_data(Archive& ar, const LongIntConcreteValue* icv_p, const unsigned int version) {
-    SIGHT_VERB_DECL(scope, ("save_construct_data(LongIntConcreteValue*)", scope::medium),
-                    3, serializationDebugLevel)
+    scope reg("save_construct_data(LongIntConcreteValue*)", scope::medium, attrGE("serializationDebugLevel", 3));
     long value = icv_p->get_value();
     ar & value;
   }
 
   template<class Archive>
   void load_construct_data(Archive& ar, LongIntConcreteValue* icv_p, const unsigned int version) {
-    SIGHT_VERB_DECL(scope, ("load_construct_data(LongIntConcreteValue*)", scope::medium),
-                    3, serializationDebugLevel)
+    scope reg("load_construct_data(LongIntConcreteValue*)", scope::medium, attrGE("serializationDebugLevel", 3));
     long value;
     ar & value;
     ::new(icv_p) LongIntConcreteValue(value);
@@ -161,8 +143,7 @@ namespace fuse {
 
   template<class Archive>
   void LongIntConcreteValue::serialize(Archive& ar, const unsigned int version) {
-    SIGHT_VERB_DECL(scope, ("LongIntConcreteValue::serialize()", scope::medium),
-                    3, serializationDebugLevel)
+    scope reg("LongIntConcreteValue::serialize()", scope::medium, attrGE("serializationDebugLevel", 3));
     ar & boost::serialization::base_object<ConcreteValue>(*this);
     long value = get_value();
     ar & value;
@@ -173,16 +154,14 @@ namespace fuse {
    ****************************/
   template<class Archive>
   void save_construct_data(Archive& ar, const LongLongIntConcreteValue* icv_p, const unsigned int version) {
-    SIGHT_VERB_DECL(scope, ("save_construct_data(LongLongIntConcreteValue*)", scope::medium),
-                    3, serializationDebugLevel)
+    scope reg("save_construct_data(LongLongIntConcreteValue*)", scope::medium, attrGE("serializationDebugLevel", 3));
     long long value = icv_p->get_value();
     ar & value;
   }
 
   template<class Archive>
   void load_construct_data(Archive& ar, LongLongIntConcreteValue* icv_p, const unsigned int version) {
-    SIGHT_VERB_DECL(scope, ("load_construct_data(LongLongIntConcreteValue*)", scope::medium),
-                    3, serializationDebugLevel)
+    scope reg("load_construct_data(LongLongIntConcreteValue*)", scope::medium, attrGE("serializationDebugLevel", 3));
     long long value;
     ar & value;
     ::new(icv_p) LongLongIntConcreteValue(value);
@@ -190,8 +169,7 @@ namespace fuse {
 
   template<class Archive>
   void LongLongIntConcreteValue::serialize(Archive& ar, const unsigned int version) {
-    SIGHT_VERB_DECL(scope, ("LongLongIntConcreteValue::serialize()", scope::medium),
-                    3, serializationDebugLevel)
+    scope reg("LongLongIntConcreteValue::serialize()", scope::medium, attrGE("serializationDebugLevel", 3));
     ar & boost::serialization::base_object<ConcreteValue>(*this);
     long long value = get_value();
     ar & value;
@@ -202,16 +180,14 @@ namespace fuse {
    ***********************/
   template<class Archive>
   void save_construct_data(Archive& ar, const StringConcreteValue* scv_p, const unsigned int version) {
-    SIGHT_VERB_DECL(scope, ("save_construct_data(StringConcreteValue*)", scope::medium),
-                    3, serializationDebugLevel)
+    scope reg("save_construct_data(StringConcreteValue*)", scope::medium, attrGE("serializationDebugLevel", 3));
     string value = scv_p->get_value();
     ar & value;
   }
 
   template<class Archive>
   void load_construct_data(Archive& ar, StringConcreteValue* scv_p, const unsigned int version) {
-    SIGHT_VERB_DECL(scope, ("load_construct_data(StringConcreteValue*)", scope::medium),
-                    3, serializationDebugLevel)
+    scope reg("load_construct_data(StringConcreteValue*)", scope::medium, attrGE("serializationDebugLevel", 3));
     string value;
     ar & value;
     ::new(scv_p) StringConcreteValue(value);
@@ -219,8 +195,7 @@ namespace fuse {
 
   template<class Archive>
   void StringConcreteValue::serialize(Archive& ar, const unsigned int version) {
-    SIGHT_VERB_DECL(scope, ("StringConcreteValue::serialize()", scope::medium),
-                    3, serializationDebugLevel)
+    scope reg("StringConcreteValue::serialize()", scope::medium, attrGE("serializationDebugLevel", 3));
     ar & boost::serialization::base_object<ConcreteValue>(*this);
     string value = get_value();
     ar & value;
@@ -231,13 +206,11 @@ namespace fuse {
    *****************/
   template<class Type> template<class Archive>
   void CompSharedPtr<Type>::serialize(Archive& ar, const unsigned int version) {
-    SIGHT_VERB_DECL(scope, ("CompSharedPtr::serialize", scope::medium),
-                    3, serializationDebugLevel)
+    scope reg("CompSharedPtr::serialize", scope::medium, attrGE("serializationDebugLevel", 3));
     ar & ptr;
-
-    SIGHT_VERB(dbg << "ptr=" << ptr->str() << ", addr=" << ptr.get() << ", use_count=" << ptr.use_count() << endl,
-               3, serializationDebugLevel)
-
+    if(serializationDebugLevel() >= 3) {
+      dbg << "ptr=" << ptr->str() << ", addr=" << ptr.get() << ", use_count=" << ptr.use_count() << endl;
+    }
   }
 };
 #endif

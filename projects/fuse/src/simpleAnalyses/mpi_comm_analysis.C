@@ -347,8 +347,21 @@ namespace fuse {
     assert(concreteValues.size() > 0);
     set<ConcreteValuePtr>::iterator c = concreteValues.begin();
     SgType* type = (*c)->getConcreteType(); ++c;
-    for( ; c != concreteValues.end(); ++c) {
-      assert(type == (*c)->getConcreteType());
+    SIGHT_VERB(dbg << "type[0]=" << SgNode2Str(type) << endl, 2, mpiCommAnalysisDebugLevel)
+    SIGHT_VERB(dbg << "type[0]->variantT()" << type->variantT() << endl, 2, mpiCommAnalysisDebugLevel)
+
+    int i=1;
+    for(; c != concreteValues.end(); ++c, ++i) {
+      SgType* ctype = (*c)->getConcreteType();
+      SIGHT_VERB(dbg << "type[" << i << "]=" << SgNode2Str(ctype) << endl, 2, mpiCommAnalysisDebugLevel)
+      SIGHT_VERB(dbg << "type[" << i << "]->variantT()=" << ctype->variantT() << endl, 2, mpiCommAnalysisDebugLevel)
+
+      // If the variantT() doesn't match we have a problem
+      if(type->variantT() != ctype->variantT()) {
+        SIGHT_VERB(dbg << "type=" << type << ",ctype=" << ctype << endl, 2, mpiCommAnalysisDebugLevel)
+        cerr << "Type mismatch in MPICommValueConcreteKind::getConcreteType()\n";
+        exit(EXIT_FAILURE);
+      }
     }
     return type;
   }
@@ -788,17 +801,36 @@ namespace fuse {
   }
 
   string MPICommAnalysisTransfer::serialize(MPICommValueObjectPtr mvo) {
+    SIGHT_VERB_DECL(scope, ("MPICommAnalysisTransfer::serialize", scope::medium),
+                    2, mpiCommAnalysisDebugLevel)
     stringstream ss;
-    boost::archive::text_oarchive oa(ss);
-    oa << mvo;
+    SIGHT_VERB(dbg << "mvo=" << mvo->str() << endl, 2, mpiCommAnalysisDebugLevel)
+    try {
+      boost::archive::text_oarchive oa(ss);
+      oa << mvo;
+    }
+    catch(boost::archive::archive_exception e) {
+      cerr << "Serialization failed\n";
+      exit(EXIT_FAILURE);
+    }
+    SIGHT_VERB(dbg << "ss=" << ss.str() << endl, 2, mpiCommAnalysisDebugLevel)
     return ss.str();
   }
 
   MPICommValueObjectPtr MPICommAnalysisTransfer::deserialize(string data) {
+    SIGHT_VERB_DECL(scope, ("MPICommAnalysisTransfer::deserialize", scope::medium),
+                    2, mpiCommAnalysisDebugLevel)
     MPICommValueObjectPtr mvo;
+    SIGHT_VERB(dbg << "data=" << data << endl, 2, mpiCommAnalysisDebugLevel)
     stringstream ss(data);
-    boost::archive::text_iarchive ia(ss);
-    ia >> mvo;
+    try {
+      boost::archive::text_iarchive ia(ss);
+      ia >> mvo;
+    }
+    catch(boost::archive::archive_exception e) {
+      cerr << "Deserialization failed\n";
+      exit(EXIT_FAILURE);
+    }
     assert(mvo);
     return mvo;
   }

@@ -1282,11 +1282,11 @@ void ChainComposer::runAnalysis()
     if(flag) {
       int rank;
       MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-      cout << rank << ", " << (*a)->str("") << ", " << ((end.tv_sec*1000000+end.tv_usec) -
+      cerr << rank << ", " << (*a)->str("") << ", " << ((end.tv_sec*1000000+end.tv_usec) -
 							(start.tv_sec*1000000+start.tv_usec))/1000000.0<<endl;
     }
     else {
-      cout << "  "<<(*a)->str("")<<" Elapsed="<<((end.tv_sec*1000000+end.tv_usec) - 
+      cerr << "  "<<(*a)->str("")<<" Elapsed="<<((end.tv_sec*1000000+end.tv_usec) - 
                                                (start.tv_sec*1000000+start.tv_usec))/1000000.0<<"s"<<endl;
     }
     

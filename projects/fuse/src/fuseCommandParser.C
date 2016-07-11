@@ -12,6 +12,7 @@
 #include "ortho_array_analysis.h"
 #include <boost/xpressive/xpressive.hpp>
 #include "fuseCommandParser.h"
+#include "mpi.h"
 
 using namespace sight;
 using namespace std;
@@ -30,7 +31,7 @@ namespace fuse {
   }
   
   void FuseCommand::push_back(ComposedAnalysis* analysis) {
-    cout << "Adding analysis=" << analysis->str() << endl;
+    // cout << "Adding analysis=" << analysis->str() << endl;
     subanalyses.push_back(analysis);
   }
 

@@ -46,7 +46,7 @@ int main(int argc, char* argv[])
 {
   MPI_Init(&argc, &argv);
   FuseMPIInit(argc, argv);
-  cout << "========== S T A R T ==========\n";
+  // cout << "========== S T A R T ==========\n";
 
   // Run the front end
   SgProject* project = frontend(argc, argv);
@@ -54,7 +54,7 @@ int main(int argc, char* argv[])
   AnnotateMPISideEffects annotateMPI;
   annotateMPI.traverseInputFiles(project, preorder);
 
-  printf("Frontend done\n");fflush(stdout);
+  // printf("Frontend done\n");fflush(stdout);
 
   std::list<ComposedAnalysis*> scanalyses;
   std::list<ComposedAnalysis*> tcanalyses;
@@ -84,12 +84,27 @@ int main(int argc, char* argv[])
   FuseCommandParser parser;
   FuseCommand* cmd = parser(cmd_s);
   cmd->initFuseCommand();
+
+  double start, end;
+  MPI_Barrier(MPI_COMM_WORLD);
+  start = MPI_Wtime();
+ 
   cmd->execute();
+  
+  MPI_Barrier(MPI_COMM_WORLD);
+  end = MPI_Wtime();
+
+  int rank;
+  MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+
+  if(rank==0) cerr << "Analysis DONE\n";
+  cout << rank << ", AnalysisTime, " << end-start << endl;
+
   if(cmd->hasMPIDotValue()) {
     MPIDotValueAnalysis* mdvanalysis = cmd->getLastMPIDotValueAnalysis();
     MPIDotGraphGenerator dotgen(mdvanalysis);
     dotgen.generateDot();
-    dotgen.generateDotFile();
+    // dotgen.generateDotFile();
   }
 
   // FuseMPIDotValueCommand dotvalueanaysis;
@@ -141,6 +156,6 @@ int main(int argc, char* argv[])
   // dotgen.generateDotFile();
   MPI_Finalize();
 
-  cout << "==========  E  N  D  ==========\n";
+  // cout << "==========  E  N  D  ==========\n";
   return 0;
 }

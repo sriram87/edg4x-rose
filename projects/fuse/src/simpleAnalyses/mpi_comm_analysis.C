@@ -1013,11 +1013,11 @@ namespace fuse {
     SIGHT_VERB(dbg << "in: " << in << endl, 3, mpiCommAnalysisDebugLevel)
     SIGHT_VERB(dbg << "inout: " << inout << endl, 3, mpiCommAnalysisDebugLevel)
 
-    string idata = in, iodata = inout;
+    string idata(in), iodata(inout);
 
     MPICommValueObjectPtr inVO = deserialize(idata);
     MPICommValueObjectPtr inoutVO = deserialize(iodata);
-    Lattice* inL = dynamic_cast<Lattice*>(inVO.get()); assert(inL);
+    Lattice* inL = dynamic_cast<Lattice*>(inVO.get()); 
 
     SIGHT_VERB(dbg << "inVO:" << inVO->str() << endl, 2, mpiCommAnalysisDebugLevel)
     SIGHT_VERB(dbg << "ioVO: " << inoutVO->str() << endl, 2, mpiCommAnalysisDebugLevel)
@@ -1027,9 +1027,14 @@ namespace fuse {
     SIGHT_VERB(dbg << "After MeetUpdate ioVO: " << inoutVO->str() << endl, 2, mpiCommAnalysisDebugLevel)
 
     string mdata = serialize(inoutVO);
-    if(mdata.length() > *len) assert(false);
-
-    mdata.copy(inout, mdata.length());
+    try {
+      if(mdata.length() >= *len) throw "MPICommValueReduceOp failed: Insufficient buffer size";
+      mdata.copy(inout, mdata.length());
+    }
+    catch(std::exception e) {
+      std::cerr << "Exception: " << e.what() << endl;
+      exit(EXIT_FAILURE);
+    }
   }
 
   void MPICommAnalysisTransfer::transferMPIReduceOp(SgCommaOpExp* sgn, Function mpif_) {
@@ -1068,7 +1073,7 @@ namespace fuse {
 
     string sdata = serialize(sbuffMVO);    
     char *sbuff_s, *rbuff_s;
-    int bufflen = 512 * size;
+    int bufflen = 1024 * size;
     rbuff_s = new char[bufflen];
     sbuff_s = new char[bufflen];
 
@@ -1076,7 +1081,7 @@ namespace fuse {
 
     MPI_Op commReduceOp;
 
-    MPI_Op_create((MPI_User_function*)MPICommValueReduceOp, true, &commReduceOp);
+    MPI_Op_create((MPI_User_function*)MPICommValueReduceOp, false, &commReduceOp);
     MPI_Reduce(sbuff_s, rbuff_s, bufflen, MPI_CHAR, commReduceOp, root, comm);
 
     SIGHT_VERB(dbg << "sbuff[" << rank << "]=" << sbuff_s << endl, 3 , mpiCommAnalysisDebugLevel)
@@ -1085,7 +1090,7 @@ namespace fuse {
     // Only root has to process the received data
     // Everybody else receive empty message
     if(root == rank) {
-      string rdata = rbuff_s;
+      string rdata(rbuff_s);
       // de-serialize all the recieved data
       MPICommValueObjectPtr rbuffMVO = deserialize(rdata);
       // Find the outgoing edges of MPI call expression part
@@ -1097,6 +1102,9 @@ namespace fuse {
       list<PartEdgePtr>::iterator ce = callExpEdges.begin();   
       for( ; ce != callExpEdges.end(); ++ce) analysis->insertRecvMLVal(*ce, buffML, rbuffMVO);
     }
+
+    MPI_Op_free(&commReduceOp);
+    delete sbuff_s, rbuff_s;
   }
 
   // void MPICommAnalysisTransfer::transferMPIReduceOp(SgCommaOpExp* sgn, Function mpif_) {

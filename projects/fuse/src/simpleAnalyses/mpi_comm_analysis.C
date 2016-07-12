@@ -800,7 +800,7 @@ namespace fuse {
     return op.isMPIRecvOp();
   }
 
-  string MPICommAnalysisTransfer::serialize(MPICommValueObjectPtr mvo) {
+  string serialize(MPICommValueObjectPtr mvo) {
     SIGHT_VERB_DECL(scope, ("MPICommAnalysisTransfer::serialize", scope::medium),
                     2, mpiCommAnalysisDebugLevel)
     stringstream ss;
@@ -814,10 +814,11 @@ namespace fuse {
       exit(EXIT_FAILURE);
     }
     SIGHT_VERB(dbg << "ss=" << ss.str() << endl, 2, mpiCommAnalysisDebugLevel)
+    SIGHT_VERB(dbg << "ss.len()=" << ss.str().length() << endl, 2, mpiCommAnalysisDebugLevel)
     return ss.str();
   }
 
-  MPICommValueObjectPtr MPICommAnalysisTransfer::deserialize(string data) {
+  MPICommValueObjectPtr deserialize(string data) {
     SIGHT_VERB_DECL(scope, ("MPICommAnalysisTransfer::deserialize", scope::medium),
                     2, mpiCommAnalysisDebugLevel)
     MPICommValueObjectPtr mvo;
@@ -1002,24 +1003,33 @@ namespace fuse {
     SIGHT_VERB(dbg << analysis->stringifyRecvMLValMap() << endl, 3, mpiCommAnalysisDebugLevel)
   }
 
-  void MPIDotValueReduceOp(char* in, char* inout, int* len, MPI_Datatype* datatype) {
+  void MPICommValueReduceOp(char* in, char* inout, int* len, MPI_Datatype* type) {
+    SIGHT_VERB_DECL(scope, ("MPICommAnalysisTransfer::transferMPIReduceOp", scope::medium),
+                    2, mpiCommAnalysisDebugLevel)
     int rank;
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-    cout << "rank=" << rank << endl;
-    cout << "len=" << *len << endl;
-    cout << "in: " << in << endl;
-    cout << "inout_b:" << inout << endl;
+    SIGHT_VERB(dbg << "rank=" << rank << endl, 3, mpiCommAnalysisDebugLevel)    
+    SIGHT_VERB(dbg << "len=" << *len << endl, 3, mpiCommAnalysisDebugLevel)
+    SIGHT_VERB(dbg << "in: " << in << endl, 3, mpiCommAnalysisDebugLevel)
+    SIGHT_VERB(dbg << "inout: " << inout << endl, 3, mpiCommAnalysisDebugLevel)
 
-    ostringstream oss;
-    oss << in << endl;
-    oss << inout << endl;
+    string idata = in, iodata = inout;
 
-    string red_s(oss.str());
-    inout = strdup(red_s.c_str());
-    in = strdup(red_s.c_str());
-    *len = red_s.length();
+    MPICommValueObjectPtr inVO = deserialize(idata);
+    MPICommValueObjectPtr inoutVO = deserialize(iodata);
+    Lattice* inL = dynamic_cast<Lattice*>(inVO.get()); assert(inL);
 
-    cout << "inout_a: " << inout << endl;
+    SIGHT_VERB(dbg << "inVO:" << inVO->str() << endl, 2, mpiCommAnalysisDebugLevel)
+    SIGHT_VERB(dbg << "ioVO: " << inoutVO->str() << endl, 2, mpiCommAnalysisDebugLevel)
+
+    inoutVO->meetUpdate(inL);
+
+    SIGHT_VERB(dbg << "After MeetUpdate ioVO: " << inoutVO->str() << endl, 2, mpiCommAnalysisDebugLevel)
+
+    string mdata = serialize(inoutVO);
+    if(mdata.length() > *len) assert(false);
+
+    mdata.copy(inout, mdata.length());
   }
 
   void MPICommAnalysisTransfer::transferMPIReduceOp(SgCommaOpExp* sgn, Function mpif_) {
@@ -1048,62 +1058,129 @@ namespace fuse {
     int size;
     MPI_Comm_size(MPI_COMM_WORLD, &size);
 
-    // MPI_Op op;
-    // MPI_Op_create((MPI_User_function*) MPIDotValueReduceOp, true, &op);
-    
-    // char *rdata_p = new char[1000 * size];
-    // MPI_Reduce(sdata_p, rdata_p, sdata.length(), MPI_CHAR, op, root, MPI_COMM_WORLD);
+    int rank;
+    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
 
     ValueObjectPtr  sbuffVO = composer->Expr2Val(sbuff, part->inEdgeFromAny(), analysis);
     SIGHT_VERB(dbg << "sbuffVO=" << sbuffVO->str() << endl, 2, mpiCommAnalysisDebugLevel)
     MPICommValueKindPtr kind = createMPICommValueKind(sbuffVO, part->inEdgeFromAny());
     MPICommValueObjectPtr sbuffMVO = boost::make_shared<MPICommValueObject>(kind, part->inEdgeFromAny());
-      
-    string sdata = serialize(sbuffMVO);
-    char* sdata_p;
-    sdata_p = strdup(sdata.c_str());
-    
-    int rank;
-    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+
+    string sdata = serialize(sbuffMVO);    
+    char *sbuff_s, *rbuff_s;
+    int bufflen = 512 * size;
+    rbuff_s = new char[bufflen];
+    sbuff_s = new char[bufflen];
+
+    sdata.copy(sbuff_s, sdata.length());
+
+    MPI_Op commReduceOp;
+
+    MPI_Op_create((MPI_User_function*)MPICommValueReduceOp, true, &commReduceOp);
+    MPI_Reduce(sbuff_s, rbuff_s, bufflen, MPI_CHAR, commReduceOp, root, comm);
+
+    SIGHT_VERB(dbg << "sbuff[" << rank << "]=" << sbuff_s << endl, 3 , mpiCommAnalysisDebugLevel)
+    SIGHT_VERB(dbg << "rbuff[" << rank << "]=" << rbuff_s << endl, 3, mpiCommAnalysisDebugLevel)
+
+    // Only root has to process the received data
+    // Everybody else receive empty message
     if(root == rank) {
-      // Create the reduce set with my value first
-      MPICommValueKindPtr kind = createMPICommValueKind(sbuffVO, part->inEdgeFromAny());
-      MPICommValueObjectPtr rbuffMVO = boost::make_shared<MPICommValueObject>(kind, part->inEdgeFromAny());
-      // Collect the dataflow value from others
-      for(int i = 0; i < size; ++i) {
-        if(i != rank) {
-          // space of 1000 char to receive dataflow info
-          char* rdata_p = new char[1000];
-
-          // Issue the MPI_Recv operation to runtime from analysis
-          MPI_Status status;
-          MPI_Recv(rdata_p, 1000, MPI_CHAR, i, 0, comm, &status);
-
-          // deserialize
-          string rdata(rdata_p);
-          MPICommValueObjectPtr rmvo = deserialize(rdata);
-          SIGHT_VERB(dbg << "rmvo=" << rmvo->str() << endl, 2, mpiCommAnalysisDebugLevel)
-
-          rbuffMVO->meetUpdateV(rmvo, part->inEdgeFromAny());
-          SIGHT_VERB(dbg << "rbuffMVO=" << rbuffMVO->str() << endl, 2, mpiCommAnalysisDebugLevel)
-          delete rdata_p;
-        }
-      }
+      string rdata = rbuff_s;
+      // de-serialize all the recieved data
+      MPICommValueObjectPtr rbuffMVO = deserialize(rdata);
       // Find the outgoing edges of MPI call expression part
-      list<PartEdgePtr> callExpEdges = outGoingEdgesMPICallExp(part, "MPI_Reduce");
-    
+      SIGHT_VERB(dbg << "rbuffMVO: " << rbuffMVO->str() << endl, 2, mpiCommAnalysisDebugLevel)
+
+      list<PartEdgePtr> callExpEdges = outGoingEdgesMPICallExp(part, "MPI_Reduce");   
       // Update the RecvValueObjectMap corresponding to each edge in callExpEdges list
       MemLocObjectPtr buffML = composer->Expr2MemLoc(rbuff, part->inEdgeFromAny(), analysis);
-      list<PartEdgePtr>::iterator ce = callExpEdges.begin();
-    
-      for( ; ce != callExpEdges.end(); ++ce) {
-        analysis->insertRecvMLVal(*ce, buffML, rbuffMVO);
-      }
+      list<PartEdgePtr>::iterator ce = callExpEdges.begin();   
+      for( ; ce != callExpEdges.end(); ++ce) analysis->insertRecvMLVal(*ce, buffML, rbuffMVO);
     }
-    else {
-      MPI_Send(sdata_p, 1000, MPI_CHAR, root, 0, comm);
-    }    
   }
+
+  // void MPICommAnalysisTransfer::transferMPIReduceOp(SgCommaOpExp* sgn, Function mpif_) {
+  //   SIGHT_VERB_DECL(scope, ("MPICommAnalysisTransfer::transferMPIReduceOp", scope::medium),
+  //                   2, mpiCommAnalysisDebugLevel)
+
+  //   Composer* composer = analysis->getComposer();
+  //   SgPointerDerefExp* sbuff = isSgPointerDerefExp(sgn->get_lhs_operand());
+  //   SgPointerDerefExp* rbuff = isSgPointerDerefExp(sgn->get_rhs_operand());
+
+  //   if(!sbuff && !rbuff) {
+  //     cerr << "Error interpreting MPI_Reduce"
+  //          <<" line:" << __LINE__
+  //          <<" file:" << __FILE__ << endl;
+  //     exit(EXIT_FAILURE);
+  //   }
+   
+  //   ValueObject2Int vo2int(composer, part->inEdgeFromAny(), analysis, mpiCommAnalysisDebugLevel);
+  //   SgInitializedName* sgnroot = getReduceOpRoot(mpif_);
+  //   int root = vo2int(sgnroot);
+
+  //   SgInitializedName* sgncomm = getReduceOpComm(mpif_);
+  //   MPI_Comm comm = (MPI_Comm) vo2int(sgncomm);
+  //   assert(comm == MPI_COMM_WORLD);
+
+  //   int size;
+  //   MPI_Comm_size(MPI_COMM_WORLD, &size);
+
+  //   // MPI_Op op;
+  //   // MPI_Op_create((MPI_User_function*) MPIDotValueReduceOp, true, &op);
+    
+  //   // char *rdata_p = new char[1000 * size];
+  //   // MPI_Reduce(sdata_p, rdata_p, sdata.length(), MPI_CHAR, op, root, MPI_COMM_WORLD);
+
+  //   ValueObjectPtr  sbuffVO = composer->Expr2Val(sbuff, part->inEdgeFromAny(), analysis);
+  //   SIGHT_VERB(dbg << "sbuffVO=" << sbuffVO->str() << endl, 2, mpiCommAnalysisDebugLevel)
+  //   MPICommValueKindPtr kind = createMPICommValueKind(sbuffVO, part->inEdgeFromAny());
+  //   MPICommValueObjectPtr sbuffMVO = boost::make_shared<MPICommValueObject>(kind, part->inEdgeFromAny());
+      
+  //   string sdata = serialize(sbuffMVO);
+  //   char* sdata_p;
+  //   sdata_p = strdup(sdata.c_str());
+    
+  //   int rank;
+  //   MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+  //   if(root == rank) {
+  //     // Create the reduce set with my value first
+  //     MPICommValueKindPtr kind = createMPICommValueKind(sbuffVO, part->inEdgeFromAny());
+  //     MPICommValueObjectPtr rbuffMVO = boost::make_shared<MPICommValueObject>(kind, part->inEdgeFromAny());
+  //     // Collect the dataflow value from others
+  //     for(int i = 0; i < size; ++i) {
+  //       if(i != rank) {
+  //         // space of 1000 char to receive dataflow info
+  //         char* rdata_p = new char[1000];
+
+  //         // Issue the MPI_Recv operation to runtime from analysis
+  //         MPI_Status status;
+  //         MPI_Recv(rdata_p, 1000, MPI_CHAR, i, 0, comm, &status);
+
+  //         // deserialize
+  //         string rdata(rdata_p);
+  //         MPICommValueObjectPtr rmvo = deserialize(rdata);
+  //         SIGHT_VERB(dbg << "rmvo=" << rmvo->str() << endl, 2, mpiCommAnalysisDebugLevel)
+
+  //         rbuffMVO->meetUpdateV(rmvo, part->inEdgeFromAny());
+  //         SIGHT_VERB(dbg << "rbuffMVO=" << rbuffMVO->str() << endl, 2, mpiCommAnalysisDebugLevel)
+  //         delete rdata_p;
+  //       }
+  //     }
+  //     // Find the outgoing edges of MPI call expression part
+  //     list<PartEdgePtr> callExpEdges = outGoingEdgesMPICallExp(part, "MPI_Reduce");
+    
+  //     // Update the RecvValueObjectMap corresponding to each edge in callExpEdges list
+  //     MemLocObjectPtr buffML = composer->Expr2MemLoc(rbuff, part->inEdgeFromAny(), analysis);
+  //     list<PartEdgePtr>::iterator ce = callExpEdges.begin();
+    
+  //     for( ; ce != callExpEdges.end(); ++ce) {
+  //       analysis->insertRecvMLVal(*ce, buffML, rbuffMVO);
+  //     }
+  //   }
+  //   else {
+  //     MPI_Send(sdata_p, 1000, MPI_CHAR, root, 0, comm);
+  //   }    
+  // }
 
   void MPICommAnalysisTransfer::visit(SgPointerDerefExp* sgn) {
     Function func = getFunction(sgn);

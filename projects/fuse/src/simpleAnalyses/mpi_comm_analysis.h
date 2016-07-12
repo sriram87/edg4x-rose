@@ -302,12 +302,15 @@ namespace fuse {
   /*********************
    * MPIDotValueReduce *
    *********************/
-  void MPIDotValueReduceOp(char* in, char* inout, int* len, MPI_Datatype* datatype);
+  // void MPIDotValueReduceOp(char* in, char* inout, int* len, MPI_Datatype* datatype);
 
+  typedef struct {
+    char data[1024];
+  } CommSerialType;
+  
   /**************************
    * MPICommAnalysisTranfer *
    **************************/
-
   class MPICommAnalysis;
 
   class MPICommAnalysisTransfer : public DFTransferVisitor {
@@ -330,8 +333,8 @@ namespace fuse {
     bool isMPISendOp(const Function& func) const;
     bool isMPIRecvOp(const Function& func) const;
 
-    std::string serialize(MPICommValueObjectPtr mvo);
-    MPICommValueObjectPtr deserialize(std::string data);
+    friend std::string serialize(MPICommValueObjectPtr mvo);
+    friend MPICommValueObjectPtr deserialize(std::string data);
 
     void visit(SgCommaOpExp* sgn);
     void visit(SgPointerDerefExp* sgn);
@@ -352,6 +355,7 @@ namespace fuse {
 
     void transferMPIBcastOp(SgPointerDerefExp* sgn, Function mpif_);
 
+    friend void MPICommValueReduceOp(char* in, char* inout, int* len, MPI_Datatype* datatype);
     void transferMPIReduceOp(SgCommaOpExp* sgn, Function mpif_);
     
     list<PartEdgePtr> outGoingEdgesMPICallExp(PartPtr part, string funcname);

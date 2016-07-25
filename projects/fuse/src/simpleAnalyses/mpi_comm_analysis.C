@@ -803,19 +803,28 @@ namespace fuse {
   string serialize(MPICommValueObjectPtr mvo) {
     SIGHT_VERB_DECL(scope, ("MPICommAnalysisTransfer::serialize", scope::medium),
                     2, mpiCommAnalysisDebugLevel)
-    stringstream ss;
     SIGHT_VERB(dbg << "mvo=" << mvo->str() << endl, 2, mpiCommAnalysisDebugLevel)
     try {
+      stringstream ss;
       boost::archive::text_oarchive oa(ss);
       oa << mvo;
+      SIGHT_VERB(dbg << "ss=" << ss.str() << endl, 2, mpiCommAnalysisDebugLevel)
+      SIGHT_VERB(dbg << "ss.len()=" << ss.str().length() << endl, 2, mpiCommAnalysisDebugLevel)
+      return ss.str();
     }
     catch(boost::archive::archive_exception e) {
-      cerr << "Serialization failed\n";
+      int rank;
+      MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+      cerr << rank << ", Serialization failed\n";      
+
       exit(EXIT_FAILURE);
     }
-    SIGHT_VERB(dbg << "ss=" << ss.str() << endl, 2, mpiCommAnalysisDebugLevel)
-    SIGHT_VERB(dbg << "ss.len()=" << ss.str().length() << endl, 2, mpiCommAnalysisDebugLevel)
-    return ss.str();
+    catch(std::exception e) {
+      int rank;
+      MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+      cerr << rank << ", Serialization failed\n" << e.what() << endl;
+      exit(EXIT_FAILURE);
+    }    
   }
 
   MPICommValueObjectPtr deserialize(string data) {
@@ -823,17 +832,27 @@ namespace fuse {
                     2, mpiCommAnalysisDebugLevel)
     MPICommValueObjectPtr mvo;
     SIGHT_VERB(dbg << "data=" << data << endl, 2, mpiCommAnalysisDebugLevel)
-    stringstream ss(data);
+
     try {
+      stringstream ss(data);
       boost::archive::text_iarchive ia(ss);
       ia >> mvo;
+      assert(mvo);
+      SIGHT_VERB(dbg << "Deserialization success:" << mvo->str() << endl, 2, mpiCommAnalysisDebugLevel)
+      return mvo;
     }
     catch(boost::archive::archive_exception e) {
-      cerr << "Deserialization failed\n";
+      int rank;
+      MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+      cerr << rank << ", Deserialization failed data=" << data << endl;      
       exit(EXIT_FAILURE);
     }
-    assert(mvo);
-    return mvo;
+    catch(std::exception e) {
+      int rank;
+      MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+      cerr << rank << ", Deserialization failed\n" << e.what() << endl;
+      exit(EXIT_FAILURE);
+    }
   }
 
 
@@ -926,6 +945,7 @@ namespace fuse {
     
      // space of 1000 char to receive dataflow info
      char* sdata_p = new char[1000];
+     memset(sdata_p, 0, 1000);
 
      // Issue the MPI_Recv operation to runtime from analysis
      MPI_Status status;
@@ -936,8 +956,8 @@ namespace fuse {
      MPICommValueObjectPtr mvo = deserialize(sdata);
      SIGHT_VERB(dbg << "Recv VO:" << mvo->str() << endl, 2, mpiCommAnalysisDebugLevel)
 
-       // Find the outgoing edges of MPI call expression part
-       list<PartEdgePtr> callExpEdges = outGoingEdgesMPICallExp(part, "MPI_Recv");
+     // Find the outgoing edges of MPI call expression part
+     list<PartEdgePtr> callExpEdges = outGoingEdgesMPICallExp(part, "MPI_Recv");
     
      // Update the RecvValueObjectMap corresponding to each edge in callExpEdges list
      MemLocObjectPtr buffML = composer->Expr2MemLoc(sgn, part->inEdgeFromAny(), analysis);
@@ -1004,35 +1024,51 @@ namespace fuse {
   }
 
   void MPICommValueReduceOp(char* in, char* inout, int* len, MPI_Datatype* type) {
-    SIGHT_VERB_DECL(scope, ("MPICommAnalysisTransfer::transferMPIReduceOp", scope::medium),
+    SIGHT_VERB_DECL(scope, ("MPICommValueReduceOp", scope::medium),
                     2, mpiCommAnalysisDebugLevel)
     int rank;
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-    SIGHT_VERB(dbg << "rank=" << rank << endl, 3, mpiCommAnalysisDebugLevel)    
-    SIGHT_VERB(dbg << "len=" << *len << endl, 3, mpiCommAnalysisDebugLevel)
-    SIGHT_VERB(dbg << "in: " << in << endl, 3, mpiCommAnalysisDebugLevel)
-    SIGHT_VERB(dbg << "inout: " << inout << endl, 3, mpiCommAnalysisDebugLevel)
+    SIGHT_VERB(dbg << "rank=" << rank << endl, 2, mpiCommAnalysisDebugLevel)    
+    SIGHT_VERB(dbg << "len=" << *len << endl, 2, mpiCommAnalysisDebugLevel)
+    SIGHT_VERB(dbg << "in: " << in << endl, 2, mpiCommAnalysisDebugLevel)
+    SIGHT_VERB(dbg << "inout: " << inout << endl, 2, mpiCommAnalysisDebugLevel)
 
     string idata(in), iodata(inout);
 
-    MPICommValueObjectPtr inVO = deserialize(idata);
-    MPICommValueObjectPtr inoutVO = deserialize(iodata);
-    Lattice* inL = dynamic_cast<Lattice*>(inVO.get()); 
+    MPICommValueObjectPtr inVO;
+    MPICommValueObjectPtr ioVO;
+    // If serialized data is available
+    if(idata.length() > 0) {
+      inVO = deserialize(idata);
+    }
+    else inVO = boost::make_shared<MPICommValueObject>(NULLPartEdge);
+
+    if(iodata.length() > 0) {
+      ioVO = deserialize(iodata);
+    }
+    else ioVO = boost::make_shared<MPICommValueObject>(NULLPartEdge);
+    Lattice* inL = dynamic_cast<Lattice*>(inVO.get()); assert(inL);
 
     SIGHT_VERB(dbg << "inVO:" << inVO->str() << endl, 2, mpiCommAnalysisDebugLevel)
-    SIGHT_VERB(dbg << "ioVO: " << inoutVO->str() << endl, 2, mpiCommAnalysisDebugLevel)
+    SIGHT_VERB(dbg << "ioVO: " << ioVO->str() << endl, 2, mpiCommAnalysisDebugLevel)
 
-    inoutVO->meetUpdate(inL);
+    ioVO->meetUpdate(inL);
 
-    SIGHT_VERB(dbg << "After MeetUpdate ioVO: " << inoutVO->str() << endl, 2, mpiCommAnalysisDebugLevel)
-
-    string mdata = serialize(inoutVO);
+    SIGHT_VERB(dbg << "After MeetUpdate ioVO: " << ioVO->str() << endl, 2, mpiCommAnalysisDebugLevel)       
+    SIGHT_VERB(dbg << "Attempting serialization..\n", 2, mpiCommAnalysisDebugLevel)
+    string mdata = serialize(ioVO);
+    SIGHT_VERB(dbg << "Serialization complete..\n", 2, mpiCommAnalysisDebugLevel)
+    memset(inout, 0, *len);
     try {
-      if(mdata.length() >= *len) throw "MPICommValueReduceOp failed: Insufficient buffer size";
+      if(mdata.length() >= *len) {
+        cerr << "len=" << *len << endl;
+        cerr << "mdata.length=" << mdata.length() << endl;
+        throw "MPICommValueReduceOp failed: Insufficient buffer size";
+      }
       mdata.copy(inout, mdata.length());
     }
-    catch(std::exception e) {
-      std::cerr << "Exception: " << e.what() << endl;
+    catch(char const* e) {
+      std::cerr << e << endl;
       exit(EXIT_FAILURE);
     }
   }
@@ -1104,7 +1140,8 @@ namespace fuse {
     }
 
     MPI_Op_free(&commReduceOp);
-    delete sbuff_s, rbuff_s;
+    delete[] sbuff_s;
+    delete[] rbuff_s;
   }
 
   // void MPICommAnalysisTransfer::transferMPIReduceOp(SgCommaOpExp* sgn, Function mpif_) {

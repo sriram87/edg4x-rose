@@ -38,14 +38,14 @@ void FuseMPIInit(int argc, char** argv) {
   int rank;
   MPI_Comm_rank(MPI_COMM_WORLD, &rank);
   string title = (txt() << "Process " << rank << " Debug Output").c_str();
-  string workdir = (txt() << "dbg" << rank).c_str();
+  string workdir = (txt() << "dbg").c_str();
   SightInit(argc, argv, title, workdir);
 }
 
 int main(int argc, char* argv[])
 {
   MPI_Init(&argc, &argv);
-  FuseMPIInit(argc, argv);
+  // FuseMPIInit(argc, argv);
   // cout << "========== S T A R T ==========\n";
 
   // Run the front end
@@ -81,24 +81,37 @@ int main(int argc, char* argv[])
     cerr << "No Fuse Command Found!" << endl;
   }
 
-  FuseCommandParser parser;
-  FuseCommand* cmd = parser(cmd_s);
-  cmd->initFuseCommand();
+  int rank, size;
+  MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+  MPI_Comm_size(MPI_COMM_WORLD, &size);
 
   double start, end;
   MPI_Barrier(MPI_COMM_WORLD);
   start = MPI_Wtime();
- 
+
+  FuseCommandParser parser;
+  FuseCommand* cmd = parser(cmd_s);
+  cmd->initFuseCommand();
+
+  if(rank == 0) cerr << "=========== Executing Analyisis Composition ===========\n";
   cmd->execute();
-  
-  MPI_Barrier(MPI_COMM_WORLD);
-  end = MPI_Wtime();
+  if(rank == 0) cerr << "=========== Execution complete ===========\n";
 
-  int rank;
-  MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+  // MPI_Barrier(MPI_COMM_WORLD);
+  end = MPI_Wtime();  
+  double time=end-start;
+  double min, max, sum, avg;
 
-  if(rank==0) cerr << "Analysis DONE\n";
-  cout << rank << ", AnalysisTime, " << end-start << endl;
+  MPI_Reduce(&time, &min, 1, MPI_DOUBLE, MPI_MIN, 0, MPI_COMM_WORLD);
+  MPI_Reduce(&time, &max, 1, MPI_DOUBLE, MPI_MAX, 0, MPI_COMM_WORLD);
+  MPI_Reduce(&time, &sum, 1, MPI_DOUBLE, MPI_SUM, 0, MPI_COMM_WORLD);
+
+
+  if(rank == 0) {
+    avg = sum/size;
+    cout << "Analysis Done:";
+    cout << "min=" << min << ", max=" << max << ", avg=" << avg;
+  }
 
   if(cmd->hasMPIDotValue()) {
     MPIDotValueAnalysis* mdvanalysis = cmd->getLastMPIDotValueAnalysis();
@@ -107,53 +120,6 @@ int main(int argc, char* argv[])
     // dotgen.generateDotFile();
   }
 
-  // FuseMPIDotValueCommand dotvalueanaysis;
-  // dotvalueanaysis.execute();
-  // dotvalueanaysis.generateDot();
-
-  // init_sregex();
-
-  // run_analysis_composition_cmd(seq_cmd_s);
-
-  // MPI_Barrier(MPI_COMM_WORLD);
-
-  // run_analysis_composition_cmd(tc_cmd_s);
-  
-  // Sequential composer    
-  // scanalyses.push_back(new FlowInSensAddrTakenAnalysis(project));
-
-  // scanalyses.push_back(new CallContextSensitivityAnalysis(1, CallContextSensitivityAnalysis::callSite));
-  // scanalyses.push_back(new MPICommContextAnalysis());
-  // scanalyses.push_back(new PointsToAnalysis());
-  // scanalyses.push_back(new ConstantPropagationAnalysis());
-  // scanalyses.push_back(new MPIValueAnalysis());
-  // scanalyses.push_back(new ConstantPropagationAnalysis());
-  // scanalyses.push_back(new DeadPathElimAnalysis());  
-  // scanalyses.push_back(new MPIDotValueAnalysis());
-  // scanalyses.push_back(new MPICommAnalysis());
-  // MPIDotValueAnalysis* mdvanalysis = new MPIDotValueAnalysis();
-  // scanalyses.push_back(mdvanalysis);
-  // // scanalyses.push_back(new ConstantPropagationAnalysis());
-  // // scanalyses.push_back(new MPICommAnalysis());
-  // // scanalyses.push_back(new ConstantPropagationAnalysis());
-
-  // // Tight composition of analyses
-  // // tcanalyses.push_back(new ConstantPropagationAnalysis());
-  // // tcanalyses.push_back(new MPICommAnalysis());
-  // // TightComposer* tightcomposer = new TightComposer(tcanalyses);
-  // // scanalyses.push_back(tightcomposer);
-  
-  // checkDataflowInfoPass* cdip = new checkDataflowInfoPass();
-  // ChainComposer cc(scanalyses, cdip, false);
-
-  // cc.runAnalysis();
-
-  // if(cdip->getNumErrors() > 0) cout << cdip->getNumErrors() << " Errors Reported!"<<endl;
-  // else                         cout << "PASS"<<endl;
-
-  // MPIDotGraphGenerator dotgen(mdvanalysis);
-  // dotgen.generateDot();
-  // dotgen.generateDotFile();
   MPI_Finalize();
 
   // cout << "==========  E  N  D  ==========\n";

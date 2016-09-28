@@ -938,7 +938,7 @@ PartEdgeUnionCodeLocObject::PartEdgeUnionCodeLocObject() :
 }
 
 PartEdgeUnionCodeLocObject::PartEdgeUnionCodeLocObject(const PartEdgeUnionCodeLocObject& thatCL) :
-  CodeLocObject(thatCL), unionCL_p(thatCL.copyCL()) {
+  CodeLocObject(thatCL), unionCL_p(thatCL.unionCL_p->copyCL()) {
 }
 
 void PartEdgeUnionCodeLocObject::add(CodeLocObjectPtr cl_p, PartEdgePtr pedge) {
@@ -2054,7 +2054,7 @@ PartEdgeUnionValueObject::PartEdgeUnionValueObject() :
 }
 
 PartEdgeUnionValueObject::PartEdgeUnionValueObject(const PartEdgeUnionValueObject& thatV) :
-  ValueObject(thatV), unionV_p(thatV.copyV()) {
+  ValueObject(thatV), unionV_p(thatV.unionV_p->copyV()) {
 }
 
 void PartEdgeUnionValueObject::add(ValueObjectPtr v_p, PartEdgePtr pedge) {
@@ -3068,7 +3068,7 @@ PartEdgeUnionMemRegionObject::PartEdgeUnionMemRegionObject() :
 }
 
 PartEdgeUnionMemRegionObject::PartEdgeUnionMemRegionObject(const PartEdgeUnionMemRegionObject& thatMR) :
-  MemRegionObject(thatMR), unionMR_p(thatMR.copyMR()) {
+  MemRegionObject(thatMR), unionMR_p(thatMR.unionMR_p->copyMR()) {
 }
 
 void PartEdgeUnionMemRegionObject::add(MemRegionObjectPtr mr_p, PartEdgePtr pedge) {
@@ -4025,7 +4025,7 @@ PartEdgeUnionMemLocObject::PartEdgeUnionMemLocObject() :
 }
 
 PartEdgeUnionMemLocObject::PartEdgeUnionMemLocObject(const PartEdgeUnionMemLocObject& thatML) :
-  MemLocObject(thatML), unionML_p(thatML.copyML()) {
+  MemLocObject(thatML), unionML_p(thatML.unionML_p->copyML()) {
 }
 
 void PartEdgeUnionMemLocObject::add(MemLocObjectPtr ml_p, PartEdgePtr pedge) {
